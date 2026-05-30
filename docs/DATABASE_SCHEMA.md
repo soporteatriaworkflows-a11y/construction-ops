@@ -18,8 +18,12 @@
 1. **PK**: `id UUID PRIMARY KEY DEFAULT gen_random_uuid()` en toda tabla.
 2. **Nombres**: `snake_case` en PostgreSQL.
 3. **Dinero / cantidades financieras**: `NUMERIC(20,10)` (nunca `float`).
-   No se redondea en el esquema; la política de redondeo (Q9) se aplica en
-   el dominio de costos (Oleada 2).
+   No se redondea en el esquema ni en pasos intermedios. **Q9 RESUELTA
+   (2026-05-30)**: el cálculo interno conserva precisión completa
+   (`Decimal.js` + `NUMERIC(20,10)` + serialización `string`); el redondeo
+   `ROUND_HALF_UP` es solo de **presentación** (UI/PDF cliente 0 decimales;
+   Excel técnico 2 decimales; regresión/auditoría raw) y NO muta snapshots.
+   Ver `docs/DECISIONS.md` y `docs/API_CONTRACTS.md`.
 4. **Fechas auditables**: `TIMESTAMPTZ`. `created_at NOT NULL DEFAULT now()`
    y `updated_at NOT NULL DEFAULT now()` con trigger de actualización.
 5. **Fechas de calendario** (sin hora): `DATE`.
@@ -289,7 +293,7 @@ necesariamente un rol de fila; se trata en el perfil de exports).
 13. **Enums**: `rule_type IN ('preventive_variation','negotiated_discount','tax','commercial_markup','rounding','manual_adjustment')`; `scope_type IN ('global','project','scope','resource','supplier_product')`.
 14-15. —.
 16. 🔒 INTERNO: `percentage` para `negotiated_discount` (descuento interno). La variación preventiva e impuestos pueden ser visibles según perfil.
-17. **Dudas**: Q8 (base del descuento) y Q9 (redondeo) **NO se cierran**; afectan cálculo, no esquema.
+17. **Q8/Q9 RESUELTAS (2026-05-30)** — afectan cálculo, no esquema. Q8: la base del `negotiated_discount` (`rule_type='negotiated_discount'`, `percentage`) es `online_public_price` por defecto (excepciones configurables por proveedor/producto). Q9: redondeo `ROUND_HALF_UP` solo en presentación; cálculo raw. Ver `docs/DECISIONS.md`.
 
 ### `labor_roles`
 1. **Tabla**: `labor_roles` 2. **Propósito**: cargo de mano de obra con factores prestacionales (insumo del costo integral).
@@ -579,9 +583,13 @@ necesariamente un rol de fila; se trata en el perfil de exports).
 - **`change_orders`** — actas de modificación; `status`, fechas. (Oleada 4)
 - **`change_order_items`** — `original_quantity`, `variation_quantity`, `adjusted_quantity`, `unit_price_snapshot`, `adjusted_total`. (Oleada 4)
 
-Métricas de ahorro (derivadas, dominio, 🔒 INTERNO):
+Métricas de ahorro (derivadas, dominio, 🔒 INTERNO). **Q8 RESUELTA
+(2026-05-30)** — base del descuento = `online_public_price`:
+`budget_reference_price = online_public_price × (1 + preventive_variation_pct)`;
+`expected_purchase_price = online_public_price × (1 − negotiated_discount_pct)`;
 `projected_saving = budget_reference_price − expected_purchase_price`;
 `realized_saving = budget_reference_price − actual_purchase_price`.
+Excepciones de base configurables por proveedor/producto. Ver `docs/DECISIONS.md`.
 
 ---
 
@@ -591,3 +599,4 @@ Métricas de ahorro (derivadas, dominio, 🔒 INTERNO):
 |-------|--------|-----------|-------|
 | 2026-05-29 | Documento inicializado | — | orchestrator |
 | 2026-05-29 | **Contrato congelado v1** (20 entidades Oleada 1 + 7 provisionales) | — | orchestrator |
+| 2026-05-30 | **Q8/Q9 RESUELTAS** (base descuento = `online_public_price`; redondeo `ROUND_HALF_UP` solo presentación). Afectan cálculo, no esquema | — | orchestrator (Oleada 1.5) |

@@ -2,11 +2,41 @@
 
 ## BLOCKERS activos
 
-_Ninguno._
+_Sin blockers activos._
 
 ---
 
 ## BLOCKERS resueltos
+
+### B-003 — Docker Desktop: content store corrupto (bloqueaba RLS runtime)  ✅ RESUELTO
+- **Estado**: RESUELTO el 2026-05-30 (Oleada 1.5, rama `feature/wave-1.5-local-rls`).
+- **Síntoma original**: `supabase start` y `docker pull` fallaban con
+  `write /var/lib/desktop-containerd/.../io.containerd.metadata.v1.bolt/meta.db: input/output error`;
+  `docker system df` no podía listar imágenes (blob faltante / I/O error).
+- **Causa**: corrupción del almacén interno de containerd de Docker Desktop
+  (NO era falta de espacio; host D: 1.5 TB libres).
+- **Acción aplicada (usuario)**: reparó Docker Desktop (reinicio / purga del
+  content store). Verificado: `docker info` Server OK, `docker system df` OK,
+  `docker pull alpine` OK, `docker run alpine` → `docker-store-ok`.
+- **Re-ejecución (orchestrator)**: `supabase start` descargó imágenes y aplicó
+  **11 migraciones** en orden limpio; `db reset` re-aplicó migraciones + **2
+  seeds** sin errores; el harness **`scripts/rls-runtime/run.ts` → 21/21 PASS**
+  contra Postgres real (aislamiento A/B, denegación cross-org lectura/escritura,
+  usuario sin organización, `price_observations` append-only + trigger de
+  inmutabilidad, `apu_calculation_snapshots` inmutable, versiones emitidas y sus
+  hijos bloqueados, helper `app.current_org()` desde el JWT, control positivo en
+  `draft`). NO se conectó base remota; sin `supabase link`/`db push`.
+- **Hallazgo lateral (resuelto)**: en el stack Supabase local el esquema `auth`
+  existe, así que la migración `0001` activa el FK `profiles_id_auth_users_fk` y
+  el seed fallaba (23503). Fix de integración: el seed crea filas `auth.users`
+  antes de `profiles`, guardado por la presencia del esquema `auth`. Registrado
+  en `docs/INTEGRATION_REQUESTS.md` para aval de `agent-db-rls`. También añadida
+  config `[db.seed]` en `supabase/config.toml` (los seeds de `supabase/seeds/`
+  no se cargaban por defecto).
+- **Impacto residual**: ninguno. RLS runtime validado empíricamente; Oleada 1.5
+  puede cerrarse. Habilita la recomendación de merge a `main` y el inicio de
+  Oleada 2.
+- **Responsable**: usuario (infra) + agent-orchestrator (re-ejecución + fix de seeds).
 
 ### B-002 — Toolchain del monorepo no inicializado  ✅ RESUELTO
 - **Estado**: RESUELTO el 2026-05-29 (Paso 0 / orchestrator).
@@ -60,10 +90,25 @@ _Ninguno._
 6. ¿El Gantt se organiza por capítulos del presupuesto o por actividades
    libres?
 7. ¿Quiénes son los primeros usuarios y qué roles tienen?
-8. ¿La base de descuento se aplica sobre precio público o sobre precio de
-   referencia? (pricing).
-9. ¿Cuál es la política de redondeo (HALF_EVEN, HALF_UP, etc.) para totales
-   en COP?
+8. ✅ **RESUELTA (2026-05-30, Q8)** — ¿La base de descuento se aplica sobre
+   precio público o sobre precio de referencia? → **`online_public_price`**.
+   `negotiated_discount_pct` se aplica por defecto sobre `online_public_price`,
+   NO sobre `budget_reference_price`. Fórmulas canónicas:
+   `budget_reference_price = online_public_price × (1 + preventive_variation_pct)`;
+   `expected_purchase_price = online_public_price × (1 − negotiated_discount_pct)`;
+   `projected_saving = budget_reference_price − expected_purchase_price`;
+   `realized_saving = budget_reference_price − actual_purchase_price`.
+   Excepciones futuras configurables por proveedor/producto. Descuento, ahorro
+   y margen son internos (🔒), nunca al rol cliente. Privacidad backend-first.
+   `actual_purchase_price` proviene de factura/compra real. Ver `docs/DECISIONS.md`.
+9. ✅ **RESUELTA (2026-05-30, Q9)** — ¿Cuál es la política de redondeo para
+   totales en COP? → **cálculo raw, presentación `ROUND_HALF_UP`**.
+   Cálculo interno: `Decimal.js`, persistir `NUMERIC(20,10)`, serializar dinero
+   como `string` decimal, sin float JS, sin redondear pasos intermedios,
+   snapshots con precisión completa. Presentación: `ROUND_HALF_UP`; UI/PDF
+   cliente COP sin decimales; Excel técnico interno hasta 2 decimales;
+   regresión/auditoría precisión raw completa. El redondeo visual NO modifica
+   snapshots, cálculos ni regresión. Ver `docs/DECISIONS.md`.
 10. ¿Qué información ve el cliente en el detalle de un APU?
 11. ¿La aprobación humana de mapeos SKU requiere doble firma o una sola?
 12. ¿Hay un umbral máximo configurable para variación de precio sin

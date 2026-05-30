@@ -446,6 +446,51 @@ export interface QuantityLine {
 
 ---
 
+## Capa de precio — fórmulas canónicas (Q8 — RESUELTA 2026-05-30)
+
+Base del descuento negociado = **`online_public_price`** (NO
+`budget_reference_price`). Todas las cantidades son `DecimalString` y se operan
+con `Decimal.js` (sin float JS). Los porcentajes son fracciones (ej. `0.03`).
+
+```
+budget_reference_price  = online_public_price × (1 + preventive_variation_pct)
+expected_purchase_price = online_public_price × (1 − negotiated_discount_pct)
+projected_saving        = budget_reference_price − expected_purchase_price
+realized_saving         = budget_reference_price − actual_purchase_price
+```
+
+Reglas:
+- `negotiated_discount_pct` se aplica por defecto sobre `online_public_price`.
+  Las excepciones futuras (base alternativa) son **configurables por proveedor
+  o por producto**; el default permanece `online_public_price`.
+- `actual_purchase_price` proviene de factura o compra real (provisional v0:
+  `purchase_items.actual_unit_price`).
+- 🔒 **INTERNO, nunca al rol cliente**: `negotiated_discount_pct`,
+  `expected_purchase_price`, `projected_saving`, `realized_saving`, margen.
+  Privacidad backend-first (el backend NO serializa estos campos a cliente).
+- `budget_reference_price` (referencia presupuestada) puede mostrarse al cliente
+  como precio unitario; el desglose de descuento/ahorro no.
+
+## Política de redondeo COP (Q9 — RESUELTA 2026-05-30)
+
+Separación explícita **cálculo interno** ↔ **presentación**.
+
+**Cálculo interno (fuente de verdad):**
+- Operar con `Decimal.js`; persistir dinero como `NUMERIC(20,10)`.
+- Serializar dinero como `string` decimal (`DecimalString`); nunca `number`.
+- **No** usar float de JavaScript para cálculos financieros.
+- **No** redondear pasos intermedios; snapshots con precisión completa.
+
+**Presentación (capa de salida, no muta datos):**
+- Modo de redondeo: **`ROUND_HALF_UP`**.
+- UI cliente y PDF cliente: **COP sin decimales** (0 dp).
+- Excel técnico interno: hasta **2 decimales**.
+- Regresión y auditoría: **precisión raw completa** (sin redondeo).
+
+El redondeo visual **no** modifica snapshots, cálculos ni regresión.
+
+---
+
 ## Endpoints REST/RSC (a definir en Oleada 1 según RSC vs API routes)
 
 | Método | Ruta | Rol mínimo | Descripción |

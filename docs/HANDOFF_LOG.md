@@ -531,3 +531,120 @@ Resultado global: PASS (exit code 0)
 
 ### Agentes activos al cierre
 - Ninguno. Oleada 2 NO iniciada (a la espera de autorización).
+
+## 2026-05-30 — Oleada 1.5: cierre Q8/Q9 + intento RLS runtime local (orchestrator)
+
+### Rama
+- Toda la Oleada 1.5 se ejecuta FUERA de `main`, en `feature/wave-1.5-local-rls`
+  (creada desde `main` `d9ca10b`, pusheada a origin). `main` permanece intacto.
+
+### Fase 1-2 — Q8 y Q9 CERRADAS
+- **Q8** (base del descuento) = **`online_public_price`**. Fórmulas canónicas:
+  `budget_reference_price = online_public_price × (1 + preventive_variation_pct)`;
+  `expected_purchase_price = online_public_price × (1 − negotiated_discount_pct)`;
+  `projected_saving = budget_reference_price − expected_purchase_price`;
+  `realized_saving = budget_reference_price − actual_purchase_price`. Excepciones
+  configurables por proveedor/producto. Descuento/ahorro/margen son 🔒 internos
+  (nunca a cliente; privacidad backend-first).
+- **Q9** (redondeo COP): cálculo interno raw (`Decimal.js` + `NUMERIC(20,10)` +
+  serialización `string`, sin float JS, sin redondear intermedios, snapshots con
+  precisión completa); presentación `ROUND_HALF_UP` (UI/PDF cliente 0 dec; Excel
+  técnico 2 dec; regresión/auditoría raw). El redondeo visual NO muta snapshots.
+- Documentadas en DECISIONS, API_CONTRACTS, DATABASE_SCHEMA y OPEN_QUESTIONS.
+
+### Fase 3 — Entorno e instalación
+- Docker 29.5.2 operativo (`docker info` Server OK; `hello-world` OK). Node v24.13.0,
+  pnpm 11.5.0 (Corepack). Supabase CLI NO estaba instalado.
+- Instalado **`supabase ^2.102.0`** (MIT) como devDep raíz (`corepack pnpm
+  --workspace-root add -D supabase`). Sin global, sin remoto. `supabase --version`
+  → 2.102.0. Registrado en LICENSING y DECISIONS.
+
+### Fase 4-5 — RLS runtime: BLOQUEADO por Docker (B-003)
+- Auditados `config.toml`, 11 migraciones, 2 seeds, README de policies (compatibles
+  con CLI local). El seed solo crea 1 organización ⇒ el harness crea una org B.
+- Creado harness **`scripts/rls-runtime/run.ts`**: conecta al Postgres local
+  (`postgres` pkg), `SET LOCAL ROLE authenticated` + claims JWT vía
+  `set_config('request.jwt.claims', ...)`, transacciones con ROLLBACK. Cubre:
+  helper `app.current_org()`, aislamiento A/B, denegación cross-org (UPDATE 0 filas +
+  INSERT WITH CHECK), usuario sin organización, `price_observations` append-only
+  (+ trigger de inmutabilidad), `apu_calculation_snapshots` inmutable, versiones
+  emitidas bloqueadas (+ hijos) y control positivo en `draft`.
+- **BLOQUEO**: `supabase start` y `docker pull` fallan con
+  `io.containerd.metadata.v1.bolt/meta.db: input/output error` (content store de
+  Docker Desktop corrupto; `docker system df` no lista imágenes). Host con 1.5 TB
+  libres ⇒ no es espacio. Ver **B-003** en OPEN_QUESTIONS. NO se ejecutó la suite
+  RLS runtime; NO se declara PASS. NO se conectó base remota.
+
+### Fase 6 — Validación offline (todo PASS)
+- typecheck 0 · lint 0 · **108 tests** · build Next 16.2.6 (8 rutas + Proxy) ·
+  `gm:regression` 22/22 · `gm:import` PASS (privacidad 0 fugas) ·
+  `validate-claude-agents` 214/0/0 · `git diff --check` limpio.
+- `.gitignore`: añadido `supabase/.temp/` y `supabase/.branches/`. Excel ignorado;
+  sin privados en staging; sin `.env` trackeado; sin `package-lock.json`.
+
+### Estado / próximo paso
+- Commit de deliverables en la rama (NO merge a `main`). Falta SOLO la ejecución
+  real de RLS runtime, bloqueada por B-003 (infra/Docker). Tras reparar Docker
+  Desktop: `supabase start` → `db reset` → ejecutar el harness → si PASS, decidir
+  merge a `main` y habilitar Oleada 2.
+- **NO se recomienda merge a `main` todavía** (RLS runtime sin ejecutar).
+
+### Agentes activos al cierre
+- Ninguno.
+
+## 2026-05-30 — Oleada 1.5: RLS runtime REAL ejecutado, B-003 RESUELTO (orchestrator)
+
+### Contexto
+- Docker Desktop reparado por el usuario (content store regenerado; validado:
+  `docker info`/`system df`/`pull alpine`/`run alpine` OK). Sesión sobre la rama
+  existente `feature/wave-1.5-local-rls` (sin rama nueva, sin merge a `main`, sin
+  remoto, sin `supabase link`/`db push`, sin Oleada 2).
+
+### Entorno Supabase local
+- `corepack pnpm install`: up to date (pnpm 11.5.0).
+- `supabase start`: imágenes descargadas OK (Docker reparado); **11 migraciones**
+  aplicadas en orden. El contenedor `realtime` quedó *unhealthy* en Windows ⇒ se
+  arrancó excluyendo servicios no esenciales (`-x realtime,studio,storage-api,
+  imgproxy,edge-runtime,logflare,mailpit,vector`); el harness solo necesita `db`.
+- `supabase db reset`: re-aplicó **11 migraciones + 2 seeds** sin errores.
+
+### Fixes de integración (necesarios para que corriera el runtime)
+- **`supabase/config.toml`** (orchestrator-owned): añadido `[db.seed]` con
+  `sql_paths` explícito a `seeds/0001` y `seeds/0002` (no se cargaban por defecto;
+  `supabase db reset` avisaba `no files matched supabase/seed.sql`).
+- **`supabase/seeds/0001_demo_org_and_profiles.sql`** (db-rls-owned, fix de
+  integración): el seed insertaba `profiles` sin filas previas en `auth.users`.
+  En el stack Supabase local el esquema `auth` existe ⇒ la migración `0001`
+  activa el FK `profiles_id_auth_users_fk` y `db reset` fallaba (SQLSTATE 23503).
+  Añadido bloque `DO $$ … INSERT auth.users … $$` guardado por la presencia del
+  esquema `auth` (espejo de la condición de la migración; sigue funcionando en
+  Postgres puro). Solo `id`+columnas mínimas, sin credenciales. **Registrado en
+  INTEGRATION_REQUESTS para aval de agent-db-rls.**
+- **`scripts/rls-runtime/run.ts`** (orchestrator-owned): `setupOrgB` ahora crea
+  la fila `auth.users` del admin B antes de su `profile` (mismo guard de `auth`).
+
+### RLS runtime — RESULTADO: 21 PASS / 0 FAIL (Postgres real)
+- Pre-flight: seeds org/proyecto A; **20 tablas con RLS FORCE**.
+- Helper `app.current_org()` lee `organization_id` del JWT; aislamiento A/B
+  (A no ve B, B no ve A); A no UPDATE/INSERT en org B (0 filas / WITH CHECK);
+  usuario sin organización 0 filas; `price_observations` append-only + precio
+  inmutable (trigger); `apu_calculation_snapshots` inmutable; `estimate_versions`
+  emitida bloquea UPDATE/DELETE + hijos; control positivo `draft` editable.
+
+### Validaciones generales (todas PASS)
+- typecheck 0 · lint 0 · **108 tests** · build Next 16.2.6 (9 rutas + Proxy) ·
+  `gm:regression` **22/22** (golden master ±0.01 COP) · `gm:import` PASS
+  (privacidad 0 fugas) · `validate-claude-agents` **214/0/0** · `git diff --check`
+  limpio (solo avisos LF→CRLF). Sin privados en staging; sin `.env` trackeado;
+  sin `package-lock.json`; sin `ag-grid-enterprise`; sin AGPL.
+
+### Estado / próximo paso
+- **B-003 RESUELTO**. Q8/Q9 ya cerradas. Commit `test: complete local supabase
+  rls runtime validation` en la rama; push solo a
+  `origin feature/wave-1.5-local-rls`. Supabase local detenido (`supabase stop`).
+- **Recomendación: APROBAR merge `feature/wave-1.5-local-rls` → `main`** (no
+  ejecutado en este ciclo; queda a decisión del usuario). Tras el merge, habilitar
+  **Oleada 2** (cost-domain ∥ pricing ∥ homecenter).
+
+### Agentes activos al cierre
+- Ninguno.
