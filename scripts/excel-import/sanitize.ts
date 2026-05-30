@@ -67,17 +67,51 @@ export function scrubText(text: string | null | undefined): string | null {
   return out;
 }
 
+/** ¿Es un valor estructural (no texto libre) donde NO viven datos privados? */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const DECIMAL_RE = /^-?\d+(\.\d+)?$/; // DecimalString / number serializado
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2})?([.+-]\S*)?)?$/;
+const CURRENCY_RE = /^[A-Z]{3}$/; // ISO-4217 (COP, USD…)
+
+function isStructuralString(s: string): boolean {
+  const t = s.trim();
+  return (
+    UUID_RE.test(t) || DECIMAL_RE.test(t) || ISO_DATE_RE.test(t) || CURRENCY_RE.test(t)
+  );
+}
+
+/** Recolecta solo los strings de TEXTO LIBRE de un objeto (recursivo). */
+function collectFreeText(value: unknown, out: string[]): void {
+  if (typeof value === 'string') {
+    if (!isStructuralString(value)) out.push(value);
+  } else if (Array.isArray(value)) {
+    for (const v of value) collectFreeText(v, out);
+  } else if (value && typeof value === 'object') {
+    for (const v of Object.values(value)) collectFreeText(v, out);
+  }
+}
+
 /**
- * Verifica que un objeto serializado a JSON NO contenga datos privados según
- * los patrones. Devuelve la lista de hallazgos (vacía = limpio).
- * Usado por el importador como verificación final antes de escribir el fixture.
+ * Verifica que un objeto NO contenga datos privados según los patrones.
+ * Escanea ÚNICAMENTE strings de texto libre (nombres, descripciones, notas):
+ * los UUID, montos DecimalString, fechas ISO y códigos de moneda son valores
+ * estructurales y se excluyen para evitar falsos positivos (p. ej. un monto
+ * "76691.00299..." o un UUID con ceros NO es un NIT ni un teléfono).
+ * Devuelve la lista de hallazgos (vacía = limpio). Verificación final del
+ * importador antes de aceptar el fixture.
  */
 export function findPrivateLeaks(value: unknown): { pattern: string; sample: string }[] {
-  const json = JSON.stringify(value);
+  const texts: string[] = [];
+  collectFreeText(value, texts);
   const leaks: { pattern: string; sample: string }[] = [];
   for (const { name, re } of PRIVATE_PATTERNS) {
-    const m = json.match(new RegExp(re, 'i'));
-    if (m) leaks.push({ pattern: name, sample: m[0].slice(0, 40) });
+    for (const text of texts) {
+      const m = text.match(new RegExp(re, 'i'));
+      if (m) {
+        leaks.push({ pattern: name, sample: m[0].slice(0, 40) });
+        break;
+      }
+    }
   }
   return leaks;
 }

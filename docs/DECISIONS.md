@@ -28,6 +28,9 @@
 | 2026-05-29 | Dependencias Oleada 1 instaladas (pnpm) | db: drizzle-kit (raíz), postgres. excel/decimal: xlsx, decimal.js. frontend: ag-grid-community/react, clsx, tailwind-merge, cva, lucide-react, @radix-ui/react-slot. Todas permisivas, sin AGPL | ✅ Aprobado |
 | 2026-05-29 | Diferidas: recharts, frappe-gantt, exceljs, @react-pdf/renderer | No necesarias hasta Oleada 3 (dashboard/planning/exports); se pedirán vía INTEGRATION_REQUESTS | ✅ Aprobado |
 | 2026-05-29 | `drizzle-kit` en `package.json` raíz (no en apps/web) | `drizzle.config.ts` vive en raíz; el CLI se ejecuta desde ahí (`pnpm db:generate`) | ✅ Aprobado |
+| 2026-05-30 | `tsx` (devDep raíz) + scripts `gm:dump`/`gm:build-fixture`/`gm:regression`/`gm:import` | Validación empírica del golden master (Oleada 1, Fase 1). `tsx` ejecuta scripts TS del importador | ✅ Aprobado |
+| 2026-05-30 | Fixture regenerado **fila por fila** desde el Excel real (v2.0.0) | 14 capítulos + 131 ítems BOQ reales; SIN ítem de balanceo artificial; Σ ítems = costos_directos ±2e-8 COP | ✅ Aprobado |
+| 2026-05-30 | `findPrivateLeaks` corregido (escanea solo texto libre) | Evita falsos positivos sobre UUIDs/DecimalString; los datos privados viven en texto, no en números | ✅ Aprobado |
 
 Decisiones abiertas:
 - [ ] Nombre final del producto

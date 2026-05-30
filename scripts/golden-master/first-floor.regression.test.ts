@@ -89,4 +89,32 @@ describe('Regresión financiera — ENTRE PATIOS / Primer piso', () => {
       });
     }
   });
+
+  describe('(3) BOQ fila por fila suma a costos_directos (sin ítem de balanceo)', () => {
+    const boqItems = (fixture.boqItems ?? []) as Array<{ subtotal: string; descriptionSnapshot: string; code: string }>;
+
+    it('el fixture tiene ítems BOQ reales', () => {
+      expect(boqItems.length).toBeGreaterThan(50);
+    });
+
+    it('ningún ítem es de balanceo artificial', () => {
+      // Marcador del relleno artificial retirado: la palabra "balanceo" o el
+      // código sentinela "9.99". (No confundir con actividades reales de obra
+      // como "Relleno compactado…", que son legítimas.)
+      const artificial = boqItems.filter((b) =>
+        /balanceo|no detalladas en este fixture/i.test(b.descriptionSnapshot ?? '') || b.code === '9.99',
+      );
+      expect(artificial, `ítems artificiales: ${JSON.stringify(artificial)}`).toHaveLength(0);
+    });
+
+    it('Σ subtotales BOQ ≈ costos_directos (±0.01 COP)', () => {
+      const sum = boqItems.reduce((acc, it) => acc.plus(new Decimal(it.subtotal)), new Decimal(0));
+      const directos = requireStr(totals['costos_directos'], 'costos_directos');
+      const diff = sum.minus(new Decimal(directos)).abs();
+      expect(
+        diff.lessThanOrEqualTo('0.01'),
+        `Σboq=${sum.toString()} costos_directos=${directos} diff=${diff.toString()}`,
+      ).toBe(true);
+    });
+  });
 });

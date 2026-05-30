@@ -346,6 +346,46 @@ Comandos en `scripts/README.md`.
 | LISTADO MATERIALES | ✅ Documentada (coords TODO_VERIFY) |
 | CANT COMPLETO | ✅ Documentada (coords TODO_VERIFY) |
 
-> Las 10 hojas están mapeadas a entidades v1 y a la cadena de regresión. La
-> única pendiente es la confirmación de coordenadas celda a celda mediante
-> `dump-workbook.mjs`, que requiere permiso de ejecución sobre `private/`.
+> Las 10 hojas están mapeadas a entidades v1 y a la cadena de regresión.
+
+---
+
+## 10. Coordenadas confirmadas EMPÍRICAMENTE (Oleada 1, Fase 1 — 2026-05-30)
+
+Ejecutado `gm:dump` + buscador sobre el Excel real. Los 9 valores de §6/§3.4
+se localizaron en celdas reales con su fórmula (valor cacheado: `xlsx` no
+evalúa fórmulas pero sí lee el último valor calculado):
+
+| Indicador | Celda autoritativa | Fórmula | Valor cacheado |
+|---|---|---|---|
+| costos_directos | `RESUMEN 1 PISO!E27` | `=SUM(E13:E26)` | 336084479.93690735 |
+| administracion | `RESUMEN 1 PISO!E28` | `=E27*D28` (D28=0.035) | 11762956.797791759 |
+| imprevistos | `RESUMEN 1 PISO!E29` | `=E27*D29` (D29=0.025) | 8402111.998422684 |
+| utilidad | `RESUMEN 1 PISO!E30` | `=E27*D30` (D30=0.04) | 13443379.197476294 |
+| iva_sobre_utilidad | `RESUMEN 1 PISO!E31` | `=E30*D31` (D31=0.19) | 2554242.047520496 |
+| costos_indirectos | `RESUMEN 1 PISO!E32` | `=SUM(E28:E31)` | 36162690.04121123 |
+| total_costo | `RESUMEN 1 PISO!E33` | `=E32+E27` | 372247169.9781186 |
+| area_construida | `CANTIDADES 1 PISO!I187`→`COTIZACION 1 PISO!E45`→`RESUMEN 1 PISO!D35` | `=SUM(I182:I183)-I184-I185-I186` | 236.77900000000005 |
+| valor_m2 | `RESUMEN 1 PISO!E35` | `=E33/D35` | 1572129.1583211287 |
+
+Los 9 cacheados de `RESUMEN 1 PISO` **coinciden con §6/§3.4 a precisión
+completa**. Los `TODO_VERIFY` de los 9 indicadores quedan **resueltos con
+evidencia** (A-1 y A-5 cerrados para estos valores).
+
+### BOQ fila por fila (sin balanceo)
+- 14 capítulos reales en `RESUMEN 1 PISO!B13:E26` (código, nombre, % incidencia,
+  subtotal); cada subtotal `='COTIZACION 1 PISO'!G…`.
+- 131 ítems reales en `COTIZACION 1 PISO` (cabecera fila 11: A=código,
+  B=ítem, C=descripción, D=unidad, E=cant., F=vr.unitario, G=vr.parcial).
+- `gm:build-fixture` regenera el fixture v2 fila por fila; Σ ítems =
+  costos_directos dentro de **±2.05e-8 COP**, **sin ítem de balanceo**.
+
+### Datos privados detectados y EXCLUIDOS (nunca al fixture)
+`COTIZACION 1 PISO` filas 4–8: contratante, contratista, encargado y N° de
+cotización (personas/empresa). El generador no copia esas filas. Las
+descripciones de actividades de obra NO son datos personales y se conservan.
+`findPrivateLeaks` (texto libre) confirma **0 fugas**.
+
+> Estado: las 10 hojas documentadas; coordenadas de los 9 indicadores y del
+> BOQ confirmadas empíricamente. Coordenadas celda-a-celda de hojas auxiliares
+> (APU/CANTIDADES) siguen como referencia tentativa; no afectan la regresión.

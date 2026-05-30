@@ -421,3 +421,44 @@ Resultado global: PASS (exit code 0)
 
 ### Agentes activos al cierre
 - Ninguno.
+
+## 2026-05-30 — Oleada 1 Fase 1: validación empírica del Excel Mapper (orchestrator)
+
+### Contexto
+- Trabajo sobre `backup/wave1-excel-mapper` (respaldo `c9fe850`), en el checkout
+  principal (con node_modules). Excel real presente e ignorado (`.gitignore:2`).
+
+### Toolchain añadido (orchestrator owns package.json)
+- `tsx ^4.22.3` (devDep raíz, MIT) + scripts raíz `gm:dump`, `gm:build-fixture`,
+  `gm:regression`, `gm:import`.
+
+### Validación empírica (todo PASA)
+- `gm:dump`: 10 hojas confirmadas con ref/fórmulas/inputs.
+- Localización por celda: los 9 valores §3.4 confirmados en celdas reales de
+  `RESUMEN 1 PISO` (E27..E35) + `CANTIDADES 1 PISO!I187` (área). Cacheados
+  coinciden con §3.4 a precisión completa. Coordenadas documentadas en
+  EXCEL_MAPPING §10. TODO_VERIFY de los 9 → resueltos con evidencia.
+- `gm:build-fixture`: fixture **v2.0.0 fila por fila** desde el Excel real:
+  14 capítulos + **131 ítems BOQ** reales, **SIN ítem de balanceo**.
+  Σ ítems = costos_directos ±2.05e-8 COP.
+- `gm:regression` (Vitest): **22/22 PASS** (9 fixture vs §3.4 + 9 cadena
+  recalculada + 3 BOQ fila-por-fila sin balanceo + 1 presencia).
+- `gm:import`: regresión 9/9, recálculo 9/9, **privacidad OK**, idempotencia.
+
+### Fix de privacidad
+- `findPrivateLeaks` (sanitize.ts) reescrito: escanea solo texto libre,
+  excluye UUID/DecimalString/fecha/moneda. Antes daba falsos positivos
+  (NIT/teléfono) sobre ceros de UUID y montos. Fixture verificado: 0 fugas.
+
+### Validaciones de proyecto
+- typecheck 0 · lint 0 · test 1 passed · build OK (Next 16.2.6) ·
+  validate-claude-agents PASS 214/0.
+- Excel ignorado; sin privados en staging; los 9 valores **pasan
+  empíricamente**. No se ajustó ninguna fórmula.
+
+### Estado
+- Fase 1 COMPLETA. Listo para commit adicional sobre `backup/wave1-excel-mapper`
+  y luego crear `integration/wave-1` (Fase 2).
+
+### Agentes activos al cierre
+- Ninguno.
