@@ -15,6 +15,10 @@ Antes de realizar cualquier acción:
 11. Registra cambios y handoff al finalizar.
 12. No incluyas `private/` ni archivos Excel reales dentro de Git.
 13. Antes de editar archivos compartidos, escala a `agent-orchestrator`.
+14. Para cualquier API de Next.js, consulta primero la documentación
+    versionada local (ver `@AGENTS.md`).
+
+@AGENTS.md
 
 ---
 

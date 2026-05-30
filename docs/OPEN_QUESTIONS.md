@@ -8,6 +8,28 @@ _Ninguno._
 
 ## BLOCKERS resueltos
 
+### B-002 — Toolchain del monorepo no inicializado  ✅ RESUELTO
+- **Estado**: RESUELTO el 2026-05-29 (Paso 0 / orchestrator).
+- **Detectado**: 2026-05-29 (auditoría de arranque).
+- **Detalle original**: No existía `package.json` ni configuración de
+  toolchain; los `apps/web/app/*.tsx` eran stubs de 1 línea.
+- **Acción aplicada**: scaffolding del monorepo pnpm. Creados:
+  `package.json` (raíz) con `packageManager: pnpm@11.5.0`,
+  `pnpm-workspace.yaml`, `tsconfig.json` base, `apps/web/package.json`,
+  configs de Next/Tailwind/PostCSS/ESLint/Vitest, `middleware.ts`,
+  `drizzle.config.ts` (esqueleto), `supabase/config.toml`, placeholders
+  válidos de páginas y un smoke test.
+- **Verificación (todos PASAN)**:
+  - `pnpm install` → OK (pnpm 11.5.0, lockfile `pnpm-lock.yaml`).
+  - `pnpm run typecheck` → exit 0.
+  - `pnpm run lint` → "No ESLint warnings or errors".
+  - `pnpm run test` → 1 passed.
+  - `pnpm run build` → 8 rutas + middleware compilados.
+  - `validate-claude-agents.ps1` → PASS 214 / 0 / 0.
+- **Impacto residual**: ninguno. Se habilita la ejecución del checklist de
+  merge y el inicio efectivo de la Oleada 1.
+- **Responsable**: agent-orchestrator.
+
 ### B-001 — docs/PROJECT_MASTER.md está vacío  ✅ RESUELTO
 - **Estado**: RESUELTO el 2026-05-29.
 - **Detectado**: 2026-05-29.

@@ -2,7 +2,7 @@
 name: agent-frontend-boq
 description: >
   Invoca este agente para construir la interfaz del presupuesto (BOQ),
-  catálogo, APU, cantidades y proyectos en Next.js 14 con shadcn/ui,
+  catálogo, APU, cantidades y proyectos en Next.js 16 con shadcn/ui,
   Tailwind y AG Grid Community. Úsalo cuando necesites implementar
   pantallas de presupuesto, edición de capítulos e ítems, vistas
   jerárquicas, formularios de proyecto o cualquier componente visual
@@ -119,7 +119,9 @@ No modificar:
 
 ## Reglas técnicas
 
-1. Next.js 14 App Router. Server Components por defecto.
+1. Next.js 16 App Router. Server Components por defecto. Consultar la doc
+   versionada local (ver `AGENTS.md`). Convención de red: `proxy.ts`
+   (no `middleware.ts`). Lint con flat config (`eslint.config.mjs`).
 2. Usar `"use client"` solo donde haya estado o eventos.
 3. shadcn/ui para componentes base; Tailwind para estilos.
 4. AG Grid Community para tablas editables (NUNCA Enterprise).

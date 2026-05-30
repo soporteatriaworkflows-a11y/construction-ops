@@ -1,0 +1,11 @@
+packages:
+  - "apps/*"
+
+# pnpm 11 — aprobación explícita de build scripts (clave vigente: allowBuilds).
+# esbuild: requerido por vitest.
+# unrs-resolver: resolver nativo usado por eslint-config-next.
+# sharp: optimización de imágenes de Next.js 16.
+allowBuilds:
+  esbuild: true
+  sharp: true
+  unrs-resolver: true

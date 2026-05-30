@@ -17,6 +17,8 @@ node_modules/
 .turbo/
 dist/
 coverage/
+*.tsbuildinfo
+next-env.d.ts
 
 # ── Claude Code ─────────────────────────────────────────────────
 .claude/worktrees/
