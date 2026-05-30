@@ -153,19 +153,22 @@ describe("RLS — aislamiento por organización", () => {
 });
 
 describe("RLS — inmutabilidad de snapshots y versiones emitidas", () => {
+  // Helper: políticas CREATE POLICY ... ; acotadas a una tabla concreta
+  // (evita regex greedy que cruzan a otras tablas del mismo archivo).
+  const policiesOn = (table: string): string[] =>
+    [...rlsSql.matchAll(/CREATE POLICY[\s\S]*?;/gi)]
+      .map((m) => m[0])
+      .filter((b) => new RegExp(`ON ${table}\\b`, "i").test(b));
+
   it("apu_calculation_snapshots NO tiene política UPDATE", () => {
-    expect(rlsSql).not.toMatch(
-      /CREATE POLICY[^;]*FOR UPDATE[\s\S]*?ON apu_calculation_snapshots/i,
-    );
-    expect(rlsSql).not.toMatch(
-      /ON apu_calculation_snapshots[\s\S]*?FOR UPDATE/i,
-    );
+    const policies = policiesOn("apu_calculation_snapshots");
+    expect(policies.length).toBeGreaterThan(0);
+    expect(policies.some((p) => /FOR UPDATE/i.test(p))).toBe(false);
   });
 
   it("apu_calculation_snapshots NO tiene política DELETE", () => {
-    expect(rlsSql).not.toMatch(
-      /ON apu_calculation_snapshots[\s\S]*?FOR DELETE/i,
-    );
+    const policies = policiesOn("apu_calculation_snapshots");
+    expect(policies.some((p) => /FOR DELETE/i.test(p))).toBe(false);
   });
 
   it("apu_calculation_snapshots SÍ permite SELECT e INSERT acotados", () => {
@@ -209,9 +212,15 @@ describe("RLS — inmutabilidad de snapshots y versiones emitidas", () => {
   });
 
   it("price_observations es append-only (sin política DELETE)", () => {
-    expect(rlsSql).not.toMatch(/ON price_observations[\s\S]*?FOR DELETE/i);
-    expect(rlsSql).toMatch(/price_observations_insert[\s\S]*?FOR INSERT/i);
-    expect(rlsSql).toMatch(/price_observations_select[\s\S]*?FOR SELECT/i);
+    const policies = policiesOn("price_observations");
+    expect(policies.length).toBeGreaterThan(0);
+    expect(policies.some((p) => /FOR DELETE/i.test(p))).toBe(false);
+    expect(
+      policies.some((p) => /price_observations_insert[\s\S]*?FOR INSERT/i.test(p)),
+    ).toBe(true);
+    expect(
+      policies.some((p) => /price_observations_select[\s\S]*?FOR SELECT/i.test(p)),
+    ).toBe(true);
   });
 });
 
