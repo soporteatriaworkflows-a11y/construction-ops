@@ -360,3 +360,140 @@ Resultado global: PASS (exit code 0)
   (Next 16.2.6 Turbopack, `ƒ Proxy`). validate-claude-agents PASS 214/0/0.
 - Excel ignorado; sin privados en staging; sin .env trackeado; sin
   package-lock.json; sin ag-grid-enterprise; 11/11 agentes.
+
+## 2026-05-30 — Oleada 1: mapeo del golden master (agent-excel-mapper)
+
+### Alcance trabajado
+- Worktree aislado `agent-ad8fb1044998f390d`. Excel privado presente y
+  legible en `private/COT.ENTRE PATIOS 1 PISO (1).xlsx` (323 KB, vía
+  `.worktreeinclude`). NO se commiteó ni se modificó el Excel.
+
+### Hojas analizadas (10/10)
+- RESUMEN, COTIZACION FULL, APU, COTIZACION 1 PISO, ACTA DE MODIFICACION 01,
+  RESUMEN 1 PISO, CANTIDADES 1 PISO, CANTIDADES, LISTADO MATERIALES,
+  CANT COMPLETO. Documentadas en `docs/EXCEL_MAPPING.md` (propósito, rango,
+  columnas, inputs vs derivadas, fórmulas clave, refs cruzadas, sanitización)
+  y mapeadas a entidades del contrato congelado v1.
+
+### Archivos creados (todos dentro del alcance de excel-mapper)
+- `scripts/golden-master/dump-workbook.mjs` — volcado estructural del Excel.
+- `scripts/golden-master/expected-values.ts` — 9 valores de regresión §3.4.
+- `scripts/golden-master/recompute-first-floor.ts` — recálculo puro AIU/IVA.
+- `scripts/golden-master/first-floor.regression.test.ts` — test Vitest.
+- `scripts/golden-master/vitest.config.ts` — config local aislada.
+- `scripts/excel-import/import.ts` — importador idempotente.
+- `scripts/excel-import/sheet-map.ts` — mapa declarativo Excel→entidades v1.
+- `scripts/excel-import/sanitize.ts` — sanitización + alias deterministas.
+- `scripts/fixtures/entre-patios-first-floor.fixture.json` — fixture SANITIZADO
+  (contrato v1, dinero como string, sin datos privados).
+- `scripts/fixtures/entre-patios-first-floor.schema-notes.md` — notas del fixture.
+- `scripts/README.md` — cómo ejecutar dump/regresión/importador.
+
+### Archivos modificados
+- `docs/EXCEL_MAPPING.md` — completado (10 hojas + mapeo + regresión).
+- `docs/INTEGRATION_REQUESTS.md` — solicitudes (ejecución Bash, scripts pnpm).
+
+### Regresión financiera (estado)
+- VERIFICADA ANALÍTICAMENTE dentro de tolerancia (±0.01 COP / ±0.001 m²): la
+  cadena Admin=D×0.035, Imprev=D×0.025, Util=D×0.04, IVA=Util×0.19,
+  Indirectos=ΣAIU+IVA, Total=D+Indirectos, valor_m2=Total/área reproduce los
+  9 valores de §3.4 desde la base. NO se ejecutó Vitest (ver bloqueo).
+- NO se ajustaron fórmulas ni tasas para forzar coincidencia.
+
+### Bloqueo activo
+- **Ejecución denegada**: la herramienta Bash rechazó ejecutar `node`,
+  `pnpm exec vitest` y el dump del Excel (solo pasó `node --version`). En
+  consecuencia NO se pudo: (a) confirmar coordenadas celda a celda con
+  `dump-workbook.mjs`, (b) correr la suite de regresión, (c) ejecutar el
+  importador. Registrado en `docs/INTEGRATION_REQUESTS.md`. Las coordenadas
+  exactas quedan como `TODO_VERIFY` en `sheet-map.ts` y EXCEL_MAPPING §8.
+
+### Privacidad
+- Fixture sanitizado (cliente/proveedores → alias; NIT/tel/dir eliminados).
+  `import.ts` incluye `findPrivateLeaks` como verificación final.
+- `.gitignore` cubre `private/`, `*.xlsx`, `*.xls` (verificado).
+
+### Siguiente paso recomendado
+- Orquestador (o sesión con Bash): ejecutar `scripts/README.md` para
+  confirmar PASS empírico de regresión e importador, y poblar el detalle real
+  fila a fila con el dump. Luego habilitar Oleada 2 (cost-domain consume el
+  fixture y la regresión como oráculo).
+
+### Agentes activos al cierre
+- Ninguno.
+
+## 2026-05-30 — Oleada 1 Fase 1: validación empírica del Excel Mapper (orchestrator)
+
+### Contexto
+- Trabajo sobre `backup/wave1-excel-mapper` (respaldo `c9fe850`), en el checkout
+  principal (con node_modules). Excel real presente e ignorado (`.gitignore:2`).
+
+### Toolchain añadido (orchestrator owns package.json)
+- `tsx ^4.22.3` (devDep raíz, MIT) + scripts raíz `gm:dump`, `gm:build-fixture`,
+  `gm:regression`, `gm:import`.
+
+### Validación empírica (todo PASA)
+- `gm:dump`: 10 hojas confirmadas con ref/fórmulas/inputs.
+- Localización por celda: los 9 valores §3.4 confirmados en celdas reales de
+  `RESUMEN 1 PISO` (E27..E35) + `CANTIDADES 1 PISO!I187` (área). Cacheados
+  coinciden con §3.4 a precisión completa. Coordenadas documentadas en
+  EXCEL_MAPPING §10. TODO_VERIFY de los 9 → resueltos con evidencia.
+- `gm:build-fixture`: fixture **v2.0.0 fila por fila** desde el Excel real:
+  14 capítulos + **131 ítems BOQ** reales, **SIN ítem de balanceo**.
+  Σ ítems = costos_directos ±2.05e-8 COP.
+- `gm:regression` (Vitest): **22/22 PASS** (9 fixture vs §3.4 + 9 cadena
+  recalculada + 3 BOQ fila-por-fila sin balanceo + 1 presencia).
+- `gm:import`: regresión 9/9, recálculo 9/9, **privacidad OK**, idempotencia.
+
+### Fix de privacidad
+- `findPrivateLeaks` (sanitize.ts) reescrito: escanea solo texto libre,
+  excluye UUID/DecimalString/fecha/moneda. Antes daba falsos positivos
+  (NIT/teléfono) sobre ceros de UUID y montos. Fixture verificado: 0 fugas.
+
+### Validaciones de proyecto
+- typecheck 0 · lint 0 · test 1 passed · build OK (Next 16.2.6) ·
+  validate-claude-agents PASS 214/0.
+- Excel ignorado; sin privados en staging; los 9 valores **pasan
+  empíricamente**. No se ajustó ninguna fórmula.
+
+### Estado
+- Fase 1 COMPLETA. Listo para commit adicional sobre `backup/wave1-excel-mapper`
+  y luego crear `integration/wave-1` (Fase 2).
+
+### Agentes activos al cierre
+- Ninguno.
+
+## 2026-05-30 — Integración Oleada 1 en integration/wave-1 (orchestrator)
+
+### Fase 0 — respaldos
+- `backup/wave1-db-rls` (00283d0), `backup/wave1-frontend-boq` (b7f0de8),
+  `backup/wave1-excel-mapper` (c9fe850→c9e4f3a) creadas y en origin.
+
+### Fases 2-5 — integración secuencial (cherry-picks en integration/wave-1)
+- Rama creada desde `origin/main` (7e45691), pusheada. `main` intacto.
+- **DB+RLS** (00283d0): cherry-pick limpio. Fix integración: `drizzle-orm`
+  0.33→0.45 (schema usa API array) + regex tests RLS acotados por política.
+  RLS = **estática PASS (70 tests)**; **runtime PENDIENTE** (Supabase/Docker).
+  NO se conectó base remota.
+- **Excel Mapper** (c9fe850 + c9e4f3a): cherry-pick limpio; gm:regression 22/22,
+  gm:import PASS; fixture idéntico al regenerar (idempotente).
+- **Frontend BOQ** (b7f0de8): cherry-pick limpio (layout/proxy intactos). Fix
+  integración: tipos AG Grid v35 (`boq-grid.tsx`) + orden `@import` en
+  `globals.css`. Dev smoke: 8/8 rutas HTTP 200.
+
+### Fase 6 — `.worktreeinclude` eliminado (temporal); `private/` sigue ignorado.
+
+### Fase 7 — validación integral (integration/wave-1)
+- typecheck 0 · lint 0 · **108 tests PASS** · build Next 16.2.6 (9 rutas + Proxy)
+  · validate-claude-agents PASS 214/0/0.
+- Sin ag-grid-enterprise, sin AGPL, sin `.env` trackeado, sin `package-lock.json`;
+  Excel ignorado y no en staging; fixture sin balanceo; sin TODO_VERIFY crítico.
+- INTEGRATION_REQUESTS: 3 solicitudes del excel-mapper RESUELTAS.
+- QA_REPORT actualizado (PASS pre-merge; salvedad RLS runtime).
+
+### Estado
+- `integration/wave-1` lista para commit final + push. **NO merge a main**
+  (a la espera de aprobación del usuario).
+
+### Agentes activos al cierre
+- Ninguno.

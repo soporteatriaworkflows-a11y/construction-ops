@@ -63,6 +63,7 @@ Gestor: pnpm 11.5.0 (Corepack). Lockfile: `pnpm-lock.yaml`.
 | Paquete | Rango | Licencia | Uso |
 |---|---|---|---|
 | drizzle-kit | ^0.31.10 | MIT | Migraciones/generación Drizzle (db-rls). Vive en raíz porque `drizzle.config.ts` está en raíz |
+| tsx | ^4.22.3 | MIT | Runner TS/ESM para scripts golden-master (`gm:import`). Añadido en la validación empírica del Excel Mapper (Oleada 1) |
 
 ### apps/web — dependencies
 | Paquete | Rango | Licencia | Uso |

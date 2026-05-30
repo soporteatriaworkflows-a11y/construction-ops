@@ -14,9 +14,14 @@
     "lint": "pnpm --filter web lint",
     "typecheck": "pnpm --filter web typecheck",
     "test": "pnpm --filter web test",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "gm:dump": "node \"scripts/golden-master/dump-workbook.mjs\" \"private/COT.ENTRE PATIOS 1 PISO (1).xlsx\"",
+    "gm:build-fixture": "node \"scripts/golden-master/build-fixture.mjs\" \"private/COT.ENTRE PATIOS 1 PISO (1).xlsx\"",
+    "gm:regression": "pnpm --filter web exec vitest run --config ../../scripts/golden-master/vitest.config.ts",
+    "gm:import": "pnpm --filter web exec tsx ../../scripts/excel-import/import.ts"
   },
   "devDependencies": {
-    "drizzle-kit": "^0.31.10"
+    "drizzle-kit": "^0.31.10",
+    "tsx": "^4.22.3"
   }
 }
