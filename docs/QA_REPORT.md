@@ -55,3 +55,15 @@ Ninguno.
 |-------|---------|-----------|----------|
 | 2026-05-29 | preparación inicial | estructura lista | PROJECT_MASTER vacío (B-001) |
 | 2026-05-30 | orquestador (integración Oleada 1) | PASS pre-merge | RLS runtime pendiente (no bloqueante) |
+| 2026-05-30 | orquestador (merge a main `58f4366`) | ✅ PASS post-merge | RLS runtime pendiente; Q8/Q9 abiertas |
+
+## Validación post-merge (main, 2026-05-30)
+
+Merge `--no-ff` `integration/wave-1` → `main` (commit `58f4366`). Resultados:
+typecheck 0 · lint 0 · **test 108 PASS** · build Next 16.2.6 OK · `gm:regression`
+**22/22** (9/9 golden master ±0.01 COP) · `gm:import` todas PASS ·
+`validate-claude-agents` **214/0/0** · `git diff --check` limpio. Privacidad:
+Excel ignorado y no versionado, 0 nombres de cliente en tracked, fixture
+sanitizado sin ítem de balanceo. Sin `ag-grid-enterprise`, sin AGPL, sin `.env`
+trackeado, sin `package-lock.json`. **Salvedad**: RLS solo estático (runtime
+pendiente contra Supabase/Postgres local).

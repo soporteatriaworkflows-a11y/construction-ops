@@ -497,3 +497,37 @@ Resultado global: PASS (exit code 0)
 
 ### Agentes activos al cierre
 - Ninguno.
+
+## 2026-05-30 — Merge de Oleada 1 a main (orchestrator)
+
+### Merge
+- Usuario aprobó el merge. `git merge --no-ff integration/wave-1` →
+  **merge commit `58f4366222d86cec492748dc84eabd1123e7c8db`** (`58f4366`).
+  Sin conflictos. `main` adelantó 8 commits sobre `7e45691`.
+
+### Validación post-merge (todo PASA)
+- typecheck 0 · lint 0 · **test 108 PASS** · build Next 16.2.6 (9 rutas + Proxy).
+- `gm:regression` **22/22** (9/9 golden master ±0.01 COP) · `gm:import` todas PASS.
+- `validate-claude-agents.ps1` **PASS 214/0/0** · `git diff --check` limpio.
+
+### Privacidad y limpieza (verificado en main)
+- Excel ignorado (`.gitignore:2 private/`) y NO versionado; 0 nombres de cliente
+  en archivos versionados (leak-check por hash); fixture sanitizado fila-por-fila
+  **sin ítem de balanceo**; sin `TODO_VERIFY` críticos.
+- Sin `ag-grid-enterprise`, sin AGPL, sin `.env` trackeado, sin `package-lock.json`.
+- `.worktreeinclude` eliminado; fixture sanitizado presente.
+
+### Estado del frontend
+- Build prerenderiza 9 rutas; dev smoke previo 8/8 HTTP 200. AG Grid Community.
+
+### Ramas y tag
+- **Conservados**: `backup/wave1-db-rls`, `backup/wave1-frontend-boq`,
+  `backup/wave1-excel-mapper`, `integration/wave-1`.
+- Tag anotado: `wave-1-foundation-v1`.
+
+### Pendientes antes de Oleada 2
+- **RLS runtime** contra Supabase/Postgres local (Docker) — solo estático hasta ahora.
+- **Q8** (base del descuento) y **Q9** (redondeo COP) deben cerrarse.
+
+### Agentes activos al cierre
+- Ninguno. Oleada 2 NO iniciada (a la espera de autorización).

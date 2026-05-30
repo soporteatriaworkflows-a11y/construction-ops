@@ -36,6 +36,7 @@
 | 2026-05-30 | Fix tipos AG Grid v35 (`boq-grid.tsx`) + orden `@import` en `globals.css` | `getRowStyle`→`RowClassParams/RowStyle`; `ColDef[]` con cast localizado; `@import` AG Grid antes de `@tailwind` (build Turbopack) | ✅ Aprobado |
 | 2026-05-30 | Regex de tests RLS acotados por política | Evitar `[\s\S]*?` greedy que cruza tablas (falsos positivos). Migraciones NO modificadas | ✅ Aprobado |
 | 2026-05-30 | `.worktreeinclude` ELIMINADO (Fase 6) | Fixture sanitizado fila-por-fila suficiente; Oleada 2 consume el fixture, no el Excel. `private/` sigue ignorado | ✅ Aprobado |
+| 2026-05-30 | **Merge de Oleada 1 a `main`** (`--no-ff`, merge commit `58f4366`) | Aprobado por el usuario. Post-merge PASS (tc/lint/test 108/build/gm 22/gm:import/validador 214). `integration/wave-1` y backups conservados. Tag `wave-1-foundation-v1` | ✅ Aprobado |
 
 Decisiones abiertas:
 - [ ] Nombre final del producto
