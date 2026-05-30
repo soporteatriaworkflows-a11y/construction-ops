@@ -232,3 +232,34 @@ orchestrator ──┬─► db-rls ────────► cost-domain ─�
    `docs/INTEGRATION_REQUESTS.md`.
 4. El orquestador resuelve el conflicto o delega.
 5. Cambios en `package.json` SIEMPRE pasan por el orquestador.
+
+---
+
+## Contrato de entidades congelado v1 (2026-05-29)
+
+El contrato de datos está **congelado v1** en `docs/DATABASE_SCHEMA.md` y
+`docs/API_CONTRACTS.md`. Es la fuente única de verdad de nombres y tipos.
+
+Confirmación de ownership frente al contrato:
+
+- **`agent-db-rls`** implementa **exactamente** el esquema congelado
+  (mismos nombres de tabla/columna, tipos, FK, RLS, enums). Los tipos
+  Drizzle deben mapear 1:1 a las interfaces de `API_CONTRACTS.md`.
+- **`agent-excel-mapper`** produce fixture JSON e importador que usan
+  **los nombres canónicos** y respetan las interfaces públicas.
+- **`agent-frontend-boq`** construye mocks y vistas que respetan
+  **exactamente** los tipos públicos (sin inventar campos ni renombrar).
+- **Ningún agente** renombra campos, cambia tipos ni altera enums
+  unilateralmente.
+- Toda solicitud de modificación del contrato se registra en
+  `docs/INTEGRATION_REQUESTS.md` y la resuelve el orquestador (cambios
+  incompatibles ⇒ contrato v2).
+
+Reglas transversales del contrato:
+- DB `snake_case` ↔ TypeScript `camelCase`; interfaces en `PascalCase`.
+- Dinero/decimales: `NUMERIC(20,10)` en DB, **`string` decimal** en API
+  (Decimal.js para operar). El frontend **no** calcula totales financieros.
+- Snapshots y versiones emitidas (`approved`/`issued`/`archived`) son
+  **inmutables**.
+- Privacidad **backend-first**: los campos 🔒 INTERNO no se serializan al
+  rol cliente.

@@ -275,3 +275,62 @@ Resultado global: PASS (exit code 0)
 
 ### Agentes activos al cierre
 - Ninguno.
+
+## 2026-05-29 — Paso 0 commit/push + congelamiento de contrato v1 (orchestrator)
+
+### Commit del Paso 0
+- Commit `9bb4a397633a3513d7a0d50d8b592c4e32fff510` (`9bb4a39`):
+  "chore: scaffold pnpm monorepo toolchain". Push OK
+  `463d6a3..9bb4a39 main -> main`. Auditoría de `.claude/agent-memory/`
+  limpia (sin secretos/datos privados).
+
+### Congelamiento de contrato de entidades v1
+- `docs/DATABASE_SCHEMA.md` → **Contrato congelado v1**: 20 entidades de
+  Oleada 1 documentadas a fondo (tabla, propósito, columnas, tipos,
+  nullability, PK UUID, FK, ON DELETE, organization_id/RLS, índices,
+  integridad, enums, inmutabilidad, snapshots, campos 🔒, dudas). 7
+  entidades marcadas **Provisional v0 — no congelada**.
+- `docs/API_CONTRACTS.md` → **Contrato congelado v1**: 20 interfaces TS
+  públicas (Organization … QuantityLine), alias base (`Uuid`,
+  `IsoDateTime`, `IsoDate`, `DecimalString`), todos los enums, matriz de
+  privacidad cliente-safe vs interno, ownership de tipos y reglas de cambio.
+- `docs/AGENT_REGISTRY.md` → sección de ownership del contrato: db-rls
+  implementa el esquema exacto; excel-mapper y frontend-boq respetan
+  nombres/tipos canónicos; sin renombres unilaterales; cambios solo vía
+  INTEGRATION_REQUESTS.
+
+### Estrategia ratificada
+- DB `snake_case` ↔ TS `camelCase`; tipos `PascalCase`.
+- Dinero: `NUMERIC(20,10)` (DB) ↔ `string` decimal (API) ↔ Decimal.js (cálculo).
+  El frontend NO calcula totales financieros.
+- Snapshots/versiones emitidas inmutables (RLS bloquea UPDATE/DELETE).
+- Privacidad backend-first (campos 🔒 no se serializan a rol cliente).
+- Alcance Oleada 1 = solo entidades congeladas v1.
+
+### Decisiones que siguen ABIERTAS (no cerradas)
+- **Q9** política de redondeo COP → bloquea Oleada 2 (cost-domain).
+- **Q8** base del descuento (público vs referencia) → bloquea Oleada 2 (pricing).
+- Ninguna afecta el esquema congelado v1.
+
+### Validaciones
+- typecheck/lint/test/build OK; validate-claude-agents.ps1 PASS 214/0/0.
+- Cambios solo en docs (.md); sin código/migraciones.
+
+### Estado
+- Contrato v1 redactado. Pendiente tu revisión. Commit/push NO realizados.
+- Tras tu aprobación, listo para lanzar Oleada 1.
+
+### Agentes activos al cierre
+- Ninguno.
+
+## 2026-05-29 — Preparación operativa de Oleada 1 (orchestrator)
+
+### .worktreeinclude (temporal)
+- Creado `.worktreeinclude` en raíz con **solo** la ruta exacta
+  `private/COT.ENTRE PATIOS 1 PISO (1).xlsx`. Permite que los worktrees
+  aislados reciban el golden master (Git no copia archivos ignorados).
+- **TEMPORAL Oleada 1**: revisar/retirar después de que
+  `agent-excel-mapper` genere el fixture sanitizado, para no depender del
+  Excel privado en worktrees.
+- Verificado: Excel sigue ignorado (`.gitignore:2 private/`),
+  `.worktreeinclude` es versionable, Excel NO en staging.

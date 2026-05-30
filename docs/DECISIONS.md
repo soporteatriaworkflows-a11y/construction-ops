@@ -18,10 +18,18 @@
 | 2026-05-29 | Lint: **ESLint 9 flat config** (`eslint.config.mjs`), `eslint .` | Next 16 eliminó `next lint`; se consume el flat config de `eslint-config-next` 16. `.eslintrc.json` eliminado | ✅ Aprobado |
 | 2026-05-29 | TypeScript fijado en `^5.9.3` y ESLint en `^9.39.4` | Estables maduros; se descartan TS 6.0.3 y ESLint 10.4.1 por recién liberados | ✅ Aprobado |
 | 2026-05-29 | `AGENTS.md` + `@AGENTS.md` en CLAUDE.md | Obligar a consultar la doc versionada de Next en `node_modules/next/dist/docs/` | ✅ Aprobado |
+| 2026-05-29 | **Contrato de entidades congelado v1** (DATABASE_SCHEMA + API_CONTRACTS) | Fuente única de verdad para paralelizar Oleada 1 sin divergencias. 20 entidades congeladas + 7 provisionales v0 | ✅ Aprobado |
+| 2026-05-29 | DB `snake_case` ↔ TS `camelCase`; tipos `PascalCase` | Convención uniforme entre capas | ✅ Aprobado |
+| 2026-05-29 | Dinero como **`string` decimal** en API; `NUMERIC(20,10)` en DB; Decimal.js para operar | Preservar precisión COP; el frontend NO calcula totales financieros | ✅ Aprobado |
+| 2026-05-29 | Snapshots y versiones emitidas inmutables (RLS bloquea UPDATE/DELETE) | No recalcular presupuestos emitidos | ✅ Aprobado |
+| 2026-05-29 | Privacidad **backend-first** (campos 🔒 no se serializan a rol cliente) | No basta ocultar en UI; el backend omite los campos internos | ✅ Aprobado |
+| 2026-05-29 | Alcance Oleada 1 = solo entidades congeladas v1 | Vertical de presupuesto; planning/ejecución/compras/actas diferidas | ✅ Aprobado |
+| 2026-05-29 | `.worktreeinclude` limitado al golden master exacto | Los worktrees aislados no copian archivos ignorados por Git; `agent-excel-mapper` necesita el Excel privado. **TEMPORAL Oleada 1**: revisar/retirar tras crear el fixture sanitizado. NO incluye toda `private/` ni `.env` | ✅ Aprobado |
 
 Decisiones abiertas:
 - [ ] Nombre final del producto
-- [ ] Política exacta de redondeo decimal
+- [ ] **Q9 — Política exacta de redondeo decimal COP** (NO cerrada; bloquea Oleada 2 / cost-domain; no afecta el esquema congelado v1)
+- [ ] **Q8 — Base exacta del descuento** (público vs referencia; NO cerrada; bloquea Oleada 2 / pricing; no afecta el esquema congelado v1)
 - [ ] Usuarios iniciales y roles asignados
 - [ ] Qué información ve el cliente en APU
 - [ ] Proveedores visibles para cliente
