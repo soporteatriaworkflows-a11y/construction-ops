@@ -53,6 +53,41 @@ Gestor: pnpm 11.5.0 (Corepack). Lockfile: `pnpm-lock.yaml`.
 > en oleadas posteriores vía `docs/INTEGRATION_REQUESTS.md`.
 >
 > Builds nativos aprobados explícitamente (`allowBuilds` en
-> `pnpm-workspace.yaml`, clave vigente en pnpm 11): `esbuild` (vitest),
-> `sharp` (optimización de imágenes de Next 16), `unrs-resolver`
-> (resolver nativo de eslint-config-next).
+> `pnpm-workspace.yaml`, clave vigente en pnpm 11): `esbuild` (vitest +
+> drizzle-kit), `sharp` (optimización de imágenes de Next 16),
+> `unrs-resolver` (resolver nativo de eslint-config-next).
+
+## Dependencias añadidas — Preparación Oleada 1 (2026-05-29)
+
+### Raíz (devDependencies)
+| Paquete | Rango | Licencia | Uso |
+|---|---|---|---|
+| drizzle-kit | ^0.31.10 | MIT | Migraciones/generación Drizzle (db-rls). Vive en raíz porque `drizzle.config.ts` está en raíz |
+
+### apps/web — dependencies
+| Paquete | Rango | Licencia | Uso |
+|---|---|---|---|
+| postgres | ^3.4.9 | Unlicense | Driver PostgreSQL (postgres.js) para el cliente Drizzle |
+| decimal.js | ^10.6.0 | MIT | Precisión financiera COP (regresión y cost-domain) |
+| ag-grid-community | ^35.3.0 | MIT | Grilla del BOQ (frontend-boq). **Community**, no Enterprise |
+| ag-grid-react | ^35.3.0 | MIT | Wrapper React de AG Grid (soporta React 19) |
+| clsx | ^2.1.1 | MIT | Utilidad de clases (base shadcn/ui) |
+| tailwind-merge | ^3.6.0 | MIT | Merge de clases Tailwind (base shadcn/ui) |
+| class-variance-authority | ^0.7.1 | Apache-2.0 | Variantes de componentes (base shadcn/ui) |
+| lucide-react | ^1.17.0 | ISC | Iconos (UI) |
+| @radix-ui/react-slot | ^1.2.4 | MIT | Primitiva `Slot` (`asChild`) para componentes base shadcn/ui |
+
+### apps/web — devDependencies
+| Paquete | Rango | Licencia | Uso |
+|---|---|---|---|
+| xlsx | ^0.18.5 | Apache-2.0 | Lectura del golden master por el importador (excel-mapper) |
+
+> Todas permisivas (MIT / Apache-2.0 / Unlicense / ISC). **Sin AGPL.**
+> Sin `ag-grid-enterprise`.
+>
+> **Diferidas a oleadas posteriores** (NO instaladas): `recharts`
+> (dashboard, Oleada 3), `frappe-gantt` (planning, Oleada 3), `exceljs`
+> y `@react-pdf/renderer` (exports, Oleada 3). Se solicitarán vía
+> `docs/INTEGRATION_REQUESTS.md` cuando su oleada lo requiera. Nota: el
+> importador de Excel usa `xlsx` (lectura); las exportaciones `.xlsx`
+> usarán `exceljs` más adelante.

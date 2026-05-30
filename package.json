@@ -13,6 +13,10 @@
     "start": "pnpm --filter web start",
     "lint": "pnpm --filter web lint",
     "typecheck": "pnpm --filter web typecheck",
-    "test": "pnpm --filter web test"
+    "test": "pnpm --filter web test",
+    "db:generate": "drizzle-kit generate"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.31.10"
   }
 }

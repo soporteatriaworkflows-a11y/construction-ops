@@ -25,6 +25,9 @@
 | 2026-05-29 | Privacidad **backend-first** (campos 🔒 no se serializan a rol cliente) | No basta ocultar en UI; el backend omite los campos internos | ✅ Aprobado |
 | 2026-05-29 | Alcance Oleada 1 = solo entidades congeladas v1 | Vertical de presupuesto; planning/ejecución/compras/actas diferidas | ✅ Aprobado |
 | 2026-05-29 | `.worktreeinclude` limitado al golden master exacto | Los worktrees aislados no copian archivos ignorados por Git; `agent-excel-mapper` necesita el Excel privado. **TEMPORAL Oleada 1**: revisar/retirar tras crear el fixture sanitizado. NO incluye toda `private/` ni `.env` | ✅ Aprobado |
+| 2026-05-29 | Dependencias Oleada 1 instaladas (pnpm) | db: drizzle-kit (raíz), postgres. excel/decimal: xlsx, decimal.js. frontend: ag-grid-community/react, clsx, tailwind-merge, cva, lucide-react, @radix-ui/react-slot. Todas permisivas, sin AGPL | ✅ Aprobado |
+| 2026-05-29 | Diferidas: recharts, frappe-gantt, exceljs, @react-pdf/renderer | No necesarias hasta Oleada 3 (dashboard/planning/exports); se pedirán vía INTEGRATION_REQUESTS | ✅ Aprobado |
+| 2026-05-29 | `drizzle-kit` en `package.json` raíz (no en apps/web) | `drizzle.config.ts` vive en raíz; el CLI se ejecuta desde ahí (`pnpm db:generate`) | ✅ Aprobado |
 
 Decisiones abiertas:
 - [ ] Nombre final del producto

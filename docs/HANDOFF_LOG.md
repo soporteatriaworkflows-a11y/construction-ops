@@ -334,3 +334,29 @@ Resultado global: PASS (exit code 0)
   Excel privado en worktrees.
 - Verificado: Excel sigue ignorado (`.gitignore:2 private/`),
   `.worktreeinclude` es versionable, Excel NO en staging.
+
+### Commit del contrato v1
+- Commit `cadd8c7ce903f51700cf35161fd8ab406b2f065a` (`cadd8c7`):
+  "docs: freeze wave 1 entity contracts". Push OK
+  `9bb4a39..cadd8c7 main -> main`. Excel NO staged.
+
+### Dependencias de Oleada 1 (pnpm)
+- **Raíz** devDependencies: `drizzle-kit ^0.31.10` (MIT) + script
+  `db:generate`. Vive en raíz porque `drizzle.config.ts` está en raíz.
+- **apps/web** dependencies: `postgres ^3.4.9` (Unlicense),
+  `decimal.js ^10.6.0` (MIT), `ag-grid-community`/`ag-grid-react ^35.3.0`
+  (MIT, Community, soporta React 19), `clsx ^2.1.1`,
+  `tailwind-merge ^3.6.0`, `class-variance-authority ^0.7.1` (Apache-2.0),
+  `lucide-react ^1.17.0` (ISC), `@radix-ui/react-slot ^1.2.4` (MIT).
+- **apps/web** devDependencies: `xlsx ^0.18.5` (Apache-2.0).
+- **Diferidas** (no instaladas): recharts, frappe-gantt, exceljs,
+  @react-pdf/renderer (Oleada 3, vía INTEGRATION_REQUESTS).
+- Todas las licencias permisivas; **sin AGPL**; sin `ag-grid-enterprise`.
+- Build scripts aprobados ahora incluyen las variantes de `esbuild` que
+  trae drizzle-kit (cubiertas por `allowBuilds: esbuild: true`).
+
+### Validaciones (todas PASAN)
+- install limpio · typecheck 0 · lint 0 · test 1 passed · build OK
+  (Next 16.2.6 Turbopack, `ƒ Proxy`). validate-claude-agents PASS 214/0/0.
+- Excel ignorado; sin privados en staging; sin .env trackeado; sin
+  package-lock.json; sin ag-grid-enterprise; 11/11 agentes.
