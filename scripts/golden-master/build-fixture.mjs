@@ -12,7 +12,7 @@
  *  - Reemplaza en el fixture: chapters, boqItems, indirectCostRules,
  *    estimateTotals. SIN ítem de balanceo artificial.
  *  - Sanitiza: NUNCA copia contratante/contratista/encargado/N° cotización ni
- *    nombres de personas/empresas (denylist + verificación de fugas).
+ *    nombres de personas/empresas (verificación de fugas por hash).
  *
  * Uso (desde la raíz, con xlsx en apps/web):
  *   node scripts/golden-master/build-fixture.mjs "private/COT.ENTRE PATIOS 1 PISO (1).xlsx"
@@ -24,6 +24,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '..', '..');
@@ -34,8 +35,21 @@ const xlsxArg = process.argv[2] || 'private/COT.ENTRE PATIOS 1 PISO (1).xlsx';
 const xlsxPath = path.isAbsolute(xlsxArg) ? xlsxArg : path.join(repoRoot, xlsxArg);
 const fixturePath = path.join(repoRoot, 'scripts', 'fixtures', 'entre-patios-first-floor.fixture.json');
 
-// Datos privados que NUNCA deben aparecer en el fixture.
-const DENYLIST = ['ramirez', 'calderon', 'noraida', 'franco', 'guillermo', 'andres felipe', 'cot.20251129', 'entre patrios'];
+// Leak-check de privacidad por HASH: SHA-256 de tokens privados del Excel
+// (nombres de cliente/contratista). NO se almacenan los nombres en texto plano
+// para no filtrarlos al repositorio; se comparan los hashes de cada token de
+// la salida contra este conjunto.
+const sha = (s) => crypto.createHash('sha256').update(s).digest('hex');
+const PRIVATE_TOKEN_HASHES = new Set([
+  '9f714d1e5a2306c4550a3f2a1dc7c8e44f6de4f7f74c5372433d83118fdab7e6',
+  'f8ba450d76839504552d6f4c7d57aad9cc7f1e3e6ab612b651d564131c4eca85',
+  '30ec41c491bb0d740a2476dec492738290ccb0a08e3eb8109e3bf7dc47d0fe1b',
+  '93722a04fa35a4daf711970c7bc4ad6a66eb690236929f5449e3323db268d610',
+  '48cb0041ceae7ad8dc1d6af69cde36b531e7104177140f96cf536257872b1236',
+  '0a92efb1b91ac02c858ab205fbb6baf44d67e8d1e625600a11020cfae50065da',
+  '2bd2d3a31934d76198acc030caca4c31965474fe5fa48f35fef79d0fd74ee1b2',
+  '6d1d89ba4b0e02416ffe2838731b405bfd10ee56358ec65889685d7381a3cbe3',
+]);
 
 function s(ws, addr) {
   const c = ws[addr];
@@ -134,11 +148,12 @@ const chapterCheck = chapters.map((ch) => {
   return { code: ch.code, name: ch.name, items: items.length, sum: sum.toString(), subtotal: ch._subtotal, diff: diff ? diff.toString() : 'n/a' };
 });
 
-// ── 4) Leak check de privacidad ──────────────────────────────────────────────
+// ── 4) Leak check de privacidad (por hash de token) ──────────────────────────
 const haystack = JSON.stringify({ chapters, boqItems }).toLowerCase();
-const leaks = DENYLIST.filter((d) => haystack.includes(d));
-if (leaks.length) {
-  console.error(`[FALLO PRIVACIDAD] El fixture contendría datos privados: ${leaks.join(', ')}`);
+const tokens = new Set(haystack.match(/[a-záéíóúñ]{3,}/gi) ?? []);
+const leakCount = [...tokens].filter((t) => PRIVATE_TOKEN_HASHES.has(sha(t))).length;
+if (leakCount > 0) {
+  console.error(`[FALLO PRIVACIDAD] ${leakCount} token(es) privado(s) detectado(s) por hash en la salida.`);
   process.exit(3);
 }
 
@@ -181,5 +196,5 @@ for (const c of chapterCheck) {
 console.log(`Σ ítems BOQ = ${sumItems.toString()}`);
 console.log(`costos_directos (§3.4) = ${estimateTotals.costos_directos}`);
 console.log(`|Σítems - costos_directos| = ${diffDirectos.toString()} (tolerancia 0.01)`);
-console.log(`Leak check privacidad: OK (sin coincidencias en denylist)`);
+console.log(`Leak check privacidad: OK (sin tokens privados por hash)`);
 console.log(`Fixture escrito: ${path.relative(repoRoot, fixturePath)}`);

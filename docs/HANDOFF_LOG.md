@@ -462,3 +462,38 @@ Resultado global: PASS (exit code 0)
 
 ### Agentes activos al cierre
 - Ninguno.
+
+## 2026-05-30 — Integración Oleada 1 en integration/wave-1 (orchestrator)
+
+### Fase 0 — respaldos
+- `backup/wave1-db-rls` (00283d0), `backup/wave1-frontend-boq` (b7f0de8),
+  `backup/wave1-excel-mapper` (c9fe850→c9e4f3a) creadas y en origin.
+
+### Fases 2-5 — integración secuencial (cherry-picks en integration/wave-1)
+- Rama creada desde `origin/main` (7e45691), pusheada. `main` intacto.
+- **DB+RLS** (00283d0): cherry-pick limpio. Fix integración: `drizzle-orm`
+  0.33→0.45 (schema usa API array) + regex tests RLS acotados por política.
+  RLS = **estática PASS (70 tests)**; **runtime PENDIENTE** (Supabase/Docker).
+  NO se conectó base remota.
+- **Excel Mapper** (c9fe850 + c9e4f3a): cherry-pick limpio; gm:regression 22/22,
+  gm:import PASS; fixture idéntico al regenerar (idempotente).
+- **Frontend BOQ** (b7f0de8): cherry-pick limpio (layout/proxy intactos). Fix
+  integración: tipos AG Grid v35 (`boq-grid.tsx`) + orden `@import` en
+  `globals.css`. Dev smoke: 8/8 rutas HTTP 200.
+
+### Fase 6 — `.worktreeinclude` eliminado (temporal); `private/` sigue ignorado.
+
+### Fase 7 — validación integral (integration/wave-1)
+- typecheck 0 · lint 0 · **108 tests PASS** · build Next 16.2.6 (9 rutas + Proxy)
+  · validate-claude-agents PASS 214/0/0.
+- Sin ag-grid-enterprise, sin AGPL, sin `.env` trackeado, sin `package-lock.json`;
+  Excel ignorado y no en staging; fixture sin balanceo; sin TODO_VERIFY crítico.
+- INTEGRATION_REQUESTS: 3 solicitudes del excel-mapper RESUELTAS.
+- QA_REPORT actualizado (PASS pre-merge; salvedad RLS runtime).
+
+### Estado
+- `integration/wave-1` lista para commit final + push. **NO merge a main**
+  (a la espera de aprobación del usuario).
+
+### Agentes activos al cierre
+- Ninguno.

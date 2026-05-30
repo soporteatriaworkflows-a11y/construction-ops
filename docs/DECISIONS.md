@@ -31,6 +31,11 @@
 | 2026-05-30 | `tsx` (devDep raíz) + scripts `gm:dump`/`gm:build-fixture`/`gm:regression`/`gm:import` | Validación empírica del golden master (Oleada 1, Fase 1). `tsx` ejecuta scripts TS del importador | ✅ Aprobado |
 | 2026-05-30 | Fixture regenerado **fila por fila** desde el Excel real (v2.0.0) | 14 capítulos + 131 ítems BOQ reales; SIN ítem de balanceo artificial; Σ ítems = costos_directos ±2e-8 COP | ✅ Aprobado |
 | 2026-05-30 | `findPrivateLeaks` corregido (escanea solo texto libre) | Evita falsos positivos sobre UUIDs/DecimalString; los datos privados viven en texto, no en números | ✅ Aprobado |
+| 2026-05-30 | Integración Oleada 1 en rama `integration/wave-1` (NO merge directo a main) | Proteger `main`; validar los 3 entregables en conjunto antes del merge | ✅ Aprobado |
+| 2026-05-30 | `drizzle-orm` alineado a `^0.45.2` | El schema de db-rls usa la API moderna (callback de tabla retorna array); 0.33 esperaba objeto. 0.45 empareja con drizzle-kit 0.31 | ✅ Aprobado |
+| 2026-05-30 | Fix tipos AG Grid v35 (`boq-grid.tsx`) + orden `@import` en `globals.css` | `getRowStyle`→`RowClassParams/RowStyle`; `ColDef[]` con cast localizado; `@import` AG Grid antes de `@tailwind` (build Turbopack) | ✅ Aprobado |
+| 2026-05-30 | Regex de tests RLS acotados por política | Evitar `[\s\S]*?` greedy que cruza tablas (falsos positivos). Migraciones NO modificadas | ✅ Aprobado |
+| 2026-05-30 | `.worktreeinclude` ELIMINADO (Fase 6) | Fixture sanitizado fila-por-fila suficiente; Oleada 2 consume el fixture, no el Excel. `private/` sigue ignorado | ✅ Aprobado |
 
 Decisiones abiertas:
 - [ ] Nombre final del producto

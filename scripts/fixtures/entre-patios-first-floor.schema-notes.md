@@ -38,16 +38,20 @@ fuente de verdad de la regresión financiera. Lo consumen:
 | Precios de nómina | Valores ficticios plausibles (no reales) |
 | SKU / URL de proveedor | Ficticios o `null` |
 
-## Muestra representativa vs detalle completo
+## BOQ real fila por fila (v2.0.0 — 2026-05-30)
+
+`chapters` (14) y `boqItems` (131) se extraen **fila por fila** del Excel real
+con `scripts/golden-master/build-fixture.mjs` (lee `COTIZACION 1 PISO` y
+`RESUMEN 1 PISO`). **NO hay ítem de balanceo artificial**: `Σ subtotales =
+costos_directos` dentro de ±0.01 COP (residual float ~2e-8 propio de las sumas
+del Excel). `estimateTotals` lleva los 9 valores autoritativos leídos de
+`RESUMEN 1 PISO!E27:E35`.
 
 Las secciones `resources`, `suppliers`, `apuTemplates`, `apuComponents`,
-`boqItems`, `quantityGroups`, `quantityLines` son una **muestra
-representativa** que ejercita el importador y respeta el contrato. El ítem
-BOQ `9.99` ("Balanceo cantidades restantes") es **relleno declarado** para que
-`Σ subtotales = costos_directos` exacto; NO es un dato real del Excel.
+`quantityGroups`, `quantityLines` son una **muestra representativa** sanitizada
+que ejercita el importador y respeta el contrato v1 (el detalle de APU/cantidades
+por ítem se poblará en oleadas posteriores; los `boqItems` cargan su
+`unitPriceSnapshot`/`subtotal` directamente, como define el contrato).
 
-El detalle real fila a fila se poblará cuando se pueda ejecutar
-`scripts/golden-master/dump-workbook.mjs` sobre el Excel privado (requiere
-permiso de ejecución sobre `private/`). Hasta entonces, la regresión se valida
-contra `estimateTotals` (autoritativo) y contra la cadena de fórmulas
-recalculada.
+Privacidad: contratante/contratista/encargado/N° de cotización del Excel NO se
+copian; verificación de fugas por **hash** (sin almacenar nombres en el repo).
