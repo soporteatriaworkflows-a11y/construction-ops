@@ -6,6 +6,28 @@ _Sin blockers activos._
 
 ---
 
+## DEUDA TÉCNICA (no bloqueante)
+
+### B-004 — Supabase Realtime unhealthy en Docker Desktop (Windows)  🟡 DEUDA TÉCNICA
+- **Estado**: ABIERTO como deuda técnica no bloqueante desde 2026-05-30 (Oleada 1.5).
+- **Síntoma**: en `supabase start`, el contenedor `supabase_realtime_*` queda
+  `unhealthy` en Docker Desktop sobre Windows y aborta el arranque por defecto.
+  También aparece `WARNING: Analytics on Windows requires Docker daemon exposed
+  on tcp://localhost:2375`.
+- **NO bloqueó la validación RLS**: el harness RLS solo necesita el contenedor
+  `db` (Postgres). Se arrancó con `supabase start -x realtime,studio,storage-api,
+  imgproxy,edge-runtime,logflare,mailpit,vector` y Postgres funcionó
+  correctamente; **RLS runtime pasó 21/21**.
+- **Impacto futuro**: debe revisarse **antes de implementar funcionalidades
+  Realtime** (suscripciones, presencia, broadcast) o **antes de producción**.
+  Posibles causas a investigar: salud de `vector`/`logflare` (analytics),
+  exposición del daemon Docker, versión del stack local, recursos WSL2.
+- **Acción**: NO resolver en esta etapa. Reevaluar en la oleada que requiera
+  Realtime o en el endurecimiento previo a producción.
+- **Responsable**: agent-orchestrator (seguimiento) + agente que requiera Realtime.
+
+---
+
 ## BLOCKERS resueltos
 
 ### B-003 — Docker Desktop: content store corrupto (bloqueaba RLS runtime)  ✅ RESUELTO

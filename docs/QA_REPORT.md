@@ -42,10 +42,17 @@ Ninguno.
 
 ## Salvedades (no bloqueantes para merge)
 
-- **RLS runtime**: validado solo estáticamente (texto SQL). Ejecutar contra
-  Supabase/Postgres local en un entorno con Docker antes de producción.
 - Coordenadas celda-a-celda de hojas auxiliares (APU/CANTIDADES) quedan como
   referencia tentativa; no afectan la regresión de los 9 totales.
+
+## Deuda técnica (no bloqueante)
+
+- **B-004 — Supabase Realtime unhealthy en Docker Desktop (Windows)**: el
+  contenedor `realtime` queda `unhealthy` y aborta `supabase start` por defecto.
+  NO afecta RLS (solo se requiere el contenedor `db`); se arrancó excluyendo
+  servicios no esenciales y el RLS runtime pasó 21/21. Revisar antes de
+  implementar funcionalidades Realtime o antes de producción. Ver
+  `docs/OPEN_QUESTIONS.md#B-004`.
 
 ---
 
@@ -58,6 +65,7 @@ Ninguno.
 | 2026-05-30 | orquestador (merge a main `58f4366`) | ✅ PASS post-merge | RLS runtime pendiente; Q8/Q9 abiertas |
 | 2026-05-30 | orquestador (Oleada 1.5, rama `feature/wave-1.5-local-rls`) | 🟡 PARCIAL | Q8/Q9 RESUELTAS; offline PASS; **RLS runtime BLOQUEADO por corrupción del content store de Docker Desktop** |
 | 2026-05-30 | orquestador (Oleada 1.5, RLS runtime real) | ✅ PASS | Docker reparado; **RLS runtime 21/21 PASS** contra Postgres local (Supabase Docker); B-003 RESUELTO |
+| 2026-05-30 | orquestador (merge Oleada 1.5 a main `1ddc833`) | ✅ PASS post-merge | Ninguno bloqueante; B-004 (Realtime) como deuda técnica |
 
 ## Validación Oleada 1.5 (rama `feature/wave-1.5-local-rls`, 2026-05-30)
 
@@ -137,3 +145,17 @@ Excel ignorado y no versionado, 0 nombres de cliente en tracked, fixture
 sanitizado sin ítem de balanceo. Sin `ag-grid-enterprise`, sin AGPL, sin `.env`
 trackeado, sin `package-lock.json`. **Salvedad**: RLS solo estático (runtime
 pendiente contra Supabase/Postgres local).
+
+## Validación post-merge Oleada 1.5 (main, 2026-05-30)
+
+Merge `--no-ff` `feature/wave-1.5-local-rls` → `main` (merge commit `1ddc833`),
+sin conflictos. Validación post-merge en `main`:
+typecheck 0 · lint 0 · **test 108 PASS** · build Next 16.2.6 (9 rutas + Proxy) ·
+`gm:regression` **22/22** · `gm:import` **9/9 PASS** (regresión §3.4 diff=0;
+cadena recálculo ±1.9e-8; privacidad 0 fugas) · `validate-claude-agents`
+**214/0/0** · `git diff --check` limpio · árbol limpio. **Privacidad**: Excel
+ignorado (`git check-ignore` confirma `private/`); sin `.env` trackeado; sin
+`package-lock.json`; solo `ag-grid-community`/`ag-grid-react` (MIT), `enterprise`
+únicamente en comentarios de prohibición; sin AGPL. **RLS runtime 21/21**
+(validado en la rama; ver sección anterior). **Deuda técnica**: B-004 (Realtime
+unhealthy en Windows), no bloqueante. **Oleada 1.5 CERRADA**; Q8/Q9 RESUELTAS.

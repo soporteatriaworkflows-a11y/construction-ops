@@ -648,3 +648,45 @@ Resultado global: PASS (exit code 0)
 
 ### Agentes activos al cierre
 - Ninguno.
+
+## 2026-05-30 — Merge de Oleada 1.5 a main + cierre (orchestrator)
+
+### Merge
+- Usuario aprobó el merge. Preflight: `main = origin/main = d9ca10b` (árbol
+  limpio); `origin/feature/wave-1.5-local-rls` final = `febfeb8`; 3 backups y tag
+  `wave-1-foundation-v1` conservados; Excel ignorado; sin `.env` trackeado; sin
+  `package-lock.json`; solo `ag-grid-community/react` (MIT).
+- `git merge --no-ff feature/wave-1.5-local-rls` → **merge commit
+  `1ddc833d733c51e556445ccee96bdab8843efcd1`** (`1ddc833`). **Sin conflictos.**
+  16 archivos, +784/-13. `main` adelantó 2 commits de contenido + merge.
+
+### Validación post-merge (todo PASA en main)
+- `pnpm install` up to date · typecheck 0 · lint 0 · **108 tests** · build Next
+  16.2.6 (9 rutas + Proxy) · `gm:regression` **22/22** · `gm:import` **9/9**
+  (regresión §3.4 diff=0; privacidad 0 fugas) · `validate-claude-agents`
+  **214/0/0** · `git diff --check` limpio · árbol limpio.
+- Privacidad: `git check-ignore` confirma `private/` ignorado; sin `.env`
+  trackeado; sin `package-lock.json`; `ag-grid-enterprise` solo en comentarios de
+  prohibición; sin AGPL.
+
+### Deuda técnica registrada
+- **B-004 — Supabase Realtime unhealthy en Docker Desktop (Windows)**: no
+  bloqueante; no afectó RLS (solo se requiere el contenedor `db`); RLS runtime
+  21/21. Revisar antes de funcionalidades Realtime o producción. Documentado en
+  OPEN_QUESTIONS y QA_REPORT. NO se intentó resolver.
+
+### Commit documental
+- `docs: record wave 1.5 runtime validation and realtime caveat` (B-004 +
+  validación post-merge en OPEN_QUESTIONS, QA_REPORT, HANDOFF_LOG).
+
+### Estado de cierre
+- **Oleada 1.5 CERRADA.** B-003 RESUELTO; Q8/Q9 RESUELTAS; RLS runtime 21/21.
+- Push a `origin main` + tag anotado `wave-1.5-rls-runtime-validated-v1`.
+- Ramas `feature/wave-1.5-local-rls`, backups e `integration/wave-1`
+  conservadas; tag `wave-1-foundation-v1` conservado.
+- **Oleada 2 NO lanzada** (plan preparado; espera autorización del usuario).
+  Secuencia recomendada: 2A `agent-cost-domain` ∥ `agent-pricing`; congelar
+  `docs/PRICING_ADAPTER_CONTRACT.md`; luego 2B `agent-homecenter`.
+
+### Agentes activos al cierre
+- Ninguno.
