@@ -64,6 +64,7 @@ Gestor: pnpm 11.5.0 (Corepack). Lockfile: `pnpm-lock.yaml`.
 |---|---|---|---|
 | drizzle-kit | ^0.31.10 | MIT | Migraciones/generación Drizzle (db-rls). Vive en raíz porque `drizzle.config.ts` está en raíz |
 | tsx | ^4.22.3 | MIT | Runner TS/ESM para scripts golden-master (`gm:import`). Añadido en la validación empírica del Excel Mapper (Oleada 1) |
+| supabase | ^2.102.0 | MIT | **Supabase CLI** (wrapper npm que descarga el binario). Solo desarrollo/local: `supabase start` + `supabase db reset` para validar RLS runtime contra PostgreSQL local. NO se usa `supabase link` ni `db push`. Añadido en Oleada 1.5 (rama `feature/wave-1.5-local-rls`). Sin global; sin remoto |
 
 ### apps/web — dependencies
 | Paquete | Rango | Licencia | Uso |

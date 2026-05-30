@@ -56,6 +56,32 @@ Ninguno.
 | 2026-05-29 | preparación inicial | estructura lista | PROJECT_MASTER vacío (B-001) |
 | 2026-05-30 | orquestador (integración Oleada 1) | PASS pre-merge | RLS runtime pendiente (no bloqueante) |
 | 2026-05-30 | orquestador (merge a main `58f4366`) | ✅ PASS post-merge | RLS runtime pendiente; Q8/Q9 abiertas |
+| 2026-05-30 | orquestador (Oleada 1.5, rama `feature/wave-1.5-local-rls`) | 🟡 PARCIAL | Q8/Q9 RESUELTAS; offline PASS; **RLS runtime BLOQUEADO por corrupción del content store de Docker Desktop** |
+
+## Validación Oleada 1.5 (rama `feature/wave-1.5-local-rls`, 2026-05-30)
+
+Objetivo: validar RLS **runtime** real contra PostgreSQL local (Supabase/Docker).
+
+**Resuelto:**
+- Q8 (base del descuento = `online_public_price`) y Q9 (redondeo `ROUND_HALF_UP`
+  solo presentación) cerradas en DECISIONS/API_CONTRACTS/DATABASE_SCHEMA/OPEN_QUESTIONS.
+- Supabase CLI `supabase ^2.102.0` (MIT) instalado como devDep raíz (sin global, sin remoto).
+- Harness de pruebas RLS runtime creado: `scripts/rls-runtime/run.ts` (2 orgs,
+  aislamiento, cross-org, sin-org, append-only, inmutabilidad de snapshots,
+  versiones emitidas) — pendiente de ejecución real.
+
+**Offline (todo PASS):** typecheck 0 · lint 0 · **108 tests** · build Next 16.2.6 ·
+`gm:regression` 22/22 · `gm:import` PASS · `validate-claude-agents` 214/0/0 ·
+`git diff --check` limpio. Excel ignorado; sin privados en staging.
+
+**BLOQUEO (infraestructura, no código):** `supabase start` y `docker pull`
+fallan con `write .../io.containerd.metadata.v1.bolt/meta.db: input/output error`.
+El content store de containerd de Docker Desktop está corrupto (`docker system df`
+no puede listar imágenes: blob faltante). Host con 1.5 TB libres ⇒ no es espacio.
+**Requiere intervención del usuario**: reiniciar Docker Desktop y, si persiste,
+*Troubleshoot → Clean / Purge data* (o reset a fábrica) para regenerar el store;
+luego reintentar `supabase start` + `db reset` + `scripts/rls-runtime/run.ts`.
+NO se conectó ninguna base remota. RLS runtime sigue **PENDIENTE** (solo estático).
 
 ## Validación post-merge (main, 2026-05-30)
 

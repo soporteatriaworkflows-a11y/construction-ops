@@ -22,6 +22,7 @@
   },
   "devDependencies": {
     "drizzle-kit": "^0.31.10",
+    "supabase": "^2.102.0",
     "tsx": "^4.22.3"
   }
 }

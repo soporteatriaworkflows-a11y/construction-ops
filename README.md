@@ -29,7 +29,22 @@ pnpm build          # build de producción
 pnpm typecheck      # tsc --noEmit
 pnpm lint           # next lint
 pnpm test           # vitest run
+pnpm gm:regression  # regresión financiera del golden master (22 tests)
+pnpm gm:import      # importador idempotente + chequeo de privacidad
 ```
+
+## Validación RLS runtime (local, requiere Docker)
+Valida las políticas Row Level Security contra un PostgreSQL **local** de
+Supabase. NO usa base remota (`supabase link` / `db push` están prohibidos).
+```bash
+corepack pnpm exec supabase start        # levanta el stack local (Docker)
+corepack pnpm exec supabase db reset     # aplica migraciones + seeds desde cero
+pnpm --filter web exec tsx ../../scripts/rls-runtime/run.ts   # pruebas RLS reales
+corepack pnpm exec supabase stop         # detiene el stack
+```
+> Si `supabase start` falla con `io.containerd...meta.db: input/output error`,
+> el almacén de Docker Desktop está corrupto: reinicia Docker Desktop y, si
+> persiste, usa *Troubleshoot → Clean / Purge data*.
 
 ## Estructura
 - `apps/web` — aplicación Next.js 16 (monolito modular).

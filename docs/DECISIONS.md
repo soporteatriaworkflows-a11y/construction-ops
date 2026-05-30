@@ -37,11 +37,14 @@
 | 2026-05-30 | Regex de tests RLS acotados por política | Evitar `[\s\S]*?` greedy que cruza tablas (falsos positivos). Migraciones NO modificadas | ✅ Aprobado |
 | 2026-05-30 | `.worktreeinclude` ELIMINADO (Fase 6) | Fixture sanitizado fila-por-fila suficiente; Oleada 2 consume el fixture, no el Excel. `private/` sigue ignorado | ✅ Aprobado |
 | 2026-05-30 | **Merge de Oleada 1 a `main`** (`--no-ff`, merge commit `58f4366`) | Aprobado por el usuario. Post-merge PASS (tc/lint/test 108/build/gm 22/gm:import/validador 214). `integration/wave-1` y backups conservados. Tag `wave-1-foundation-v1` | ✅ Aprobado |
+| 2026-05-30 | **Q8 RESUELTA — Base del descuento = `online_public_price`** | `negotiated_discount_pct` se aplica por defecto sobre `online_public_price`, NO sobre `budget_reference_price`. Fórmulas canónicas: `budget_reference_price = online_public_price × (1 + preventive_variation_pct)`; `expected_purchase_price = online_public_price × (1 − negotiated_discount_pct)`; `projected_saving = budget_reference_price − expected_purchase_price`; `realized_saving = budget_reference_price − actual_purchase_price`. Excepciones futuras configurables por proveedor/producto. Descuento, ahorro y margen son internos (🔒), nunca al rol cliente. Privacidad backend-first. Cerrada en Oleada 1.5 (rama `feature/wave-1.5-local-rls`) | ✅ Aprobado |
+| 2026-05-30 | **Supabase CLI `supabase ^2.102.0`** (devDep raíz, MIT) | Validar RLS runtime contra PostgreSQL **local** (Docker): `supabase start` + `db reset`. NO `link`, NO `db push`, NO remoto. Sin instalación global. Oleada 1.5 | ✅ Aprobado |
+| 2026-05-30 | **Q9 RESUELTA — Redondeo COP: cálculo raw / presentación `ROUND_HALF_UP`** | Cálculo interno: `Decimal.js`, persistir `NUMERIC(20,10)`, serializar dinero como `string` decimal, sin float JS, sin redondear pasos intermedios, snapshots con precisión completa. Presentación: `ROUND_HALF_UP`; UI/PDF cliente COP sin decimales; Excel técnico interno hasta 2 decimales; regresión/auditoría precisión raw completa. El redondeo visual NO modifica snapshots, cálculos ni regresión. Separación explícita cálculo↔presentación. Cerrada en Oleada 1.5 | ✅ Aprobado |
 
 Decisiones abiertas:
 - [ ] Nombre final del producto
-- [ ] **Q9 — Política exacta de redondeo decimal COP** (NO cerrada; bloquea Oleada 2 / cost-domain; no afecta el esquema congelado v1)
-- [ ] **Q8 — Base exacta del descuento** (público vs referencia; NO cerrada; bloquea Oleada 2 / pricing; no afecta el esquema congelado v1)
+- [x] **Q9 — Política de redondeo decimal COP** — ✅ RESUELTA 2026-05-30 (ver tabla)
+- [x] **Q8 — Base exacta del descuento** — ✅ RESUELTA 2026-05-30 (`online_public_price`; ver tabla)
 - [ ] Usuarios iniciales y roles asignados
 - [ ] Qué información ve el cliente en APU
 - [ ] Proveedores visibles para cliente
