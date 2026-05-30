@@ -24,8 +24,8 @@ cada ciclo de validación.
 | Regresión financiera (golden master) | ✅ PASS (empírico) | 9/9 valores §3.4 confirmados en celdas reales del Excel; `gm:regression` 22/22; `gm:import` todas PASS; ±0.01 COP. Sin ajustar fórmulas |
 | Fixture fila-por-fila | ✅ PASS | 14 capítulos + 131 ítems reales; SIN ítem de balanceo; Σ=costos_directos ±2.05e-8 |
 | Privacidad (fixture/Excel) | ✅ PASS | Excel ignorado y no commiteado; `findPrivateLeaks` 0 fugas; datos de contratante/contratista excluidos |
-| RLS multitenant | 🟡 PARCIAL | **Validación estática PASS** (70 tests parsean policies/migraciones: RLS por organización, inmutabilidad, append-only). **Runtime PENDIENTE**: requiere Supabase local/Docker para ejecutar SQL contra Postgres |
-| Inmutabilidad de snapshots | ✅ PASS (estático) | Policies bloquean UPDATE/DELETE en `apu_calculation_snapshots` y versiones `approved/issued/archived` (verificado en SQL) |
+| RLS multitenant | ✅ PASS (runtime) | **Estático** 70 tests + **Runtime 21/21 PASS** contra Postgres local (Supabase Docker): aislamiento A/B, denegación cross-org (UPDATE 0 filas + INSERT WITH CHECK), usuario sin organización 0 filas, helper `app.current_org()` desde JWT, 20 tablas con RLS FORCE |
+| Inmutabilidad de snapshots | ✅ PASS (runtime) | `apu_calculation_snapshots` UPDATE/DELETE 0 filas; `price_observations` DELETE 0 filas + trigger de precio inmutable; versiones `issued` UPDATE/DELETE bloqueado + INSERT de hijo bloqueado; control positivo `draft` editable. Verificado en runtime real |
 | Idempotencia importador | ✅ PASS | `gm:build-fixture` reproduce el fixture byte-idéntico (salvo EOL) |
 | Privacidad por rol (endpoints) | ⏳ Pendiente | Requiere pricing/exports (Oleada 2-3) |
 | Exportaciones por perfil | ⏳ Pendiente | Requiere exports (Oleada 3) |
@@ -57,6 +57,7 @@ Ninguno.
 | 2026-05-30 | orquestador (integración Oleada 1) | PASS pre-merge | RLS runtime pendiente (no bloqueante) |
 | 2026-05-30 | orquestador (merge a main `58f4366`) | ✅ PASS post-merge | RLS runtime pendiente; Q8/Q9 abiertas |
 | 2026-05-30 | orquestador (Oleada 1.5, rama `feature/wave-1.5-local-rls`) | 🟡 PARCIAL | Q8/Q9 RESUELTAS; offline PASS; **RLS runtime BLOQUEADO por corrupción del content store de Docker Desktop** |
+| 2026-05-30 | orquestador (Oleada 1.5, RLS runtime real) | ✅ PASS | Docker reparado; **RLS runtime 21/21 PASS** contra Postgres local (Supabase Docker); B-003 RESUELTO |
 
 ## Validación Oleada 1.5 (rama `feature/wave-1.5-local-rls`, 2026-05-30)
 
@@ -82,6 +83,49 @@ no puede listar imágenes: blob faltante). Host con 1.5 TB libres ⇒ no es espa
 *Troubleshoot → Clean / Purge data* (o reset a fábrica) para regenerar el store;
 luego reintentar `supabase start` + `db reset` + `scripts/rls-runtime/run.ts`.
 NO se conectó ninguna base remota. RLS runtime sigue **PENDIENTE** (solo estático).
+
+## Validación RLS runtime REAL (rama `feature/wave-1.5-local-rls`, 2026-05-30)
+
+Docker Desktop reparado por el usuario (content store regenerado). El orquestador
+re-ejecutó el flujo completo contra el PostgreSQL local de Supabase (Docker).
+**NO se conectó base remota; sin `supabase link`/`db push`.**
+
+**Entorno:**
+- `supabase start`: imágenes descargadas; **11 migraciones** aplicadas en orden.
+  Servicios no esenciales excluidos (`-x realtime,studio,storage-api,imgproxy,
+  edge-runtime,logflare,mailpit,vector`) por contenedor `realtime` *unhealthy*
+  en Windows; el `db` (Postgres 15) es lo único requerido por el harness.
+- `supabase db reset`: re-aplicó **11 migraciones + 2 seeds** sin errores.
+- Fix de integración: `[db.seed]` en `config.toml` (los seeds no se cargaban por
+  defecto) + seed `0001` ahora crea filas `auth.users` antes de `profiles`
+  (FK `profiles_id_auth_users_fk` activo en el stack Supabase real).
+
+**Harness `scripts/rls-runtime/run.ts` → 21 PASS / 0 FAIL:**
+
+| # | Verificación runtime | Resultado |
+|---|----------------------|-----------|
+| Pre | seed org A / proyecto A aplicados; **20 tablas con RLS FORCE** | ✅ |
+| 1 | helper `app.current_org()` = `organization_id` del JWT | ✅ |
+| 2 | A ve su proyecto y **NO** ve el de B | ✅ |
+| 3 | B ve su proyecto y **NO** ve el de A | ✅ |
+| 4 | A no puede UPDATE proyecto de B (0 filas) | ✅ |
+| 4b | A no puede INSERT en org B (WITH CHECK lanza error) | ✅ |
+| 5 | usuario **sin organización** no ve proyectos (0 filas) | ✅ |
+| 6 | `price_observations` **append-only** (DELETE 0 filas) + fila persiste + precio inmutable (trigger) | ✅ |
+| 7 | `apu_calculation_snapshots` **inmutable** (INSERT ok; UPDATE/DELETE 0 filas) | ✅ |
+| 8 | `estimate_versions` **emitida** (`issued`) bloquea UPDATE/DELETE + INSERT de hijo (capítulo) | ✅ |
+| 9 | control positivo: en `draft` SÍ se edita dentro de la org (1 fila) | ✅ |
+
+**Validaciones de proyecto (todas PASS):** typecheck 0 · lint 0 · **108 tests** ·
+build Next 16.2.6 (9 rutas + Proxy) · `gm:regression` **22/22** · `gm:import`
+PASS (privacidad 0 fugas) · `validate-claude-agents` **214/0/0** ·
+`git diff --check` limpio (solo avisos LF→CRLF). Sin privados en staging; sin
+`.env` trackeado; sin `package-lock.json`; sin `ag-grid-enterprise`; sin AGPL.
+
+**Conclusión:** B-003 RESUELTO. RLS multitenant e inmutabilidad de snapshots
+validados **empíricamente**. **Recomendación: APROBAR merge de
+`feature/wave-1.5-local-rls` → `main`** (queda a decisión del usuario; este ciclo
+NO hace merge). Habilita el inicio de Oleada 2 (cost-domain / pricing / homecenter).
 
 ## Validación post-merge (main, 2026-05-30)
 

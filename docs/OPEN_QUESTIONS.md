@@ -2,29 +2,41 @@
 
 ## BLOCKERS activos
 
-### B-003 — Docker Desktop: content store corrupto (bloquea RLS runtime)  🔴 ACTIVO
-- **Estado**: ACTIVO desde 2026-05-30 (Oleada 1.5, rama `feature/wave-1.5-local-rls`).
-- **Síntoma**: `supabase start` y `docker pull` fallan con
-  `write /var/lib/desktop-containerd/.../io.containerd.metadata.v1.bolt/meta.db: input/output error`.
-  `docker system df` no puede listar imágenes (blob faltante / I/O error).
-- **Descartado**: NO es falta de espacio (host D: 1.5 TB libres). `docker --version`,
-  `docker info` y `docker run hello-world` (imagen ya presente) sí funcionan; el fallo
-  es al **descargar/escribir imágenes nuevas** (postgres 15.8 + dependencias).
-- **Causa probable**: corrupción del almacén interno de containerd de Docker Desktop
-  (posiblemente tras un pull grande interrumpido o disco de la VM WSL2 dañado).
-- **Acción requerida (usuario)**: reiniciar Docker Desktop; si persiste,
-  *Docker Desktop → Troubleshoot → Clean / Purge data* (o reset a fábrica) para
-  regenerar el content store. Luego reintentar `supabase start` → `db reset` →
-  `pnpm --filter web exec tsx ../../scripts/rls-runtime/run.ts`.
-- **Impacto**: RLS runtime sigue PENDIENTE (solo validación estática). Gatea el
-  cierre de Oleada 1.5 y, con ello, el inicio recomendado de Oleada 2.
-- **Responsable**: usuario (infra) + orchestrator (re-ejecución tras el fix).
-
-_Sin otros blockers activos._
+_Sin blockers activos._
 
 ---
 
 ## BLOCKERS resueltos
+
+### B-003 — Docker Desktop: content store corrupto (bloqueaba RLS runtime)  ✅ RESUELTO
+- **Estado**: RESUELTO el 2026-05-30 (Oleada 1.5, rama `feature/wave-1.5-local-rls`).
+- **Síntoma original**: `supabase start` y `docker pull` fallaban con
+  `write /var/lib/desktop-containerd/.../io.containerd.metadata.v1.bolt/meta.db: input/output error`;
+  `docker system df` no podía listar imágenes (blob faltante / I/O error).
+- **Causa**: corrupción del almacén interno de containerd de Docker Desktop
+  (NO era falta de espacio; host D: 1.5 TB libres).
+- **Acción aplicada (usuario)**: reparó Docker Desktop (reinicio / purga del
+  content store). Verificado: `docker info` Server OK, `docker system df` OK,
+  `docker pull alpine` OK, `docker run alpine` → `docker-store-ok`.
+- **Re-ejecución (orchestrator)**: `supabase start` descargó imágenes y aplicó
+  **11 migraciones** en orden limpio; `db reset` re-aplicó migraciones + **2
+  seeds** sin errores; el harness **`scripts/rls-runtime/run.ts` → 21/21 PASS**
+  contra Postgres real (aislamiento A/B, denegación cross-org lectura/escritura,
+  usuario sin organización, `price_observations` append-only + trigger de
+  inmutabilidad, `apu_calculation_snapshots` inmutable, versiones emitidas y sus
+  hijos bloqueados, helper `app.current_org()` desde el JWT, control positivo en
+  `draft`). NO se conectó base remota; sin `supabase link`/`db push`.
+- **Hallazgo lateral (resuelto)**: en el stack Supabase local el esquema `auth`
+  existe, así que la migración `0001` activa el FK `profiles_id_auth_users_fk` y
+  el seed fallaba (23503). Fix de integración: el seed crea filas `auth.users`
+  antes de `profiles`, guardado por la presencia del esquema `auth`. Registrado
+  en `docs/INTEGRATION_REQUESTS.md` para aval de `agent-db-rls`. También añadida
+  config `[db.seed]` en `supabase/config.toml` (los seeds de `supabase/seeds/`
+  no se cargaban por defecto).
+- **Impacto residual**: ninguno. RLS runtime validado empíricamente; Oleada 1.5
+  puede cerrarse. Habilita la recomendación de merge a `main` y el inicio de
+  Oleada 2.
+- **Responsable**: usuario (infra) + agent-orchestrator (re-ejecución + fix de seeds).
 
 ### B-002 — Toolchain del monorepo no inicializado  ✅ RESUELTO
 - **Estado**: RESUELTO el 2026-05-29 (Paso 0 / orchestrator).

@@ -591,3 +591,60 @@ Resultado global: PASS (exit code 0)
 
 ### Agentes activos al cierre
 - Ninguno.
+
+## 2026-05-30 — Oleada 1.5: RLS runtime REAL ejecutado, B-003 RESUELTO (orchestrator)
+
+### Contexto
+- Docker Desktop reparado por el usuario (content store regenerado; validado:
+  `docker info`/`system df`/`pull alpine`/`run alpine` OK). Sesión sobre la rama
+  existente `feature/wave-1.5-local-rls` (sin rama nueva, sin merge a `main`, sin
+  remoto, sin `supabase link`/`db push`, sin Oleada 2).
+
+### Entorno Supabase local
+- `corepack pnpm install`: up to date (pnpm 11.5.0).
+- `supabase start`: imágenes descargadas OK (Docker reparado); **11 migraciones**
+  aplicadas en orden. El contenedor `realtime` quedó *unhealthy* en Windows ⇒ se
+  arrancó excluyendo servicios no esenciales (`-x realtime,studio,storage-api,
+  imgproxy,edge-runtime,logflare,mailpit,vector`); el harness solo necesita `db`.
+- `supabase db reset`: re-aplicó **11 migraciones + 2 seeds** sin errores.
+
+### Fixes de integración (necesarios para que corriera el runtime)
+- **`supabase/config.toml`** (orchestrator-owned): añadido `[db.seed]` con
+  `sql_paths` explícito a `seeds/0001` y `seeds/0002` (no se cargaban por defecto;
+  `supabase db reset` avisaba `no files matched supabase/seed.sql`).
+- **`supabase/seeds/0001_demo_org_and_profiles.sql`** (db-rls-owned, fix de
+  integración): el seed insertaba `profiles` sin filas previas en `auth.users`.
+  En el stack Supabase local el esquema `auth` existe ⇒ la migración `0001`
+  activa el FK `profiles_id_auth_users_fk` y `db reset` fallaba (SQLSTATE 23503).
+  Añadido bloque `DO $$ … INSERT auth.users … $$` guardado por la presencia del
+  esquema `auth` (espejo de la condición de la migración; sigue funcionando en
+  Postgres puro). Solo `id`+columnas mínimas, sin credenciales. **Registrado en
+  INTEGRATION_REQUESTS para aval de agent-db-rls.**
+- **`scripts/rls-runtime/run.ts`** (orchestrator-owned): `setupOrgB` ahora crea
+  la fila `auth.users` del admin B antes de su `profile` (mismo guard de `auth`).
+
+### RLS runtime — RESULTADO: 21 PASS / 0 FAIL (Postgres real)
+- Pre-flight: seeds org/proyecto A; **20 tablas con RLS FORCE**.
+- Helper `app.current_org()` lee `organization_id` del JWT; aislamiento A/B
+  (A no ve B, B no ve A); A no UPDATE/INSERT en org B (0 filas / WITH CHECK);
+  usuario sin organización 0 filas; `price_observations` append-only + precio
+  inmutable (trigger); `apu_calculation_snapshots` inmutable; `estimate_versions`
+  emitida bloquea UPDATE/DELETE + hijos; control positivo `draft` editable.
+
+### Validaciones generales (todas PASS)
+- typecheck 0 · lint 0 · **108 tests** · build Next 16.2.6 (9 rutas + Proxy) ·
+  `gm:regression` **22/22** (golden master ±0.01 COP) · `gm:import` PASS
+  (privacidad 0 fugas) · `validate-claude-agents` **214/0/0** · `git diff --check`
+  limpio (solo avisos LF→CRLF). Sin privados en staging; sin `.env` trackeado;
+  sin `package-lock.json`; sin `ag-grid-enterprise`; sin AGPL.
+
+### Estado / próximo paso
+- **B-003 RESUELTO**. Q8/Q9 ya cerradas. Commit `test: complete local supabase
+  rls runtime validation` en la rama; push solo a
+  `origin feature/wave-1.5-local-rls`. Supabase local detenido (`supabase stop`).
+- **Recomendación: APROBAR merge `feature/wave-1.5-local-rls` → `main`** (no
+  ejecutado en este ciclo; queda a decisión del usuario). Tras el merge, habilitar
+  **Oleada 2** (cost-domain ∥ pricing ∥ homecenter).
+
+### Agentes activos al cierre
+- Ninguno.

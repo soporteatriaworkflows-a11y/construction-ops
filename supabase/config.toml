@@ -16,6 +16,15 @@ port = 54322
 shadow_port = 54320
 major_version = 15
 
+# Seeds sanitizados aplicados por `supabase db reset` (orden explícito).
+# Sin datos privados; la org B la crea el harness RLS runtime.
+[db.seed]
+enabled = true
+sql_paths = [
+  "./seeds/0001_demo_org_and_profiles.sql",
+  "./seeds/0002_demo_project_catalog.sql",
+]
+
 [studio]
 enabled = true
 port = 54323

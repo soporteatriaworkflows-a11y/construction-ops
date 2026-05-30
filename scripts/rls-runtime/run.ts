@@ -97,6 +97,22 @@ const claimsNoOrg: Claims = { user_role: 'admin', sub: USER_A_ADMIN };
 async function setupOrgB(): Promise<void> {
   // Crea la segunda organización y un proyecto, como superusuario (sin RLS).
   await sql`INSERT INTO organizations (id, name) VALUES (${ORG_B}, 'Constructora Demo B') ON CONFLICT (id) DO NOTHING`;
+  // En el stack Supabase real existe el esquema auth y la FK
+  // profiles_id_auth_users_fk; el usuario admin de B debe existir en auth.users
+  // antes de crear su profile. Guardado por la presencia del esquema auth para
+  // que el harness también corra contra un Postgres puro sin auth.
+  await sql.unsafe(`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema = 'auth' AND table_name = 'users'
+      ) THEN
+        INSERT INTO auth.users (id, instance_id, aud, role, email)
+        VALUES ('${USER_B_ADMIN}', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'admin-b@example.test')
+        ON CONFLICT (id) DO NOTHING;
+      END IF;
+    END $$;`);
   await sql`
     INSERT INTO profiles (id, organization_id, full_name, email, role)
     VALUES (${USER_B_ADMIN}, ${ORG_B}, 'Admin B', 'admin-b@example.test', 'admin')
