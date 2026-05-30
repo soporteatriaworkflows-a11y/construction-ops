@@ -4,36 +4,52 @@
  */
 import type {
   PricingReadPort,
-  ApprovedPriceQuery,
+  PricingReadQuery,
+  PricingReadResult,
   ApprovedPriceContext,
 } from '@/modules/apu';
-import { PricingResolutionError } from '@/modules/apu';
 import type { DecimalString, Uuid } from '@/lib/utils/types';
 
 /**
- * Fake del PricingReadPort: tabla en memoria resourceId → budgetReferencePrice.
- * `null` registrado ⇒ ambiguous_price; ausente ⇒ no_approved_price.
+ * Fake del PricingReadPort (contrato unificado, async + Result): tabla en
+ * memoria resourceId → budgetReferencePrice. `'AMBIGUOUS'` ⇒ ambiguous_price;
+ * ausente ⇒ no_approved_price. cost-domain sólo lee `budgetReferencePrice`.
  */
 export function makeFakePricingPort(
   prices: Record<Uuid, DecimalString | 'AMBIGUOUS'>,
   currency = 'COP',
 ): PricingReadPort {
   return {
-    getApprovedPrice(query: ApprovedPriceQuery): ApprovedPriceContext {
+    getApprovedPrice(query: PricingReadQuery): Promise<PricingReadResult> {
       const entry = prices[query.resourceId];
       if (entry === undefined) {
-        throw new PricingResolutionError('no_approved_price', query.resourceId);
+        return Promise.resolve({
+          ok: false,
+          error: { kind: 'no_approved_price', resourceId: query.resourceId },
+        });
       }
       if (entry === 'AMBIGUOUS') {
-        throw new PricingResolutionError('ambiguous_price', query.resourceId);
+        return Promise.resolve({
+          ok: false,
+          error: { kind: 'ambiguous_price', resourceId: query.resourceId, candidates: [] },
+        });
       }
-      return {
+      const value: ApprovedPriceContext = {
         resourceId: query.resourceId,
-        budgetReferencePrice: entry,
+        supplierProductId: '00000000-0000-4000-8000-0000000000ff',
         currency,
-        approvedPriceObservationId: null,
-        approvedAt: null,
+        observedAt: '2026-01-01T00:00:00.000Z',
+        approvedAt: '2026-01-01T00:00:00.000Z',
+        sourceType: 'manual',
+        onlinePublicPrice: entry,
+        preventiveVariationPct: '0',
+        budgetReferencePrice: entry,
+        negotiatedDiscountPct: '0',
+        expectedPurchasePrice: entry,
+        projectedSaving: '0',
+        manualOverride: false,
       };
+      return Promise.resolve({ ok: true, value });
     },
   };
 }

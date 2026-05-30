@@ -7,6 +7,22 @@
 > Consume: **agent-cost-domain**. Ningún agente edita este documento por su
 > cuenta; toda propuesta de cambio pasa por `docs/INTEGRATION_REQUESTS.md` y la
 > aprueba el orquestador.
+>
+> **FUENTE ÚNICA DE CÓDIGO (integración 2A):** los tipos/puertos de este contrato
+> viven en **`apps/web/lib/contracts/pricing-read.ts`**. `agent-cost-domain`
+> los importa (vía `apps/web/modules/apu/pricing-port.ts`, re-export);
+> `agent-pricing` los implementa (vía `apps/web/modules/pricing/types.ts`,
+> re-export). No debe existir ninguna otra definición de `PricingReadPort` /
+> `ApprovedPriceContext`.
+>
+> **Aclaraciones de la integración 2A (compatibles, documentadas):**
+> 1. `PricingReadPort.getApprovedPrice` es **async** y devuelve un
+>    `PricingReadResult` (`{ok:true,value}|{ok:false,error}`). Para estilo
+>    excepción se proveen las clases `ApprovedPriceNotFoundError` y
+>    `AmbiguousApprovedPriceError` + el helper `throwOnPricingError`.
+> 2. `PricingReadQuery` incluye `estimateVersionId?` (opcional) para congelar el
+>    precio por versión de presupuesto (lo usa cost-domain; pricing puede
+>    ignorarlo y resolver por `asOf`).
 
 Define la **interfaz estable de lectura de precios** que `agent-cost-domain`
 consume y que `agent-pricing` implementa. Su objetivo es desacoplar el motor

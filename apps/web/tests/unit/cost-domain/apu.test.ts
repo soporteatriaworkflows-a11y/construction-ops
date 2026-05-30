@@ -10,7 +10,8 @@ import {
   calculateApuUnitCost,
   resolveUnitPriceSnapshot,
   calculateApuComponentWithPort,
-  PricingResolutionError,
+  ApprovedPriceNotFoundError,
+  AmbiguousApprovedPriceError,
 } from '@/modules/apu';
 import { makeFakePricingPort } from './_fakes';
 
@@ -107,14 +108,14 @@ describe('frontera de precios (PricingReadPort)', () => {
   const RES = '00000000-0000-4000-8000-000000000041';
   const VER = '00000000-0000-4000-8000-0000000000b1';
 
-  it('resuelve unitPriceSnapshot desde budgetReferencePrice', () => {
+  it('resuelve unitPriceSnapshot desde budgetReferencePrice', async () => {
     const port = makeFakePricingPort({ [RES]: '56650' });
-    expect(resolveUnitPriceSnapshot(port, RES, VER)).toBe('56650');
+    expect(await resolveUnitPriceSnapshot(port, RES, VER)).toBe('56650');
   });
 
-  it('calcula componente usando el precio aprobado del puerto', () => {
+  it('calcula componente usando el precio aprobado del puerto', async () => {
     const port = makeFakePricingPort({ [RES]: '55000' });
-    const r = calculateApuComponentWithPort(port, {
+    const r = await calculateApuComponentWithPort(port, {
       componentType: 'material',
       resourceId: RES,
       estimateVersionId: VER,
@@ -125,24 +126,17 @@ describe('frontera de precios (PricingReadPort)', () => {
     expect(r.totalComponentCost).toBe('62370');
   });
 
-  it('error de dominio no_approved_price cuando no hay precio (no inventa)', () => {
+  it('error de dominio no_approved_price cuando no hay precio (no inventa)', async () => {
     const port = makeFakePricingPort({});
-    try {
-      resolveUnitPriceSnapshot(port, RES, VER);
-      expect.unreachable('debió lanzar');
-    } catch (e) {
-      expect(e).toBeInstanceOf(PricingResolutionError);
-      expect((e as PricingResolutionError).code).toBe('no_approved_price');
-    }
+    await expect(resolveUnitPriceSnapshot(port, RES, VER)).rejects.toBeInstanceOf(
+      ApprovedPriceNotFoundError,
+    );
   });
 
-  it('error de dominio ambiguous_price', () => {
+  it('error de dominio ambiguous_price', async () => {
     const port = makeFakePricingPort({ [RES]: 'AMBIGUOUS' });
-    try {
-      resolveUnitPriceSnapshot(port, RES, VER);
-      expect.unreachable('debió lanzar');
-    } catch (e) {
-      expect((e as PricingResolutionError).code).toBe('ambiguous_price');
-    }
+    await expect(resolveUnitPriceSnapshot(port, RES, VER)).rejects.toBeInstanceOf(
+      AmbiguousApprovedPriceError,
+    );
   });
 });

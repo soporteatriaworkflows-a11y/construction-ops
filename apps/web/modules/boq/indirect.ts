@@ -6,10 +6,15 @@
  * Funciones PURAS, precisión decimal completa (Q9), sin redondeo intermedio.
  *
  * Las tasas AIU/IVA NO se hardcodean: provienen de `indirect_cost_rules`
- * (configurables por proyecto/versión). Cada regla tiene un `baseType`:
+ * (configurables por proyecto/versión). La FUENTE ÚNICA de la base es el
+ * `baseType` del esquema congelado (`indirect_cost_rules.base_type`), sin flags
+ * paralelos (la integración de Oleada 2A eliminó `contributesToUtilityBase`):
  *   - 'direct_cost' → la tasa se aplica sobre los costos directos.
- *   - 'utility'     → la tasa se aplica sobre la base de utilidad (suma de las
- *                     líneas marcadas como utilidad; típicamente la línea "U").
+ *   - 'utility'     → la tasa se aplica sobre la BASE DE UTILIDAD = el monto de
+ *                     la última línea `direct_cost` precedente (en `sortOrder`),
+ *                     es decir, la línea de Utilidad. Así el "IVA sobre utilidad"
+ *                     (base_type='utility') se calcula sobre el monto de Utilidad
+ *                     sin hardcodear el código 'U' ni la tasa.
  *   - 'custom'      → la tasa se aplica sobre una base provista explícitamente.
  *
  * Cadena del golden master (docs/PROJECT_MASTER.md §3.4):
@@ -29,9 +34,10 @@ import type { DecimalString, Uuid, IndirectCostBaseType } from '@/lib/utils/type
 import { toDecimal, toDecimalString, sumDecimals } from '../apu/decimal';
 
 /**
- * Regla de costo indirecto evaluable. Espejo de `IndirectCostRule` más un flag
- * de configuración (`contributesToUtilityBase`) para identificar qué líneas
- * componen la base de utilidad SIN hardcodear códigos.
+ * Regla de costo indirecto evaluable. Espejo de `IndirectCostRule` del esquema
+ * congelado. La base se deriva ÚNICAMENTE de `baseType` + `sortOrder` (sin
+ * flags paralelos): una regla `baseType='utility'` se aplica sobre el monto de
+ * la última línea `direct_cost` precedente.
  */
 export interface IndirectCostRuleInput {
   id?: Uuid;
@@ -42,12 +48,6 @@ export interface IndirectCostRuleInput {
   baseType: IndirectCostBaseType;
   sortOrder: number;
   visibleToClient: boolean;
-  /**
-   * Si la línea forma parte de la BASE DE UTILIDAD sobre la que se aplican las
-   * reglas con `baseType='utility'` (p. ej. la línea "Utilidad" alimenta la
-   * base del "IVA sobre utilidad"). Configurable; por defecto `false`.
-   */
-  contributesToUtilityBase?: boolean;
   /** Base explícita para `baseType='custom'`. Requerida si baseType='custom'. */
   customBase?: DecimalString;
 }
@@ -78,14 +78,17 @@ export interface IndirectCostResult {
  * Calcula las líneas de costos indirectos (AIU + IVA) a partir de reglas
  * configurables y la base de costos directos. Función PURA.
  *
- * Las reglas se evalúan en orden de `sortOrder`. La base de utilidad se acumula
- * con las líneas marcadas `contributesToUtilityBase`, de modo que una regla
- * `baseType='utility'` (p. ej. IVA) se aplica sobre dicha acumulación.
+ * Las reglas se evalúan en orden de `sortOrder`. La BASE DE UTILIDAD para una
+ * regla `baseType='utility'` es el monto de la última línea `direct_cost`
+ * procesada antes de ella (la línea de Utilidad), de modo que el "IVA sobre
+ * utilidad" se aplica sobre el monto de Utilidad. Derivado sólo de
+ * `baseType` + `sortOrder`; sin flags ni códigos hardcodeados.
  *
  * @param directCosts - Costos directos (base de las reglas `direct_cost`).
  * @param rules - Reglas de `indirect_cost_rules` (configurables, no hardcodeadas).
  * @returns Líneas calculadas y el total de costos indirectos.
- * @throws Error si una tasa es negativa o si falta la base de una regla `custom`.
+ * @throws Error si una tasa es negativa, si falta la base de una regla `custom`,
+ *   o si una regla `utility` no tiene una línea `direct_cost` previa.
  */
 export function calculateIndirectCosts(
   directCosts: DecimalString,
@@ -93,7 +96,8 @@ export function calculateIndirectCosts(
 ): IndirectCostResult {
   const ordered = [...rules].sort((a, b) => a.sortOrder - b.sortOrder);
   const lines: IndirectCostLine[] = [];
-  const utilityBaseParts: DecimalString[] = [];
+  // Monto de la última línea `direct_cost` procesada = base de utilidad vigente.
+  let lastDirectCostAmount: DecimalString | undefined;
 
   for (const rule of ordered) {
     const pct = toDecimal(rule.percentage);
@@ -107,7 +111,12 @@ export function calculateIndirectCosts(
         base = directCosts;
         break;
       case 'utility':
-        base = sumDecimals(utilityBaseParts);
+        if (lastDirectCostAmount === undefined) {
+          throw new Error(
+            `Regla '${rule.code}' con baseType='utility' requiere una línea direct_cost previa (base de utilidad)`,
+          );
+        }
+        base = lastDirectCostAmount;
         break;
       case 'custom':
         if (rule.customBase === undefined) {
@@ -123,8 +132,8 @@ export function calculateIndirectCosts(
 
     const amount = toDecimalString(toDecimal(base).times(pct));
 
-    if (rule.contributesToUtilityBase === true) {
-      utilityBaseParts.push(amount);
+    if (rule.baseType === 'direct_cost') {
+      lastDirectCostAmount = amount;
     }
 
     lines.push({

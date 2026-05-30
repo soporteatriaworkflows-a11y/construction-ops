@@ -23,7 +23,7 @@
 
 import type { DecimalString, ApuComponentType, Uuid } from '@/lib/utils/types';
 import { DomainDecimal, toDecimal, toDecimalString, sumDecimals, ZERO } from './decimal';
-import type { PricingReadPort } from './pricing-port';
+import { type PricingReadPort, throwOnPricingError } from './pricing-port';
 
 /** Entrada mínima para calcular el costo de un componente quantity×price. */
 export interface ApuComponentInput {
@@ -132,15 +132,18 @@ export function calculateApuUnitCost(componentCosts: readonly DecimalString[]): 
  * @param resourceId - Recurso del componente.
  * @param estimateVersionId - Versión de presupuesto que congela el precio.
  * @returns `budgetReferencePrice` como `DecimalString` para usar de snapshot.
- * @throws PricingResolutionError (`no_approved_price` | `ambiguous_price`).
+ * @throws ApprovedPriceNotFoundError | AmbiguousApprovedPriceError.
  */
-export function resolveUnitPriceSnapshot(
+export async function resolveUnitPriceSnapshot(
   port: PricingReadPort,
   resourceId: Uuid,
   estimateVersionId: Uuid,
-): DecimalString {
-  const ctx = port.getApprovedPrice({ resourceId, estimateVersionId });
-  return ctx.budgetReferencePrice;
+): Promise<DecimalString> {
+  const result = await port.getApprovedPrice({ resourceId, estimateVersionId });
+  if (!result.ok) {
+    throwOnPricingError(result.error);
+  }
+  return result.value.budgetReferencePrice;
 }
 
 /**
@@ -151,7 +154,7 @@ export function resolveUnitPriceSnapshot(
  * @param params - Recurso, versión, cantidad y desperdicio del componente.
  * @returns Resultado del componente (incluye el `unitPriceSnapshot` resuelto).
  */
-export function calculateApuComponentWithPort(
+export async function calculateApuComponentWithPort(
   port: PricingReadPort,
   params: {
     componentType: ApuComponentType;
@@ -160,8 +163,8 @@ export function calculateApuComponentWithPort(
     quantity: DecimalString;
     wastePct?: DecimalString;
   },
-): ApuComponentResult & { unitPriceSnapshot: DecimalString } {
-  const unitPriceSnapshot = resolveUnitPriceSnapshot(
+): Promise<ApuComponentResult & { unitPriceSnapshot: DecimalString }> {
+  const unitPriceSnapshot = await resolveUnitPriceSnapshot(
     port,
     params.resourceId,
     params.estimateVersionId,

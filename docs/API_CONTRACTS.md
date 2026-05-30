@@ -446,7 +446,12 @@ export interface QuantityLine {
 La interfaz estable que **agent-cost-domain** consume y **agent-pricing**
 implementa está **congelada v1** en **`docs/PRICING_READ_CONTRACT.md`**
 (`PricingReadPort`, `ApprovedPriceContext`, `PricingApprovalPort`, proyección
-`ClientSafePrice`). Reglas clave:
+`ClientSafePrice`). **Fuente única de código**:
+`apps/web/lib/contracts/pricing-read.ts` (importa cost-domain; implementa
+pricing). El puerto de lectura es **async** y devuelve `PricingReadResult`;
+errores de dominio como clases `ApprovedPriceNotFoundError` /
+`AmbiguousApprovedPriceError`. `PricingReadQuery` admite `estimateVersionId?`
+(opcional, congela por versión). Reglas clave:
 
 - cost-domain **no** consulta tablas de pricing ni recalcula descuentos/ahorros;
   solo consume `PricingReadPort` / un DTO `ApprovedPriceContext` compatible.

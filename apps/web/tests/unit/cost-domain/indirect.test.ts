@@ -17,7 +17,7 @@ import { toDecimal } from '@/modules/apu';
 const RULES: IndirectCostRuleInput[] = [
   { code: 'A', name: 'Administración', percentage: '0.035', baseType: 'direct_cost', sortOrder: 0, visibleToClient: true },
   { code: 'I', name: 'Imprevistos', percentage: '0.025', baseType: 'direct_cost', sortOrder: 1, visibleToClient: true },
-  { code: 'U', name: 'Utilidad', percentage: '0.04', baseType: 'direct_cost', sortOrder: 2, visibleToClient: true, contributesToUtilityBase: true },
+  { code: 'U', name: 'Utilidad', percentage: '0.04', baseType: 'direct_cost', sortOrder: 2, visibleToClient: true },
   { code: 'IVA', name: 'IVA sobre utilidad', percentage: '0.19', baseType: 'utility', sortOrder: 3, visibleToClient: true },
 ];
 
@@ -32,6 +32,44 @@ describe('calculateIndirectCosts', () => {
     const util = toDecimal(byCode['U']!);
     const iva = toDecimal(byCode['IVA']!);
     expect(iva.toFixed()).toBe(util.times('0.19').toFixed());
+  });
+
+  it('reglas con base direct_cost se aplican sobre los costos directos', () => {
+    const r = calculateIndirectCosts(DIRECT, RULES);
+    const lines = Object.fromEntries(r.lines.map((l) => [l.code, l]));
+    for (const code of ['A', 'I', 'U']) {
+      expect(lines[code]!.base).toBe(DIRECT);
+      expect(toDecimal(lines[code]!.amount).toFixed()).toBe(
+        toDecimal(DIRECT).times(lines[code]!.percentage).toFixed(),
+      );
+    }
+  });
+
+  it('regla con base utility se aplica sobre el monto de la Utilidad (base_type, no flag)', () => {
+    const r = calculateIndirectCosts(DIRECT, RULES);
+    const lines = Object.fromEntries(r.lines.map((l) => [l.code, l]));
+    // La base efectiva del IVA debe ser EXACTAMENTE el monto de Utilidad.
+    expect(lines['IVA']!.base).toBe(lines['U']!.amount);
+  });
+
+  it('orden de cálculo: la base utility usa la última direct_cost previa', () => {
+    // Si U no es la última direct_cost antes del IVA, la base cambia.
+    const reordered: IndirectCostRuleInput[] = [
+      { code: 'U', name: 'Utilidad', percentage: '0.04', baseType: 'direct_cost', sortOrder: 0, visibleToClient: true },
+      { code: 'A', name: 'Administración', percentage: '0.035', baseType: 'direct_cost', sortOrder: 1, visibleToClient: true },
+      { code: 'IVA', name: 'IVA sobre utilidad', percentage: '0.19', baseType: 'utility', sortOrder: 2, visibleToClient: true },
+    ];
+    const r = calculateIndirectCosts(DIRECT, reordered);
+    const lines = Object.fromEntries(r.lines.map((l) => [l.code, l]));
+    // Ahora la última direct_cost previa al IVA es 'A', no 'U'.
+    expect(lines['IVA']!.base).toBe(lines['A']!.amount);
+  });
+
+  it('regla utility sin una direct_cost previa lanza error', () => {
+    const onlyUtility: IndirectCostRuleInput[] = [
+      { code: 'IVA', name: 'IVA', percentage: '0.19', baseType: 'utility', sortOrder: 0, visibleToClient: true },
+    ];
+    expect(() => calculateIndirectCosts(DIRECT, onlyUtility)).toThrow();
   });
 
   it('las tasas son configurables: cambiarlas cambia los montos', () => {

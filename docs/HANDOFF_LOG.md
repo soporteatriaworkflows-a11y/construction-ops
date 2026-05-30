@@ -776,3 +776,58 @@ Resultado global: PASS (exit code 0)
 
 ### Agentes activos al cierre
 - Ninguno (cost-domain y pricing finalizaron).
+
+## 2026-05-30 — Oleada 2A: integración secuencial cost-domain + pricing (orchestrator)
+
+### Rama e integración
+- Sobre `integration/wave-2a`. Cherry-picks aplicados: **`6694d88`** (cost-domain,
+  desde backup `3783aca`) y **`1e8a869`** (pricing, desde backup `7897926`).
+  Ambos limpios, sin conflictos. `main` intacta.
+
+### Unificación del contrato de precios (Fase 3)
+- Creada **FUENTE ÚNICA DE CÓDIGO** `apps/web/lib/contracts/pricing-read.ts`
+  (refleja el contrato congelado: forma async + `PricingReadResult` union +
+  `ApprovedPriceContext` completo + clases de error `ApprovedPriceNotFoundError`/
+  `AmbiguousApprovedPriceError` + helper `throwOnPricingError` + `ClientSafePrice`
+  + `INTERNAL_PRICE_FIELDS`).
+- `apps/web/modules/apu/pricing-port.ts` ahora re-exporta el contrato (cost-domain
+  consume); `apps/web/modules/pricing/types.ts` re-exporta el contrato y conserva
+  sólo el `PricingApprovalPort` (write-side de pricing). **Una sola**
+  `interface PricingReadPort`/`ApprovedPriceContext` (verificado por grep).
+- cost-domain pasó `resolveUnitPriceSnapshot`/`calculateApuComponentWithPort` a
+  **async** y convierte `!ok`→clases de error. `_fakes.ts` y `apu.test.ts`
+  adaptados (async + `rejects.toBeInstanceOf`). Sin dependencias circulares
+  (el contrato sólo importa `@/lib/utils/types`).
+- Ajuste menor documentado: `PricingReadQuery.estimateVersionId?` (opcional) para
+  congelar precio por versión (cost-domain). Reflejado en PRICING_READ_CONTRACT
+  y API_CONTRACTS.
+
+### Base del IVA (Fase 4)
+- Eliminado el flag `contributesToUtilityBase`. Regla canónica (solo `base_type`
+  + `sortOrder`): una regla `base_type='utility'` se aplica sobre el monto de la
+  última línea `direct_cost` previa (la Utilidad). Reproduce el golden master
+  (IVA = Utilidad × 0.19, gm:import diff=0). Sin cambios al seed/fixture (U sigue
+  `direct_cost`). Tests añadidos: base directa, base utility, orden de cálculo,
+  error si no hay `direct_cost` previa.
+
+### Validación integral (Fase 5 — todo PASS)
+- typecheck 0 · lint 0 · **229 tests** (108 base + cost-domain + pricing) · build
+  Next 16.2.6 (9 rutas + Proxy) · `gm:regression` **22/22** · `gm:import` **9/9**
+  (±0.01 COP, diff=0) · `validate-claude-agents` **214/0/0** · `git diff --check`
+  limpio. Sin privados/`.env`/`package-lock`; sin `ag-grid-enterprise` en dominio;
+  sin AGPL. Proyección `ClientSafePrice` sin campos 🔒 (privacy.test.ts).
+
+### RLS runtime (Fase 6)
+- La integración NO modificó `supabase/migrations|policies|seeds` ni
+  `apps/web/lib/db/schema.ts` ⇒ **RLS runtime 21/21** de Oleada 1.5 sigue vigente
+  (no se relevantó Docker). **B-004** (Realtime) sigue como deuda técnica.
+
+### Estado / próximo paso
+- Commit `chore: integrate and validate wave 2a cost domain and pricing` +
+  push a `origin integration/wave-2a`. **NO merge a `main`** (a la espera de
+  aprobación del usuario). **`agent-homecenter` NO lanzado.**
+- Recomendación: **APROBAR merge `integration/wave-2a` → `main`**. Antes de
+  Oleada 2B: congelar `docs/PRICING_ADAPTER_CONTRACT.md`.
+
+### Agentes activos al cierre
+- Ninguno.

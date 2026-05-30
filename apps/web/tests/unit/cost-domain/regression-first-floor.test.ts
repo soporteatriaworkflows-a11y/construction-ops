@@ -42,7 +42,8 @@ function diff(a: string, b: string): InstanceType<typeof import('decimal.js').de
   return toDecimal(a).minus(toDecimal(b)).abs();
 }
 
-// Marca la línea Utilidad como base de la utilidad (config, no hardcode de tasas).
+// La base del IVA se deriva de baseType + sortOrder (IVA='utility' aplica sobre
+// el monto de la última línea direct_cost previa = Utilidad). Sin flags.
 const rulesInput: IndirectCostRuleInput[] = indirectRules.map((r) => ({
   code: r.code,
   name: r.name,
@@ -50,7 +51,6 @@ const rulesInput: IndirectCostRuleInput[] = indirectRules.map((r) => ({
   baseType: r.baseType,
   sortOrder: r.sortOrder,
   visibleToClient: r.visibleToClient,
-  contributesToUtilityBase: r.code === 'U',
 }));
 
 describe('Regresión motor cost-domain — ENTRE PATIOS / Primer piso', () => {
