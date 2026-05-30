@@ -11,7 +11,13 @@
 
 import { useCallback, useMemo, useRef } from 'react';
 import { AgGridReact } from 'ag-grid-react';
-import type { ColDef, GridReadyEvent, CellValueChangedEvent } from 'ag-grid-community';
+import type {
+  ColDef,
+  GridReadyEvent,
+  CellValueChangedEvent,
+  RowClassParams,
+  RowStyle,
+} from 'ag-grid-community';
 import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
 import type { BoqItem, Chapter } from '@/lib/utils/types';
 import { formatCOP, formatNumber } from '@/lib/utils/format';
@@ -110,7 +116,7 @@ export function BoqGrid({
     [chapters, items]
   );
 
-  const columnDefs = useMemo<ColDef<BoqRow>[]>(
+  const columnDefs = useMemo<ColDef[]>(
     () => [
       {
         field: 'code',
@@ -186,7 +192,9 @@ export function BoqGrid({
         valueFormatter: (params) =>
           params.data?.isChapter ? '' : (params.value ?? ''),
       },
-    ],
+      // Cast: AG Grid v35 infiere una unión incompatible para arrays de ColDef
+      // con `cellClassRules` heterogéneos. Los defs son válidos en runtime.
+    ] as ColDef[],
     []
   );
 
@@ -214,10 +222,10 @@ export function BoqGrid({
   );
 
   const getRowStyle = useCallback(
-    (params: { data?: BoqRow }) =>
+    (params: RowClassParams<BoqRow>): RowStyle | undefined =>
       params.data?.isChapter
         ? { background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }
-        : {},
+        : undefined,
     []
   );
 

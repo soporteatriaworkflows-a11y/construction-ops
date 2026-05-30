@@ -1,10 +1,11 @@
+/* AG Grid — tema base sin módulos Enterprise.
+   Los @import deben preceder a cualquier regla (incl. @tailwind). */
+@import 'ag-grid-community/styles/ag-grid.css';
+@import 'ag-grid-community/styles/ag-theme-alpine.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* AG Grid — tema base sin módulos Enterprise */
-@import 'ag-grid-community/styles/ag-grid.css';
-@import 'ag-grid-community/styles/ag-theme-alpine.css';
 
 @layer base {
   *,
