@@ -1,22 +1,25 @@
 /**
- * Drizzle config — ESQUELETO MÍNIMO (Paso 0 / orchestrator).
+ * Drizzle config — Construction Ops.
  *
- * Propiedad real: agent-db-rls (ver docs/AGENT_REGISTRY.md).
- * agent-db-rls debe:
- *   - solicitar `drizzle-kit` vía docs/INTEGRATION_REQUESTS.md,
- *   - sustituir este objeto por `defineConfig(...)` de drizzle-kit,
- *   - definir `schema`, `out` (supabase/migrations) y `dialect: 'postgresql'`.
+ * Propiedad: agent-db-rls (ver docs/AGENT_REGISTRY.md).
  *
- * Sin credenciales reales: la URL se lee de la variable de entorno.
- * Este esqueleto NO importa drizzle-kit para no añadir dependencias en Paso 0.
+ * - `schema`: esquema Drizzle tipado (fuente del DDL generado).
+ * - `out`: las migraciones SQL se escriben en `supabase/migrations`.
+ * - `dialect`: PostgreSQL (Supabase).
+ *
+ * Sin credenciales hardcodeadas: `DATABASE_URL` se lee del entorno.
+ * `pnpm db:generate` (raíz) genera el SQL desde el schema. NO se ejecuta
+ * `migrate`/`push` contra ninguna base remota desde este agente.
  */
-const config = {
+import { defineConfig } from "drizzle-kit";
+
+export default defineConfig({
   dialect: "postgresql",
   schema: "./apps/web/lib/db/schema.ts",
   out: "./supabase/migrations",
   dbCredentials: {
     url: process.env.DATABASE_URL ?? "",
   },
-} as const;
-
-export default config;
+  strict: true,
+  verbose: true,
+});
