@@ -207,11 +207,19 @@ orchestrator ──┬─► db-rls ────────► cost-domain ─�
   `modules/apu|boq|estimates` (cost) vs `modules/suppliers|pricing` salvo
   `adapters/` (pricing).
 
-### agent-homecenter (Oleada 2)
-- Interfaz genérica `SupplierAdapter` definida.
-- CSV fallback funcional con preview y aprobación.
-- Mapeo SKU con candidatos.
-- Diseño n8n documentado.
+### agent-homecenter (Oleada 2B)
+- Interfaz genérica `SupplierAdapter` definida (contrato congelado
+  `docs/PRICING_ADAPTER_CONTRACT.md`).
+- CSV/Excel fallback funcional con preview y **aprobación humana simple** (Q11).
+- Mapeo SKU con candidatos y score; fallback manual; ambiguos `pending`.
+- Persistencia SOLO vía `PricingApprovalPort`; imports idempotentes;
+  `price_observations` append-only; sin tocar snapshots emitidos.
+- Privacidad backend-first (SKU/URL/`sourceReference`/proveedor/precio público/
+  candidatos/score/aprobador/motivos = 🔒). Sin scraping ni API pública asumida.
+- Diseño n8n documentado (no productivo en 2B).
+- **Ownership**: `apps/web/modules/pricing/adapters/`, `scripts/catalog-sync/`,
+  `apps/web/tests/unit/pricing-adapters/`. NO toca `modules/apu|boq|estimates`,
+  `modules/pricing/*` (salvo `adapters/`), `modules/suppliers/`, ni `package.json`.
 
 ### agent-dashboard (Oleada 3)
 - KPIs gerencia y obra implementados.

@@ -132,8 +132,30 @@ _Sin blockers activos._
    regresión/auditoría precisión raw completa. El redondeo visual NO modifica
    snapshots, cálculos ni regresión. Ver `docs/DECISIONS.md`.
 10. ¿Qué información ve el cliente en el detalle de un APU?
-11. ¿La aprobación humana de mapeos SKU requiere doble firma o una sola?
+11. ✅ **RESUELTA (2026-05-30, Q11)** — ¿La aprobación humana de mapeos SKU /
+    importación de precios requiere doble firma o una sola? → **MVP: aprobación
+    SIMPLE** por un usuario interno autorizado. Auditoría obligatoria por
+    aprobación: aprobador, timestamp, fuente, motivo, override, observación
+    previa, resultado aprobado, `supplierProductId`, `resourceId`, `observedAt`,
+    `sourceType`, `sourceReference` (cuando exista). Reglas: la importación NO
+    persiste automáticamente (preview primero); coincidencias SKU ambiguas
+    quedan `pending`; ningún precio nuevo modifica snapshots emitidos;
+    `price_observations` sigue append-only. **Doble aprobación** queda como
+    soporte FUTURO configurable (umbral superado, anomalía, proveedor crítico,
+    organización lo exige, rol insuficiente) — NO obligatoria aún. Ver
+    `docs/DECISIONS.md` y `docs/PRICING_ADAPTER_CONTRACT.md`.
 12. ¿Hay un umbral máximo configurable para variación de precio sin
-    aprobación?
+    aprobación? (relacionado con Q11; el umbral disparará doble aprobación
+    futura — pendiente de valor concreto).
 13. ¿Despliegue final: Vercel + Railway, o solo Vercel?
-14. ¿Canal oficial de Homecenter (CSV manual, portal empresarial, API)?
+14. ✅ **RESUELTA (2026-05-30, Q14)** — ¿Canal oficial de Homecenter? → **MVP:
+    adaptador genérico de proveedores con implementación Homecenter por archivo
+    CSV/Excel**. Preview obligatorio; aprobación humana antes de persistir;
+    permitir SKU y URL cuando existan; matching SKU→`supplierProductId`/
+    `resourceId` con candidatos y score; fallback manual; trazabilidad completa.
+    NO asumir API pública / feed estable / endpoints internos / acceso
+    empresarial concedido. Prohibido scraping agresivo, automatización opaca,
+    modificar presupuestos emitidos y persistir coincidencias ambiguas como
+    aprobadas. Interfaz **sustituible** para soportar luego API oficial / feed
+    oficial / cotización empresarial / carga manual / n8n supervisado. Ver
+    `docs/DECISIONS.md` y `docs/PRICING_ADAPTER_CONTRACT.md`.

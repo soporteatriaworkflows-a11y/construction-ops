@@ -873,3 +873,35 @@ Resultado global: PASS (exit code 0)
 
 ### Agentes activos al cierre
 - Ninguno.
+
+## 2026-05-30 — Oleada 2B: microfase documental (orchestrator)
+
+### Rama
+- Creada y publicada `integration/wave-2b` desde `main` (`75394f1`). `main` intacta.
+
+### Q11 y Q14 CERRADAS
+- **Q11** (aprobación humana): MVP **simple** por usuario interno autorizado;
+  auditoría obligatoria; preview antes de persistir; SKU ambiguos `pending`; sin
+  tocar snapshots emitidos; `price_observations` append-only; doble aprobación =
+  soporte futuro configurable. Cerrada en DECISIONS/OPEN_QUESTIONS.
+- **Q14** (canal Homecenter): MVP **adaptador genérico + CSV/Excel** con preview
+  y aprobación humana; SKU/URL opcionales; matching con candidatos+score;
+  fallback manual; sin API pública asumida; sin scraping; interfaz sustituible.
+  Cerrada en DECISIONS/OPEN_QUESTIONS.
+
+### Contrato del adaptador CONGELADO v1
+- Creado **`docs/PRICING_ADAPTER_CONTRACT.md`** (orchestrator-owned, congelado;
+  cambios solo vía INTEGRATION_REQUESTS): frontera del módulo, interfaz
+  `SupplierAdapter` (`parseCatalog`/`mapToSupplierProducts`/`buildPreview`/
+  `toPriceObservations`), tipos `RawSupplierItem`/`SkuMatchCandidate`/
+  `SkuMatchProposal`/`ImportPreview`/`ImportResult`, idempotencia, aprobación
+  humana (Q11) y privacidad backend-first (Q14).
+- Actualizados `API_CONTRACTS.md` (§6) y `AGENT_REGISTRY.md` (ownership 2B).
+
+### Próximo paso
+- Commit `docs: freeze wave 2b pricing adapter contract` + push a
+  `origin integration/wave-2b`. Luego lanzar **únicamente** `agent-homecenter`
+  en worktree aislado. NO integrar. NO merge.
+
+### Agentes activos al cierre de esta microfase
+- Ninguno (aún). A continuación se lanza agent-homecenter.

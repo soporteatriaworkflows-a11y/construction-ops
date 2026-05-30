@@ -462,6 +462,24 @@ errores de dominio como clases `ApprovedPriceNotFoundError` /
   backend antes de serializar a rol cliente. Proyección `ClientSafePrice` separada.
 - Cambios al contrato: solo vía `docs/INTEGRATION_REQUESTS.md` (orchestrator).
 
+## 6. Contrato del adaptador de proveedores (Oleada 2B)
+
+La interfaz estable de **adaptadores de proveedor** (importación de catálogos/
+precios externos con aprobación humana) está **congelada v1** en
+**`docs/PRICING_ADAPTER_CONTRACT.md`**: `SupplierAdapter`
+(`parseCatalog`/`mapToSupplierProducts`/`buildPreview`/`toPriceObservations`) y
+tipos `RawSupplierItem`, `SkuMatchCandidate`, `SkuMatchProposal`, `ImportPreview`,
+`ImportResult`. Implementa **agent-homecenter** en
+`apps/web/modules/pricing/adapters/` + `scripts/catalog-sync/`. Reglas clave:
+
+- Ningún adaptador escribe en DB; toda persistencia pasa por `PricingApprovalPort`
+  tras **aprobación humana simple** (Q11), con auditoría obligatoria.
+- Imports **idempotentes** (`providerKey`+`supplierProductId`+`observedAt`+
+  `sourceType`); `price_observations` append-only; sin tocar snapshots emitidos.
+- Privacidad backend-first: `sku`/`url`/`sourceReference`/proveedor/precio
+  público/candidatos/score/aprobador/motivos son 🔒 (nunca a rol cliente).
+- Canal Homecenter MVP = CSV/Excel (Q14); sin API pública asumida; sin scraping.
+
 > Funciones financieras (`calculateApuComponent`, `calculateApuUnitPrice`,
 > `calculateBoqItem`, `calculateChapterTotal`, `calculateDirectCosts`,
 > `calculateAiu`, `calculateTotal`, `calculateValuePerSqm`,
