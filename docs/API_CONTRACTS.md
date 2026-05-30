@@ -436,6 +436,26 @@ export interface QuantityLine {
 | Mocks de UI (respetan estas interfaces) | frontend-boq | — |
 | Funciones de cálculo (`calculate*`, `createSnapshot`, `cloneEstimateVersion`) | cost-domain (Oleada 2) | frontend-boq, dashboard, exports |
 | Proyector de privacidad por perfil | pricing/exports (Oleada 2-3) | exports, endpoints cliente |
+| **`PricingReadPort` / `ApprovedPriceContext`** (interfaz de lectura de precios) | **pricing** (implementa) | **cost-domain** (consume) |
+| **`PricingApprovalPort`** (escritura interna de precios) | **pricing** (exclusivo) | — |
+
+---
+
+## 5. Contrato de lectura de precios (Oleada 2A)
+
+La interfaz estable que **agent-cost-domain** consume y **agent-pricing**
+implementa está **congelada v1** en **`docs/PRICING_READ_CONTRACT.md`**
+(`PricingReadPort`, `ApprovedPriceContext`, `PricingApprovalPort`, proyección
+`ClientSafePrice`). Reglas clave:
+
+- cost-domain **no** consulta tablas de pricing ni recalcula descuentos/ahorros;
+  solo consume `PricingReadPort` / un DTO `ApprovedPriceContext` compatible.
+- Fórmulas canónicas Q8 con base `onlinePublicPrice`; dinero/porcentajes como
+  `DecimalString`; sin `number`, sin redondeo intermedio (Q9).
+- Campos 🔒 (público, variación, descuento, esperado, real, ahorros,
+  `sourceReference`, proveedor interno, aprobador, notas) se **omiten** en el
+  backend antes de serializar a rol cliente. Proyección `ClientSafePrice` separada.
+- Cambios al contrato: solo vía `docs/INTEGRATION_REQUESTS.md` (orchestrator).
 
 > Funciones financieras (`calculateApuComponent`, `calculateApuUnitPrice`,
 > `calculateBoqItem`, `calculateChapterTotal`, `calculateDirectCosts`,

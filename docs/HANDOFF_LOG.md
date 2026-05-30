@@ -690,3 +690,39 @@ Resultado global: PASS (exit code 0)
 
 ### Agentes activos al cierre
 - Ninguno.
+
+## 2026-05-30 — Oleada 2A: rama de integración + congelar contrato de precios (orchestrator)
+
+### Fase 0 — rama de integración
+- Preflight: `main = origin/main = 974ea99` (árbol limpio); tags
+  `wave-1-foundation-v1` y `wave-1.5-rls-runtime-validated-v1` conservados;
+  3 backups conservados; Excel ignorado; sin `.env`/`package-lock`; solo
+  `ag-grid-community/react` (MIT).
+- Creada y publicada **`integration/wave-2a`** desde `main`. `main` intacta.
+
+### Fase 1 — contrato de lectura de precios CONGELADO v1
+- Creado **`docs/PRICING_READ_CONTRACT.md`** (orchestrator-owned, congelado v1;
+  cambios solo vía INTEGRATION_REQUESTS). Define:
+  - tipos base (reusa `Uuid`/`IsoDateTime`/`DecimalString`/`PriceSourceType`/
+    `PricingRuleType`/`SyncStatus` de API_CONTRACTS);
+  - `ApprovedPriceContext` (snapshot aprobado; dinero/porcentajes `DecimalString`;
+    fórmulas Q8 base `onlinePublicPrice`; campos 🔒 marcados);
+  - `PricingReadPort` (`getApprovedPrice` → único contexto | `no_approved_price`
+    | `ambiguous_price`); determinista, solo lectura;
+  - `PricingApprovalPort` (escritura interna exclusiva de pricing: observación,
+    aprobación humana, override trazable, append-only, no muta snapshots);
+  - privacidad backend-first + proyección `ClientSafePrice` (sin campos 🔒).
+- **Frontera**: cost-domain consume el puerto/DTO; NO consulta tablas de pricing
+  ni recalcula descuentos/ahorros; usa `budgetReferencePrice` como
+  `unit_price_snapshot`.
+- Actualizados: `API_CONTRACTS.md` (§5 + ownership de puertos),
+  `AGENT_REGISTRY.md` (dependencia 2A + criterios cost/pricing), `DECISIONS.md`
+  (4 filas: merge 1.5, B-004, rama 2A, contrato de precios), este HANDOFF_LOG.
+
+### Próximo paso
+- Commit `docs: freeze wave 2a pricing read contract` + push a
+  `origin integration/wave-2a`. Luego lanzar en paralelo (worktrees aislados)
+  `agent-cost-domain` y `agent-pricing`. NO `agent-homecenter`. NO merge.
+
+### Agentes activos al cierre de esta microfase
+- Ninguno (aún). A continuación se lanzan cost-domain ∥ pricing.
