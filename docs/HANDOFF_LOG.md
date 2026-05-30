@@ -360,3 +360,64 @@ Resultado global: PASS (exit code 0)
   (Next 16.2.6 Turbopack, `ƒ Proxy`). validate-claude-agents PASS 214/0/0.
 - Excel ignorado; sin privados en staging; sin .env trackeado; sin
   package-lock.json; sin ag-grid-enterprise; 11/11 agentes.
+
+## 2026-05-30 — Oleada 1: mapeo del golden master (agent-excel-mapper)
+
+### Alcance trabajado
+- Worktree aislado `agent-ad8fb1044998f390d`. Excel privado presente y
+  legible en `private/COT.ENTRE PATIOS 1 PISO (1).xlsx` (323 KB, vía
+  `.worktreeinclude`). NO se commiteó ni se modificó el Excel.
+
+### Hojas analizadas (10/10)
+- RESUMEN, COTIZACION FULL, APU, COTIZACION 1 PISO, ACTA DE MODIFICACION 01,
+  RESUMEN 1 PISO, CANTIDADES 1 PISO, CANTIDADES, LISTADO MATERIALES,
+  CANT COMPLETO. Documentadas en `docs/EXCEL_MAPPING.md` (propósito, rango,
+  columnas, inputs vs derivadas, fórmulas clave, refs cruzadas, sanitización)
+  y mapeadas a entidades del contrato congelado v1.
+
+### Archivos creados (todos dentro del alcance de excel-mapper)
+- `scripts/golden-master/dump-workbook.mjs` — volcado estructural del Excel.
+- `scripts/golden-master/expected-values.ts` — 9 valores de regresión §3.4.
+- `scripts/golden-master/recompute-first-floor.ts` — recálculo puro AIU/IVA.
+- `scripts/golden-master/first-floor.regression.test.ts` — test Vitest.
+- `scripts/golden-master/vitest.config.ts` — config local aislada.
+- `scripts/excel-import/import.ts` — importador idempotente.
+- `scripts/excel-import/sheet-map.ts` — mapa declarativo Excel→entidades v1.
+- `scripts/excel-import/sanitize.ts` — sanitización + alias deterministas.
+- `scripts/fixtures/entre-patios-first-floor.fixture.json` — fixture SANITIZADO
+  (contrato v1, dinero como string, sin datos privados).
+- `scripts/fixtures/entre-patios-first-floor.schema-notes.md` — notas del fixture.
+- `scripts/README.md` — cómo ejecutar dump/regresión/importador.
+
+### Archivos modificados
+- `docs/EXCEL_MAPPING.md` — completado (10 hojas + mapeo + regresión).
+- `docs/INTEGRATION_REQUESTS.md` — solicitudes (ejecución Bash, scripts pnpm).
+
+### Regresión financiera (estado)
+- VERIFICADA ANALÍTICAMENTE dentro de tolerancia (±0.01 COP / ±0.001 m²): la
+  cadena Admin=D×0.035, Imprev=D×0.025, Util=D×0.04, IVA=Util×0.19,
+  Indirectos=ΣAIU+IVA, Total=D+Indirectos, valor_m2=Total/área reproduce los
+  9 valores de §3.4 desde la base. NO se ejecutó Vitest (ver bloqueo).
+- NO se ajustaron fórmulas ni tasas para forzar coincidencia.
+
+### Bloqueo activo
+- **Ejecución denegada**: la herramienta Bash rechazó ejecutar `node`,
+  `pnpm exec vitest` y el dump del Excel (solo pasó `node --version`). En
+  consecuencia NO se pudo: (a) confirmar coordenadas celda a celda con
+  `dump-workbook.mjs`, (b) correr la suite de regresión, (c) ejecutar el
+  importador. Registrado en `docs/INTEGRATION_REQUESTS.md`. Las coordenadas
+  exactas quedan como `TODO_VERIFY` en `sheet-map.ts` y EXCEL_MAPPING §8.
+
+### Privacidad
+- Fixture sanitizado (cliente/proveedores → alias; NIT/tel/dir eliminados).
+  `import.ts` incluye `findPrivateLeaks` como verificación final.
+- `.gitignore` cubre `private/`, `*.xlsx`, `*.xls` (verificado).
+
+### Siguiente paso recomendado
+- Orquestador (o sesión con Bash): ejecutar `scripts/README.md` para
+  confirmar PASS empírico de regresión e importador, y poblar el detalle real
+  fila a fila con el dump. Luego habilitar Oleada 2 (cost-domain consume el
+  fixture y la regresión como oráculo).
+
+### Agentes activos al cierre
+- Ninguno.

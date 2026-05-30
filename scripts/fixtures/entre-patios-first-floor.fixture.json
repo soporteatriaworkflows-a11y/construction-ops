@@ -1,0 +1,446 @@
+{
+  "$schema": "./entre-patios-first-floor.schema-notes.md",
+  "meta": {
+    "fixtureVersion": "1.0.0",
+    "contract": "API_CONTRACTS v1 (2026-05-29, congelado)",
+    "source": "COT.ENTRE PATIOS 1 PISO (1).xlsx (golden master, NO versionado)",
+    "scope": "PRIMER PISO",
+    "sanitized": true,
+    "sanitizationNotes": "Todo nombre propio, NIT/RUT, dirección y teléfono fue reemplazado por valores ficticios. No contiene datos privados del cliente real.",
+    "money": "DecimalString (string decimal). NUNCA number.",
+    "ids": "UUID v4 deterministas/ficticios sólo para el fixture.",
+    "representativeSampleNote": "Las secciones de catálogo, APU y BOQ son una MUESTRA REPRESENTATIVA sanitizada que respeta las interfaces v1. El bloque 'estimateTotals' contiene los 9 valores AUTORITATIVOS de regresión de PROJECT_MASTER §3.4 (fuente de verdad). Un ítem BOQ de balanceo ('balanceo cantidades restantes') hace que la suma de subtotales iguale costos_directos exactamente, manteniendo el fixture internamente consistente hasta que dump-workbook.mjs permita poblar el detalle real fila a fila."
+  },
+
+  "organization": {
+    "id": "00000000-0000-4000-8000-000000000001",
+    "name": "Constructora Demo S.A.S.",
+    "createdAt": "2026-05-29T00:00:00-05:00",
+    "updatedAt": "2026-05-29T00:00:00-05:00"
+  },
+
+  "project": {
+    "id": "00000000-0000-4000-8000-000000000010",
+    "organizationId": "00000000-0000-4000-8000-000000000001",
+    "code": "ENTRE-PATIOS",
+    "name": "Proyecto Entre Patios",
+    "status": "active",
+    "clientReference": "CLIENTE-DEMO-001",
+    "location": "Ciudad Demo",
+    "startDate": null,
+    "estimatedEndDate": null,
+    "createdAt": "2026-05-29T00:00:00-05:00",
+    "updatedAt": "2026-05-29T00:00:00-05:00"
+  },
+
+  "projectScopes": [
+    {
+      "id": "00000000-0000-4000-8000-000000000020",
+      "projectId": "00000000-0000-4000-8000-000000000010",
+      "parentScopeId": null,
+      "code": "FULL",
+      "name": "Alcance completo",
+      "scopeType": "package",
+      "status": "active",
+      "createdAt": "2026-05-29T00:00:00-05:00",
+      "updatedAt": "2026-05-29T00:00:00-05:00"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000021",
+      "projectId": "00000000-0000-4000-8000-000000000010",
+      "parentScopeId": "00000000-0000-4000-8000-000000000020",
+      "code": "P1",
+      "name": "Primer piso",
+      "scopeType": "floor",
+      "status": "active",
+      "createdAt": "2026-05-29T00:00:00-05:00",
+      "updatedAt": "2026-05-29T00:00:00-05:00"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000022",
+      "projectId": "00000000-0000-4000-8000-000000000010",
+      "parentScopeId": "00000000-0000-4000-8000-000000000020",
+      "code": "MOD-01",
+      "name": "Acta de modificación 01",
+      "scopeType": "modification",
+      "status": "active",
+      "createdAt": "2026-05-29T00:00:00-05:00",
+      "updatedAt": "2026-05-29T00:00:00-05:00"
+    }
+  ],
+
+  "suppliers": [
+    {
+      "id": "00000000-0000-4000-8000-000000000030",
+      "organizationId": "00000000-0000-4000-8000-000000000001",
+      "name": "Proveedor Retail Demo",
+      "supplierType": "distributor",
+      "contactData": null,
+      "active": true,
+      "createdAt": "2026-05-29T00:00:00-05:00",
+      "updatedAt": "2026-05-29T00:00:00-05:00"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000031",
+      "organizationId": "00000000-0000-4000-8000-000000000001",
+      "name": "Proveedor Materiales Demo",
+      "supplierType": "vendor",
+      "contactData": null,
+      "active": true,
+      "createdAt": "2026-05-29T00:00:00-05:00",
+      "updatedAt": "2026-05-29T00:00:00-05:00"
+    }
+  ],
+
+  "resources": [
+    {
+      "id": "00000000-0000-4000-8000-000000000040",
+      "organizationId": "00000000-0000-4000-8000-000000000001",
+      "code": "MAT-CEM-001",
+      "name": "Cemento gris (saco 50 kg)",
+      "resourceType": "material",
+      "unit": "saco",
+      "defaultWastePct": "0.05",
+      "active": true,
+      "createdAt": "2026-05-29T00:00:00-05:00",
+      "updatedAt": "2026-05-29T00:00:00-05:00"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000041",
+      "organizationId": "00000000-0000-4000-8000-000000000001",
+      "code": "MAT-POR-001",
+      "name": "Porcelanato 60x60 (caja)",
+      "resourceType": "material",
+      "unit": "m2",
+      "defaultWastePct": "0.08",
+      "active": true,
+      "createdAt": "2026-05-29T00:00:00-05:00",
+      "updatedAt": "2026-05-29T00:00:00-05:00"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000042",
+      "organizationId": "00000000-0000-4000-8000-000000000001",
+      "code": "LAB-OF-001",
+      "name": "Oficial de construcción",
+      "resourceType": "labor",
+      "unit": "dia",
+      "defaultWastePct": "0",
+      "active": true,
+      "createdAt": "2026-05-29T00:00:00-05:00",
+      "updatedAt": "2026-05-29T00:00:00-05:00"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000043",
+      "organizationId": "00000000-0000-4000-8000-000000000001",
+      "code": "LAB-AY-001",
+      "name": "Ayudante de construcción",
+      "resourceType": "labor",
+      "unit": "dia",
+      "defaultWastePct": "0",
+      "active": true,
+      "createdAt": "2026-05-29T00:00:00-05:00",
+      "updatedAt": "2026-05-29T00:00:00-05:00"
+    }
+  ],
+
+  "supplierProducts": [
+    {
+      "id": "00000000-0000-4000-8000-000000000050",
+      "supplierId": "00000000-0000-4000-8000-000000000030",
+      "resourceId": "00000000-0000-4000-8000-000000000041",
+      "supplierSku": "SKU-DEMO-PORC-6060",
+      "supplierProductName": "Porcelanato 60x60 Demo",
+      "productUrl": null,
+      "locationReference": null,
+      "currency": "COP",
+      "active": true,
+      "manualOverride": false,
+      "lastCheckedAt": null,
+      "syncStatus": "manual",
+      "createdAt": "2026-05-29T00:00:00-05:00",
+      "updatedAt": "2026-05-29T00:00:00-05:00"
+    }
+  ],
+
+  "priceObservations": [
+    {
+      "id": "00000000-0000-4000-8000-000000000060",
+      "supplierProductId": "00000000-0000-4000-8000-000000000050",
+      "observedPrice": "55000.0000000000",
+      "stockStatus": "available",
+      "sourceType": "manual",
+      "sourceReference": "fixture-demo",
+      "observedAt": "2026-05-29T00:00:00-05:00",
+      "approved": true,
+      "approvedBy": null,
+      "notes": null,
+      "createdAt": "2026-05-29T00:00:00-05:00"
+    }
+  ],
+
+  "pricingRules": [
+    {
+      "id": "00000000-0000-4000-8000-000000000070",
+      "organizationId": "00000000-0000-4000-8000-000000000001",
+      "name": "Variación preventiva 3%",
+      "ruleType": "preventive_variation",
+      "percentage": "0.03",
+      "scopeType": "global",
+      "scopeReferenceId": null,
+      "active": true,
+      "effectiveFrom": null,
+      "effectiveTo": null,
+      "createdAt": "2026-05-29T00:00:00-05:00",
+      "updatedAt": "2026-05-29T00:00:00-05:00"
+    }
+  ],
+
+  "laborRoles": [
+    {
+      "id": "00000000-0000-4000-8000-000000000080",
+      "organizationId": "00000000-0000-4000-8000-000000000001",
+      "code": "ROL-OF-001",
+      "name": "Oficial",
+      "baseSalary": "1300000.0000000000",
+      "transportSubsidy": "162000.0000000000",
+      "benefitsPct": "0.4000000000",
+      "socialSecurityPct": "0.2050000000",
+      "payrollTaxPct": "0.0900000000",
+      "uniformCost": "120000.0000000000",
+      "uniformPeriodMonths": "4",
+      "workingDaysMonth": "24",
+      "workingHoursDay": "8",
+      "active": true,
+      "createdAt": "2026-05-29T00:00:00-05:00",
+      "updatedAt": "2026-05-29T00:00:00-05:00"
+    }
+  ],
+
+  "apuTemplates": [
+    {
+      "id": "00000000-0000-4000-8000-000000000090",
+      "organizationId": "00000000-0000-4000-8000-000000000001",
+      "code": "APU-PISO-PORC",
+      "name": "Instalación piso porcelanato 60x60",
+      "unit": "m2",
+      "chapterTemplateId": null,
+      "description": "Suministro e instalación de porcelanato 60x60 incluye pega y emboquillado.",
+      "active": true,
+      "version": 1,
+      "createdAt": "2026-05-29T00:00:00-05:00",
+      "updatedAt": "2026-05-29T00:00:00-05:00"
+    }
+  ],
+
+  "apuComponents": [
+    {
+      "id": "00000000-0000-4000-8000-0000000000a0",
+      "apuTemplateId": "00000000-0000-4000-8000-000000000090",
+      "resourceId": "00000000-0000-4000-8000-000000000041",
+      "componentType": "material",
+      "quantity": "1.0500000000",
+      "wastePct": "0.0800000000",
+      "unitPriceSource": "manual",
+      "unitPriceSnapshot": "55000.0000000000",
+      "totalComponentCost": "62370.0000000000",
+      "sortOrder": 0,
+      "notes": null
+    },
+    {
+      "id": "00000000-0000-4000-8000-0000000000a1",
+      "apuTemplateId": "00000000-0000-4000-8000-000000000090",
+      "resourceId": "00000000-0000-4000-8000-000000000042",
+      "componentType": "labor",
+      "quantity": "0.0500000000",
+      "wastePct": "0.0000000000",
+      "unitPriceSource": "labor_role",
+      "unitPriceSnapshot": "120000.0000000000",
+      "totalComponentCost": "6000.0000000000",
+      "sortOrder": 1,
+      "notes": null
+    }
+  ],
+
+  "estimate": {
+    "id": "00000000-0000-4000-8000-0000000000b0",
+    "projectScopeId": "00000000-0000-4000-8000-000000000021",
+    "code": "EST-P1",
+    "name": "Presupuesto primer piso",
+    "status": "active",
+    "createdAt": "2026-05-29T00:00:00-05:00",
+    "updatedAt": "2026-05-29T00:00:00-05:00"
+  },
+
+  "estimateVersion": {
+    "id": "00000000-0000-4000-8000-0000000000b1",
+    "estimateId": "00000000-0000-4000-8000-0000000000b0",
+    "versionNumber": 1,
+    "status": "approved",
+    "createdBy": null,
+    "createdAt": "2026-05-29T00:00:00-05:00",
+    "approvedAt": "2026-05-29T00:00:00-05:00",
+    "notes": "Versión espejo del golden master (Primer piso)."
+  },
+
+  "chapters": [
+    {
+      "id": "00000000-0000-4000-8000-0000000000c0",
+      "estimateVersionId": "00000000-0000-4000-8000-0000000000b1",
+      "code": "CAP-01",
+      "name": "Preliminares y cimentación",
+      "sortOrder": 0
+    },
+    {
+      "id": "00000000-0000-4000-8000-0000000000c1",
+      "estimateVersionId": "00000000-0000-4000-8000-0000000000b1",
+      "code": "CAP-02",
+      "name": "Acabados primer piso",
+      "sortOrder": 1
+    }
+  ],
+
+  "boqItems": [
+    {
+      "id": "00000000-0000-4000-8000-0000000000d0",
+      "estimateVersionId": "00000000-0000-4000-8000-0000000000b1",
+      "chapterId": "00000000-0000-4000-8000-0000000000c1",
+      "apuTemplateId": "00000000-0000-4000-8000-000000000090",
+      "quantityGroupId": "00000000-0000-4000-8000-0000000000e0",
+      "code": "1.01",
+      "descriptionSnapshot": "Instalación piso porcelanato 60x60 (muestra)",
+      "unitSnapshot": "m2",
+      "quantitySnapshot": "120.0000000000",
+      "unitPriceSnapshot": "68370.0000000000",
+      "subtotal": "8204400.0000000000",
+      "sortOrder": 0,
+      "notes": "Ítem de muestra; precio unitario = suma componentes APU."
+    },
+    {
+      "id": "00000000-0000-4000-8000-0000000000d1",
+      "estimateVersionId": "00000000-0000-4000-8000-0000000000b1",
+      "chapterId": "00000000-0000-4000-8000-0000000000c0",
+      "apuTemplateId": null,
+      "quantityGroupId": null,
+      "code": "9.99",
+      "descriptionSnapshot": "Balanceo cantidades restantes (no detalladas en este fixture)",
+      "unitSnapshot": "gl",
+      "quantitySnapshot": "1.0000000000",
+      "unitPriceSnapshot": "327880079.9369073500",
+      "subtotal": "327880079.9369073500",
+      "sortOrder": 99,
+      "notes": "Ítem de balanceo: completa costos_directos exactos (§3.4) mientras el detalle real fila a fila se puebla con dump-workbook.mjs. NO es un dato real del Excel; es relleno declarado para mantener consistencia aritmética del fixture."
+    }
+  ],
+
+  "indirectCostRules": [
+    {
+      "id": "00000000-0000-4000-8000-0000000000f0",
+      "estimateVersionId": "00000000-0000-4000-8000-0000000000b1",
+      "code": "A",
+      "name": "Administración",
+      "percentage": "0.035",
+      "baseType": "direct_cost",
+      "sortOrder": 0,
+      "visibleToClient": true
+    },
+    {
+      "id": "00000000-0000-4000-8000-0000000000f1",
+      "estimateVersionId": "00000000-0000-4000-8000-0000000000b1",
+      "code": "I",
+      "name": "Imprevistos",
+      "percentage": "0.025",
+      "baseType": "direct_cost",
+      "sortOrder": 1,
+      "visibleToClient": true
+    },
+    {
+      "id": "00000000-0000-4000-8000-0000000000f2",
+      "estimateVersionId": "00000000-0000-4000-8000-0000000000b1",
+      "code": "U",
+      "name": "Utilidad",
+      "percentage": "0.04",
+      "baseType": "direct_cost",
+      "sortOrder": 2,
+      "visibleToClient": true
+    },
+    {
+      "id": "00000000-0000-4000-8000-0000000000f3",
+      "estimateVersionId": "00000000-0000-4000-8000-0000000000b1",
+      "code": "IVA",
+      "name": "IVA sobre utilidad",
+      "percentage": "0.19",
+      "baseType": "utility",
+      "sortOrder": 3,
+      "visibleToClient": true
+    }
+  ],
+
+  "quantityGroups": [
+    {
+      "id": "00000000-0000-4000-8000-0000000000e0",
+      "projectScopeId": "00000000-0000-4000-8000-000000000021",
+      "code": "QG-PISO-P1",
+      "name": "Áreas de piso primer piso (muestra)",
+      "unit": "m2",
+      "calculationMode": "area",
+      "createdAt": "2026-05-29T00:00:00-05:00"
+    }
+  ],
+
+  "quantityLines": [
+    {
+      "id": "00000000-0000-4000-8000-0000000000e1",
+      "quantityGroupId": "00000000-0000-4000-8000-0000000000e0",
+      "description": "Sala-comedor",
+      "length": "8.0000000000",
+      "width": "5.0000000000",
+      "height": null,
+      "multiplier": "1.0000000000",
+      "directQuantity": null,
+      "formulaType": "area",
+      "calculatedQuantity": "40.0000000000",
+      "notes": "largo × ancho × multiplicador",
+      "sortOrder": 0
+    },
+    {
+      "id": "00000000-0000-4000-8000-0000000000e2",
+      "quantityGroupId": "00000000-0000-4000-8000-0000000000e0",
+      "description": "Habitaciones (2)",
+      "length": "5.0000000000",
+      "width": "4.0000000000",
+      "height": null,
+      "multiplier": "2.0000000000",
+      "directQuantity": null,
+      "formulaType": "area",
+      "calculatedQuantity": "40.0000000000",
+      "notes": "largo × ancho × multiplicador (2 espacios iguales)",
+      "sortOrder": 1
+    },
+    {
+      "id": "00000000-0000-4000-8000-0000000000e3",
+      "quantityGroupId": "00000000-0000-4000-8000-0000000000e0",
+      "description": "Cocina + baños + circulación",
+      "length": null,
+      "width": null,
+      "height": null,
+      "multiplier": "1.0000000000",
+      "directQuantity": "40.0000000000",
+      "formulaType": "direct",
+      "calculatedQuantity": "40.0000000000",
+      "notes": "cantidad directa (suma de áreas menores)",
+      "sortOrder": 2
+    }
+  ],
+
+  "estimateTotals": {
+    "costos_directos": "336084479.93690735",
+    "administracion": "11762956.797791759",
+    "imprevistos": "8402111.998422684",
+    "utilidad": "13443379.197476294",
+    "iva_sobre_utilidad": "2554242.047520496",
+    "costos_indirectos": "36162690.04121123",
+    "total_costo": "372247169.9781186",
+    "area_construida": "236.77900000000005",
+    "valor_m2": "1572129.1583211287"
+  }
+}
