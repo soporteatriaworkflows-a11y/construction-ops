@@ -831,3 +831,45 @@ Resultado global: PASS (exit code 0)
 
 ### Agentes activos al cierre
 - Ninguno.
+
+## 2026-05-30 — Merge de Oleada 2A a main (orchestrator)
+
+### Merge
+- Usuario aprobó el merge. Preflight: `main = origin/main = 974ea99` (árbol
+  limpio); integración final `31c3102`; backups wave1 (3) + wave2 (2) y tags
+  conservados; Excel ignorado; sin `.env`/`package-lock`; solo ag-grid-community.
+- `git merge --no-ff integration/wave-2a` → **merge commit
+  `f0c7d235beb7d16ce514566594df2becd869cf06`** (`f0c7d23`). **Sin conflictos.**
+
+### Validación post-merge (todo PASA en main)
+- typecheck 0 · lint 0 · **test 229** · build Next 16.2.6 (9 rutas + Proxy) ·
+  `gm:regression` **22/22** · `gm:import` **9/9** (±0.01 COP, **IVA diff=0**) ·
+  `validate-claude-agents` **214/0/0** · `git diff --check` limpio.
+- Estructura: **1** `interface PricingReadPort` y **1** `ApprovedPriceContext`
+  (en `apps/web/lib/contracts/pricing-read.ts`); sin `contributesToUtilityBase`;
+  IVA por `base_type='utility'`; `ClientSafePrice` sin campos 🔒.
+
+### RLS runtime (Paso 4)
+- El merge NO modificó `supabase/migrations|policies|seeds` ni
+  `apps/web/lib/db/schema.ts` (verificado `git diff 974ea99..HEAD`) ⇒ **RLS
+  runtime 21/21** de Oleada 1.5 sigue vigente. No se relevantó Docker.
+- **B-004** (Realtime unhealthy en Windows) sigue como deuda técnica no bloqueante.
+
+### Privacidad
+- `INTERNAL_PRICE_FIELDS` cubre público/descuento/esperado/real/ahorros/
+  `sourceReference`/proveedor interno; proyección `ClientSafePrice` sin 🔒
+  (privacy.test.ts). Excel ignorado y no versionado; sin `.env`/`package-lock`;
+  sin `ag-grid-enterprise` en dominio; sin AGPL; sin datos privados.
+
+### Ramas y tag
+- **Conservados**: backups wave1 (db-rls/excel-mapper/frontend-boq), wave2
+  (cost-domain/pricing), `integration/wave-2a`, `feature/wave-1.5-local-rls`.
+- Tag anotado: **`wave-2a-domain-pricing-v1`** sobre el merge.
+
+### Estado / próximo paso
+- **Oleada 2A CERRADA y en `main`.** `agent-homecenter` NO lanzado; Oleada 2B
+  NO iniciada. Antes de 2B: congelar `docs/PRICING_ADAPTER_CONTRACT.md`
+  (decisiones recomendadas Q11 aprobación humana + Q14 canal Homecenter).
+
+### Agentes activos al cierre
+- Ninguno.
