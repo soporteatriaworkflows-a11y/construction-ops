@@ -690,3 +690,144 @@ Resultado global: PASS (exit code 0)
 
 ### Agentes activos al cierre
 - Ninguno.
+
+## 2026-05-30 — Oleada 2A: rama de integración + congelar contrato de precios (orchestrator)
+
+### Fase 0 — rama de integración
+- Preflight: `main = origin/main = 974ea99` (árbol limpio); tags
+  `wave-1-foundation-v1` y `wave-1.5-rls-runtime-validated-v1` conservados;
+  3 backups conservados; Excel ignorado; sin `.env`/`package-lock`; solo
+  `ag-grid-community/react` (MIT).
+- Creada y publicada **`integration/wave-2a`** desde `main`. `main` intacta.
+
+### Fase 1 — contrato de lectura de precios CONGELADO v1
+- Creado **`docs/PRICING_READ_CONTRACT.md`** (orchestrator-owned, congelado v1;
+  cambios solo vía INTEGRATION_REQUESTS). Define:
+  - tipos base (reusa `Uuid`/`IsoDateTime`/`DecimalString`/`PriceSourceType`/
+    `PricingRuleType`/`SyncStatus` de API_CONTRACTS);
+  - `ApprovedPriceContext` (snapshot aprobado; dinero/porcentajes `DecimalString`;
+    fórmulas Q8 base `onlinePublicPrice`; campos 🔒 marcados);
+  - `PricingReadPort` (`getApprovedPrice` → único contexto | `no_approved_price`
+    | `ambiguous_price`); determinista, solo lectura;
+  - `PricingApprovalPort` (escritura interna exclusiva de pricing: observación,
+    aprobación humana, override trazable, append-only, no muta snapshots);
+  - privacidad backend-first + proyección `ClientSafePrice` (sin campos 🔒).
+- **Frontera**: cost-domain consume el puerto/DTO; NO consulta tablas de pricing
+  ni recalcula descuentos/ahorros; usa `budgetReferencePrice` como
+  `unit_price_snapshot`.
+- Actualizados: `API_CONTRACTS.md` (§5 + ownership de puertos),
+  `AGENT_REGISTRY.md` (dependencia 2A + criterios cost/pricing), `DECISIONS.md`
+  (4 filas: merge 1.5, B-004, rama 2A, contrato de precios), este HANDOFF_LOG.
+
+### Próximo paso
+- Commit `docs: freeze wave 2a pricing read contract` + push a
+  `origin integration/wave-2a`. Luego lanzar en paralelo (worktrees aislados)
+  `agent-cost-domain` y `agent-pricing`. NO `agent-homecenter`. NO merge.
+
+### Agentes activos al cierre de esta microfase
+- Ninguno (aún). A continuación se lanzan cost-domain ∥ pricing.
+
+## 2026-05-30 — Oleada 2A: agentes ejecutados y entregables preservados (orchestrator)
+
+### Lanzamiento
+- Contrato congelado commit `02ca9c3` en `integration/wave-2a`. Lanzados en
+  paralelo en worktrees aislados: **agent-cost-domain** y **agent-pricing**.
+- **Nota**: ambos worktrees se derivaron de `main`@`974ea99` (antes de
+  `02ca9c3`), por lo que NO vieron `docs/PRICING_READ_CONTRACT.md`. Cada uno
+  implementó `PricingReadPort` desde la spec de la tarea + Q8 de API_CONTRACTS.
+  Reconciliación de tipos registrada en INTEGRATION_REQUESTS (pendiente 2A).
+
+### agent-cost-domain — entregable
+- Motor financiero puro en `apps/web/modules/apu|boq|estimates/` + 8 archivos de
+  test en `apps/web/tests/unit/cost-domain/` + memoria de agente. Mano de obra,
+  APU (vía `PricingReadPort`), BOQ, AIU/IVA configurables, total, valor/m²,
+  snapshots inmutables, clonación. `decimal.js`/`DecimalString` (Q9).
+- Validado: **typecheck 0 · lint 0 · 178/178 tests · gm:regression 22/22**;
+  9 valores §3.4 ±0.01 COP desde el fixture (sin ajustar fórmulas).
+- **`git commit` denegado en su entorno**; el orquestador commiteó →
+  **`3783aca`**. Preservado en `backup/wave2-cost-domain` (pusheada).
+
+### agent-pricing — entregable
+- Capas de precio en `apps/web/modules/pricing/` (sin `adapters/`) y
+  `apps/web/modules/suppliers/` + 8 archivos de test en
+  `apps/web/tests/unit/pricing/`. Proveedores, `supplier_products`,
+  `price_observations` append-only, reglas con precedencia, variación preventiva,
+  descuento interno, precios/ahorros (Q8), override trazable, aprobación humana,
+  `PricingReadPort`/`PricingApprovalPort`, proyección `ClientSafePrice`
+  (privacidad backend-first).
+- Validado por el orquestador en su worktree: **typecheck 0 · lint 0 ·
+  155/155 tests** (108 previos + 47 de pricing).
+- **`git commit` denegado en su entorno**; el orquestador commiteó →
+  **`7897926`**. Preservado en `backup/wave2-pricing` (pusheada).
+
+### Higiene (ambos worktrees)
+- Sin archivos privados, `.env`, Excel, AGPL ni `ag-grid-enterprise`. Sin solape
+  de archivos entre agentes. `adapters/` y `scripts/catalog-sync/` intactos
+  (reservados a homecenter, Oleada 2B).
+
+### Estado / próximo paso
+- **NO integrado aún** a `integration/wave-2a`; **NO merge a `main`**;
+  **`agent-homecenter` NO lanzado**. Backups y `feature/wave-1.5-local-rls`,
+  backups de wave-1, tags: todo conservado.
+- Pendientes registrados en INTEGRATION_REQUESTS: (1) reconciliar tipos del
+  puerto de precios a una sola fuente; (2) confirmar base del IVA vía
+  `base_type='utility'` del esquema vs flag de dominio.
+- Antes de Oleada 2B: congelar `docs/PRICING_ADAPTER_CONTRACT.md`.
+
+### Agentes activos al cierre
+- Ninguno (cost-domain y pricing finalizaron).
+
+## 2026-05-30 — Oleada 2A: integración secuencial cost-domain + pricing (orchestrator)
+
+### Rama e integración
+- Sobre `integration/wave-2a`. Cherry-picks aplicados: **`6694d88`** (cost-domain,
+  desde backup `3783aca`) y **`1e8a869`** (pricing, desde backup `7897926`).
+  Ambos limpios, sin conflictos. `main` intacta.
+
+### Unificación del contrato de precios (Fase 3)
+- Creada **FUENTE ÚNICA DE CÓDIGO** `apps/web/lib/contracts/pricing-read.ts`
+  (refleja el contrato congelado: forma async + `PricingReadResult` union +
+  `ApprovedPriceContext` completo + clases de error `ApprovedPriceNotFoundError`/
+  `AmbiguousApprovedPriceError` + helper `throwOnPricingError` + `ClientSafePrice`
+  + `INTERNAL_PRICE_FIELDS`).
+- `apps/web/modules/apu/pricing-port.ts` ahora re-exporta el contrato (cost-domain
+  consume); `apps/web/modules/pricing/types.ts` re-exporta el contrato y conserva
+  sólo el `PricingApprovalPort` (write-side de pricing). **Una sola**
+  `interface PricingReadPort`/`ApprovedPriceContext` (verificado por grep).
+- cost-domain pasó `resolveUnitPriceSnapshot`/`calculateApuComponentWithPort` a
+  **async** y convierte `!ok`→clases de error. `_fakes.ts` y `apu.test.ts`
+  adaptados (async + `rejects.toBeInstanceOf`). Sin dependencias circulares
+  (el contrato sólo importa `@/lib/utils/types`).
+- Ajuste menor documentado: `PricingReadQuery.estimateVersionId?` (opcional) para
+  congelar precio por versión (cost-domain). Reflejado en PRICING_READ_CONTRACT
+  y API_CONTRACTS.
+
+### Base del IVA (Fase 4)
+- Eliminado el flag `contributesToUtilityBase`. Regla canónica (solo `base_type`
+  + `sortOrder`): una regla `base_type='utility'` se aplica sobre el monto de la
+  última línea `direct_cost` previa (la Utilidad). Reproduce el golden master
+  (IVA = Utilidad × 0.19, gm:import diff=0). Sin cambios al seed/fixture (U sigue
+  `direct_cost`). Tests añadidos: base directa, base utility, orden de cálculo,
+  error si no hay `direct_cost` previa.
+
+### Validación integral (Fase 5 — todo PASS)
+- typecheck 0 · lint 0 · **229 tests** (108 base + cost-domain + pricing) · build
+  Next 16.2.6 (9 rutas + Proxy) · `gm:regression` **22/22** · `gm:import` **9/9**
+  (±0.01 COP, diff=0) · `validate-claude-agents` **214/0/0** · `git diff --check`
+  limpio. Sin privados/`.env`/`package-lock`; sin `ag-grid-enterprise` en dominio;
+  sin AGPL. Proyección `ClientSafePrice` sin campos 🔒 (privacy.test.ts).
+
+### RLS runtime (Fase 6)
+- La integración NO modificó `supabase/migrations|policies|seeds` ni
+  `apps/web/lib/db/schema.ts` ⇒ **RLS runtime 21/21** de Oleada 1.5 sigue vigente
+  (no se relevantó Docker). **B-004** (Realtime) sigue como deuda técnica.
+
+### Estado / próximo paso
+- Commit `chore: integrate and validate wave 2a cost domain and pricing` +
+  push a `origin integration/wave-2a`. **NO merge a `main`** (a la espera de
+  aprobación del usuario). **`agent-homecenter` NO lanzado.**
+- Recomendación: **APROBAR merge `integration/wave-2a` → `main`**. Antes de
+  Oleada 2B: congelar `docs/PRICING_ADAPTER_CONTRACT.md`.
+
+### Agentes activos al cierre
+- Ninguno.

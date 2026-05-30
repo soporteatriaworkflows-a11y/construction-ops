@@ -185,12 +185,27 @@ orchestrator ──┬─► db-rls ────────► cost-domain ─�
 - Regresión PASA ±0.01 COP.
 - Snapshots inmutables verificados.
 - Tests unitarios de cada fórmula.
+- **Consume `PricingReadPort` / `ApprovedPriceContext`** (contrato congelado
+  `docs/PRICING_READ_CONTRACT.md`). NO consulta tablas de pricing ni recalcula
+  descuentos/ahorros. Usa `budgetReferencePrice` como `unit_price_snapshot`.
 
 ### agent-pricing (Oleada 2)
 - 8 capas de precio implementadas.
 - Endpoints cliente NO retornan campos privados.
 - Aprobación humana para variación > umbral.
 - Histórico de observaciones preservado.
+- **Implementa `PricingReadPort` y `PricingApprovalPort`** y la proyección
+  `ClientSafePrice` (contrato congelado `docs/PRICING_READ_CONTRACT.md`).
+  Fórmulas Q8 con base `onlinePublicPrice`; dinero/porcentajes `DecimalString`.
+
+### Dependencia de contrato Oleada 2A
+- `agent-cost-domain` **depende** de la interfaz que provee `agent-pricing`. Para
+  paralelizar sin bloqueo, la interfaz está **congelada v1** en
+  `docs/PRICING_READ_CONTRACT.md`: cost-domain programa contra el puerto/DTO;
+  pricing lo implementa. Ningún agente edita el contrato; cambios solo vía
+  `docs/INTEGRATION_REQUESTS.md` (orchestrator). Sin solape de archivos:
+  `modules/apu|boq|estimates` (cost) vs `modules/suppliers|pricing` salvo
+  `adapters/` (pricing).
 
 ### agent-homecenter (Oleada 2)
 - Interfaz genérica `SupplierAdapter` definida.

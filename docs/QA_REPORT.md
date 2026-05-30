@@ -66,6 +66,7 @@ Ninguno.
 | 2026-05-30 | orquestador (Oleada 1.5, rama `feature/wave-1.5-local-rls`) | 🟡 PARCIAL | Q8/Q9 RESUELTAS; offline PASS; **RLS runtime BLOQUEADO por corrupción del content store de Docker Desktop** |
 | 2026-05-30 | orquestador (Oleada 1.5, RLS runtime real) | ✅ PASS | Docker reparado; **RLS runtime 21/21 PASS** contra Postgres local (Supabase Docker); B-003 RESUELTO |
 | 2026-05-30 | orquestador (merge Oleada 1.5 a main `1ddc833`) | ✅ PASS post-merge | Ninguno bloqueante; B-004 (Realtime) como deuda técnica |
+| 2026-05-30 | orquestador (integración Oleada 2A en `integration/wave-2a`) | ✅ PASS pre-merge | cost-domain + pricing integrados y unificados; **229 tests**; gm 22/22 + 9/9; sin merge a main |
 
 ## Validación Oleada 1.5 (rama `feature/wave-1.5-local-rls`, 2026-05-30)
 
@@ -159,3 +160,42 @@ ignorado (`git check-ignore` confirma `private/`); sin `.env` trackeado; sin
 únicamente en comentarios de prohibición; sin AGPL. **RLS runtime 21/21**
 (validado en la rama; ver sección anterior). **Deuda técnica**: B-004 (Realtime
 unhealthy en Windows), no bloqueante. **Oleada 1.5 CERRADA**; Q8/Q9 RESUELTAS.
+
+## Validación integración Oleada 2A (rama `integration/wave-2a`, 2026-05-30)
+
+Integración secuencial de los entregables de Oleada 2A en `integration/wave-2a`
+(cherry-picks `6694d88` cost-domain + `1e8a869` pricing), unificación del
+contrato de precios y resolución de la base del IVA. **Sin merge a `main`.**
+
+**Unificación del contrato:**
+- Fuente única de código `apps/web/lib/contracts/pricing-read.ts`. **Una sola**
+  `interface PricingReadPort` / `ApprovedPriceContext` (verificado por grep).
+  cost-domain re-exporta vía `modules/apu/pricing-port.ts`; pricing vía
+  `modules/pricing/types.ts`. Sin dependencias circulares (el contrato solo
+  importa `@/lib/utils/types`). cost-domain pasó su puerto a **async** + clases
+  de error `ApprovedPriceNotFoundError`/`AmbiguousApprovedPriceError`.
+
+**Base del IVA:**
+- Eliminado el flag `contributesToUtilityBase` (sin código activo). Regla
+  canónica: `base_type='utility'` aplica sobre el monto de la última línea
+  `direct_cost` previa (Utilidad). IVA = Utilidad × 0.19, **diff=0** en gm:import.
+
+**Resultados (todo PASS):** typecheck 0 · lint 0 · **229 tests** (cost-domain +
+pricing + base) · build Next 16.2.6 (9 rutas + Proxy) · `gm:regression` **22/22**
+· `gm:import` **9/9** (±0.01 COP, diff=0) · `validate-claude-agents` **214/0/0**
+· `git diff --check` limpio.
+
+**Privacidad:** proyección `ClientSafePrice` sin campos 🔒 (privacy.test.ts);
+`INTERNAL_PRICE_FIELDS` cubre descuentos/ahorros/precio público/proveedor
+interno; `price_observations` append-only y snapshots inmutables (tests de
+pricing + cost-domain). Excel ignorado; sin `.env`/`package-lock`; sin
+`ag-grid-enterprise` en dominio; sin AGPL; sin datos privados.
+
+**RLS runtime:** la integración NO modificó `supabase/migrations|policies|seeds`
+ni `apps/web/lib/db/schema.ts` ⇒ la validación **RLS runtime 21/21** de Oleada
+1.5 continúa vigente (no se relevantó Docker). **B-004** (Realtime) sigue como
+deuda técnica no bloqueante.
+
+**Recomendación:** ✅ **APROBAR merge `integration/wave-2a` → `main`** (queda a
+decisión del usuario; este ciclo NO hace merge). Antes de Oleada 2B: congelar
+`docs/PRICING_ADAPTER_CONTRACT.md`.
