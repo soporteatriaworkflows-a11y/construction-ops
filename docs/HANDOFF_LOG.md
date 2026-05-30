@@ -726,3 +726,53 @@ Resultado global: PASS (exit code 0)
 
 ### Agentes activos al cierre de esta microfase
 - Ninguno (aún). A continuación se lanzan cost-domain ∥ pricing.
+
+## 2026-05-30 — Oleada 2A: agentes ejecutados y entregables preservados (orchestrator)
+
+### Lanzamiento
+- Contrato congelado commit `02ca9c3` en `integration/wave-2a`. Lanzados en
+  paralelo en worktrees aislados: **agent-cost-domain** y **agent-pricing**.
+- **Nota**: ambos worktrees se derivaron de `main`@`974ea99` (antes de
+  `02ca9c3`), por lo que NO vieron `docs/PRICING_READ_CONTRACT.md`. Cada uno
+  implementó `PricingReadPort` desde la spec de la tarea + Q8 de API_CONTRACTS.
+  Reconciliación de tipos registrada en INTEGRATION_REQUESTS (pendiente 2A).
+
+### agent-cost-domain — entregable
+- Motor financiero puro en `apps/web/modules/apu|boq|estimates/` + 8 archivos de
+  test en `apps/web/tests/unit/cost-domain/` + memoria de agente. Mano de obra,
+  APU (vía `PricingReadPort`), BOQ, AIU/IVA configurables, total, valor/m²,
+  snapshots inmutables, clonación. `decimal.js`/`DecimalString` (Q9).
+- Validado: **typecheck 0 · lint 0 · 178/178 tests · gm:regression 22/22**;
+  9 valores §3.4 ±0.01 COP desde el fixture (sin ajustar fórmulas).
+- **`git commit` denegado en su entorno**; el orquestador commiteó →
+  **`3783aca`**. Preservado en `backup/wave2-cost-domain` (pusheada).
+
+### agent-pricing — entregable
+- Capas de precio en `apps/web/modules/pricing/` (sin `adapters/`) y
+  `apps/web/modules/suppliers/` + 8 archivos de test en
+  `apps/web/tests/unit/pricing/`. Proveedores, `supplier_products`,
+  `price_observations` append-only, reglas con precedencia, variación preventiva,
+  descuento interno, precios/ahorros (Q8), override trazable, aprobación humana,
+  `PricingReadPort`/`PricingApprovalPort`, proyección `ClientSafePrice`
+  (privacidad backend-first).
+- Validado por el orquestador en su worktree: **typecheck 0 · lint 0 ·
+  155/155 tests** (108 previos + 47 de pricing).
+- **`git commit` denegado en su entorno**; el orquestador commiteó →
+  **`7897926`**. Preservado en `backup/wave2-pricing` (pusheada).
+
+### Higiene (ambos worktrees)
+- Sin archivos privados, `.env`, Excel, AGPL ni `ag-grid-enterprise`. Sin solape
+  de archivos entre agentes. `adapters/` y `scripts/catalog-sync/` intactos
+  (reservados a homecenter, Oleada 2B).
+
+### Estado / próximo paso
+- **NO integrado aún** a `integration/wave-2a`; **NO merge a `main`**;
+  **`agent-homecenter` NO lanzado**. Backups y `feature/wave-1.5-local-rls`,
+  backups de wave-1, tags: todo conservado.
+- Pendientes registrados en INTEGRATION_REQUESTS: (1) reconciliar tipos del
+  puerto de precios a una sola fuente; (2) confirmar base del IVA vía
+  `base_type='utility'` del esquema vs flag de dominio.
+- Antes de Oleada 2B: congelar `docs/PRICING_ADAPTER_CONTRACT.md`.
+
+### Agentes activos al cierre
+- Ninguno (cost-domain y pricing finalizaron).
