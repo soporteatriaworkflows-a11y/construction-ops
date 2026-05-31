@@ -633,6 +633,209 @@ export const quantityLines = pgTable(
 );
 
 /* ----------------------------------------------------------------------------
+ * PLANNING (Oleada 3B) — cronograma, dependencias, avance, asignaciones.
+ *
+ * Contrato congelado: docs/PLANNING_CONTRACT.md (v1). Las 4 tablas llevan
+ * `organization_id` DIRECTO (RLS simple). Duraciones/cantidades/porcentajes como
+ * NUMERIC; fechas de calendario DATE; auditoría TIMESTAMPTZ. Las políticas RLS
+ * y el trigger `updated_at` viven en migraciones SQL dedicadas
+ * (supabase/migrations/20260531100000_planning_schedule.sql y *_rls_policies_planning.sql).
+ * ------------------------------------------------------------------------- */
+
+export const scheduleTasks = pgTable(
+  "schedule_tasks",
+  {
+    id: pk(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    projectScopeId: uuid("project_scope_id").references(() => projectScopes.id, {
+      onDelete: "set null",
+    }),
+    chapterId: uuid("chapter_id").references(() => chapters.id, {
+      onDelete: "set null",
+    }),
+    parentTaskId: uuid("parent_task_id").references(
+      (): AnyPgColumn => scheduleTasks.id,
+      { onDelete: "cascade" },
+    ),
+    wbsCode: text("wbs_code").notNull(),
+    name: text("name").notNull(),
+    description: text("description"),
+    plannedStart: date("planned_start").notNull(),
+    plannedEnd: date("planned_end").notNull(),
+    plannedDurationDays: numeric("planned_duration_days", {
+      precision: 12,
+      scale: 4,
+    }).notNull(),
+    progressPct: numeric("progress_pct", { precision: 7, scale: 4 })
+      .notNull()
+      .default("0"),
+    status: text("status").notNull().default("not_started"),
+    isMilestone: boolean("is_milestone").notNull().default(false),
+    sortOrder: integer("sort_order").notNull().default(0),
+    externalReference: text("external_reference"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("schedule_tasks_organization_id_idx").on(t.organizationId),
+    index("schedule_tasks_project_id_idx").on(t.projectId),
+    index("schedule_tasks_project_scope_id_idx").on(t.projectScopeId),
+    index("schedule_tasks_chapter_id_idx").on(t.chapterId),
+    index("schedule_tasks_parent_task_id_idx").on(t.parentTaskId),
+    index("schedule_tasks_project_sort_idx").on(t.projectId, t.sortOrder),
+    index("schedule_tasks_project_start_idx").on(t.projectId, t.plannedStart),
+    uniqueIndex("schedule_tasks_project_wbs_uq").on(t.projectId, t.wbsCode),
+    check("schedule_tasks_dates_valid", sql`${t.plannedEnd} >= ${t.plannedStart}`),
+    check(
+      "schedule_tasks_duration_nonneg",
+      sql`${t.plannedDurationDays} >= 0`,
+    ),
+    check(
+      "schedule_tasks_progress_range",
+      sql`${t.progressPct} >= 0 AND ${t.progressPct} <= 100`,
+    ),
+    check(
+      "schedule_tasks_status_valid",
+      sql`${t.status} IN ('not_started','in_progress','completed','blocked','cancelled')`,
+    ),
+    check(
+      "schedule_tasks_milestone_zero_duration",
+      sql`NOT ${t.isMilestone} OR (${t.plannedDurationDays} = 0 AND ${t.plannedStart} = ${t.plannedEnd})`,
+    ),
+  ],
+);
+
+export const taskDependencies = pgTable(
+  "task_dependencies",
+  {
+    id: pk(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    predecessorTaskId: uuid("predecessor_task_id")
+      .notNull()
+      .references(() => scheduleTasks.id, { onDelete: "cascade" }),
+    successorTaskId: uuid("successor_task_id")
+      .notNull()
+      .references(() => scheduleTasks.id, { onDelete: "cascade" }),
+    dependencyType: text("dependency_type").notNull().default("FS"),
+    lagDays: numeric("lag_days", { precision: 12, scale: 4 })
+      .notNull()
+      .default("0"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("task_dependencies_organization_id_idx").on(t.organizationId),
+    index("task_dependencies_project_id_idx").on(t.projectId),
+    index("task_dependencies_predecessor_idx").on(t.predecessorTaskId),
+    index("task_dependencies_successor_idx").on(t.successorTaskId),
+    uniqueIndex("task_dependencies_pred_succ_uq").on(
+      t.predecessorTaskId,
+      t.successorTaskId,
+    ),
+    check(
+      "task_dependencies_no_self",
+      sql`${t.predecessorTaskId} <> ${t.successorTaskId}`,
+    ),
+    check(
+      "task_dependencies_type_valid",
+      sql`${t.dependencyType} IN ('FS','SS','FF','SF')`,
+    ),
+  ],
+);
+
+export const progressEntries = pgTable(
+  "progress_entries",
+  {
+    id: pk(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    taskId: uuid("task_id")
+      .notNull()
+      .references(() => scheduleTasks.id, { onDelete: "cascade" }),
+    recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull(),
+    physicalProgressPct: numeric("physical_progress_pct", {
+      precision: 7,
+      scale: 4,
+    }).notNull(),
+    financialProgressPct: numeric("financial_progress_pct", {
+      precision: 7,
+      scale: 4,
+    }),
+    notes: text("notes"),
+    createdBy: uuid("created_by").references(() => profiles.id, {
+      onDelete: "set null",
+    }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("progress_entries_organization_id_idx").on(t.organizationId),
+    index("progress_entries_project_id_idx").on(t.projectId),
+    index("progress_entries_task_recorded_idx").on(
+      t.taskId,
+      t.recordedAt.desc(),
+    ),
+    check(
+      "progress_entries_physical_range",
+      sql`${t.physicalProgressPct} >= 0 AND ${t.physicalProgressPct} <= 100`,
+    ),
+    check(
+      "progress_entries_financial_range",
+      sql`${t.financialProgressPct} IS NULL OR (${t.financialProgressPct} >= 0 AND ${t.financialProgressPct} <= 100)`,
+    ),
+  ],
+);
+
+export const resourceAssignments = pgTable(
+  "resource_assignments",
+  {
+    id: pk(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    taskId: uuid("task_id")
+      .notNull()
+      .references(() => scheduleTasks.id, { onDelete: "cascade" }),
+    resourceId: uuid("resource_id").references(() => resources.id, {
+      onDelete: "set null",
+    }),
+    laborRoleId: uuid("labor_role_id").references(() => laborRoles.id, {
+      onDelete: "set null",
+    }),
+    quantity: money("quantity"),
+    unit: text("unit"),
+    notes: text("notes"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("resource_assignments_organization_id_idx").on(t.organizationId),
+    index("resource_assignments_project_id_idx").on(t.projectId),
+    index("resource_assignments_task_id_idx").on(t.taskId),
+    index("resource_assignments_resource_id_idx").on(t.resourceId),
+    index("resource_assignments_labor_role_id_idx").on(t.laborRoleId),
+    check(
+      "resource_assignments_quantity_nonneg",
+      sql`${t.quantity} IS NULL OR ${t.quantity} >= 0`,
+    ),
+  ],
+);
+
+/* ----------------------------------------------------------------------------
  * Tipos inferidos (select / insert) — espejo de las interfaces públicas.
  * ------------------------------------------------------------------------- */
 
@@ -676,3 +879,11 @@ export type QuantityGroup = typeof quantityGroups.$inferSelect;
 export type NewQuantityGroup = typeof quantityGroups.$inferInsert;
 export type QuantityLine = typeof quantityLines.$inferSelect;
 export type NewQuantityLine = typeof quantityLines.$inferInsert;
+export type ScheduleTask = typeof scheduleTasks.$inferSelect;
+export type NewScheduleTask = typeof scheduleTasks.$inferInsert;
+export type TaskDependency = typeof taskDependencies.$inferSelect;
+export type NewTaskDependency = typeof taskDependencies.$inferInsert;
+export type ProgressEntry = typeof progressEntries.$inferSelect;
+export type NewProgressEntry = typeof progressEntries.$inferInsert;
+export type ResourceAssignment = typeof resourceAssignments.$inferSelect;
+export type NewResourceAssignment = typeof resourceAssignments.$inferInsert;

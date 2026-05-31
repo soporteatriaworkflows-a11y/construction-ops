@@ -2443,6 +2443,207 @@
       "sortOrder": 2
     }
   ],
+  "planning": {
+    "notes": "Cronograma demo sanitizado del primer piso (Oleada 3B). Fechas/duraciones/avances ficticios coherentes; NO provienen del Excel real. WBS jerárquico con un hito. Dependencias FS/SS. progress_pct y progress_entries de ejemplo. Ruta crítica/holguras las calcula el dominio modules/planning en integración (aquí no se incluyen).",
+    "scheduleTasks": [
+      {
+        "id": "0d000000-0000-4000-8000-000000000001",
+        "projectId": "00000000-0000-4000-8000-000000000010",
+        "projectScopeId": "00000000-0000-4000-8000-000000000021",
+        "chapterId": "0c000000-0000-4000-8000-000000000001",
+        "parentTaskId": null,
+        "wbsCode": "1",
+        "name": "Preliminares de obra",
+        "description": "Cerramiento, campamento y replanteo",
+        "plannedStart": "2026-06-01",
+        "plannedEnd": "2026-06-10",
+        "plannedDurationDays": "10.0000",
+        "progressPct": "100.0000",
+        "status": "completed",
+        "isMilestone": false,
+        "sortOrder": 0,
+        "externalReference": "MSP-WBS-1"
+      },
+      {
+        "id": "0d000000-0000-4000-8000-000000000002",
+        "projectId": "00000000-0000-4000-8000-000000000010",
+        "projectScopeId": "00000000-0000-4000-8000-000000000021",
+        "chapterId": "0c000000-0000-4000-8000-000000000005",
+        "parentTaskId": null,
+        "wbsCode": "2",
+        "name": "Mampostería primer piso",
+        "description": "Muros en bloque",
+        "plannedStart": "2026-06-11",
+        "plannedEnd": "2026-06-30",
+        "plannedDurationDays": "20.0000",
+        "progressPct": "45.0000",
+        "status": "in_progress",
+        "isMilestone": false,
+        "sortOrder": 1,
+        "externalReference": "MSP-WBS-2"
+      },
+      {
+        "id": "0d000000-0000-4000-8000-000000000003",
+        "projectId": "00000000-0000-4000-8000-000000000010",
+        "projectScopeId": "00000000-0000-4000-8000-000000000021",
+        "chapterId": "0c000000-0000-4000-8000-000000000005",
+        "parentTaskId": "0d000000-0000-4000-8000-000000000002",
+        "wbsCode": "2.1",
+        "name": "Muros perimetrales",
+        "description": "Bloque de 15 cm en perímetro",
+        "plannedStart": "2026-06-11",
+        "plannedEnd": "2026-06-22",
+        "plannedDurationDays": "12.0000",
+        "progressPct": "60.0000",
+        "status": "in_progress",
+        "isMilestone": false,
+        "sortOrder": 2,
+        "externalReference": null
+      },
+      {
+        "id": "0d000000-0000-4000-8000-000000000004",
+        "projectId": "00000000-0000-4000-8000-000000000010",
+        "projectScopeId": "00000000-0000-4000-8000-000000000021",
+        "chapterId": "0c000000-0000-4000-8000-000000000005",
+        "parentTaskId": "0d000000-0000-4000-8000-000000000002",
+        "wbsCode": "2.2",
+        "name": "Muros divisorios",
+        "description": "Bloque de 10 cm interiores",
+        "plannedStart": "2026-06-19",
+        "plannedEnd": "2026-06-30",
+        "plannedDurationDays": "10.0000",
+        "progressPct": "25.0000",
+        "status": "in_progress",
+        "isMilestone": false,
+        "sortOrder": 3,
+        "externalReference": null
+      },
+      {
+        "id": "0d000000-0000-4000-8000-000000000005",
+        "projectId": "00000000-0000-4000-8000-000000000010",
+        "projectScopeId": "00000000-0000-4000-8000-000000000021",
+        "chapterId": "0c000000-0000-4000-8000-000000000009",
+        "parentTaskId": null,
+        "wbsCode": "3",
+        "name": "Pisos y enchapes",
+        "description": "Instalación de porcelanato",
+        "plannedStart": "2026-07-01",
+        "plannedEnd": "2026-07-20",
+        "plannedDurationDays": "20.0000",
+        "progressPct": "0.0000",
+        "status": "not_started",
+        "isMilestone": false,
+        "sortOrder": 4,
+        "externalReference": "MSP-WBS-3"
+      },
+      {
+        "id": "0d000000-0000-4000-8000-000000000006",
+        "projectId": "00000000-0000-4000-8000-000000000010",
+        "projectScopeId": "00000000-0000-4000-8000-000000000021",
+        "chapterId": null,
+        "parentTaskId": null,
+        "wbsCode": "M1",
+        "name": "Entrega primer piso",
+        "description": "Hito de entrega del primer piso",
+        "plannedStart": "2026-07-20",
+        "plannedEnd": "2026-07-20",
+        "plannedDurationDays": "0.0000",
+        "progressPct": "0.0000",
+        "status": "not_started",
+        "isMilestone": true,
+        "sortOrder": 5,
+        "externalReference": "MSP-MILESTONE-1"
+      }
+    ],
+    "taskDependencies": [
+      {
+        "id": "0d000000-0000-4000-8000-000000000101",
+        "projectId": "00000000-0000-4000-8000-000000000010",
+        "predecessorTaskId": "0d000000-0000-4000-8000-000000000001",
+        "successorTaskId": "0d000000-0000-4000-8000-000000000002",
+        "dependencyType": "FS",
+        "lagDays": "0.0000"
+      },
+      {
+        "id": "0d000000-0000-4000-8000-000000000102",
+        "projectId": "00000000-0000-4000-8000-000000000010",
+        "predecessorTaskId": "0d000000-0000-4000-8000-000000000003",
+        "successorTaskId": "0d000000-0000-4000-8000-000000000004",
+        "dependencyType": "SS",
+        "lagDays": "8.0000"
+      },
+      {
+        "id": "0d000000-0000-4000-8000-000000000103",
+        "projectId": "00000000-0000-4000-8000-000000000010",
+        "predecessorTaskId": "0d000000-0000-4000-8000-000000000002",
+        "successorTaskId": "0d000000-0000-4000-8000-000000000005",
+        "dependencyType": "FS",
+        "lagDays": "1.0000"
+      },
+      {
+        "id": "0d000000-0000-4000-8000-000000000104",
+        "projectId": "00000000-0000-4000-8000-000000000010",
+        "predecessorTaskId": "0d000000-0000-4000-8000-000000000005",
+        "successorTaskId": "0d000000-0000-4000-8000-000000000006",
+        "dependencyType": "FS",
+        "lagDays": "0.0000"
+      }
+    ],
+    "progressEntries": [
+      {
+        "id": "0d000000-0000-4000-8000-000000000201",
+        "projectId": "00000000-0000-4000-8000-000000000010",
+        "taskId": "0d000000-0000-4000-8000-000000000001",
+        "recordedAt": "2026-06-10T17:00:00-05:00",
+        "physicalProgressPct": "100.0000",
+        "financialProgressPct": "100.0000",
+        "notes": "Preliminares finalizados",
+        "createdBy": "00000000-0000-4000-8000-0000000000b1"
+      },
+      {
+        "id": "0d000000-0000-4000-8000-000000000202",
+        "projectId": "00000000-0000-4000-8000-000000000010",
+        "taskId": "0d000000-0000-4000-8000-000000000002",
+        "recordedAt": "2026-06-20T17:00:00-05:00",
+        "physicalProgressPct": "30.0000",
+        "financialProgressPct": "28.0000",
+        "notes": "Avance parcial de muros",
+        "createdBy": "00000000-0000-4000-8000-0000000000b1"
+      },
+      {
+        "id": "0d000000-0000-4000-8000-000000000203",
+        "projectId": "00000000-0000-4000-8000-000000000010",
+        "taskId": "0d000000-0000-4000-8000-000000000002",
+        "recordedAt": "2026-06-25T17:00:00-05:00",
+        "physicalProgressPct": "45.0000",
+        "financialProgressPct": "42.0000",
+        "notes": null,
+        "createdBy": "00000000-0000-4000-8000-0000000000b1"
+      }
+    ],
+    "resourceAssignments": [
+      {
+        "id": "0d000000-0000-4000-8000-000000000301",
+        "projectId": "00000000-0000-4000-8000-000000000010",
+        "taskId": "0d000000-0000-4000-8000-000000000002",
+        "resourceId": "00000000-0000-4000-8000-000000000042",
+        "laborRoleId": "00000000-0000-4000-8000-000000000080",
+        "quantity": "3.0000000000",
+        "unit": "cuadrilla",
+        "notes": "Cuadrilla de mampostería"
+      },
+      {
+        "id": "0d000000-0000-4000-8000-000000000302",
+        "projectId": "00000000-0000-4000-8000-000000000010",
+        "taskId": "0d000000-0000-4000-8000-000000000005",
+        "resourceId": "00000000-0000-4000-8000-000000000043",
+        "laborRoleId": null,
+        "quantity": "2.0000000000",
+        "unit": "cuadrilla",
+        "notes": "Ayudantes para enchape"
+      }
+    ]
+  },
   "estimateTotals": {
     "costos_directos": "336084479.93690735",
     "administracion": "11762956.797791759",
