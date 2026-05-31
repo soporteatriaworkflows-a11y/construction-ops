@@ -79,6 +79,7 @@ Gestor: pnpm 11.5.0 (Corepack). Lockfile: `pnpm-lock.yaml`.
 | lucide-react | ^1.17.0 | ISC | Iconos (UI) |
 | @radix-ui/react-slot | ^1.2.4 | MIT | Primitiva `Slot` (`asChild`) para componentes base shadcn/ui |
 | recharts | ^3.8.1 | MIT | Gráficos del dashboard (agent-dashboard, Oleada 3A). Solo frontend |
+| frappe-gantt | ^1.2.2 | MIT | Vista Gantt de planning (agent-planning, Oleada 3B). Solo frontend; import dinámico (DOM/SVG) |
 
 ### apps/web — devDependencies
 | Paquete | Rango | Licencia | Uso |
@@ -88,10 +89,10 @@ Gestor: pnpm 11.5.0 (Corepack). Lockfile: `pnpm-lock.yaml`.
 > Todas permisivas (MIT / Apache-2.0 / Unlicense / ISC). **Sin AGPL.**
 > Sin `ag-grid-enterprise`.
 >
-> **`recharts` ^3.8.1 (MIT)** instalado en Oleada 3A para el dashboard.
-> **Diferidas a oleadas posteriores** (NO instaladas): `frappe-gantt`
-> (planning, Oleada 3B), `exceljs` y `@react-pdf/renderer` (exports,
-> Oleada 3C). Se solicitarán vía `docs/INTEGRATION_REQUESTS.md` cuando su
-> oleada lo requiera. Nota: el
+> **`recharts` ^3.8.1 (MIT)** instalado en Oleada 3A (dashboard).
+> **`frappe-gantt` ^1.2.2 (MIT)** instalado en Oleada 3B (vista Gantt de planning).
+> **Diferidas a oleadas posteriores** (NO instaladas): `exceljs` y
+> `@react-pdf/renderer` (exports, Oleada 3C). Se solicitarán vía
+> `docs/INTEGRATION_REQUESTS.md` cuando su oleada lo requiera. Nota: el
 > importador de Excel usa `xlsx` (lectura); las exportaciones `.xlsx`
 > usarán `exceljs` más adelante.

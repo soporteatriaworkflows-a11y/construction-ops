@@ -1198,3 +1198,35 @@ Resultado global: PASS (exit code 0)
 
 ### Agentes activos al cierre
 - Ninguno.
+
+## 2026-05-31 — Oleada 3B: microfase documental + frappe-gantt (orchestrator)
+
+### Rama
+- Creada y publicada `integration/wave-3b` desde `main` (`352825f`). `main` intacta.
+
+### PLANNING_CONTRACT CONGELADO v1
+- Creado **`docs/PLANNING_CONTRACT.md`** (orchestrator-owned; cambios solo vía
+  INTEGRATION_REQUESTS): entidades PostgreSQL (`schedule_tasks`,
+  `task_dependencies`, `progress_entries` append-only, `resource_assignments`)
+  con RLS; dominio puro `apps/web/modules/planning/` (CPM/ruta crítica/holguras/
+  ciclos, `DecimalString`); extensión del read-model (`ScheduleTaskView`,
+  `DependencyView`, `MilestoneView`, `ProgressEntryView`, `ResourceAssignmentView`,
+  `ScheduleSummary`, `CriticalPathSummary`; `ReadModelPort.getSchedule/
+  listProgressEntries/listResourceAssignments`); privacidad por rol
+  (holguras/ruta crítica/avance financiero/`external_reference`/responsables 🔒);
+  campos reservados para export MS Project (no en 3B).
+- Actualizados: `DATABASE_SCHEMA.md` (entidades planning), `API_CONTRACTS.md` (§8),
+  `READ_MODEL_CONTRACT.md` (§8 extensión), `AGENT_REGISTRY.md` (ownership 3B),
+  `DECISIONS.md`, `LICENSING.md`, `INTEGRATION_REQUESTS.md`.
+
+### Dependencia
+- **`frappe-gantt` ^1.2.2 (MIT, sin peers)** instalado en `apps/web`. Import
+  dinámico client-side (DOM/SVG). NO se instalaron exceljs/@react-pdf/renderer.
+
+### Próximo paso
+- Validar + commit documental + push a `origin integration/wave-3b`. Luego lanzar
+  en paralelo agent-db-rls (esquema/RLS/read-model planning) ∥ agent-planning
+  (dominio/Gantt). NO exports, NO merge.
+
+### Agentes activos al cierre de esta microfase
+- Ninguno (aún).

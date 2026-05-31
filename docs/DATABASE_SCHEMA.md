@@ -600,3 +600,32 @@ Excepciones de base configurables por proveedor/producto. Ver `docs/DECISIONS.md
 | 2026-05-29 | Documento inicializado | — | orchestrator |
 | 2026-05-29 | **Contrato congelado v1** (20 entidades Oleada 1 + 7 provisionales) | — | orchestrator |
 | 2026-05-30 | **Q8/Q9 RESUELTAS** (base descuento = `online_public_price`; redondeo `ROUND_HALF_UP` solo presentación). Afectan cálculo, no esquema | — | orchestrator (Oleada 1.5) |
+
+---
+
+## Planning — entidades congeladas v1 (Oleada 3B)
+
+Esquema NUEVO de planificación/cronograma. Contrato detallado:
+`docs/PLANNING_CONTRACT.md §1`. Todas con `organization_id` + **RLS FORCE**
+(helper `app.current_org()`), UUID PK, índices por proyecto/organización/fechas.
+
+- **`schedule_tasks`**: tareas/WBS del cronograma. FK a `projects`/`project_scopes`/
+  `chapters`/`schedule_tasks`(parent). `planned_start/end` (DATE),
+  `planned_duration_days` NUMERIC(12,4), `progress_pct` NUMERIC(7,4) CHECK 0..100,
+  `status IN ('not_started','in_progress','completed','blocked','cancelled')`,
+  `is_milestone` (hito ⇒ duración 0), `wbs_code`, `external_reference` (🔒).
+- **`task_dependencies`**: predecesora→sucesora. `dependency_type IN
+  ('FS','SS','FF','SF')`, `lag_days` NUMERIC(12,4). CHECK no autodependencia;
+  UNIQUE (predecessor,successor). Ciclos se detectan en el dominio.
+- **`progress_entries`**: histórico de avance **append-only** (sin UPDATE/DELETE
+  por RLS). `physical_progress_pct` CHECK 0..100; `financial_progress_pct` (🔒,
+  derivado server-side); `created_by` (🔒).
+- **`resource_assignments`**: recursos/MO por tarea. FK a `resources`/`labor_roles`.
+
+Reglas: hitos con duración 0; no recalcular presupuesto emitido; avance financiero
+derivado server-side (sin float); campos `wbs_code`/`dependency_type`/`lag_days`/
+`external_reference` reservados para export MS Project futuro (no en 3B).
+
+| Fecha | Cambio | Migración | Autor |
+|-------|--------|-----------|-------|
+| 2026-05-31 | **Planning congelado v1** (`schedule_tasks`, `task_dependencies`, `progress_entries`, `resource_assignments`) — Oleada 3B | (db-rls) | orchestrator |

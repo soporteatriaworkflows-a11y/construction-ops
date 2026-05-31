@@ -41,6 +41,9 @@ importers:
       drizzle-orm:
         specifier: ^0.45.2
         version: 0.45.2(postgres@3.4.9)
+      frappe-gantt:
+        specifier: ^1.2.2
+        version: 1.2.2
       lucide-react:
         specifier: ^1.17.0
         version: 1.17.0(react@19.2.6)
@@ -2282,6 +2285,9 @@ packages:
 
   fraction.js@5.3.4:
     resolution: {integrity: sha512-1X1NTtiJphryn/uLQz3whtY6jK3fTqoE3ohKs0tT+Ujr1W59oopxmoEh7Lu5p6vBaPbgoM0bzveAW4Qi5RyWDQ==}
+
+  frappe-gantt@1.2.2:
+    resolution: {integrity: sha512-1+uPNRa92LBIeKiZCVhJMiGIifJk5ONaoerXI8eBREXWRZGGoTJR5ATpMpsnAQcyBA6Gnq5wIht4eL+e4eHMBA==}
 
   fsevents@2.3.3:
     resolution: {integrity: sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==}
@@ -5239,6 +5245,8 @@ snapshots:
   frac@1.1.2: {}
 
   fraction.js@5.3.4: {}
+
+  frappe-gantt@1.2.2: {}
 
   fsevents@2.3.3:
     optional: true

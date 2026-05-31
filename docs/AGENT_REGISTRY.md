@@ -260,6 +260,27 @@ Contrato: `docs/READ_MODEL_CONTRACT.md`. Sin solape de archivos entre agentes.
 - Vista Gantt operativa.
 - Avance físico independiente del financiero.
 
+### Ownership congelado — Oleada 3B (planificación)
+
+Contrato: `docs/PLANNING_CONTRACT.md`. Sin solape de archivos entre agentes.
+
+**agent-db-rls (3B)**:
+- `supabase/migrations/`, `supabase/policies/`, `supabase/seeds/`,
+  `apps/web/lib/db/schema.ts`, `apps/web/server/read-model/` (extensión planning),
+  `apps/web/server/repositories/`, tests RLS/read-model de planning.
+- Migraciones + RLS + índices de `schedule_tasks`/`task_dependencies`/
+  `progress_entries`/`resource_assignments`; seed sanitizado; `FixtureReadModelRepository`
+  + `DrizzleReadModelRepository` de planning. **RLS runtime obligatorio** (21/21
+  previo + nuevos tests de planning). **No** UI.
+
+**agent-planning (3B)**:
+- `apps/web/modules/planning/` (dominio puro: CPM/ruta crítica/holguras/ciclos/
+  progreso), `apps/web/app/(dashboard)/planning/`, `apps/web/components/planning/`,
+  `apps/web/tests/unit/planning/`.
+- Página `/planning` + Gantt (frappe-gantt, import dinámico si requiere DOM);
+  fixture UI compatible; loading/error/empty; responsive básico. **Cero** cálculo
+  monetario/CPM en React (consume DTOs); **no** toca DB.
+
 ### agent-exports (Oleada 3)
 - Exportador XLSX con 4 perfiles.
 - Exportador PDF con marca de agua.
