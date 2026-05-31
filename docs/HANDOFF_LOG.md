@@ -1230,3 +1230,39 @@ Resultado global: PASS (exit code 0)
 
 ### Agentes activos al cierre de esta microfase
 - Ninguno (aún).
+
+## 2026-05-31 — Oleada 3B: subagentes interrumpidos (WIP preservado) (orchestrator)
+
+### Lanzamiento
+- Lanzados en paralelo (worktrees desde `main`@`352825f`): agent-db-rls
+  (esquema/RLS/read-model planning) ∥ agent-planning (dominio/Gantt).
+- **Ambos interrumpidos por límite de sesión** (~49-54 acciones), con trabajo
+  **materialmente incompleto** y sin commitear.
+
+### Estado de los entregables (PARCIAL)
+- **agent-db-rls** → `backup/wave3b-db-planning` (`89bfab7`, **WIP typecheck rojo**):
+  migración `20260531100000_planning_schedule.sql` (4 tablas) +
+  `20260531100100_rls_policies_planning.sql`, `schema.ts` (Drizzle planning),
+  `read-model.ts` (DTOs/métodos), `server/read-model/{types,compute-planning}.ts`,
+  datos de cronograma en el fixture. **PENDIENTE**: implementar
+  `getSchedule/listProgressEntries/listResourceAssignments` en
+  `FixtureReadModelRepository` y `DrizzleReadModelRepository` (4 errores
+  "incorrectly implements ReadModelPort"); seed de planning; RLS runtime 21/21 +
+  pruebas de planning.
+- **agent-planning** → `backup/wave3b-planning-ui` (`6f4dab9`, **typecheck verde,
+  incompleto**): `modules/planning/{cpm,graph,date,decimal,types}.ts` (dominio
+  puro CPM/holguras/ciclos). frappe-gantt instalado. **PENDIENTE**: página
+  `/planning`, componente Gantt, accesor dev de cronograma, tests de dominio.
+
+### Higiene (ambos)
+- Sin privados/Excel/`.env`. Sin solape de archivos entre agentes.
+
+### Estado / próximo paso
+- **NO integrado** a `integration/wave-3b` ni a `main`. `main` intacta
+  (`352825f`). Backups (11) y tags conservados. Worktrees por limpiar.
+- **Acción requerida**: reanudar ambos agentes (sesión reseteada ~15:50) para
+  completar los puntos pendientes; luego ciclo de integración 3B. Registrado en
+  INTEGRATION_REQUESTS.
+
+### Agentes activos al cierre
+- Ninguno (ambos finalizaron por límite, incompletos).
