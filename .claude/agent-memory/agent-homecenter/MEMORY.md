@@ -1,0 +1,2 @@
+- [Project context](project_context.md) — Construction Ops Wave 2B; agent-homecenter implements pricing adapters + CSV/Excel import for Homecenter
+- [Adapter contract](adapter_contract.md) — PRICING_ADAPTER_CONTRACT v1: SupplierAdapter interface, types, idempotency, approval flow, privacy rules
