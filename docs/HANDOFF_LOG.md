@@ -1066,3 +1066,43 @@ Resultado global: PASS (exit code 0)
 
 ### Agentes activos al cierre de esta microfase
 - Ninguno (aún).
+
+## 2026-05-31 — Oleada 3A: subagentes ejecutados (interrumpidos) y preservados (orchestrator)
+
+### Lanzamiento
+- Lanzados en paralelo (worktrees aislados desde `main`@`30b1053`): agent-db-rls
+  (read-model), agent-frontend-boq (páginas presupuesto), agent-dashboard (KPIs).
+- Los tres se **interrumpieron por límite de sesión** (~54-62 acciones c/u), con
+  trabajo casi completo **sin commitear** y errores triviales remanentes de
+  `tsc`/build (los worktrees derivan de main, sin el contrato ni recharts; el
+  contrato fue embebido en los prompts y dashboard instaló el recharts aprobado).
+
+### Entregables preservados (verdes tras fixes mínimos del orquestador)
+- **agent-db-rls** → `backup/wave3-db-read-model` (`7478ceb`): `lib/contracts/
+  read-model.ts` (DTOs+port), `server/read-model/{types,errors,port,compute,
+  fixture-repository,drizzle-repository,index}`, `server/repositories/`,
+  selector `READ_MODEL_SOURCE` sin fallback, proyección por rol, 2 tests.
+  Validado: typecheck 0, lint 0, **329 tests**, build OK. Fix: `env:Partial<ProcessEnv>`.
+- **agent-dashboard** → `backup/wave3-dashboard` (`79d9fd3`): `/dashboard` +
+  `modules/dashboard/*` (KPIs, Recharts barras+pie, ahorros solo rol autorizado)
+  + accesor TEMP de dev. Validado: typecheck 0, lint 0, **336 tests**, build OK.
+  recharts ^3.8.1. Fixes: import estático del fixture (Turbopack) + typing legend.
+- **agent-frontend-boq** → `backup/wave3-frontend-boq` (`28d8bfe`): páginas
+  `/projects /estimates /apu /quantities /catalog` cableadas (sin mocks) +
+  `components/budget/*` + accesor TEMP. Validado: typecheck 0, lint 0, **338
+  tests**, build OK. Fixes: ruta fixture + anotaciones de tipo + cast de status.
+
+### Reconciliación pendiente (integración 3A)
+- Triple `read-model.ts` → unificar a la canónica de db-rls. Rewire de accesores
+  TEMP de la UI a `@/server/read-model` (`getReadModel()`). Alinear DTOs
+  divergentes del frontend (`scopeNames/code/status:string`) a los canónicos.
+  Registrado en INTEGRATION_REQUESTS.
+
+### Estado / próximo paso
+- **NO integrado** a `integration/wave-3a` ni a `main`. `main` intacta. Backups
+  3A (3) + previos y tags conservados. Worktrees obsoletos por limpiar.
+- Recomendación: ciclo de integración 3A (cherry-pick db-rls → frontend →
+  dashboard, reconciliar, validar) antes de pedir merge a `main`.
+
+### Agentes activos al cierre
+- Ninguno.
