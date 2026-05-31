@@ -905,3 +905,47 @@ Resultado global: PASS (exit code 0)
 
 ### Agentes activos al cierre de esta microfase
 - Ninguno (aún). A continuación se lanza agent-homecenter.
+
+## 2026-05-30 — Oleada 2B: agent-homecenter ejecutado y preservado (orchestrator)
+
+### Lanzamiento
+- Lanzado `agent-homecenter` en worktree aislado (derivado de `main`@`75394f1`,
+  por lo que NO vio `docs/PRICING_ADAPTER_CONTRACT.md`; implementó desde la spec
+  de la tarea). Reconciliación contra el contrato registrada en
+  INTEGRATION_REQUESTS (pendiente 2B).
+
+### Entregable
+- Adaptador genérico en `apps/web/modules/pricing/adapters/` (`types`,
+  `supplier-adapter`, `import-preview`, `idempotency`, `homecenter-csv`, `index`)
+  + tests en `apps/web/tests/unit/pricing-adapters/` (csv-parser, fixtures,
+  homecenter-adapter; **77 tests**) + `scripts/catalog-sync/` (README,
+  `convert-excel.ts` [xlsx devDep, import dinámico], `preview-import.ts`,
+  `sample-catalog.csv` sanitizado). Sin cambios a `package.json`.
+- `SupplierAdapter` (parseCatalog/mapToSupplierProducts/buildPreview/
+  toPriceObservations); idempotencia; preview sin persistencia; matching SKU con
+  candidatos+score; persistencia SOLO vía `PricingApprovalPort` tras aprobación
+  humana simple (Q11); `price_observations` append-only; ambiguos `pending`;
+  privacidad backend-first. **Sin scraping, sin API pública, sin red.**
+
+### Incidencias y resolución (orchestrator)
+- El agente dejó **typecheck rojo (43 errores)** (strict-null + `string|undefined`
+  + export `ResourceCatalog` faltante); su corrida se truncó. Tests (runtime) y
+  lint sí pasaban.
+- Un reintento generó un **segundo worktree** (no se continuó el original vía
+  SendMessage) que dejó adapters+tests en **typecheck 0** pero sin
+  `scripts/catalog-sync/`. El orquestador **consolidó**: copió
+  `scripts/catalog-sync/` + memoria del worktree original al worktree verde.
+- Revalidación en el worktree consolidado: **typecheck 0 · lint 0 · 306 tests ·
+  build OK**; sin privados/Excel/`.env`/scraping/red/enterprise/AGPL.
+- `git commit` denegado a los subagentes ⇒ el orquestador commiteó `ccc1f0b` y
+  preservó en **`backup/wave2-homecenter`** (pusheada).
+
+### Estado / próximo paso
+- **NO integrado** a `integration/wave-2b` ni a `main`. `main` intacta
+  (`75394f1`). Backups y tags conservados.
+- Antes de integrar 2B: reconciliar tipos del adaptador contra
+  `PRICING_ADAPTER_CONTRACT` (ver INTEGRATION_REQUESTS). Otros worktrees de 2B
+  pueden limpiarse (sin commits de valor).
+
+### Agentes activos al cierre
+- Ninguno.
