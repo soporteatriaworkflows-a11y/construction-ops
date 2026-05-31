@@ -2,11 +2,11 @@
  * Página de proyectos — Oleada 3A.
  * Server Component. Propiedad: agent-frontend-boq.
  *
- * Consume el read-model (dev-read-model TEMP) en lugar de mocks estáticos.
+ * Consume el read-model canónico (@/server/read-model) en lugar de mocks estáticos.
  * NO importa @/lib/utils/mocks. NO calcula totales financieros.
  */
 import Link from 'next/link';
-import { FolderOpen, MapPin, Calendar, Plus } from 'lucide-react';
+import { FolderOpen, MapPin, Calendar, Plus, Layers, ClipboardList } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
 import { ProjectStatusBadge } from '@/components/shared/status-badge';
 import { EmptyState } from '@/components/shared/empty-state';
@@ -18,15 +18,16 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { formatDate } from '@/lib/utils/format';
-import { getReadModel } from '@/components/budget/dev-read-model';
+import { getReadModel, getDemoViewer } from '@/server/read-model';
 
 export default async function ProjectsPage() {
   const rm = getReadModel();
+  const viewer = getDemoViewer();
   let projects: Awaited<ReturnType<typeof rm.listProjects>> = [];
   let error: string | null = null;
 
   try {
-    projects = await rm.listProjects();
+    projects = await rm.listProjects(viewer);
   } catch (e) {
     error = e instanceof Error ? e.message : 'Error al cargar proyectos';
     projects = [];
@@ -78,12 +79,7 @@ export default async function ProjectsPage() {
               <CardHeader className="pb-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <div className="flex items-center gap-2">
-                      <span className="rounded bg-gray-100 px-2 py-0.5 text-xs font-mono text-gray-600">
-                        {project.code}
-                      </span>
-                      <ProjectStatusBadge status={project.status} />
-                    </div>
+                    <ProjectStatusBadge status={project.status} />
                     <CardTitle className="mt-1 text-lg">{project.name}</CardTitle>
                   </div>
                   {/* Enlaza al primer alcance del proyecto (primer piso) */}
@@ -104,40 +100,19 @@ export default async function ProjectsPage() {
                       {project.location}
                     </span>
                   )}
-                  {project.startDate && (
-                    <span className="flex items-center gap-1.5">
-                      <Calendar className="h-3.5 w-3.5" aria-hidden="true" />
-                      Inicio: {formatDate(project.startDate)}
-                    </span>
-                  )}
-                  {project.estimatedEndDate && (
-                    <span className="flex items-center gap-1.5">
-                      <Calendar className="h-3.5 w-3.5" aria-hidden="true" />
-                      Fin estimado: {formatDate(project.estimatedEndDate)}
-                    </span>
-                  )}
+                  <span className="flex items-center gap-1.5">
+                    <Calendar className="h-3.5 w-3.5" aria-hidden="true" />
+                    Creado: {formatDate(project.createdAt)}
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <Layers className="h-3.5 w-3.5" aria-hidden="true" />
+                    {project.scopeCount} alcance{project.scopeCount === 1 ? '' : 's'}
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <ClipboardList className="h-3.5 w-3.5" aria-hidden="true" />
+                    {project.estimateCount} presupuesto{project.estimateCount === 1 ? '' : 's'}
+                  </span>
                 </div>
-
-                {/* Alcances raíz */}
-                {project.scopeNames.length > 0 && (
-                  <div>
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
-                      Alcances
-                    </p>
-                    <ul
-                      className="flex flex-wrap gap-2"
-                      aria-label={`Alcances de ${project.name}`}
-                    >
-                      {project.scopeNames.map((name) => (
-                        <li key={name}>
-                          <span className="inline-flex items-center rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700">
-                            {name}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
               </CardContent>
             </Card>
           ))}

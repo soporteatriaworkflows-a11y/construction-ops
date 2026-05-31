@@ -21,29 +21,18 @@ import { PageHeader } from '@/components/shared/page-header';
 import { KpiCard, FinancialKpiCard } from '@/modules/dashboard/kpi-card';
 import { ChapterDistributionSection } from '@/modules/dashboard/chapter-distribution-section';
 import { SavingsSection } from '@/modules/dashboard/savings-section';
-import { getDashboardSummaryFromFixture } from '@/modules/dashboard/dev-read-model';
+import { getReadModel, getDemoViewer } from '@/server/read-model';
 import { formatCOP, formatDateTime, ESTIMATE_VERSION_STATUS_LABELS } from '@/lib/utils/format';
-import type { ViewerContext } from '@/lib/contracts/read-model';
 
-// ---------------------------------------------------------------------------
-// Contexto de viewer para demo (modo fixture).
-// En producción, esto vendrá de la sesión de auth (server-side, no de query params).
-// TEMP integración 3A: reemplazar por resolución real de sesión.
-// ---------------------------------------------------------------------------
-const DEMO_VIEWER: ViewerContext = {
-  organizationId: '00000000-0000-4000-8000-000000000001',
-  role: 'management', // demo como gerencia para mostrar todos los KPIs
-};
-
-// ID del proyecto piloto (del fixture sanitizado)
+// ID del proyecto piloto (del fixture sanitizado).
 const DEMO_PROJECT_ID = '00000000-0000-4000-8000-000000000010';
 
 export default async function DashboardPage() {
-  // Obtener el resumen — en producción: await getReadModel().getDashboardSummary(viewer, projectId)
-  const summary = getDashboardSummaryFromFixture(DEMO_VIEWER, DEMO_PROJECT_ID);
+  // ViewerContext resuelto server-side (demo en modo fixture; auth real en `db`).
+  const viewer = getDemoViewer();
+  const summary = await getReadModel().getDashboardSummary(viewer, DEMO_PROJECT_ID);
 
-  const isAuthorizedForSavings =
-    DEMO_VIEWER.role === 'management' || DEMO_VIEWER.role === 'internal';
+  const isAuthorizedForSavings = viewer.role === 'management' || viewer.role === 'internal';
 
   const statusLabel =
     ESTIMATE_VERSION_STATUS_LABELS[summary.estimateStatus] ?? summary.estimateStatus;

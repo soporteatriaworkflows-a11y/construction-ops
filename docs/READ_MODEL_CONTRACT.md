@@ -259,6 +259,24 @@ consumen **solo** server-side dentro del read-model.
 
 ---
 
+---
+
+## 7. Nota de integración 3A (2026-05-31)
+
+- Implementación canónica única: `apps/web/lib/contracts/read-model.ts` (DTOs +
+  `ReadModelPort`) + `apps/web/server/read-model/` (Fixture/Drizzle + `getReadModel()`).
+- **Viewer demo**: se añadió `getDemoViewer(role='management')` y
+  `DEMO_ORGANIZATION_ID` en `apps/web/server/read-model/viewer.ts`. Es un
+  **contexto demo/dev** (no autenticación productiva) para el preview con
+  `READ_MODEL_SOURCE=fixture`; en modo `db` el viewer provendrá de la sesión y
+  RLS es la barrera real. La org demo coincide con la del fixture sanitizado.
+- Las páginas (Server Components) obtienen datos con
+  `getReadModel().<método>(viewer, …)`; los componentes cliente reciben DTOs
+  serializables por props; ningún componente recalcula finanzas.
+- Verificado por dev smoke: 8/8 rutas HTTP 200 con datos reales del golden master.
+
+---
+
 _Congelado el 2026-05-31 (Oleada 3A). Referencias: tipos base y privacidad en
 `docs/API_CONTRACTS.md`; precios en `docs/PRICING_READ_CONTRACT.md`; entidades en
 `docs/DATABASE_SCHEMA.md`._

@@ -2,7 +2,7 @@
  * Página de presupuestos (estimates) — Oleada 3A.
  * Server Component. Propiedad: agent-frontend-boq.
  *
- * Consume el read-model (dev-read-model TEMP) en lugar de mocks estáticos.
+ * Consume el read-model canónico (@/server/read-model) en lugar de mocks estáticos.
  * NO importa @/lib/utils/mocks. NO calcula totales financieros.
  * Los valores llegan como DecimalString ya calculados desde el read-model.
  */
@@ -16,8 +16,7 @@ import {
 } from '@/components/ui/card';
 import { formatCOP, formatDateTime, formatNumber, formatPct } from '@/lib/utils/format';
 import { BudgetBoqGrid } from '@/components/budget/budget-boq-grid';
-import { getReadModel } from '@/components/budget/dev-read-model';
-import type { EstimateVersionStatus } from '@/lib/utils/types';
+import { getReadModel, getDemoViewer } from '@/server/read-model';
 
 // ---------------------------------------------------------------------------
 // Reglas AIU del fixture (estáticas — ya incluidas en el estimateSummary)
@@ -39,75 +38,56 @@ export default async function EstimatesPage({ searchParams }: PageProps) {
   const projectId = typeof params['projectId'] === 'string' ? params['projectId'] : undefined;
 
   const rm = getReadModel();
+  const viewer = getDemoViewer();
 
-  // Cargar overview del proyecto para obtener el scope "Primer piso"
-  let scopeId: string | null = null;
-  let projectName = 'Proyecto';
-  let scopeName = 'Alcance';
-
-  if (projectId) {
-    try {
-      const overview = await rm.getProjectOverview(projectId);
-      if (overview) {
-        projectName = overview.name;
-        // Buscar el primer alcance de tipo "floor" (Primer piso)
-        const floorScope = overview.scopes.find(
-          (s) => s.scopeType === 'floor'
-        );
-        const anyScope = overview.scopes[0];
-        const chosen = floorScope ?? anyScope;
-        if (chosen) {
-          scopeId = chosen.id;
-          scopeName = chosen.name;
-        }
-      }
-    } catch {
-      // error handled below
+  // Resolver el proyecto y su alcance "Primer piso" para títulos. Una sola
+  // resolución que devuelve valores `const` (sin reasignar variables usadas en JSX).
+  async function resolveView() {
+    let pid = projectId ?? null;
+    if (!pid) {
+      const projects = await rm.listProjects(viewer);
+      pid = projects[0]?.id ?? null;
     }
+    if (!pid) {
+      return { resolvedProjectId: null, projectName: 'Proyecto', scopeName: 'Alcance' };
+    }
+    const overview = await rm.getProjectOverview(viewer, pid);
+    const chosen = overview.scopes.find((s) => s.scopeType === 'floor') ?? overview.scopes[0];
+    return {
+      resolvedProjectId: pid,
+      projectName: overview.project.name,
+      scopeName: chosen?.name ?? 'Alcance',
+    };
   }
 
-  // Si no hay projectId, usar el primer proyecto del read-model
-  if (!scopeId) {
-    try {
-      const projects = await rm.listProjects();
-      if (projects.length > 0) {
-        const first = projects[0]!;
-        projectName = first.name;
-        const overview = await rm.getProjectOverview(first.id);
-        if (overview) {
-          const floorScope = overview.scopes.find((s) => s.scopeType === 'floor');
-          const anyScope = overview.scopes[0];
-          const chosen = floorScope ?? anyScope;
-          if (chosen) {
-            scopeId = chosen.id;
-            scopeName = chosen.name;
-          }
-        }
-      }
-    } catch {
-      // continue with empty state
-    }
-  }
+  const view = await resolveView().catch(() => ({
+    resolvedProjectId: projectId ?? null,
+    projectName: 'Proyecto',
+    scopeName: 'Alcance',
+  }));
+  const resolvedProjectId = view.resolvedProjectId;
+  const projectName = view.projectName;
+  const scopeName = view.scopeName;
 
-  // Cargar estimados para el scope encontrado
+  // Cargar estimados del proyecto resuelto.
   let estimates: Awaited<ReturnType<typeof rm.listEstimates>> = [];
   let loadError: string | null = null;
 
-  if (scopeId) {
+  if (resolvedProjectId) {
     try {
-      estimates = await rm.listEstimates(scopeId);
+      estimates = await rm.listEstimates(viewer, resolvedProjectId);
     } catch (e) {
       loadError = e instanceof Error ? e.message : 'Error al cargar presupuesto';
     }
   }
 
-  // Cargar detalle de la primera versión
+  // Cargar detalle de la primera versión.
   const latestVersion = estimates[0] ?? null;
-  let detail: Awaited<ReturnType<typeof rm.getEstimateDetail>> = null;
+  let detail: Awaited<ReturnType<typeof rm.getEstimateDetail>> | null = null;
 
   if (latestVersion) {
     try {
-      detail = await rm.getEstimateDetail(latestVersion.id);
+      detail = await rm.getEstimateDetail(viewer, latestVersion.versionId);
     } catch (e) {
       loadError = e instanceof Error ? e.message : 'Error al cargar detalle del BOQ';
     }
@@ -157,15 +137,7 @@ export default async function EstimatesPage({ searchParams }: PageProps) {
           <span className="text-sm font-semibold text-gray-900">
             V{String(latestVersion.versionNumber).padStart(2, '0')}
           </span>
-          <EstimateVersionBadge status={latestVersion.status as EstimateVersionStatus} />
-          {latestVersion.approvedAt && (
-            <span className="text-xs text-gray-400">
-              Aprobado {formatDateTime(latestVersion.approvedAt)}
-            </span>
-          )}
-          {latestVersion.notes && (
-            <span className="text-xs text-gray-500 italic">{latestVersion.notes}</span>
-          )}
+          <EstimateVersionBadge status={latestVersion.status} />
         </div>
       </section>
 

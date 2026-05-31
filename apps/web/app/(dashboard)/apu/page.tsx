@@ -2,7 +2,7 @@
  * Página de catálogo APU — Oleada 3A.
  * Server Component. Propiedad: agent-frontend-boq.
  *
- * Consume el read-model (dev-read-model TEMP) en lugar de mocks estáticos.
+ * Consume el read-model canónico (@/server/read-model) en lugar de mocks estáticos.
  * NO importa @/lib/utils/mocks. NO calcula totales financieros.
  * unitCost llega pre-calculado como DecimalString desde el read-model.
  */
@@ -17,15 +17,16 @@ import {
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatCOP } from '@/lib/utils/format';
-import { getReadModel } from '@/components/budget/dev-read-model';
+import { getReadModel, getDemoViewer } from '@/server/read-model';
 
 export default async function ApuPage() {
   const rm = getReadModel();
+  const viewer = getDemoViewer();
   let apus: Awaited<ReturnType<typeof rm.listApus>> = [];
   let error: string | null = null;
 
   try {
-    apus = await rm.listApus();
+    apus = await rm.listApus(viewer);
   } catch (e) {
     error = e instanceof Error ? e.message : 'Error al cargar APU';
     apus = [];

@@ -2,7 +2,7 @@
  * Página de catálogo de recursos — Oleada 3A.
  * Server Component. Propiedad: agent-frontend-boq.
  *
- * Consume el read-model (dev-read-model TEMP) en lugar de mocks estáticos.
+ * Consume el read-model canónico (@/server/read-model) en lugar de mocks estáticos.
  * NO importa @/lib/utils/mocks. NO expone campos 🔒 (precios internos, SKU, etc.).
  * budgetReferencePrice es cliente-safe y se muestra solo si está disponible.
  */
@@ -11,7 +11,7 @@ import { PageHeader } from '@/components/shared/page-header';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Badge } from '@/components/ui/badge';
 import { formatCOP, RESOURCE_TYPE_LABELS } from '@/lib/utils/format';
-import { getReadModel } from '@/components/budget/dev-read-model';
+import { getReadModel, getDemoViewer } from '@/server/read-model';
 import type { CatalogResourceView } from '@/lib/contracts/read-model';
 
 const RESOURCE_TYPE_ORDER = [
@@ -37,11 +37,12 @@ const RESOURCE_TYPE_VARIANT: Record<
 
 export default async function CatalogPage() {
   const rm = getReadModel();
+  const viewer = getDemoViewer();
   let resources: CatalogResourceView[] = [];
   let error: string | null = null;
 
   try {
-    resources = await rm.listCatalogResources();
+    resources = await rm.listCatalogResources(viewer);
   } catch (e) {
     error = e instanceof Error ? e.message : 'Error al cargar catálogo';
   }

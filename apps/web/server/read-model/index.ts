@@ -59,7 +59,6 @@ export interface ReadModelLogger {
 
 const defaultLogger: ReadModelLogger = {
   info: (message: string) => {
-    // eslint-disable-next-line no-console
     console.info(message);
   },
 };
@@ -100,6 +99,7 @@ export function getReadModel(options: GetReadModelOptions = {}): ReadModelPort {
   return new FixtureReadModelRepository();
 }
 
+export { getDemoViewer, DEMO_ORGANIZATION_ID } from './viewer';
 export { FixtureReadModelRepository } from './fixture-repository';
 export { DrizzleReadModelRepository } from './drizzle-repository';
 export {

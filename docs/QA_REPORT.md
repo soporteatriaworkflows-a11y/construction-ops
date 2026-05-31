@@ -243,3 +243,50 @@ ni `apps/web/lib/db/schema.ts` ⇒ **RLS runtime 21/21** de Oleada 1.5 vigente.
 
 **Recomendación:** ✅ **APROBAR merge `integration/wave-2b` → `main`** (queda a
 decisión del usuario; este ciclo NO hace merge).
+
+## Validación integración Oleada 3A (rama `integration/wave-3a`, 2026-05-31)
+
+Integración de la visibilidad funcional: read-model canónico cableado a las
+pantallas (cherry-picks `9e69449` db-rls + `8ab0d9c` frontend + `0bab01d`
+dashboard). **Sin merge a `main`.**
+
+**Reconciliación:**
+- Fuente única `apps/web/lib/contracts/read-model.ts` (conflicto add/add resuelto
+  con el canónico de db-rls); **1** `interface ReadModelPort` (verificado).
+- Accesores TEMP `dev-read-model.ts` eliminados; las 5 páginas de presupuesto y el
+  dashboard consumen `getReadModel()` de `@/server/read-model` con `getDemoViewer()`
+  (helper demo; en `db` el viewer vendrá de la sesión y RLS filtra).
+- Páginas adaptadas a los DTOs canónicos. Test redundante del frontend eliminado;
+  test del dashboard repointado al read-model canónico.
+
+**Resultados (todo PASS):** typecheck 0 · lint 0 · **356 tests** · build Next
+16.2.6 (rutas estáticas + dinámicas) · `gm:regression` **22/22** · `gm:import`
+**9/9** (±0.01 COP) · `validate-claude-agents` **214/0/0** · `git diff --check`
+limpio.
+
+**Dev smoke local (`READ_MODEL_SOURCE=fixture`):** 8/8 rutas **HTTP 200** con
+datos reales del golden master:
+
+| Ruta | HTTP | Nota |
+|------|------|------|
+| `/` | 200 | landing |
+| `/login` | 200 | — |
+| `/projects` | 200 | proyecto real (alcances/conteos) |
+| `/estimates` | 200 | BOQ + AIU/IVA reales ("Entre Patios") |
+| `/apu` | 200 | plantillas APU reales |
+| `/quantities` | 200 | grupos/líneas reales |
+| `/catalog` | 200 | recursos (precio referencia cliente-safe) |
+| `/dashboard` | 200 | KPIs reales (Total presupuesto $372.247…) + Recharts |
+
+**Privacidad:** los DTOs cliente-safe no exponen `onlinePublicPrice`/
+`negotiatedDiscount`/`sourceReference`/SKU; `DashboardSummary.{projectedSaving,
+realizedSaving,pricingCoverage}` son role-gated (omitidos para `client`).
+**Cero cálculo financiero en React** (dinero `DecimalString` ya calculado).
+Excel ignorado; sin `.env`/`package-lock`; sin `ag-grid-enterprise`; sin AGPL.
+
+**RLS runtime:** la integración NO modificó `supabase/migrations|policies|seeds`
+ni `apps/web/lib/db/schema.ts` ⇒ **RLS runtime 21/21** de Oleada 1.5 vigente.
+**B-004** (Realtime) deuda técnica no bloqueante.
+
+**Recomendación:** ✅ **APROBAR merge `integration/wave-3a` → `main`** (queda a
+decisión del usuario; este ciclo NO hace merge).

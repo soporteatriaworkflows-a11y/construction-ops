@@ -3,7 +3,6 @@
  * Propiedad: agent-dashboard.
  */
 
-export { getDashboardSummaryFromFixture } from './dev-read-model';
 export { KpiCard, FinancialKpiCard } from './kpi-card';
 export { ChapterBarChart } from './chapter-bar-chart';
 export { ChapterPieChart } from './chapter-pie-chart';

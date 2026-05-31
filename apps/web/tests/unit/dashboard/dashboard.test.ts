@@ -10,8 +10,9 @@
  * 5. Empty: estado vacío sin error.
  */
 
-import { describe, it, expect } from 'vitest';
-import { getDashboardSummaryFromFixture } from '@/modules/dashboard/dev-read-model';
+import { describe, it, expect, beforeAll } from 'vitest';
+import { getReadModel } from '@/server/read-model';
+import type { DashboardSummary } from '@/lib/contracts/read-model';
 import { formatCOP, formatPct } from '@/lib/utils/format';
 import {
   VIEWER_MANAGEMENT,
@@ -23,13 +24,28 @@ import {
   DEMO_PROJECT_ID,
 } from './fixtures';
 
+// Read-model canónico en modo fixture (integración 3A). Summaries precomputados
+// para mantener los `it` síncronos.
+let sMgmt!: DashboardSummary;
+let sClient!: DashboardSummary;
+let sSite!: DashboardSummary;
+let sInternal!: DashboardSummary;
+
+beforeAll(async () => {
+  const rm = getReadModel({ env: { READ_MODEL_SOURCE: 'fixture' } });
+  sMgmt = await rm.getDashboardSummary(VIEWER_MANAGEMENT, DEMO_PROJECT_ID);
+  sClient = await rm.getDashboardSummary(VIEWER_CLIENT, DEMO_PROJECT_ID);
+  sSite = await rm.getDashboardSummary(VIEWER_SITE, DEMO_PROJECT_ID);
+  sInternal = await rm.getDashboardSummary(VIEWER_INTERNAL, DEMO_PROJECT_ID);
+});
+
 // ---------------------------------------------------------------------------
 // Tests de agregación
 // ---------------------------------------------------------------------------
 
 describe('Aggregations — chapterDistribution', () => {
   it('suma de subtotales de capítulos ≈ directCost (fixture real)', () => {
-    const summary = getDashboardSummaryFromFixture(VIEWER_MANAGEMENT, DEMO_PROJECT_ID);
+    const summary = sMgmt;
 
     const sumFromChapters = summary.chapterDistribution.reduce(
       (acc, slice) => acc + parseFloat(slice.subtotal),
@@ -42,12 +58,12 @@ describe('Aggregations — chapterDistribution', () => {
   });
 
   it('hay exactamente 14 capítulos (golden master primer piso)', () => {
-    const summary = getDashboardSummaryFromFixture(VIEWER_MANAGEMENT, DEMO_PROJECT_ID);
+    const summary = sMgmt;
     expect(summary.chapterDistribution).toHaveLength(14);
   });
 
   it('la suma de shares de capítulos ≈ 1.0', () => {
-    const summary = getDashboardSummaryFromFixture(VIEWER_MANAGEMENT, DEMO_PROJECT_ID);
+    const summary = sMgmt;
     const sumShares = summary.chapterDistribution.reduce(
       (acc, s) => acc + parseFloat(s.share),
       0,
@@ -57,7 +73,7 @@ describe('Aggregations — chapterDistribution', () => {
   });
 
   it('topChapters contiene los 5 capítulos con mayor subtotal', () => {
-    const summary = getDashboardSummaryFromFixture(VIEWER_MANAGEMENT, DEMO_PROJECT_ID);
+    const summary = sMgmt;
     expect(summary.topChapters).toHaveLength(5);
 
     // Verificar que el primero es el mayor de todos
@@ -69,19 +85,19 @@ describe('Aggregations — chapterDistribution', () => {
   });
 
   it('directCost del fixture coincide con el golden master §3.4 (±1 COP)', () => {
-    const summary = getDashboardSummaryFromFixture(VIEWER_MANAGEMENT, DEMO_PROJECT_ID);
+    const summary = sMgmt;
     const EXPECTED_DIRECT_COST = 336084479.9369073500;
     expect(Math.abs(parseFloat(summary.directCost) - EXPECTED_DIRECT_COST)).toBeLessThan(1);
   });
 
   it('budget del fixture coincide con el golden master §3.4 (±1 COP)', () => {
-    const summary = getDashboardSummaryFromFixture(VIEWER_MANAGEMENT, DEMO_PROJECT_ID);
+    const summary = sMgmt;
     const EXPECTED_TOTAL = 372247169.9781186;
     expect(Math.abs(parseFloat(summary.budget) - EXPECTED_TOTAL)).toBeLessThan(1);
   });
 
   it('indirectCost del fixture coincide con el golden master §3.4 (±1 COP)', () => {
-    const summary = getDashboardSummaryFromFixture(VIEWER_MANAGEMENT, DEMO_PROJECT_ID);
+    const summary = sMgmt;
     const EXPECTED_INDIRECT = 36162690.0412112300;
     expect(Math.abs(parseFloat(summary.indirectCost) - EXPECTED_INDIRECT)).toBeLessThan(1);
   });
@@ -93,36 +109,39 @@ describe('Aggregations — chapterDistribution', () => {
 
 describe('Privacy — role-based field projection', () => {
   it('rol `client` NO recibe campos 🔒 (projectedSaving undefined)', () => {
-    const summary = getDashboardSummaryFromFixture(VIEWER_CLIENT, DEMO_PROJECT_ID);
+    const summary = sClient;
     expect(summary.projectedSaving).toBeUndefined();
   });
 
   it('rol `client` NO recibe campos 🔒 (realizedSaving undefined)', () => {
-    const summary = getDashboardSummaryFromFixture(VIEWER_CLIENT, DEMO_PROJECT_ID);
+    const summary = sClient;
     expect(summary.realizedSaving).toBeUndefined();
   });
 
   it('rol `client` NO recibe campos 🔒 (pricingCoverage undefined)', () => {
-    const summary = getDashboardSummaryFromFixture(VIEWER_CLIENT, DEMO_PROJECT_ID);
+    const summary = sClient;
     expect(summary.pricingCoverage).toBeUndefined();
   });
 
   it('rol `site` NO recibe campos 🔒 (projectedSaving undefined)', () => {
-    const summary = getDashboardSummaryFromFixture(VIEWER_SITE, DEMO_PROJECT_ID);
+    const summary = sSite;
     expect(summary.projectedSaving).toBeUndefined();
   });
 
-  it('rol `management` SÍ puede recibir campos 🔒 (claves presentes en summary)', () => {
-    const summary = getDashboardSummaryFromFixture(VIEWER_MANAGEMENT, DEMO_PROJECT_ID);
-    // En modo fixture, los campos son undefined aunque la clave esté presente.
-    // La prueba valida que el rol management sí pasa por el bloque que los incluye.
-    // (No hay datos de ahorro reales en el fixture — se verificará en integración con db.)
-    expect(Object.prototype.hasOwnProperty.call(summary, 'projectedSaving')).toBe(true);
+  it('rol `management` recibe un summary válido (sin ahorros fabricados en fixture)', () => {
+    const summary = sMgmt;
+    // El read-model canónico OMITE los campos 🔒 cuando no hay dato real (el
+    // fixture no trae ahorros). Con `db` y datos reales, los roles autorizados sí
+    // los reciben. La privacidad cliente se valida en los tests previos.
+    expect(typeof summary.budget).toBe('string');
+    expect(typeof summary.directCost).toBe('string');
+    expect(summary.projectedSaving).toBeUndefined();
   });
 
-  it('rol `internal` SÍ puede recibir campos 🔒 (claves presentes en summary)', () => {
-    const summary = getDashboardSummaryFromFixture(VIEWER_INTERNAL, DEMO_PROJECT_ID);
-    expect(Object.prototype.hasOwnProperty.call(summary, 'realizedSaving')).toBe(true);
+  it('rol `internal` recibe un summary válido (sin ahorros fabricados en fixture)', () => {
+    const summary = sInternal;
+    expect(typeof summary.budget).toBe('string');
+    expect(summary.realizedSaving).toBeUndefined();
   });
 
   it('DASHBOARD_SUMMARY_CLIENT no tiene projectedSaving', () => {
@@ -208,7 +227,7 @@ describe('Empty state — DashboardSummary handling', () => {
 
 describe('Contract types — DashboardSummary shape', () => {
   it('DashboardSummary tiene todos los campos obligatorios', () => {
-    const summary = getDashboardSummaryFromFixture(VIEWER_MANAGEMENT, DEMO_PROJECT_ID);
+    const summary = sMgmt;
     expect(typeof summary.projectId).toBe('string');
     expect(typeof summary.budget).toBe('string');
     expect(typeof summary.directCost).toBe('string');
@@ -220,7 +239,7 @@ describe('Contract types — DashboardSummary shape', () => {
   });
 
   it('ChapterDistributionSlice tiene todos los campos', () => {
-    const summary = getDashboardSummaryFromFixture(VIEWER_MANAGEMENT, DEMO_PROJECT_ID);
+    const summary = sMgmt;
     const slice = summary.chapterDistribution[0];
     expect(slice).toBeDefined();
     expect(typeof slice!.chapterId).toBe('string');
@@ -231,7 +250,7 @@ describe('Contract types — DashboardSummary shape', () => {
   });
 
   it('ChapterSummary tiene todos los campos', () => {
-    const summary = getDashboardSummaryFromFixture(VIEWER_MANAGEMENT, DEMO_PROJECT_ID);
+    const summary = sMgmt;
     const ch = summary.topChapters[0];
     expect(ch).toBeDefined();
     expect(typeof ch!.id).toBe('string');
@@ -242,7 +261,7 @@ describe('Contract types — DashboardSummary shape', () => {
   });
 
   it('DecimalString nunca es número — budget', () => {
-    const summary = getDashboardSummaryFromFixture(VIEWER_MANAGEMENT, DEMO_PROJECT_ID);
+    const summary = sMgmt;
     expect(typeof summary.budget).toBe('string');
     expect(typeof summary.directCost).toBe('string');
     expect(typeof summary.indirectCost).toBe('string');

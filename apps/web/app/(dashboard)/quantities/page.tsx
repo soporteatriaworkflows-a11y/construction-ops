@@ -2,7 +2,7 @@
  * Página de cantidades y despieces geométricos — Oleada 3A.
  * Server Component. Propiedad: agent-frontend-boq.
  *
- * Consume el read-model (dev-read-model TEMP) en lugar de mocks estáticos.
+ * Consume el read-model canónico (@/server/read-model) en lugar de mocks estáticos.
  * NO importa @/lib/utils/mocks. NO recalcula cantidades en el frontend.
  * calculatedQuantity llega pre-calculado desde el read-model.
  */
@@ -17,10 +17,11 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { formatNumber, CALCULATION_MODE_LABELS } from '@/lib/utils/format';
-import { getReadModel } from '@/components/budget/dev-read-model';
+import { getReadModel, getDemoViewer } from '@/server/read-model';
 
 export default async function QuantitiesPage() {
   const rm = getReadModel();
+  const viewer = getDemoViewer();
 
   // Para cantidades necesitamos el scopeId del primer proyecto
   let scopeId: string | null = null;
@@ -29,11 +30,11 @@ export default async function QuantitiesPage() {
   let loadError: string | null = null;
 
   try {
-    const projects = await rm.listProjects();
+    const projects = await rm.listProjects(viewer);
     if (projects.length > 0) {
       const first = projects[0]!;
       projectName = first.name;
-      const overview = await rm.getProjectOverview(first.id);
+      const overview = await rm.getProjectOverview(viewer, first.id);
       if (overview) {
         const floorScope = overview.scopes.find((s) => s.scopeType === 'floor');
         const anyScope = overview.scopes[0];
@@ -52,7 +53,7 @@ export default async function QuantitiesPage() {
 
   if (scopeId && !loadError) {
     try {
-      groups = await rm.listQuantities(scopeId);
+      groups = await rm.listQuantities(viewer, scopeId);
     } catch (e) {
       loadError = e instanceof Error ? e.message : 'Error al cargar cantidades';
     }
@@ -105,19 +106,11 @@ export default async function QuantitiesPage() {
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div>
                       <div className="flex items-center gap-2 mb-1">
-                        <Badge variant="secondary">
-                          {CALCULATION_MODE_LABELS[group.calculationMode] ??
-                            group.calculationMode}
-                        </Badge>
                         <Badge variant="outline">
                           {group.lines.length} línea{group.lines.length !== 1 ? 's' : ''}
                         </Badge>
                       </div>
                       <CardTitle className="text-base">{group.name}</CardTitle>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs text-gray-400">Unidad</p>
-                      <p className="font-semibold text-gray-900">{group.unit}</p>
                     </div>
                   </div>
                 </CardHeader>
@@ -135,7 +128,7 @@ export default async function QuantitiesPage() {
                           <tr className="border-b border-gray-200 text-xs text-gray-500">
                             <th className="pb-2 text-left font-medium">Descripción</th>
                             <th className="pb-2 text-right font-medium">
-                              Cantidad ({group.unit})
+                              Cantidad
                             </th>
                           </tr>
                         </thead>
@@ -157,7 +150,7 @@ export default async function QuantitiesPage() {
                               Total
                             </td>
                             <td className="pt-2 text-right tabular-nums font-bold text-blue-700">
-                              {formatNumber(String(displayTotal), 4)} {group.unit}
+                              {formatNumber(String(displayTotal), 4)}
                             </td>
                           </tr>
                         </tfoot>

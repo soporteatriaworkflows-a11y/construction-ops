@@ -1106,3 +1106,50 @@ Resultado global: PASS (exit code 0)
 
 ### Agentes activos al cierre
 - Ninguno.
+
+## 2026-05-31 — Integración Oleada 3A: web funcional con read-model (orchestrator)
+
+### Integración
+- Cherry-picks: `9e69449` (db-rls read-model) + `8ab0d9c` (frontend) + `0bab01d`
+  (dashboard). Conflicto add/add en `read-model.ts` resuelto con el canónico de
+  db-rls (`--ours`). `main` intacta.
+
+### Reconciliación (Fases 2-4)
+- **Fuente única**: `apps/web/lib/contracts/read-model.ts` (db-rls); duplicados de
+  frontend/dashboard eliminados. **1** `interface ReadModelPort`.
+- **Accesores TEMP eliminados** (`components/budget/dev-read-model.ts`,
+  `modules/dashboard/dev-read-model.ts`). Nuevo helper
+  `apps/web/server/read-model/viewer.ts` (`getDemoViewer()`, demo/dev). Las 5
+  páginas de presupuesto y el dashboard consumen `getReadModel()` de
+  `@/server/read-model` con el viewer demo.
+- **DTOs adaptados** al canónico: `ProjectListItem{scopeCount,createdAt,
+  estimateCount}` (sin `code`/`scopeNames`); `EstimateSummary.versionId`/
+  `status:EstimateVersionStatus` (sin `id`/`approvedAt`/`notes`);
+  `QuantityGroupView{id,name,lines}` (sin `unit`/`calculationMode`).
+- Test redundante del frontend eliminado; test del dashboard repointado al
+  read-model canónico (precompute en `beforeAll`).
+
+### Validación integral (Fase 5 — todo PASS)
+- typecheck 0 · lint 0 · **356 tests** · build Next 16.2.6 (estáticas + dinámicas)
+  · `gm:regression` **22/22** · `gm:import` **9/9** · `validate-claude-agents`
+  **214/0/0** · `git diff --check` limpio.
+- Privacidad: DTOs sin campos internos de pricing; ahorros del dashboard
+  role-gated; cero cálculo financiero en React.
+
+### RLS (Fase 6)
+- Sin cambios en `supabase/*` ni `apps/web/lib/db/schema.ts` ⇒ **RLS runtime
+  21/21** vigente. B-004 (Realtime) deuda técnica.
+
+### Dev smoke (Fase 7)
+- `READ_MODEL_SOURCE=fixture` + `pnpm --filter web dev`. **8/8 rutas HTTP 200**
+  con datos reales del golden master (`/dashboard` "Total presupuesto $372.247…"
+  + Recharts; `/estimates` "Entre Patios" + AIU/IVA). Sin 500. Servidor detenido
+  tras el smoke (incl. limpieza de un dev server obsoleto previo en :3000).
+
+### Estado / próximo paso
+- Commit `chore: integrate and validate wave 3a functional read model ui` +
+  push a `origin integration/wave-3a`. **NO merge a `main`** (espera aprobación).
+- Recomendación: **APROBAR merge `integration/wave-3a` → `main`**.
+
+### Agentes activos al cierre
+- Ninguno.
