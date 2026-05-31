@@ -18,6 +18,7 @@
     "clsx": "^2.1.1",
     "decimal.js": "^10.6.0",
     "drizzle-orm": "^0.45.2",
+    "frappe-gantt": "^1.2.2",
     "lucide-react": "^1.17.0",
     "next": "^16.2.6",
     "postgres": "^3.4.9",
