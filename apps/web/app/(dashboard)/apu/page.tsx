@@ -1,9 +1,10 @@
 /**
- * Página de catálogo APU — mock Oleada 1.
+ * Página de catálogo APU — Oleada 3A.
  * Server Component. Propiedad: agent-frontend-boq.
  *
- * Muestra plantillas APU y sus componentes.
- * NO calcula totales; los valores vienen de los mocks.
+ * Consume el read-model (dev-read-model TEMP) en lugar de mocks estáticos.
+ * NO importa @/lib/utils/mocks. NO calcula totales financieros.
+ * unitCost llega pre-calculado como DecimalString desde el read-model.
  */
 import { Calculator } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
@@ -13,19 +14,37 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
-  CardDescription,
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { formatCOP, formatNumber, formatPct, RESOURCE_TYPE_LABELS } from '@/lib/utils/format';
-import {
-  MOCK_APU_TEMPLATES,
-  MOCK_APU_COMPONENTS,
-  MOCK_RESOURCES,
-  getComponentsByApu,
-} from '@/lib/utils/mocks';
+import { formatCOP } from '@/lib/utils/format';
+import { getReadModel } from '@/components/budget/dev-read-model';
 
-export default function ApuPage() {
-  const templates = MOCK_APU_TEMPLATES;
+export default async function ApuPage() {
+  const rm = getReadModel();
+  let apus: Awaited<ReturnType<typeof rm.listApus>> = [];
+  let error: string | null = null;
+
+  try {
+    apus = await rm.listApus();
+  } catch (e) {
+    error = e instanceof Error ? e.message : 'Error al cargar APU';
+    apus = [];
+  }
+
+  if (error) {
+    return (
+      <div>
+        <PageHeader title="Análisis de Precios Unitarios (APU)" />
+        <div
+          className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+          role="alert"
+          aria-live="assertive"
+        >
+          Error al cargar APU: {error}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -34,129 +53,51 @@ export default function ApuPage() {
         description="Catálogo de plantillas APU reutilizables por proyecto"
       />
 
-      {templates.length === 0 ? (
+      {apus.length === 0 ? (
         <EmptyState
           icon={Calculator}
           title="Sin plantillas APU"
           description="No hay plantillas APU en el catálogo."
         />
       ) : (
-        <div className="space-y-6">
-          {templates.map((template) => {
-            const components = getComponentsByApu(MOCK_APU_COMPONENTS, template.id);
-
-            return (
-              <Card key={template.id}>
-                <CardHeader className="pb-3">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-mono text-xs rounded bg-gray-100 px-2 py-0.5 text-gray-600">
-                          {template.code}
-                        </span>
-                        <Badge variant="secondary">v{template.version}</Badge>
-                        <Badge variant={template.active ? 'success' : 'outline'}>
-                          {template.active ? 'Activo' : 'Inactivo'}
-                        </Badge>
-                      </div>
-                      <CardTitle className="text-base">{template.name}</CardTitle>
-                      {template.description && (
-                        <CardDescription className="mt-0.5">
-                          {template.description}
-                        </CardDescription>
-                      )}
+        <div className="space-y-4">
+          {apus.map((apu) => (
+            <Card key={apu.id}>
+              <CardHeader className="pb-3">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-mono text-xs rounded bg-gray-100 px-2 py-0.5 text-gray-600">
+                        {apu.code}
+                      </span>
+                      <Badge variant="secondary">
+                        {apu.componentCount} componente{apu.componentCount !== 1 ? 's' : ''}
+                      </Badge>
                     </div>
-                    <div className="text-right">
-                      <p className="text-xs text-gray-400">Unidad base</p>
-                      <p className="font-semibold text-gray-900">{template.unit}</p>
-                    </div>
+                    <CardTitle className="text-base">{apu.name}</CardTitle>
                   </div>
-                </CardHeader>
+                  <div className="text-right">
+                    <p className="text-xs text-gray-400">Unidad base</p>
+                    <p className="font-semibold text-gray-900">{apu.unit}</p>
+                  </div>
+                </div>
+              </CardHeader>
 
-                <CardContent>
-                  {components.length === 0 ? (
-                    <p className="text-sm text-gray-400 italic">
-                      Sin componentes registrados.
-                    </p>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table
-                        className="w-full text-sm"
-                        aria-label={`Componentes del APU ${template.code}`}
-                      >
-                        <thead>
-                          <tr className="border-b border-gray-200 text-xs text-gray-500">
-                            <th className="pb-2 text-left font-medium">Tipo</th>
-                            <th className="pb-2 text-left font-medium">Recurso</th>
-                            <th className="pb-2 text-right font-medium">Cantidad</th>
-                            <th className="pb-2 text-right font-medium">Desperdicio</th>
-                            <th className="pb-2 text-right font-medium">P. Unitario</th>
-                            <th className="pb-2 text-right font-medium">Total componente</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-50">
-                          {components
-                            .sort((a, b) => a.sortOrder - b.sortOrder)
-                            .map((comp) => {
-                              const resource = comp.resourceId
-                                ? MOCK_RESOURCES.find((r) => r.id === comp.resourceId)
-                                : null;
-                              return (
-                                <tr key={comp.id} className="hover:bg-gray-50">
-                                  <td className="py-1.5">
-                                    <Badge variant="secondary" className="text-xs">
-                                      {RESOURCE_TYPE_LABELS[comp.componentType] ??
-                                        comp.componentType}
-                                    </Badge>
-                                  </td>
-                                  <td className="py-1.5 text-gray-700">
-                                    {resource?.name ?? (
-                                      <span className="italic text-gray-400">
-                                        {comp.unitPriceSource === 'manual'
-                                          ? 'Manual'
-                                          : 'Sin recurso'}
-                                      </span>
-                                    )}
-                                    {resource && (
-                                      <span className="ml-1.5 text-xs text-gray-400">
-                                        ({resource.unit})
-                                      </span>
-                                    )}
-                                  </td>
-                                  <td className="py-1.5 text-right tabular-nums text-gray-700">
-                                    {formatNumber(comp.quantity, 4)}
-                                  </td>
-                                  <td className="py-1.5 text-right tabular-nums text-gray-500">
-                                    {formatPct(comp.wastePct)}
-                                  </td>
-                                  <td className="py-1.5 text-right tabular-nums text-gray-700">
-                                    {formatCOP(comp.unitPriceSnapshot)}
-                                  </td>
-                                  <td className="py-1.5 text-right tabular-nums font-medium text-gray-900">
-                                    {formatCOP(comp.totalComponentCost)}
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
+              <CardContent>
+                <div className="flex items-center justify-between rounded-md bg-gray-50 px-4 py-3">
+                  <span className="text-sm text-gray-600">Costo unitario total</span>
+                  <span className="text-lg font-bold text-blue-700 tabular-nums">
+                    {formatCOP(apu.unitCost)}
+                    <span className="ml-1 text-xs font-normal text-gray-400">
+                      / {apu.unit}
+                    </span>
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       )}
-
-      {/* Aviso mock */}
-      <div
-        className="mt-6 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-700"
-        role="status"
-      >
-        Modo mock — Oleada 1. APU estático. Oleada 2 conectará cálculos
-        de mano de obra y costos unitarios reales.
-      </div>
     </div>
   );
 }

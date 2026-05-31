@@ -88,7 +88,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
         {/* Footer del sidebar */}
         <div className="border-t border-gray-200 px-4 py-3">
-          <p className="text-xs text-gray-400">Modo mock — Oleada 1</p>
+          <p className="text-xs text-gray-400">Oleada 3A — fixture</p>
         </div>
       </aside>
 
