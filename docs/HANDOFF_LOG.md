@@ -1033,3 +1033,36 @@ Resultado global: PASS (exit code 0)
 
 ### Agentes activos al cierre
 - Ninguno.
+
+## 2026-05-31 — Oleada 3A: microfase documental + Recharts (orchestrator)
+
+### Rama
+- Creada y publicada `integration/wave-3a` desde `main` (`30b1053`). `main` intacta.
+
+### Read-model CONGELADO v1
+- Creado **`docs/READ_MODEL_CONTRACT.md`** (orchestrator-owned; cambios solo vía
+  INTEGRATION_REQUESTS): ubicación canónica (`apps/web/server/read-model`,
+  `apps/web/server/repositories`, `apps/web/lib/contracts/read-model.ts`); dos
+  fuentes explícitas (`FixtureReadModelRepository`/`DrizzleReadModelRepository`)
+  con selector `READ_MODEL_SOURCE=fixture|db` sin fallback silencioso;
+  `ViewerRole`/`ViewerContext`; clasificación cliente-safe vs 🔒; DTOs canónicos
+  (`ProjectListItem`, `ProjectOverview`, `EstimateSummary`, `ChapterSummary`,
+  `BoqItemView`, `ApuSummary`, `QuantityGroupView`, `CatalogResourceView`,
+  `DashboardSummary`); `ReadModelPort` (8 funciones). La UI consume DTOs; cero
+  cálculo financiero en React; cost-domain/pricing solo server-side.
+- Actualizados `API_CONTRACTS.md` (§7), `AGENT_REGISTRY.md` (ownership 3A:
+  db-rls = server/read-model; frontend-boq = páginas presupuesto; dashboard =
+  /dashboard + modules/dashboard), `DECISIONS.md`, `LICENSING.md`,
+  `INTEGRATION_REQUESTS.md`.
+
+### Dependencia
+- **`recharts` ^3.8.1 (MIT)** instalado en `apps/web` (`corepack pnpm --filter
+  web add recharts`). NO se instalaron frappe-gantt/exceljs/@react-pdf/renderer.
+
+### Próximo paso
+- Validar (typecheck/lint/test/build/validador) + commit documental + push a
+  `origin integration/wave-3a`. Luego lanzar en paralelo agent-db-rls ∥
+  agent-frontend-boq ∥ agent-dashboard. NO planning, NO exports, NO merge.
+
+### Agentes activos al cierre de esta microfase
+- Ninguno (aún).
