@@ -208,6 +208,27 @@ pricing). La única superficie cliente-safe de precio sigue siendo
 
 ---
 
+---
+
+## 8. Notas de reconciliación (integración 2B, 2026-05-30)
+
+- **Implementación**: `apps/web/modules/pricing/adapters/` (`types`,
+  `supplier-adapter`, `import-preview`, `idempotency`, `homecenter-csv`, `index`)
+  + `scripts/catalog-sync/` + `apps/web/tests/unit/pricing-adapters/`.
+- **Consumo del puerto real**: el adaptador usa `MinimalApprovalPort`, un
+  **subconjunto estructural** de `PricingApprovalPort` (`recordObservation` +
+  `approveObservation`), NO una lógica de aprobación paralela. Se verifica con
+  `tests/unit/pricing-adapters/port-reconciliation.test.ts`: (1) aserción
+  type-level de que `PricingApprovalPort` es asignable a `MinimalApprovalPort`;
+  (2) prueba runtime que persiste vía el `PricingApprovalService` real
+  (`InMemoryPricingRepository`), respetando append-only e idempotencia.
+- **Tipos auxiliares**: `ResourceCatalog`/`ResourceRef` (no listados en §3) se
+  avalan como catálogo de recursos para el matching de SKU; viven dentro de
+  `adapters/`. `RecordObservationInput` se importa del módulo real
+  `@/modules/pricing/types` (no se redefine).
+
+---
+
 _Congelado el 2026-05-30 (Oleada 2B). Referencias: Q11/Q14 en
 `docs/DECISIONS.md`; `PricingApprovalPort` en `apps/web/modules/pricing/types.ts`;
 contrato de lectura en `docs/PRICING_READ_CONTRACT.md`._
