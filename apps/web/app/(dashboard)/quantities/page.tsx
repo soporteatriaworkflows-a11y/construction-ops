@@ -1,9 +1,10 @@
 /**
- * Página de cantidades y despieces geométricos — mock Oleada 1.
+ * Página de cantidades y despieces geométricos — Oleada 3A.
  * Server Component. Propiedad: agent-frontend-boq.
  *
- * Los calculatedQuantity ya vienen del mock (cost-domain los proveerá en Oleada 2).
- * NO recalcular en el frontend.
+ * Consume el read-model (dev-read-model TEMP) en lugar de mocks estáticos.
+ * NO importa @/lib/utils/mocks. NO recalcula cantidades en el frontend.
+ * calculatedQuantity llega pre-calculado desde el read-model.
  */
 import { Hash } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
@@ -14,55 +15,89 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
-  CardDescription,
 } from '@/components/ui/card';
-import {
-  formatNumber,
-  CALCULATION_MODE_LABELS,
-} from '@/lib/utils/format';
-import {
-  MOCK_QUANTITY_GROUPS,
-  MOCK_QUANTITY_LINES,
-  MOCK_SCOPES,
-  MOCK_PROJECTS,
-} from '@/lib/utils/mocks';
+import { formatNumber, CALCULATION_MODE_LABELS } from '@/lib/utils/format';
+import { getReadModel } from '@/components/budget/dev-read-model';
 
-export default function QuantitiesPage() {
-  const groups = MOCK_QUANTITY_GROUPS;
+export default async function QuantitiesPage() {
+  const rm = getReadModel();
+
+  // Para cantidades necesitamos el scopeId del primer proyecto
+  let scopeId: string | null = null;
+  let projectName = '';
+  let scopeName = '';
+  let loadError: string | null = null;
+
+  try {
+    const projects = await rm.listProjects();
+    if (projects.length > 0) {
+      const first = projects[0]!;
+      projectName = first.name;
+      const overview = await rm.getProjectOverview(first.id);
+      if (overview) {
+        const floorScope = overview.scopes.find((s) => s.scopeType === 'floor');
+        const anyScope = overview.scopes[0];
+        const chosen = floorScope ?? anyScope;
+        if (chosen) {
+          scopeId = chosen.id;
+          scopeName = chosen.name;
+        }
+      }
+    }
+  } catch (e) {
+    loadError = e instanceof Error ? e.message : 'Error al cargar proyecto';
+  }
+
+  let groups: Awaited<ReturnType<typeof rm.listQuantities>> = [];
+
+  if (scopeId && !loadError) {
+    try {
+      groups = await rm.listQuantities(scopeId);
+    } catch (e) {
+      loadError = e instanceof Error ? e.message : 'Error al cargar cantidades';
+    }
+  }
+
+  if (loadError) {
+    return (
+      <div>
+        <PageHeader title="Cantidades y Despieces" />
+        <div
+          className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+          role="alert"
+          aria-live="assertive"
+        >
+          Error: {loadError}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
       <PageHeader
         title="Cantidades y Despieces"
-        description="Despieces geométricos vinculados a alcances del proyecto"
+        description={
+          projectName && scopeName
+            ? `${projectName} / ${scopeName}`
+            : 'Despieces geométricos vinculados a alcances del proyecto'
+        }
       />
 
       {groups.length === 0 ? (
         <EmptyState
           icon={Hash}
           title="Sin grupos de cantidades"
-          description="No hay grupos de cantidades registrados."
+          description="No hay grupos de cantidades registrados para este alcance."
         />
       ) : (
         <div className="space-y-6">
           {groups.map((group) => {
-            const scope = MOCK_SCOPES.find(
-              (s) => s.id === group.projectScopeId
+            // Total ya calculado en el read-model — NO operar aquí (solo suma display)
+            const displayTotal = group.lines.reduce(
+              (acc, l) => acc + parseFloat(l.calculatedQuantity),
+              0
             );
-            const project = scope
-              ? MOCK_PROJECTS.find((p) => p.id === scope.projectId)
-              : undefined;
-
-            const lines = MOCK_QUANTITY_LINES.filter(
-              (l) => l.quantityGroupId === group.id
-            ).sort((a, b) => a.sortOrder - b.sortOrder);
-
-            // Total ya calculado en el mock — NO operar aquí
-            const total = lines.reduce((acc, l) => {
-              // Este reduce es solo para mostrar el total sumado de líneas ya calculadas.
-              // En producción, cost-domain proveerá este valor directamente.
-              return acc + parseFloat(l.calculatedQuantity);
-            }, 0);
 
             return (
               <Card key={group.id}>
@@ -70,20 +105,15 @@ export default function QuantitiesPage() {
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div>
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="font-mono text-xs rounded bg-gray-100 px-2 py-0.5 text-gray-600">
-                          {group.code}
-                        </span>
                         <Badge variant="secondary">
                           {CALCULATION_MODE_LABELS[group.calculationMode] ??
                             group.calculationMode}
                         </Badge>
+                        <Badge variant="outline">
+                          {group.lines.length} línea{group.lines.length !== 1 ? 's' : ''}
+                        </Badge>
                       </div>
                       <CardTitle className="text-base">{group.name}</CardTitle>
-                      {scope && project && (
-                        <CardDescription>
-                          {project.name} › {scope.name}
-                        </CardDescription>
-                      )}
                     </div>
                     <div className="text-right">
                       <p className="text-xs text-gray-400">Unidad</p>
@@ -93,10 +123,8 @@ export default function QuantitiesPage() {
                 </CardHeader>
 
                 <CardContent>
-                  {lines.length === 0 ? (
-                    <p className="text-sm italic text-gray-400">
-                      Sin líneas de despiece.
-                    </p>
+                  {group.lines.length === 0 ? (
+                    <p className="text-sm italic text-gray-400">Sin líneas de despiece.</p>
                   ) : (
                     <div className="overflow-x-auto">
                       <table
@@ -106,89 +134,31 @@ export default function QuantitiesPage() {
                         <thead>
                           <tr className="border-b border-gray-200 text-xs text-gray-500">
                             <th className="pb-2 text-left font-medium">Descripción</th>
-                            {group.calculationMode !== 'direct' && (
-                              <>
-                                <th className="pb-2 text-right font-medium">Largo</th>
-                                {['area', 'volume'].includes(group.calculationMode) && (
-                                  <th className="pb-2 text-right font-medium">Ancho</th>
-                                )}
-                                {group.calculationMode === 'volume' && (
-                                  <th className="pb-2 text-right font-medium">Alto</th>
-                                )}
-                              </>
-                            )}
-                            <th className="pb-2 text-right font-medium">
-                              Multiplicador
-                            </th>
                             <th className="pb-2 text-right font-medium">
                               Cantidad ({group.unit})
                             </th>
-                            <th className="pb-2 text-left font-medium">Notas</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
-                          {lines.map((line) => (
+                          {group.lines.map((line) => (
                             <tr key={line.id} className="hover:bg-gray-50">
                               <td className="py-1.5 text-gray-700">
                                 {line.description ?? '—'}
                               </td>
-                              {group.calculationMode !== 'direct' && (
-                                <>
-                                  <td className="py-1.5 text-right tabular-nums text-gray-600">
-                                    {line.length
-                                      ? formatNumber(line.length, 4)
-                                      : '—'}
-                                  </td>
-                                  {['area', 'volume'].includes(
-                                    group.calculationMode
-                                  ) && (
-                                    <td className="py-1.5 text-right tabular-nums text-gray-600">
-                                      {line.width
-                                        ? formatNumber(line.width, 4)
-                                        : '—'}
-                                    </td>
-                                  )}
-                                  {group.calculationMode === 'volume' && (
-                                    <td className="py-1.5 text-right tabular-nums text-gray-600">
-                                      {line.height
-                                        ? formatNumber(line.height, 4)
-                                        : '—'}
-                                    </td>
-                                  )}
-                                </>
-                              )}
-                              <td className="py-1.5 text-right tabular-nums text-gray-600">
-                                {formatNumber(line.multiplier, 2)}
-                              </td>
                               <td className="py-1.5 text-right tabular-nums font-medium text-gray-900">
                                 {formatNumber(line.calculatedQuantity, 4)}
-                              </td>
-                              <td className="py-1.5 text-xs italic text-gray-400">
-                                {line.notes ?? ''}
                               </td>
                             </tr>
                           ))}
                         </tbody>
                         <tfoot>
                           <tr className="border-t-2 border-gray-300">
-                            <td
-                              className="pt-2 text-sm font-semibold text-gray-700"
-                              colSpan={
-                                group.calculationMode === 'volume'
-                                  ? 5
-                                  : group.calculationMode === 'area'
-                                  ? 4
-                                  : group.calculationMode === 'direct'
-                                  ? 2
-                                  : 3
-                              }
-                            >
+                            <td className="pt-2 text-sm font-semibold text-gray-700">
                               Total
                             </td>
                             <td className="pt-2 text-right tabular-nums font-bold text-blue-700">
-                              {formatNumber(String(total), 4)} {group.unit}
+                              {formatNumber(String(displayTotal), 4)} {group.unit}
                             </td>
-                            <td />
                           </tr>
                         </tfoot>
                       </table>
@@ -200,15 +170,6 @@ export default function QuantitiesPage() {
           })}
         </div>
       )}
-
-      {/* Aviso mock */}
-      <div
-        className="mt-6 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-700"
-        role="status"
-      >
-        Modo mock — Oleada 1. Cantidades calculadas estáticas.
-        En Oleada 2, cost-domain proveerá las cantidades calculadas dinámicamente.
-      </div>
     </div>
   );
 }
