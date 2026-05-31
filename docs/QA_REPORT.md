@@ -69,6 +69,7 @@ Ninguno.
 | 2026-05-30 | orquestador (integración Oleada 2A en `integration/wave-2a`) | ✅ PASS pre-merge | cost-domain + pricing integrados y unificados; **229 tests**; gm 22/22 + 9/9; sin merge a main |
 | 2026-05-30 | orquestador (merge Oleada 2A a main `f0c7d23`) | ✅ PASS post-merge | **229 tests**; gm 22/22 + 9/9 diff=0; IVA por `base_type='utility'`; sin cambios de DB ⇒ RLS 21/21 vigente; tag `wave-2a-domain-pricing-v1` |
 | 2026-05-30 | orquestador (integración Oleada 2B en `integration/wave-2b`) | ✅ PASS pre-merge | adaptador Homecenter integrado y reconciliado; **309 tests** (80 adapters); gm 22/22 + 9/9; persistencia solo vía `PricingApprovalPort` real; sin scraping; sin merge a main |
+| 2026-05-30 | orquestador (merge Oleada 2B a main `47fcfb3`) | ✅ PASS post-merge | **309 tests** (80 adapters); gm 22/22 + 9/9; sin cambios de DB ⇒ RLS 21/21 vigente; sin scraping/API inventada; tag `wave-2b-homecenter-adapter-v1` |
 
 ## Validación Oleada 1.5 (rama `feature/wave-1.5-local-rls`, 2026-05-30)
 

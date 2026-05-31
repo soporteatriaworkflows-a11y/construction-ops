@@ -994,3 +994,42 @@ Resultado global: PASS (exit code 0)
 
 ### Agentes activos al cierre
 - Ninguno.
+
+## 2026-05-30 — Merge de Oleada 2B a main (orchestrator)
+
+### Merge
+- Usuario aprobó el merge. Preflight: `main = origin/main = 75394f1` (árbol
+  limpio); integración final `1931aac`; 6 backups (wave1×3 + wave2×3) y 3 tags
+  conservados; Excel ignorado; sin `.env`/`package-lock`; solo ag-grid-community.
+- `git merge --no-ff integration/wave-2b` → **merge commit
+  `47fcfb36b15a0a15cd700a4886cf13555d0198bd`** (`47fcfb3`). **Sin conflictos.**
+
+### Validación post-merge (todo PASA en main)
+- typecheck 0 · lint 0 · **test 309** (incl. **80 de adapters**) · build Next
+  16.2.6 (9 rutas + Proxy) · `gm:regression` **22/22** · `gm:import` **9/9**
+  (±0.01 COP) · `validate-claude-agents` **214/0/0** · `git diff --check` limpio.
+- Adaptador: persistencia SOLO vía `PricingApprovalPort` real (verificado: los
+  `adapters/` no escriben en DB); preview no persiste; ambiguos `pending`;
+  idempotencia; auditoría Q11; snapshots emitidos intactos. **Sin scraping**
+  (sin fetch/axios/puppeteer/cheerio/URLs); **sin API Homecenter inventada**
+  (CSV/Excel local). Privacidad backend-first (campos 🔒 no a cliente).
+
+### RLS runtime (Paso 4)
+- El merge NO modificó `supabase/migrations|policies|seeds` ni
+  `apps/web/lib/db/schema.ts` (verificado `git diff 75394f1..HEAD`) ⇒ **RLS
+  runtime 21/21** de Oleada 1.5 sigue vigente. No se relevantó Docker.
+- **B-004** (Realtime unhealthy en Windows) sigue como deuda técnica no bloqueante.
+
+### Ramas y tag
+- **Conservados**: backups wave1 (db-rls/excel-mapper/frontend-boq), wave2
+  (cost-domain/pricing/homecenter), `integration/wave-2b`, ramas de integración
+  previas, `feature/wave-1.5-local-rls`.
+- Tag anotado: **`wave-2b-homecenter-adapter-v1`** sobre el merge.
+
+### Estado / próximo paso
+- **Oleada 2B CERRADA y en `main`.** Oleada 3 NO iniciada (solo diagnóstico de
+  arquitectura propuesto). Antes de paralelizar Oleada 3: congelar los contratos
+  documentales propuestos (planning, dashboard read-model, export profiles).
+
+### Agentes activos al cierre
+- Ninguno.
