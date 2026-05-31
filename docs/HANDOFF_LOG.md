@@ -1033,3 +1033,123 @@ Resultado global: PASS (exit code 0)
 
 ### Agentes activos al cierre
 - Ninguno.
+
+## 2026-05-31 — Oleada 3A: microfase documental + Recharts (orchestrator)
+
+### Rama
+- Creada y publicada `integration/wave-3a` desde `main` (`30b1053`). `main` intacta.
+
+### Read-model CONGELADO v1
+- Creado **`docs/READ_MODEL_CONTRACT.md`** (orchestrator-owned; cambios solo vía
+  INTEGRATION_REQUESTS): ubicación canónica (`apps/web/server/read-model`,
+  `apps/web/server/repositories`, `apps/web/lib/contracts/read-model.ts`); dos
+  fuentes explícitas (`FixtureReadModelRepository`/`DrizzleReadModelRepository`)
+  con selector `READ_MODEL_SOURCE=fixture|db` sin fallback silencioso;
+  `ViewerRole`/`ViewerContext`; clasificación cliente-safe vs 🔒; DTOs canónicos
+  (`ProjectListItem`, `ProjectOverview`, `EstimateSummary`, `ChapterSummary`,
+  `BoqItemView`, `ApuSummary`, `QuantityGroupView`, `CatalogResourceView`,
+  `DashboardSummary`); `ReadModelPort` (8 funciones). La UI consume DTOs; cero
+  cálculo financiero en React; cost-domain/pricing solo server-side.
+- Actualizados `API_CONTRACTS.md` (§7), `AGENT_REGISTRY.md` (ownership 3A:
+  db-rls = server/read-model; frontend-boq = páginas presupuesto; dashboard =
+  /dashboard + modules/dashboard), `DECISIONS.md`, `LICENSING.md`,
+  `INTEGRATION_REQUESTS.md`.
+
+### Dependencia
+- **`recharts` ^3.8.1 (MIT)** instalado en `apps/web` (`corepack pnpm --filter
+  web add recharts`). NO se instalaron frappe-gantt/exceljs/@react-pdf/renderer.
+
+### Próximo paso
+- Validar (typecheck/lint/test/build/validador) + commit documental + push a
+  `origin integration/wave-3a`. Luego lanzar en paralelo agent-db-rls ∥
+  agent-frontend-boq ∥ agent-dashboard. NO planning, NO exports, NO merge.
+
+### Agentes activos al cierre de esta microfase
+- Ninguno (aún).
+
+## 2026-05-31 — Oleada 3A: subagentes ejecutados (interrumpidos) y preservados (orchestrator)
+
+### Lanzamiento
+- Lanzados en paralelo (worktrees aislados desde `main`@`30b1053`): agent-db-rls
+  (read-model), agent-frontend-boq (páginas presupuesto), agent-dashboard (KPIs).
+- Los tres se **interrumpieron por límite de sesión** (~54-62 acciones c/u), con
+  trabajo casi completo **sin commitear** y errores triviales remanentes de
+  `tsc`/build (los worktrees derivan de main, sin el contrato ni recharts; el
+  contrato fue embebido en los prompts y dashboard instaló el recharts aprobado).
+
+### Entregables preservados (verdes tras fixes mínimos del orquestador)
+- **agent-db-rls** → `backup/wave3-db-read-model` (`7478ceb`): `lib/contracts/
+  read-model.ts` (DTOs+port), `server/read-model/{types,errors,port,compute,
+  fixture-repository,drizzle-repository,index}`, `server/repositories/`,
+  selector `READ_MODEL_SOURCE` sin fallback, proyección por rol, 2 tests.
+  Validado: typecheck 0, lint 0, **329 tests**, build OK. Fix: `env:Partial<ProcessEnv>`.
+- **agent-dashboard** → `backup/wave3-dashboard` (`79d9fd3`): `/dashboard` +
+  `modules/dashboard/*` (KPIs, Recharts barras+pie, ahorros solo rol autorizado)
+  + accesor TEMP de dev. Validado: typecheck 0, lint 0, **336 tests**, build OK.
+  recharts ^3.8.1. Fixes: import estático del fixture (Turbopack) + typing legend.
+- **agent-frontend-boq** → `backup/wave3-frontend-boq` (`28d8bfe`): páginas
+  `/projects /estimates /apu /quantities /catalog` cableadas (sin mocks) +
+  `components/budget/*` + accesor TEMP. Validado: typecheck 0, lint 0, **338
+  tests**, build OK. Fixes: ruta fixture + anotaciones de tipo + cast de status.
+
+### Reconciliación pendiente (integración 3A)
+- Triple `read-model.ts` → unificar a la canónica de db-rls. Rewire de accesores
+  TEMP de la UI a `@/server/read-model` (`getReadModel()`). Alinear DTOs
+  divergentes del frontend (`scopeNames/code/status:string`) a los canónicos.
+  Registrado en INTEGRATION_REQUESTS.
+
+### Estado / próximo paso
+- **NO integrado** a `integration/wave-3a` ni a `main`. `main` intacta. Backups
+  3A (3) + previos y tags conservados. Worktrees obsoletos por limpiar.
+- Recomendación: ciclo de integración 3A (cherry-pick db-rls → frontend →
+  dashboard, reconciliar, validar) antes de pedir merge a `main`.
+
+### Agentes activos al cierre
+- Ninguno.
+
+## 2026-05-31 — Integración Oleada 3A: web funcional con read-model (orchestrator)
+
+### Integración
+- Cherry-picks: `9e69449` (db-rls read-model) + `8ab0d9c` (frontend) + `0bab01d`
+  (dashboard). Conflicto add/add en `read-model.ts` resuelto con el canónico de
+  db-rls (`--ours`). `main` intacta.
+
+### Reconciliación (Fases 2-4)
+- **Fuente única**: `apps/web/lib/contracts/read-model.ts` (db-rls); duplicados de
+  frontend/dashboard eliminados. **1** `interface ReadModelPort`.
+- **Accesores TEMP eliminados** (`components/budget/dev-read-model.ts`,
+  `modules/dashboard/dev-read-model.ts`). Nuevo helper
+  `apps/web/server/read-model/viewer.ts` (`getDemoViewer()`, demo/dev). Las 5
+  páginas de presupuesto y el dashboard consumen `getReadModel()` de
+  `@/server/read-model` con el viewer demo.
+- **DTOs adaptados** al canónico: `ProjectListItem{scopeCount,createdAt,
+  estimateCount}` (sin `code`/`scopeNames`); `EstimateSummary.versionId`/
+  `status:EstimateVersionStatus` (sin `id`/`approvedAt`/`notes`);
+  `QuantityGroupView{id,name,lines}` (sin `unit`/`calculationMode`).
+- Test redundante del frontend eliminado; test del dashboard repointado al
+  read-model canónico (precompute en `beforeAll`).
+
+### Validación integral (Fase 5 — todo PASS)
+- typecheck 0 · lint 0 · **356 tests** · build Next 16.2.6 (estáticas + dinámicas)
+  · `gm:regression` **22/22** · `gm:import` **9/9** · `validate-claude-agents`
+  **214/0/0** · `git diff --check` limpio.
+- Privacidad: DTOs sin campos internos de pricing; ahorros del dashboard
+  role-gated; cero cálculo financiero en React.
+
+### RLS (Fase 6)
+- Sin cambios en `supabase/*` ni `apps/web/lib/db/schema.ts` ⇒ **RLS runtime
+  21/21** vigente. B-004 (Realtime) deuda técnica.
+
+### Dev smoke (Fase 7)
+- `READ_MODEL_SOURCE=fixture` + `pnpm --filter web dev`. **8/8 rutas HTTP 200**
+  con datos reales del golden master (`/dashboard` "Total presupuesto $372.247…"
+  + Recharts; `/estimates` "Entre Patios" + AIU/IVA). Sin 500. Servidor detenido
+  tras el smoke (incl. limpieza de un dev server obsoleto previo en :3000).
+
+### Estado / próximo paso
+- Commit `chore: integrate and validate wave 3a functional read model ui` +
+  push a `origin integration/wave-3a`. **NO merge a `main`** (espera aprobación).
+- Recomendación: **APROBAR merge `integration/wave-3a` → `main`**.
+
+### Agentes activos al cierre
+- Ninguno.

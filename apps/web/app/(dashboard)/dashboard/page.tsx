@@ -1,148 +1,143 @@
 /**
- * Dashboard principal — mock Oleada 1.
- * Server Component. Propiedad: agent-frontend-boq.
+ * Dashboard principal — Oleada 3A.
  *
- * NOTA: Los valores monetarios vienen de mocks ya calculados.
- * El frontend NO calcula totales financieros.
+ * Server Component. Propiedad: agent-dashboard.
+ *
+ * Consume DashboardSummary desde el accesor temporal de dev (fixture).
+ * CERO cálculo financiero en React: los valores llegan como DecimalString
+ * ya calculados por cost-domain (vía fixture del golden master).
+ *
+ * TEMP integración 3A: `getDashboardSummaryFromFixture` debe reemplazarse por
+ * `getReadModel().getDashboardSummary(viewer, projectId)` cuando db-rls
+ * entregue la implementación de @/server/read-model.
+ *
+ * Privacidad: campos 🔒 (projectedSaving, realizedSaving, pricingCoverage)
+ * solo se pasan a componentes cuando el viewer.role es management/internal.
+ * Para rol `client`, esos campos no se pasan ni se renderizan.
  */
-import { FolderOpen, ClipboardList, BookOpen, Calculator } from 'lucide-react';
+
+import { DollarSign, TrendingUp, BarChart2, Calendar } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from '@/components/ui/card';
-import { formatCOP } from '@/lib/utils/format';
+import { KpiCard, FinancialKpiCard } from '@/modules/dashboard/kpi-card';
+import { ChapterDistributionSection } from '@/modules/dashboard/chapter-distribution-section';
+import { SavingsSection } from '@/modules/dashboard/savings-section';
+import { getReadModel, getDemoViewer } from '@/server/read-model';
+import { formatCOP, formatDateTime, ESTIMATE_VERSION_STATUS_LABELS } from '@/lib/utils/format';
 
-// Resumen mock — valores ya calculados (simulando cost-domain Oleada 2).
-// Totales de regresión del golden master (PROJECT_MASTER §3.4).
-const MOCK_SUMMARY = {
-  projects: 2,
-  activeEstimates: 3,
-  catalogResources: 8,
-  apuTemplates: 3,
-  directCostsCOP: '336084479.9369073500',
-  indirectCostsCOP: '36162690.0412112300',
-  totalCostCOP: '372247169.9781186000',
-};
+// ID del proyecto piloto (del fixture sanitizado).
+const DEMO_PROJECT_ID = '00000000-0000-4000-8000-000000000010';
 
-const STAT_CARDS = [
-  {
-    title: 'Proyectos',
-    value: String(MOCK_SUMMARY.projects),
-    icon: FolderOpen,
-    description: 'Proyectos activos',
-    color: 'text-blue-700',
-    bg: 'bg-blue-50',
-  },
-  {
-    title: 'Presupuestos',
-    value: String(MOCK_SUMMARY.activeEstimates),
-    icon: ClipboardList,
-    description: 'Versiones activas',
-    color: 'text-green-700',
-    bg: 'bg-green-50',
-  },
-  {
-    title: 'Catálogo',
-    value: String(MOCK_SUMMARY.catalogResources),
-    icon: BookOpen,
-    description: 'Recursos en catálogo',
-    color: 'text-amber-700',
-    bg: 'bg-amber-50',
-  },
-  {
-    title: 'APU',
-    value: String(MOCK_SUMMARY.apuTemplates),
-    icon: Calculator,
-    description: 'Plantillas APU',
-    color: 'text-purple-700',
-    bg: 'bg-purple-50',
-  },
-] as const;
+export default async function DashboardPage() {
+  // ViewerContext resuelto server-side (demo en modo fixture; auth real en `db`).
+  const viewer = getDemoViewer();
+  const summary = await getReadModel().getDashboardSummary(viewer, DEMO_PROJECT_ID);
 
-export default function DashboardPage() {
+  const isAuthorizedForSavings = viewer.role === 'management' || viewer.role === 'internal';
+
+  const statusLabel =
+    ESTIMATE_VERSION_STATUS_LABELS[summary.estimateStatus] ?? summary.estimateStatus;
+
   return (
     <div>
       <PageHeader
-        title="Dashboard"
-        description="Resumen financiero del proyecto piloto — ENTRE PATIOS"
+        title="Dashboard gerencial"
+        description="Resumen financiero — ENTRE PATIOS (Primer Piso)"
       />
 
-      {/* KPI cards */}
-      <section aria-label="Indicadores principales">
+      {/* ------------------------------------------------------------------ */}
+      {/* KPIs financieros principales                                         */}
+      {/* ------------------------------------------------------------------ */}
+      <section aria-label="Resumen financiero" className="mt-2">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {STAT_CARDS.map(({ title, value, icon: Icon, description, color, bg }) => (
-            <Card key={title}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">
-                  {title}
-                </CardTitle>
-                <div
-                  className={`flex h-8 w-8 items-center justify-center rounded-lg ${bg}`}
-                  aria-hidden="true"
-                >
-                  <Icon className={`h-4 w-4 ${color}`} />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-gray-900">{value}</div>
-                <p className="text-xs text-gray-500 mt-0.5">{description}</p>
-              </CardContent>
-            </Card>
-          ))}
+          <KpiCard
+            title="Total presupuesto"
+            value={formatCOP(summary.budget)}
+            description="Costos directos + AIU"
+            valueColor="text-blue-700"
+            icon={<DollarSign className="h-4 w-4 text-blue-700" />}
+            iconBg="bg-blue-50"
+          />
+          <KpiCard
+            title="Costos directos"
+            value={formatCOP(summary.directCost)}
+            description="Σ capítulos BOQ"
+            icon={<TrendingUp className="h-4 w-4 text-green-700" />}
+            iconBg="bg-green-50"
+          />
+          <KpiCard
+            title="Costos indirectos (AIU)"
+            value={formatCOP(summary.indirectCost)}
+            description="Administración + Imprevistos + Utilidad + IVA"
+            icon={<BarChart2 className="h-4 w-4 text-amber-700" />}
+            iconBg="bg-amber-50"
+          />
+          <KpiCard
+            title="Estado del presupuesto"
+            value={statusLabel}
+            description={`Actualizado: ${formatDateTime(summary.lastUpdatedAt)}`}
+            icon={<Calendar className="h-4 w-4 text-purple-700" />}
+            iconBg="bg-purple-50"
+          />
         </div>
       </section>
 
-      {/* Resumen financiero */}
-      <section aria-label="Resumen financiero" className="mt-6">
+      {/* ------------------------------------------------------------------ */}
+      {/* Resumen financiero compacto                                          */}
+      {/* ------------------------------------------------------------------ */}
+      <section aria-label="Desglose financiero" className="mt-6">
         <h2 className="mb-4 text-base font-semibold text-gray-900">
-          Resumen financiero — ENTRE PATIOS (Primer Piso)
+          Desglose financiero
         </h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Costos directos</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-xl font-bold text-gray-900 tabular-nums">
-                {formatCOP(MOCK_SUMMARY.directCostsCOP)}
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Costos indirectos (AIU)</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-xl font-bold text-gray-900 tabular-nums">
-                {formatCOP(MOCK_SUMMARY.indirectCostsCOP)}
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Total presupuesto</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-xl font-bold text-blue-700 tabular-nums">
-                {formatCOP(MOCK_SUMMARY.totalCostCOP)}
-              </p>
-            </CardContent>
-          </Card>
+          <FinancialKpiCard
+            title="Costos directos"
+            value={formatCOP(summary.directCost)}
+            valueColor="text-gray-900"
+          />
+          <FinancialKpiCard
+            title="Costos indirectos (AIU)"
+            value={formatCOP(summary.indirectCost)}
+            valueColor="text-gray-900"
+          />
+          <FinancialKpiCard
+            title="Total presupuesto"
+            value={formatCOP(summary.budget)}
+            valueColor="text-blue-700"
+          />
         </div>
       </section>
 
-      {/* Aviso mock */}
+      {/* ------------------------------------------------------------------ */}
+      {/* Distribución por capítulo (Recharts)                                 */}
+      {/* ------------------------------------------------------------------ */}
+      <ChapterDistributionSection
+        chapterDistribution={summary.chapterDistribution}
+        topChapters={summary.topChapters}
+      />
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Ahorro e indicadores internos (🔒 solo management/internal)         */}
+      {/* ------------------------------------------------------------------ */}
+      {isAuthorizedForSavings && (
+        <SavingsSection
+          projectedSaving={summary.projectedSaving}
+          realizedSaving={summary.realizedSaving}
+          pricingCoverage={summary.pricingCoverage}
+        />
+      )}
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Aviso modo fixture                                                   */}
+      {/* ------------------------------------------------------------------ */}
       <div
         className="mt-8 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
         role="status"
         aria-live="polite"
       >
-        <strong>Modo mock — Oleada 1.</strong> Los valores mostrados son estáticos.
-        En Oleada 2, cost-domain proveerá cálculos reales desde la base de datos.
+        <strong>Modo fixture — Oleada 3A.</strong> Los valores mostrados provienen
+        del golden master sanitizado (ENTRE PATIOS — Primer Piso). En integración,
+        el orquestador reemplaza el accesor temporal por{' '}
+        <code className="font-mono text-xs">@/server/read-model</code> (db-rls).
       </div>
     </div>
   );

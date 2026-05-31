@@ -221,6 +221,33 @@ orchestrator ──┬─► db-rls ────────► cost-domain ─�
   `apps/web/tests/unit/pricing-adapters/`. NO toca `modules/apu|boq|estimates`,
   `modules/pricing/*` (salvo `adapters/`), `modules/suppliers/`, ni `package.json`.
 
+### Ownership congelado — Oleada 3A (visibilidad funcional)
+
+Contrato: `docs/READ_MODEL_CONTRACT.md`. Sin solape de archivos entre agentes.
+
+**agent-db-rls (3A)** — capa server/read-model:
+- `apps/web/lib/contracts/read-model.ts` (DTOs, fuente única de código).
+- `apps/web/server/read-model/` (port, types, errors, fixture-repository,
+  drizzle-repository, selector `READ_MODEL_SOURCE`, index).
+- `apps/web/server/repositories/`.
+- `supabase/seeds/` (seed funcional sanitizado) y tests de server/read-model.
+- Proyección por rol server-side; respeta RLS; sin fallback silencioso db→fixture.
+- **No** UI. Si modifica schema/migrations/policies/seeds ⇒ RLS runtime 21/21.
+
+**agent-frontend-boq (3A)** — páginas de presupuesto:
+- `/projects`, `/estimates`, `/apu`, `/quantities`, `/catalog`; componentes de
+  presupuesto; grilla BOQ; tests de componentes/páginas.
+- Sustituye mocks por read-model (DTOs); estados loading/error/empty; formato COP
+  desde `DecimalString`; **cero cálculos financieros**.
+- **No** toca `/dashboard`, `modules/dashboard/`, ni `apps/web/server/`.
+
+**agent-dashboard (3A)** — tablero:
+- `/dashboard`, `apps/web/modules/dashboard/`, componentes exclusivos de
+  dashboard, tests dashboard.
+- KPIs reales (presupuesto/directos/indirectos/capítulos/top capítulos/estado);
+  ahorro solo para rol autorizado; gráficos Recharts; loading/error/empty.
+- **No** toca páginas de presupuesto ni `apps/web/server/`.
+
 ### agent-dashboard (Oleada 3)
 - KPIs gerencia y obra implementados.
 - Gráficas Recharts integradas.

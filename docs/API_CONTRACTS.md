@@ -480,6 +480,26 @@ tipos `RawSupplierItem`, `SkuMatchCandidate`, `SkuMatchProposal`, `ImportPreview
   público/candidatos/score/aprobador/motivos son 🔒 (nunca a rol cliente).
 - Canal Homecenter MVP = CSV/Excel (Q14); sin API pública asumida; sin scraping.
 
+## 7. Read-model (Oleada 3A)
+
+La **única capa server-side** que alimenta las pantallas está **congelada v1** en
+**`docs/READ_MODEL_CONTRACT.md`**: `ReadModelPort`
+(`listProjects`/`getProjectOverview`/`listEstimates`/`getEstimateDetail`/
+`listApus`/`listQuantities`/`listCatalogResources`/`getDashboardSummary`), DTOs
+(`ProjectListItem`, `ProjectOverview`, `EstimateSummary`, `ChapterSummary`,
+`BoqItemView`, `ApuSummary`, `QuantityGroupView`, `CatalogResourceView`,
+`DashboardSummary`), `ViewerRole`/`ViewerContext`. Fuente única de código:
+`apps/web/lib/contracts/read-model.ts` (implementa db-rls en
+`apps/web/server/read-model/`). Reglas clave:
+
+- La UI consume DTOs; **no** consulta tablas ni calcula finanzas (cost-domain y
+  pricing se ejecutan server-side dentro del read-model).
+- Dos fuentes explícitas (`FixtureReadModelRepository` / `DrizzleReadModelRepository`)
+  vía `READ_MODEL_SOURCE=fixture|db`; sin fallback silencioso.
+- Proyección por rol: campos 🔒 (precio público/descuentos/ahorros/proveedor/
+  SKU/URL/candidatos/score/aprobador/notas) omitidos para rol `client`.
+- Dinero como `DecimalString`; sin float en React.
+
 > Funciones financieras (`calculateApuComponent`, `calculateApuUnitPrice`,
 > `calculateBoqItem`, `calculateChapterTotal`, `calculateDirectCosts`,
 > `calculateAiu`, `calculateTotal`, `calculateValuePerSqm`,

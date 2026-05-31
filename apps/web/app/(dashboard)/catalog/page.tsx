@@ -1,20 +1,30 @@
 /**
- * Página de catálogo de recursos — mock Oleada 1.
+ * Página de catálogo de recursos — Oleada 3A.
  * Server Component. Propiedad: agent-frontend-boq.
  *
- * Muestra recursos del catálogo maestro.
- * NO expone campos 🔒 (observedPrice, supplierSku, etc.).
+ * Consume el read-model canónico (@/server/read-model) en lugar de mocks estáticos.
+ * NO importa @/lib/utils/mocks. NO expone campos 🔒 (precios internos, SKU, etc.).
+ * budgetReferencePrice es cliente-safe y se muestra solo si está disponible.
  */
-import { BookOpen, Search } from 'lucide-react';
+import { BookOpen } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Badge } from '@/components/ui/badge';
-import { formatPct, RESOURCE_TYPE_LABELS } from '@/lib/utils/format';
-import { MOCK_RESOURCES } from '@/lib/utils/mocks';
-import type { ResourceType } from '@/lib/utils/types';
+import { formatCOP, RESOURCE_TYPE_LABELS } from '@/lib/utils/format';
+import { getReadModel, getDemoViewer } from '@/server/read-model';
+import type { CatalogResourceView } from '@/lib/contracts/read-model';
+
+const RESOURCE_TYPE_ORDER = [
+  'material',
+  'labor',
+  'equipment',
+  'tool',
+  'subcontract',
+  'other',
+] as const;
 
 const RESOURCE_TYPE_VARIANT: Record<
-  ResourceType,
+  string,
   'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning'
 > = {
   material: 'default',
@@ -25,28 +35,42 @@ const RESOURCE_TYPE_VARIANT: Record<
   other: 'outline',
 };
 
-export default function CatalogPage() {
-  const resources = MOCK_RESOURCES;
+export default async function CatalogPage() {
+  const rm = getReadModel();
+  const viewer = getDemoViewer();
+  let resources: CatalogResourceView[] = [];
+  let error: string | null = null;
 
-  // Agrupamos por resourceType para mejor visualización
-  const byType = resources.reduce<Record<string, typeof resources>>(
-    (acc, resource) => {
-      const key = resource.resourceType;
-      if (!acc[key]) acc[key] = [];
-      acc[key]!.push(resource);
+  try {
+    resources = await rm.listCatalogResources(viewer);
+  } catch (e) {
+    error = e instanceof Error ? e.message : 'Error al cargar catálogo';
+  }
+
+  if (error) {
+    return (
+      <div>
+        <PageHeader title="Catálogo de Recursos" />
+        <div
+          className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+          role="alert"
+          aria-live="assertive"
+        >
+          Error al cargar catálogo: {error}
+        </div>
+      </div>
+    );
+  }
+
+  // Agrupar por resourceType
+  const byType = resources.reduce<Record<string, CatalogResourceView[]>>(
+    (acc, r) => {
+      if (!acc[r.resourceType]) acc[r.resourceType] = [];
+      acc[r.resourceType]!.push(r);
       return acc;
     },
     {}
   );
-
-  const orderedTypes: ResourceType[] = [
-    'material',
-    'labor',
-    'equipment',
-    'tool',
-    'subcontract',
-    'other',
-  ];
 
   return (
     <div>
@@ -63,15 +87,18 @@ export default function CatalogPage() {
         />
       ) : (
         <div className="space-y-8">
-          {orderedTypes.map((type) => {
+          {RESOURCE_TYPE_ORDER.map((type) => {
             const group = byType[type];
             if (!group || group.length === 0) return null;
 
             return (
-              <section key={type} aria-label={`Recursos de tipo ${RESOURCE_TYPE_LABELS[type]}`}>
+              <section
+                key={type}
+                aria-label={`Recursos de tipo ${RESOURCE_TYPE_LABELS[type] ?? type}`}
+              >
                 <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-600">
-                  <Badge variant={RESOURCE_TYPE_VARIANT[type]}>
-                    {RESOURCE_TYPE_LABELS[type]}
+                  <Badge variant={RESOURCE_TYPE_VARIANT[type] ?? 'outline'}>
+                    {RESOURCE_TYPE_LABELS[type] ?? type}
                   </Badge>
                   <span className="text-gray-400 font-normal normal-case tracking-normal">
                     ({group.length})
@@ -81,7 +108,7 @@ export default function CatalogPage() {
                 <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
                   <table
                     className="w-full text-sm"
-                    aria-label={`Tabla de ${RESOURCE_TYPE_LABELS[type]}`}
+                    aria-label={`Tabla de ${RESOURCE_TYPE_LABELS[type] ?? type}`}
                   >
                     <thead className="bg-gray-50">
                       <tr>
@@ -94,11 +121,9 @@ export default function CatalogPage() {
                         <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">
                           Unidad
                         </th>
+                        {/* budgetReferencePrice es cliente-safe — se muestra si disponible */}
                         <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
-                          Desperdicio
-                        </th>
-                        <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">
-                          Estado
+                          P. Referencia
                         </th>
                       </tr>
                     </thead>
@@ -120,14 +145,9 @@ export default function CatalogPage() {
                             {resource.unit}
                           </td>
                           <td className="px-4 py-2.5 text-right tabular-nums text-gray-600">
-                            {formatPct(resource.defaultWastePct)}
-                          </td>
-                          <td className="px-4 py-2.5 text-center">
-                            <Badge
-                              variant={resource.active ? 'success' : 'outline'}
-                            >
-                              {resource.active ? 'Activo' : 'Inactivo'}
-                            </Badge>
+                            {resource.budgetReferencePrice
+                              ? formatCOP(resource.budgetReferencePrice)
+                              : <span className="text-gray-300 text-xs">—</span>}
                           </td>
                         </tr>
                       ))}
@@ -140,18 +160,9 @@ export default function CatalogPage() {
         </div>
       )}
 
-      {/* Campos internos no mostrados — privacidad */}
-      {/* observedPrice, supplierSku, productUrl, locationReference, negotiated_discount_pct
-          NO se muestran en esta vista. Son campos 🔒 del contrato. */}
-
-      {/* Aviso mock */}
-      <div
-        className="mt-6 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-700"
-        role="status"
-      >
-        Modo mock — Oleada 1. Precios del catálogo y datos de proveedores
-        disponibles en Oleada 2 (pricing agent).
-      </div>
+      {/* Nota de privacidad — campos internos no mostrados */}
+      {/* negotiated_discount_pct, observedPrice, supplierSku, productUrl,
+          locationReference y ahorros son campos 🔒 y NO se muestran aquí. */}
     </div>
   );
 }
