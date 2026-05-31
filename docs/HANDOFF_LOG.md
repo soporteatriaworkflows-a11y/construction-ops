@@ -1153,3 +1153,48 @@ Resultado global: PASS (exit code 0)
 
 ### Agentes activos al cierre
 - Ninguno.
+
+## 2026-05-31 — Merge de Oleada 3A a main (orchestrator)
+
+### Merge
+- Usuario aprobó el merge. Preflight: `main = origin/main = 30b1053` (árbol
+  limpio); integración final `971b3ad`; 9 backups y 4 tags conservados; Excel
+  ignorado; sin `.env`/`package-lock`; solo ag-grid-community.
+- `git merge --no-ff integration/wave-3a` → **merge commit
+  `d1f0920d0423f981fa5d285d493120fc44873849`** (`d1f0920`). **Sin conflictos.**
+
+### Validación post-merge (todo PASA en main)
+- typecheck 0 · lint 0 · **test 356** · build Next 16.2.6 (estáticas + dinámicas)
+  · `gm:regression` **22/22** · `gm:import` **9/9** (±0.01 COP) ·
+  `validate-claude-agents` **214/0/0** · `git diff --check` limpio.
+- Estructura: **1** `interface ReadModelPort` y **1** `getReadModel()` (en
+  `apps/web/server/read-model/index.ts`); fuente única
+  `apps/web/lib/contracts/read-model.ts`; selector `READ_MODEL_SOURCE=fixture|db`;
+  **sin** `dev-read-model.ts`; **sin** imports activos de `@/lib/utils/mocks` en
+  rutas cableadas. Dashboard + páginas cableadas; Recharts.
+
+### RLS (Paso 4)
+- El merge NO modificó `supabase/migrations|policies|seeds` ni
+  `apps/web/lib/db/schema.ts` (verificado `git diff 30b1053..HEAD`) ⇒ **RLS
+  runtime 21/21** de Oleada 1.5 vigente. **B-004** (Realtime) deuda técnica.
+
+### Privacidad
+- DTOs cliente-safe sin campos internos de pricing; ahorros del dashboard
+  role-gated (omitidos para `client`). **Cero cálculo financiero en React**
+  (dinero `DecimalString`). `getDemoViewer()` es **solo demo/dev**: en modo `db`
+  el viewer vendrá de la **sesión/auth real** (prerrequisito futuro) y RLS es la
+  barrera real.
+
+### Ramas y tag
+- **Conservados**: 9 backups (wave1×3, wave2×3, wave3×3), `integration/wave-3a`,
+  ramas de integración previas, `feature/wave-1.5-local-rls`.
+- Tag anotado: **`wave-3a-functional-read-model-ui-v1`** sobre el merge.
+
+### Estado / próximo paso
+- **Oleada 3A CERRADA y en `main`.** Web local funcional con datos reales del
+  fixture. Oleada 3B/3C NO iniciadas. Antes de 3B: congelar
+  `docs/PLANNING_CONTRACT.md` + esquema de planning (db-rls) e instalar
+  `frappe-gantt`.
+
+### Agentes activos al cierre
+- Ninguno.
