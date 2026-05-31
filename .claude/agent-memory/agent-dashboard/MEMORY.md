@@ -1,0 +1,1 @@
+- [Project context](project_context.md) — Wave 3A, worktree agent-ad8e4fac570508d5a, build dashboard with real KPIs from DashboardSummary DTO
