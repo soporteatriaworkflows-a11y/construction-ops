@@ -49,6 +49,11 @@
 | 2026-05-30 | **Ajuste menor del contrato**: `PricingReadQuery.estimateVersionId?` opcional | cost-domain congela el precio por versión de presupuesto; pricing puede ignorarlo (resuelve por `asOf`). Compatibilidad semántica preservada; documentado en PRICING_READ_CONTRACT y API_CONTRACTS | ✅ Aprobado |
 | 2026-05-30 | **Base del IVA derivada de `base_type` + `sortOrder`** (sin flag `contributesToUtilityBase`) | Una regla `base_type='utility'` se aplica sobre el monto de la última línea `direct_cost` precedente (la Utilidad). Una sola fuente de verdad (esquema); reproduce el golden master (IVA = Utilidad × 0.19, diff=0). Sin cambios al seed/fixture | ✅ Aprobado |
 | 2026-05-30 | **Merge de Oleada 2A a `main`** (`--no-ff`, merge commit `f0c7d23`) | Aprobado por el usuario. Post-merge PASS (tc/lint 0, **test 229**, build, gm:regression 22/22, gm:import 9/9 diff=0, validador 214/0/0). Fuente única `apps/web/lib/contracts/pricing-read.ts`; IVA por `base_type='utility'`. Sin cambios de DB ⇒ RLS runtime 21/21 vigente. Backups (wave1+wave2) e `integration/wave-2a` conservados. Tag `wave-2a-domain-pricing-v1` | ✅ Aprobado |
+| 2026-05-30 | **Q11 RESUELTA — Aprobación humana de importación/precios: SIMPLE en MVP** | Aprobación por un usuario interno autorizado; auditoría obligatoria (aprobador, timestamp, fuente, motivo, override, observación previa, resultado, `supplierProductId`, `resourceId`, `observedAt`, `sourceType`, `sourceReference`). Importación NO persiste automáticamente (preview primero); SKU ambiguos `pending`; no se tocan snapshots emitidos; `price_observations` append-only. Doble aprobación = soporte futuro configurable (umbral/anomalía/proveedor crítico/organización/rol). Oleada 2B | ✅ Aprobado |
+| 2026-05-30 | **Q14 RESUELTA — Canal Homecenter: adaptador genérico + CSV/Excel en MVP** | Implementación inicial por archivo CSV/Excel; preview obligatorio; aprobación humana antes de persistir; SKU/URL opcionales; matching con candidatos y score; fallback manual; trazabilidad. NO asumir API pública/feed/endpoints/acceso empresarial. Prohibido scraping agresivo, automatización opaca, tocar presupuestos emitidos, persistir ambiguos como aprobados. Interfaz sustituible (API/feed/cotización/manual/n8n supervisado). Oleada 2B | ✅ Aprobado |
+| 2026-05-30 | **Contrato del adaptador de proveedores congelado v1** (`docs/PRICING_ADAPTER_CONTRACT.md`) | `agent-homecenter` implementa `apps/web/modules/pricing/adapters/` + `scripts/catalog-sync/`; consume `PricingApprovalPort`; no calcula APU/BOQ/AIU ni define capas de pricing. Interfaz `SupplierAdapter` + tipos `RawSupplierItem`/`SkuMatchProposal`/`ImportPreview`/`ImportResult`; idempotencia; privacidad backend-first (SKU/URL/`sourceReference`/proveedor/precio público/candidatos/score/aprobador/motivos = 🔒). Cambios solo vía INTEGRATION_REQUESTS | ✅ Aprobado |
+| 2026-05-30 | **Integración Oleada 2B en `integration/wave-2b`** (cherry-pick `1a8f6fa` del adaptador; sin merge a `main`) | Reconciliación + validación conjunta antes de pedir merge. `main` intacta | ✅ Aprobado |
+| 2026-05-30 | **`MinimalApprovalPort` = subconjunto estructural de `PricingApprovalPort`** (no lógica paralela) | El adaptador delega la persistencia en el puerto real (`PricingApprovalService`). Prueba `port-reconciliation.test.ts`: aserción type-level + runtime con el servicio real (append-only, idempotencia). `ResourceCatalog`/`ResourceRef` se avalan como tipos auxiliares de matching dentro de `adapters/` | ✅ Aprobado |
 
 Decisiones abiertas:
 - [ ] Nombre final del producto
@@ -58,6 +63,7 @@ Decisiones abiertas:
 - [ ] Qué información ve el cliente en APU
 - [ ] Proveedores visibles para cliente
 - [ ] Frecuencia de sincronización de precios
-- [ ] Canal oficial Homecenter Empresas
+- [x] **Q14 — Canal oficial Homecenter** — ✅ RESUELTA 2026-05-30 (MVP CSV/Excel + adaptador genérico; ver tabla)
+- [x] **Q11 — Aprobación humana (firma simple vs doble)** — ✅ RESUELTA 2026-05-30 (simple en MVP; doble futura configurable; ver tabla)
 - [ ] Gantt por capítulos o actividades
 - [ ] Ubicación de despliegue (Vercel + Railway o solo Vercel)

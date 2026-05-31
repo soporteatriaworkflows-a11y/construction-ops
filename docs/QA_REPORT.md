@@ -68,6 +68,7 @@ Ninguno.
 | 2026-05-30 | orquestador (merge Oleada 1.5 a main `1ddc833`) | ✅ PASS post-merge | Ninguno bloqueante; B-004 (Realtime) como deuda técnica |
 | 2026-05-30 | orquestador (integración Oleada 2A en `integration/wave-2a`) | ✅ PASS pre-merge | cost-domain + pricing integrados y unificados; **229 tests**; gm 22/22 + 9/9; sin merge a main |
 | 2026-05-30 | orquestador (merge Oleada 2A a main `f0c7d23`) | ✅ PASS post-merge | **229 tests**; gm 22/22 + 9/9 diff=0; IVA por `base_type='utility'`; sin cambios de DB ⇒ RLS 21/21 vigente; tag `wave-2a-domain-pricing-v1` |
+| 2026-05-30 | orquestador (integración Oleada 2B en `integration/wave-2b`) | ✅ PASS pre-merge | adaptador Homecenter integrado y reconciliado; **309 tests** (80 adapters); gm 22/22 + 9/9; persistencia solo vía `PricingApprovalPort` real; sin scraping; sin merge a main |
 
 ## Validación Oleada 1.5 (rama `feature/wave-1.5-local-rls`, 2026-05-30)
 
@@ -200,3 +201,44 @@ deuda técnica no bloqueante.
 **Recomendación:** ✅ **APROBAR merge `integration/wave-2a` → `main`** (queda a
 decisión del usuario; este ciclo NO hace merge). Antes de Oleada 2B: congelar
 `docs/PRICING_ADAPTER_CONTRACT.md`.
+
+## Validación integración Oleada 2B (rama `integration/wave-2b`, 2026-05-30)
+
+Integración del adaptador Homecenter (cherry-pick `1a8f6fa` desde
+`backup/wave2-homecenter`) + reconciliación contra el contrato congelado.
+**Sin merge a `main`.**
+
+**Reconciliación:**
+- Tipos del adaptador alineados 1:1 con `PRICING_ADAPTER_CONTRACT`
+  (`SupplierAdapter`, `RawSupplierItem`, `SkuMatchCandidate/Proposal`,
+  `ImportPreview`, `ImportResult`); `RecordObservationInput` importado del módulo
+  real `@/modules/pricing/types`.
+- **Consumo del `PricingApprovalPort` real**: `MinimalApprovalPort` confirmado
+  como subconjunto estructural (no lógica paralela). Añadido
+  `tests/unit/pricing-adapters/port-reconciliation.test.ts` (type-level +
+  runtime con `PricingApprovalService` real, append-only e idempotencia).
+- `ResourceCatalog`/`ResourceRef` avalados como auxiliares de matching.
+
+**Resultados (todo PASS):** typecheck 0 · lint 0 · **309 tests** (incl. **80 de
+adapters**: CSV/Excel válido, columna faltante, precio inválido, moneda, SKU
+opcional/ambiguo, matching con candidatos+score, fallback manual, preview sin
+persistencia, aprobación, rechazo, duplicado, idempotencia, auditoría,
+privacidad, reconciliación de puerto) · build Next 16.2.6 · `gm:regression`
+**22/22** · `gm:import` **9/9** · `validate-claude-agents` **214/0/0** ·
+`git diff --check` limpio.
+
+**Privacidad/seguridad:** persistencia exclusivamente vía `PricingApprovalPort`
+(el adaptador no escribe en DB); `price_observations` append-only; preview no
+persiste; ambiguos `pending`; sin tocar snapshots emitidos. Campos 🔒
+(SKU/URL/`sourceReference`/proveedor/precio público/candidatos/score/aprobador/
+motivos) no se exponen a cliente. **Sin scraping** (sin `fetch`/`axios`/
+`puppeteer`/`cheerio`), **sin API Homecenter inventada** (solo CSV/Excel local;
+"homecenter" únicamente como `providerKey`/ejemplo CLI). Excel ignorado; sin
+`.env`/`package-lock`; sin `ag-grid-enterprise`; sin AGPL.
+
+**RLS runtime:** la integración NO modificó `supabase/migrations|policies|seeds`
+ni `apps/web/lib/db/schema.ts` ⇒ **RLS runtime 21/21** de Oleada 1.5 vigente.
+**B-004** (Realtime) sigue como deuda técnica no bloqueante.
+
+**Recomendación:** ✅ **APROBAR merge `integration/wave-2b` → `main`** (queda a
+decisión del usuario; este ciclo NO hace merge).

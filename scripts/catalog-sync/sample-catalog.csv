@@ -1,0 +1,11 @@
+nombre,precio,moneda,sku,url,unidad,fecha,referencia_fuente
+Cemento gris Portland 50kg,28000,COP,CEM-001,,bulto,2026-05-30T00:00:00.000Z,cat-2026-05
+Arena de rio limpia x bulto,15000,COP,,,bulto,2026-05-30T00:00:00.000Z,
+Gravilla 3/4 pulgada x bulto,22000,COP,GRV-034,,bulto,2026-05-30T00:00:00.000Z,cat-2026-05
+Ladrillo prensado 20x10x5cm,1200,COP,LAD-001,,und,2026-05-30T00:00:00.000Z,
+Ceramica piso 45x45 gris (m2),42000,COP,CER-4545G,,m2,2026-05-30T00:00:00.000Z,cat-2026-05
+Varilla corrugada 1/2 pulgada x 6m,28500,COP,VAR-12,,und,2026-05-30T00:00:00.000Z,
+Pintura vinilo blanco interior 4L,45000,COP,PIN-VIN-4,,galón,2026-05-30T00:00:00.000Z,
+Tubo PVC presion 1/2 x 6m,18000,COP,TUB-PVC-12,,und,2026-05-30T00:00:00.000Z,cat-2026-05
+Cable electrico thhn #12 rollo,185000,COP,CAB-THHN-12,,rollo,2026-05-30T00:00:00.000Z,
+Teja ondulada eternit 1.22x0.9m,38000,COP,TEJ-ETR,,und,2026-05-30T00:00:00.000Z,cat-2026-05

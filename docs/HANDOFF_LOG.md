@@ -873,3 +873,124 @@ Resultado global: PASS (exit code 0)
 
 ### Agentes activos al cierre
 - Ninguno.
+
+## 2026-05-30 — Oleada 2B: microfase documental (orchestrator)
+
+### Rama
+- Creada y publicada `integration/wave-2b` desde `main` (`75394f1`). `main` intacta.
+
+### Q11 y Q14 CERRADAS
+- **Q11** (aprobación humana): MVP **simple** por usuario interno autorizado;
+  auditoría obligatoria; preview antes de persistir; SKU ambiguos `pending`; sin
+  tocar snapshots emitidos; `price_observations` append-only; doble aprobación =
+  soporte futuro configurable. Cerrada en DECISIONS/OPEN_QUESTIONS.
+- **Q14** (canal Homecenter): MVP **adaptador genérico + CSV/Excel** con preview
+  y aprobación humana; SKU/URL opcionales; matching con candidatos+score;
+  fallback manual; sin API pública asumida; sin scraping; interfaz sustituible.
+  Cerrada en DECISIONS/OPEN_QUESTIONS.
+
+### Contrato del adaptador CONGELADO v1
+- Creado **`docs/PRICING_ADAPTER_CONTRACT.md`** (orchestrator-owned, congelado;
+  cambios solo vía INTEGRATION_REQUESTS): frontera del módulo, interfaz
+  `SupplierAdapter` (`parseCatalog`/`mapToSupplierProducts`/`buildPreview`/
+  `toPriceObservations`), tipos `RawSupplierItem`/`SkuMatchCandidate`/
+  `SkuMatchProposal`/`ImportPreview`/`ImportResult`, idempotencia, aprobación
+  humana (Q11) y privacidad backend-first (Q14).
+- Actualizados `API_CONTRACTS.md` (§6) y `AGENT_REGISTRY.md` (ownership 2B).
+
+### Próximo paso
+- Commit `docs: freeze wave 2b pricing adapter contract` + push a
+  `origin integration/wave-2b`. Luego lanzar **únicamente** `agent-homecenter`
+  en worktree aislado. NO integrar. NO merge.
+
+### Agentes activos al cierre de esta microfase
+- Ninguno (aún). A continuación se lanza agent-homecenter.
+
+## 2026-05-30 — Oleada 2B: agent-homecenter ejecutado y preservado (orchestrator)
+
+### Lanzamiento
+- Lanzado `agent-homecenter` en worktree aislado (derivado de `main`@`75394f1`,
+  por lo que NO vio `docs/PRICING_ADAPTER_CONTRACT.md`; implementó desde la spec
+  de la tarea). Reconciliación contra el contrato registrada en
+  INTEGRATION_REQUESTS (pendiente 2B).
+
+### Entregable
+- Adaptador genérico en `apps/web/modules/pricing/adapters/` (`types`,
+  `supplier-adapter`, `import-preview`, `idempotency`, `homecenter-csv`, `index`)
+  + tests en `apps/web/tests/unit/pricing-adapters/` (csv-parser, fixtures,
+  homecenter-adapter; **77 tests**) + `scripts/catalog-sync/` (README,
+  `convert-excel.ts` [xlsx devDep, import dinámico], `preview-import.ts`,
+  `sample-catalog.csv` sanitizado). Sin cambios a `package.json`.
+- `SupplierAdapter` (parseCatalog/mapToSupplierProducts/buildPreview/
+  toPriceObservations); idempotencia; preview sin persistencia; matching SKU con
+  candidatos+score; persistencia SOLO vía `PricingApprovalPort` tras aprobación
+  humana simple (Q11); `price_observations` append-only; ambiguos `pending`;
+  privacidad backend-first. **Sin scraping, sin API pública, sin red.**
+
+### Incidencias y resolución (orchestrator)
+- El agente dejó **typecheck rojo (43 errores)** (strict-null + `string|undefined`
+  + export `ResourceCatalog` faltante); su corrida se truncó. Tests (runtime) y
+  lint sí pasaban.
+- Un reintento generó un **segundo worktree** (no se continuó el original vía
+  SendMessage) que dejó adapters+tests en **typecheck 0** pero sin
+  `scripts/catalog-sync/`. El orquestador **consolidó**: copió
+  `scripts/catalog-sync/` + memoria del worktree original al worktree verde.
+- Revalidación en el worktree consolidado: **typecheck 0 · lint 0 · 306 tests ·
+  build OK**; sin privados/Excel/`.env`/scraping/red/enterprise/AGPL.
+- `git commit` denegado a los subagentes ⇒ el orquestador commiteó `ccc1f0b` y
+  preservó en **`backup/wave2-homecenter`** (pusheada).
+
+### Estado / próximo paso
+- **NO integrado** a `integration/wave-2b` ni a `main`. `main` intacta
+  (`75394f1`). Backups y tags conservados.
+- Antes de integrar 2B: reconciliar tipos del adaptador contra
+  `PRICING_ADAPTER_CONTRACT` (ver INTEGRATION_REQUESTS). Otros worktrees de 2B
+  pueden limpiarse (sin commits de valor).
+
+### Agentes activos al cierre
+- Ninguno.
+
+## 2026-05-30 — Integración Oleada 2B en integration/wave-2b (orchestrator)
+
+### Integración
+- Cherry-pick `1a8f6fa` (adaptador Homecenter, desde backup `ccc1f0b`). Limpio,
+  sin conflictos. `main` intacta.
+
+### Reconciliación (Fases 2-3)
+- Tipos del adaptador alineados 1:1 con `PRICING_ADAPTER_CONTRACT`
+  (`SupplierAdapter`, `RawSupplierItem`, `SkuMatchCandidate/Proposal`,
+  `ImportPreview`, `ImportResult`); `RecordObservationInput` importado del módulo
+  real `@/modules/pricing/types`.
+- **`MinimalApprovalPort` = subconjunto estructural de `PricingApprovalPort`**
+  (no lógica paralela). Añadido `tests/unit/pricing-adapters/port-reconciliation.test.ts`:
+  aserción type-level (`(p: PricingApprovalPort) => MinimalApprovalPort`) +
+  runtime con `PricingApprovalService` real (`InMemoryPricingRepository`),
+  comprobando persistencia vía el puerto, append-only e idempotencia.
+- `ResourceCatalog`/`ResourceRef` avalados como auxiliares de matching.
+
+### Validación integral (Fase 5 — todo PASS)
+- typecheck 0 · lint 0 · **309 tests** (incl. **80 de adapters**) · build Next
+  16.2.6 · `gm:regression` **22/22** · `gm:import` **9/9** ·
+  `validate-claude-agents` **214/0/0** · `git diff --check` limpio.
+- Persistencia solo vía `PricingApprovalPort`; preview no persiste; ambiguos
+  `pending`; snapshots emitidos intactos. **Sin scraping** (sin fetch/axios/
+  puppeteer/cheerio), **sin API Homecenter inventada** (CSV/Excel local).
+  Privacidad backend-first (campos 🔒 no a cliente). Sin privados/`.env`/
+  `package-lock`/`ag-grid-enterprise`/AGPL.
+
+### RLS runtime (Fase 6)
+- Sin cambios en `supabase/migrations|policies|seeds` ni `apps/web/lib/db/schema.ts`
+  ⇒ **RLS runtime 21/21** de Oleada 1.5 vigente. B-004 (Realtime) deuda técnica.
+
+### Limpieza de worktrees (Fase 8)
+- Eliminados worktrees temporales obsoletos de subagentes (ver lista en el commit
+  de cierre). Conservados: `backup/wave2-homecenter` (`ccc1f0b`), demás backups,
+  tags y ramas de integración.
+
+### Estado / próximo paso
+- Commit `chore: integrate and validate wave 2b homecenter adapter` + push a
+  `origin integration/wave-2b`. **NO merge a `main`** (espera aprobación).
+- Recomendación: **APROBAR merge `integration/wave-2b` → `main`**.
+
+### Agentes activos al cierre
+- Ninguno.
