@@ -1468,3 +1468,50 @@ Resultado global: PASS (exit code 0)
 
 ### Agentes activos al cierre
 - Ninguno.
+
+---
+
+## 2026-06-01 — Cierre Oleada 3C: reconciliación (Caso B) y merge a `main`
+
+> Nota: esta entrada vive en `integration/wave-3c-main-reconciled` → `main`. El
+> detalle de la implementación y la integración previa quedó en
+> `integration/wave-3c` (`7124f0f`, conservada). Aquí se documenta el cierre.
+
+### Divergencia y estrategia
+- El PR de GitHub "Integration/wave 3c (#1)" se fusionó como **SQUASH** ⇒
+  `origin/main = b09158f` (padre único `82f9e86`); `2621d3b` **no** quedó como
+  ancestro. `origin/main` ya contenía **materialmente** B-005 +
+  `EXPORT_PROFILES_CONTRACT` + deps (idénticos), faltando solo el **código de
+  exports**. `git diff origin/main..integration/wave-3c` = 15 archivos exports
+  (A) + 4 docs (M): delta aditivo y acotado.
+- **Caso B aplicado**: rama `integration/wave-3c-main-reconciled` desde
+  `origin/main` + `git merge --no-ff backup/wave3c-exports` → **solo 15 archivos
+  de exports** (+2200), **sin conflictos** y **sin duplicar** B-005/contrato/deps
+  (git auto-resolvió el contenido idéntico). Sin force-push / rebase / reset.
+- Verificado: `diff origin/main..reconciled` = solo exports; `types.ts` 176
+  líneas (B-005 una vez); deps una vez; contrato presente.
+
+### Validación post-reconciliación (PASS)
+- typecheck/lint 0 · **410 tests** · build (`/api/exports`) · gm 22/22 ·
+  gm:import 9/9 · validador 214/0/0 · diff/status limpios · Excel ignorado.
+- **RLS runtime**: sin cambios en `supabase/`/`schema.ts` ⇒ **32/32 (3B) vigente**
+  (no se levantó Docker).
+- **Smoke 6/6 HTTP 200** (proyecto `…010`): content-type/disposition/bytes ok;
+  PDF `%PDF`, XLSX `PK`, CSV; cliente sin `external_reference`, internal con
+  columna. Negativos (mismatch/sin projectId/`mpp`) → **400**. Servidor detenido.
+
+### Cierre
+- Merge `--no-ff` de `integration/wave-3c-main-reconciled` → `main`; push `main`;
+  tag **`wave-3c-exports-v1`**. **Oleada 3C CERRADA.**
+- Conservados: `integration/wave-3c` (`7124f0f`),
+  `integration/wave-3c-main-reconciled`, `backup/wave3c-exports`, y todos los
+  backups/continuations/tags.
+
+### Deudas no bloqueantes
+- Auth real/sesión pendiente (prerrequisito modo `db`); `getDemoViewer` solo demo.
+- `external_reference` vacío en CSV hasta extensión contractual del DTO.
+- **B-004** (Realtime Windows) deuda técnica.
+- **Botones UI de descarga** aún no existen (solo endpoint `/api/exports`).
+
+### Agentes activos al cierre
+- Ninguno.
