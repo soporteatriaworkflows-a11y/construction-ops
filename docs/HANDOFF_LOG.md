@@ -1549,3 +1549,50 @@ Resultado global: PASS (exit code 0)
 
 ### Agentes activos al cierre
 - Ninguno (aún no se lanza `agent-db-rls`).
+
+---
+
+## 2026-06-01 — Oleada 4A.1: agent-db-rls completado y preservado (Fases 6–9)
+
+### Estado
+- **`agent-db-rls` lanzado** en worktree aislado (desde `f637d67`). Se
+  interrumpió por límite de sesión tras implementar migración + seed + tests
+  auth, **sin commitear**. **Continuación por el orquestador**: recuperado el WIP
+  del worktree, validado a verde.
+- **Preservado en `backup/wave4a-auth-db-local` (`58de9c3`, pusheado)**.
+  Parent = `f637d67`. **NO integrado** a `integration/wave-4a-auth-local` ni
+  `main`.
+
+### Entregable (4 archivos, +401)
+- `supabase/migrations/20260601090000_auth_identity_helpers.sql`: helpers
+  `app.current_org()`/`current_role()`/`current_org_user()` que resuelven
+  identidad real (`auth.uid()`→`profiles`) con **COALESCE** a claims demo
+  (compat). `_jwt_claims()` neutraliza claims ausentes/malformados;
+  `_auth_uid()` prefiere `auth.uid()` y cae a `sub`; `_profile_org/_role`
+  **SECURITY DEFINER** (evita recursión RLS, solo la fila propia). **Deny-by-
+  default** (NULL ⇒ sin filas). GRANT EXECUTE a `authenticated`.
+- `supabase/seeds/0004_auth_org_b_and_no_membership.sql`: org B + roles
+  variados (cubre los 4 ViewerRole) + **usuario sin membresía**; sanitizado,
+  idempotente, patrón `auth.users` condicional.
+- `scripts/rls-runtime/run.ts` (+15 tests auth) y `supabase/config.toml`
+  (registro seed 0004).
+- **Reutiliza `profiles` single-org** — sin tablas nuevas (regla de no-duplicación).
+
+### Validación (PASS)
+- **RLS runtime 47/47** (Docker local): 14 migraciones + 4 seeds; **32 previos**
+  (compat) + **15 auth**: `current_org/role` desde profiles sin claim;
+  aislamiento real A/B; sin sesión→`NULL`→deny; sin membresía→`NULL`→deny;
+  cross-org INSERT/UPDATE bloqueado; rol admin puede INSERT profile, rol obra no
+  (WITH CHECK); prioridad del claim demo. Supabase detenido. Sin remoto.
+- typecheck/lint 0 · **410 tests** (incl. regresión RLS estática) · build OK ·
+  gm 22/22 · gm:import 9/9 · validador 214/0 · diff/status limpios · **sin
+  secretos/.env/privados**.
+
+### Próximo paso
+- A la espera de aprobación para **integrar `backup/wave4a-auth-db-local` →
+  `integration/wave-4a-auth-local`** (merge + revalidación) y luego diagnóstico
+  de **4A.2** (browser/server client, sesión SSR, `proxy.ts`, viewer real,
+  login/logout/reset). **NO** integrado aún.
+
+### Agentes activos al cierre
+- Ninguno (`agent-db-rls` finalizó; entregable preservado, no integrado).
