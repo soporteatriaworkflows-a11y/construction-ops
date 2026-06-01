@@ -480,6 +480,21 @@ tipos `RawSupplierItem`, `SkuMatchCandidate`, `SkuMatchProposal`, `ImportPreview
   público/candidatos/score/aprobador/motivos son 🔒 (nunca a rol cliente).
 - Canal Homecenter MVP = CSV/Excel (Q14); sin API pública asumida; sin scraping.
 
+## 8. Planning (Oleada 3B)
+
+El módulo de planificación/cronograma está **congelado v1** en
+**`docs/PLANNING_CONTRACT.md`**: entidades PostgreSQL (`schedule_tasks`,
+`task_dependencies`, `progress_entries`, `resource_assignments`), dominio puro
+`apps/web/modules/planning/` (CPM/ruta crítica/holguras/ciclos, `DecimalString`),
+y extensión del read-model (`ScheduleTaskView`, `DependencyView`, `MilestoneView`,
+`ProgressEntryView`, `ResourceAssignmentView`, `ScheduleSummary`,
+`CriticalPathSummary`; `ReadModelPort.getSchedule/listProgressEntries/
+listResourceAssignments`). Reglas: RLS por organización; `progress_entries`
+append-only; ruta crítica/holguras/avance financiero **server-side** (cero en
+React); privacidad por rol (holguras/costos/`external_reference`/responsables 🔒);
+campos reservados para export MS Project futuro (no en 3B). Cambios: vía
+`docs/INTEGRATION_REQUESTS.md`.
+
 ## 7. Read-model (Oleada 3A)
 
 La **única capa server-side** que alimenta las pantallas está **congelada v1** en

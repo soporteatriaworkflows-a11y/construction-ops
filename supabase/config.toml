@@ -23,6 +23,7 @@ enabled = true
 sql_paths = [
   "./seeds/0001_demo_org_and_profiles.sql",
   "./seeds/0002_demo_project_catalog.sql",
+  "./seeds/0003_demo_planning.sql",
 ]
 
 [studio]

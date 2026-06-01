@@ -280,3 +280,18 @@ consumen **solo** server-side dentro del read-model.
 _Congelado el 2026-05-31 (Oleada 3A). Referencias: tipos base y privacidad en
 `docs/API_CONTRACTS.md`; precios en `docs/PRICING_READ_CONTRACT.md`; entidades en
 `docs/DATABASE_SCHEMA.md`._
+
+## 8. Extensión de planning (Oleada 3B)
+
+El `ReadModelPort` se **extiende** (no rompe v1) con planificación, definida en
+**`docs/PLANNING_CONTRACT.md`**:
+- Métodos: `getSchedule(viewer, projectId)`,
+  `listProgressEntries(viewer, projectId, taskId?)`,
+  `listResourceAssignments(viewer, projectId, taskId?)`.
+- DTOs: `ScheduleTaskView`, `DependencyView`, `MilestoneView`,
+  `ProgressEntryView`, `ResourceAssignmentView`, `ScheduleSummary`,
+  `CriticalPathSummary`.
+- Mismas reglas: dos fuentes (`fixture`/`db`) vía `READ_MODEL_SOURCE` sin fallback;
+  proyección por rol (holguras/ruta crítica/avance financiero/`external_reference`/
+  responsables son 🔒). Ruta crítica/holguras se calculan server-side con el
+  dominio `apps/web/modules/planning/` (cero en React).

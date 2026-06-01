@@ -1198,3 +1198,190 @@ Resultado global: PASS (exit code 0)
 
 ### Agentes activos al cierre
 - Ninguno.
+
+## 2026-05-31 — Oleada 3B: microfase documental + frappe-gantt (orchestrator)
+
+### Rama
+- Creada y publicada `integration/wave-3b` desde `main` (`352825f`). `main` intacta.
+
+### PLANNING_CONTRACT CONGELADO v1
+- Creado **`docs/PLANNING_CONTRACT.md`** (orchestrator-owned; cambios solo vía
+  INTEGRATION_REQUESTS): entidades PostgreSQL (`schedule_tasks`,
+  `task_dependencies`, `progress_entries` append-only, `resource_assignments`)
+  con RLS; dominio puro `apps/web/modules/planning/` (CPM/ruta crítica/holguras/
+  ciclos, `DecimalString`); extensión del read-model (`ScheduleTaskView`,
+  `DependencyView`, `MilestoneView`, `ProgressEntryView`, `ResourceAssignmentView`,
+  `ScheduleSummary`, `CriticalPathSummary`; `ReadModelPort.getSchedule/
+  listProgressEntries/listResourceAssignments`); privacidad por rol
+  (holguras/ruta crítica/avance financiero/`external_reference`/responsables 🔒);
+  campos reservados para export MS Project (no en 3B).
+- Actualizados: `DATABASE_SCHEMA.md` (entidades planning), `API_CONTRACTS.md` (§8),
+  `READ_MODEL_CONTRACT.md` (§8 extensión), `AGENT_REGISTRY.md` (ownership 3B),
+  `DECISIONS.md`, `LICENSING.md`, `INTEGRATION_REQUESTS.md`.
+
+### Dependencia
+- **`frappe-gantt` ^1.2.2 (MIT, sin peers)** instalado en `apps/web`. Import
+  dinámico client-side (DOM/SVG). NO se instalaron exceljs/@react-pdf/renderer.
+
+### Próximo paso
+- Validar + commit documental + push a `origin integration/wave-3b`. Luego lanzar
+  en paralelo agent-db-rls (esquema/RLS/read-model planning) ∥ agent-planning
+  (dominio/Gantt). NO exports, NO merge.
+
+### Agentes activos al cierre de esta microfase
+- Ninguno (aún).
+
+## 2026-05-31 — Oleada 3B: subagentes interrumpidos (WIP preservado) (orchestrator)
+
+### Lanzamiento
+- Lanzados en paralelo (worktrees desde `main`@`352825f`): agent-db-rls
+  (esquema/RLS/read-model planning) ∥ agent-planning (dominio/Gantt).
+- **Ambos interrumpidos por límite de sesión** (~49-54 acciones), con trabajo
+  **materialmente incompleto** y sin commitear.
+
+### Estado de los entregables (PARCIAL)
+- **agent-db-rls** → `backup/wave3b-db-planning` (`89bfab7`, **WIP typecheck rojo**):
+  migración `20260531100000_planning_schedule.sql` (4 tablas) +
+  `20260531100100_rls_policies_planning.sql`, `schema.ts` (Drizzle planning),
+  `read-model.ts` (DTOs/métodos), `server/read-model/{types,compute-planning}.ts`,
+  datos de cronograma en el fixture. **PENDIENTE**: implementar
+  `getSchedule/listProgressEntries/listResourceAssignments` en
+  `FixtureReadModelRepository` y `DrizzleReadModelRepository` (4 errores
+  "incorrectly implements ReadModelPort"); seed de planning; RLS runtime 21/21 +
+  pruebas de planning.
+- **agent-planning** → `backup/wave3b-planning-ui` (`6f4dab9`, **typecheck verde,
+  incompleto**): `modules/planning/{cpm,graph,date,decimal,types}.ts` (dominio
+  puro CPM/holguras/ciclos). frappe-gantt instalado. **PENDIENTE**: página
+  `/planning`, componente Gantt, accesor dev de cronograma, tests de dominio.
+
+### Higiene (ambos)
+- Sin privados/Excel/`.env`. Sin solape de archivos entre agentes.
+
+### Estado / próximo paso
+- **NO integrado** a `integration/wave-3b` ni a `main`. `main` intacta
+  (`352825f`). Backups (11) y tags conservados. Worktrees por limpiar.
+- **Acción requerida**: reanudar ambos agentes (sesión reseteada ~15:50) para
+  completar los puntos pendientes; luego ciclo de integración 3B. Registrado en
+  INTEGRATION_REQUESTS.
+
+### Agentes activos al cierre
+- Ninguno (ambos finalizaron por límite, incompletos).
+
+## 2026-05-31 — Oleada 3B: continuación db-rls COMPLETADA (orchestrator)
+
+### Estrategia
+- Continuación **secuencial** (no paralela) para reducir consumo. Rama
+  `continuation/wave3b-db-planning` desde `backup/wave3b-db-planning` (`89bfab7`).
+- `agent-db-rls` recuperó el WIP con `git merge --ff-only 89bfab7` (los worktrees
+  parten de `main`; `89bfab7` desciende de `main` ⇒ ff sin redo) y completó.
+
+### Completado (db-rls)
+- `getSchedule/listProgressEntries/listResourceAssignments` en
+  `FixtureReadModelRepository` y `DrizzleReadModelRepository` (proyección por rol:
+  `client` sin holguras/ruta crítica/`financialProgressPct`/`external_reference`/
+  `createdBy`/notas).
+- `supabase/seeds/0003_demo_planning.sql` (cronograma demo sanitizado) +
+  `config.toml`. Tests `planning-fixture.test.ts` + `planning-drizzle.test.ts`.
+- Harness `scripts/rls-runtime/run.ts`: +11 pruebas de planning.
+
+### Validación
+- typecheck 0 · lint 0 · **378 tests** · build OK · gm:regression 22/22 ·
+  gm:import 9/9.
+- **RLS runtime real (Docker local): 32/32 PASS** (21 previos + **11 planning**:
+  aislamiento A/B en las 4 tablas, sin-org, `progress_entries` append-only,
+  WITH CHECK cross-org en tareas/dependencias; **24 tablas con RLS FORCE**).
+  `db reset` aplicó 13 migraciones + 3 seeds sin errores. Sin remoto.
+
+### Preservación
+- `backup/wave3b-db-planning-complete` (`560b2cc`, pusheada);
+  `continuation/wave3b-db-planning` adelantada a `560b2cc`. WIP original
+  `89bfab7` y `main` intactos. 12 backups.
+
+### Estado / próximo paso
+- **db-rls 3B COMPLETO y validado.** Falta `agent-planning` (UI/Gantt): reanudar
+  secuencialmente desde `backup/wave3b-planning-ui` (`6f4dab9`). Luego integración
+  3B. NO integrado; NO merge.
+
+### Agentes activos al cierre
+- Ninguno.
+
+## 2026-06-01 — Oleada 3B: continuación planning-ui COMPLETADA (orchestrator)
+
+### Estrategia
+- Continuación **secuencial**. Rama `continuation/wave3b-planning-ui` = WIP
+  planning (`6f4dab9`) **combinado con el read-model db completo (`560b2cc`)**
+  (sin overlap de archivos) → `2793bbf`, para cablear la UI al `getSchedule()`
+  real sin accesor TEMP. `agent-planning` recuperó la base con
+  `git merge --ff-only 2793bbf`.
+
+### Completado
+- **agent-planning**: dominio (`modules/planning/{gantt-mapping,view-model,index}`)
+  + componentes (`GanttChart` frappe-gantt dinámico, `ScheduleTable`,
+  `PlanningSummary`, `ScheduleStatusBadge`).
+- **orchestrator (completar interrumpido)**: página
+  `apps/web/app/(dashboard)/planning/page.tsx` cableada a
+  `getReadModel().getSchedule(getDemoViewer(), projectId)`; tests
+  `tests/unit/planning/planning-domain.test.ts` (CPM/ciclo/holgura/hito/
+  dependencias FS-SS-FF-SF/privacidad por rol); enlace nav `/planning` en el
+  layout; reconciliación `view-model` → `ScheduleSummary` canónico de
+  `@/lib/contracts/read-model`; CSS de frappe-gantt **vendorizado** (su `exports`
+  v1.2.2 no expone `dist/*.css`); `ganttRef any→unknown`.
+
+### Validación
+- typecheck 0 · lint 0 · **389 tests** · build Next 16.2.6 (ruta `/planning`) ·
+  gm:regression 22/22 · gm:import 9/9.
+- **Dev smoke `/planning` HTTP 200** (74 KB) con "Cronograma de obra", "Diagrama
+  de Gantt", tareas, hitos, avance reales del fixture sanitizado; sin 500; rutas
+  previas siguen 200. Servidor detenido tras el smoke.
+- Privacidad: ruta crítica/holguras solo rol autorizado (no `client`); cero
+  cálculo monetario/CPM en React (CPM en `modules/planning`).
+
+### Preservación
+- `backup/wave3b-planning-ui-complete` (`41abbe2`, pusheada); continuation
+  adelantada a `41abbe2`. WIP originales (`6f4dab9`, `89bfab7`) y `db-complete`
+  (`560b2cc`) intactos. `main` intacta. 13 backups.
+
+### Estado / próximo paso
+- **3B COMPLETO** (db `560b2cc` + ui `41abbe2`), combinado y validado end-to-end
+  en `continuation/wave3b-planning-ui` (`41abbe2`). Listo para el **ciclo de
+  integración 3B** hacia `integration/wave-3b` (incluye RLS runtime 32/32 ya
+  validado por db). NO integrado; NO merge.
+
+### Agentes activos al cierre
+- Ninguno.
+
+## 2026-06-01 — Integración formal Oleada 3B en integration/wave-3b (orchestrator)
+
+### Merge
+- `git merge --no-ff continuation/wave3b-planning-ui` (= db `560b2cc` + ui
+  `41abbe2` combinados) → **merge commit `595e5a5`**. **Sin conflictos.** Los
+  docs de 3b (PLANNING_CONTRACT, etc.) se conservaron (la continuation parte de
+  main y no los borra).
+
+### Reconciliación
+- Read-model canónico único `apps/web/lib/contracts/read-model.ts`; `/planning`
+  consume `getReadModel().getSchedule(getDemoViewer(), projectId)` real (0
+  accesores TEMP). CPM/ruta crítica/holguras **solo en `modules/planning`**
+  (verificado: 0 en `app/`+`components/`). frappe-gantt dinámico client-side +
+  CSS vendorizado; nav `/planning`. Las dos `ScheduleSummary` (dominio vs
+  read-model) son capas distintas por contrato; la UI consume la canónica.
+
+### Validación (todo PASS)
+- typecheck 0 · lint 0 · **389 tests** · build Next 16.2.6 (rutas `/planning` +
+  previas) · `gm:regression` 22/22 · `gm:import` 9/9 · `validate-claude-agents`
+  214/0/0 · `git diff --check` limpio.
+- **RLS runtime real 32/32** (Docker local): `db reset` aplicó **13 migraciones +
+  3 seeds**; **24 tablas con RLS FORCE**; 21 previos + 11 planning. Sin remoto.
+- **Dev smoke 9/9 rutas HTTP 200** (incl. `/planning` con Cronograma + Gantt +
+  tareas/hitos/avance reales). Servidor detenido tras el smoke.
+- Privacidad backend-first (holguras/ruta crítica/financiero/`external_reference`/
+  responsables role-gated); cero cálculo monetario/CPM en React; MS Project
+  reservado (sin export en 3B). B-004 (Realtime) deuda técnica no bloqueante.
+
+### Estado / próximo paso
+- Commit doc `chore: integrate and validate wave 3b planning gantt` + push a
+  `origin integration/wave-3b`. **NO merge a `main`** (espera aprobación).
+- Recomendación: **APROBAR merge `integration/wave-3b` → `main`**.
+
+### Agentes activos al cierre
+- Ninguno.

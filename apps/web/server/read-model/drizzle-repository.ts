@@ -22,10 +22,14 @@ import type {
   ChapterSummary,
   DashboardSummary,
   EstimateSummary,
+  ProgressEntryView,
   ProjectListItem,
   ProjectOverview,
   QuantityGroupView,
   ReadModelPort,
+  ResourceAssignmentView,
+  ScheduleSummary,
+  ScheduleTaskStatus,
   Uuid,
   ViewerContext,
 } from '@/lib/contracts/read-model';
@@ -40,8 +44,23 @@ import {
   type RawChapter,
   type RawIndirectRule,
 } from './compute';
-import { projectDashboardForRole } from './types';
+import {
+  computeSchedule,
+  type RawScheduleTask,
+  type RawTaskDependency,
+} from './compute-planning';
+import {
+  projectDashboardForRole,
+  projectProgressEntriesForRole,
+  projectResourceAssignmentsForRole,
+  projectScheduleForRole,
+} from './types';
 import { EstimateVersionNotFoundError, ProjectNotFoundError } from './errors';
+
+/** Normaliza un valor de fecha/hora de Drizzle a ISO string. */
+function toIso(value: Date | string): string {
+  return value instanceof Date ? value.toISOString() : value;
+}
 
 /** Estado de la versión tal cual viene del esquema. */
 type VersionStatus = EstimateSummary['status'];
@@ -381,6 +400,110 @@ export class DrizzleReadModelRepository implements ReadModelPort {
       lastUpdatedAt: input.lastUpdatedAt,
     });
     return projectDashboardForRole(full, viewer.role);
+  }
+
+  /* --- Planificación (Oleada 3B — PLANNING_CONTRACT §3) --- */
+
+  async getSchedule(viewer: ViewerContext, projectId: Uuid): Promise<ScheduleSummary> {
+    // El proyecto debe pertenecer a la organización del viewer (defensa en
+    // profundidad además de RLS, que es la barrera real en runtime).
+    const project = await this.repo.projectById(viewer.organizationId, projectId);
+    if (!project) throw new ProjectNotFoundError(projectId);
+
+    const [taskRows, depRows] = await Promise.all([
+      this.repo.scheduleTasksByProject(viewer.organizationId, projectId),
+      this.repo.taskDependenciesByProject(viewer.organizationId, projectId),
+    ]);
+
+    const tasks: RawScheduleTask[] = taskRows.map((t) => ({
+      id: t.id,
+      parentTaskId: t.parentTaskId ?? null,
+      wbsCode: t.wbsCode,
+      name: t.name,
+      plannedStart: t.plannedStart,
+      plannedEnd: t.plannedEnd,
+      plannedDurationDays: t.plannedDurationDays,
+      progressPct: t.progressPct,
+      status: t.status as ScheduleTaskStatus,
+      isMilestone: t.isMilestone,
+      sortOrder: t.sortOrder,
+      externalReference: t.externalReference ?? null,
+    }));
+    const dependencies: RawTaskDependency[] = depRows.map((d) => ({
+      predecessorTaskId: d.predecessorTaskId,
+      successorTaskId: d.successorTaskId,
+      dependencyType: d.dependencyType as RawTaskDependency['dependencyType'],
+      lagDays: d.lagDays,
+    }));
+
+    const full = computeSchedule({ projectId, tasks, dependencies });
+    return projectScheduleForRole(full, viewer.role);
+  }
+
+  async listProgressEntries(
+    viewer: ViewerContext,
+    projectId: Uuid,
+    taskId?: Uuid,
+  ): Promise<ProgressEntryView[]> {
+    const project = await this.repo.projectById(viewer.organizationId, projectId);
+    if (!project) throw new ProjectNotFoundError(projectId);
+
+    const rows = await this.repo.progressEntriesByProject(
+      viewer.organizationId,
+      projectId,
+      taskId,
+    );
+    const entries: ProgressEntryView[] = rows.map((e) => ({
+      id: e.id,
+      taskId: e.taskId,
+      recordedAt: toIso(e.recordedAt),
+      physicalProgressPct: e.physicalProgressPct,
+      // 🔒 financialProgressPct/notes — proyectados por rol abajo. `createdBy`
+      // no se expone en el DTO.
+      financialProgressPct: e.financialProgressPct ?? null,
+      notes: e.notes ?? null,
+    }));
+    return projectProgressEntriesForRole(entries, viewer.role);
+  }
+
+  async listResourceAssignments(
+    viewer: ViewerContext,
+    projectId: Uuid,
+    taskId?: Uuid,
+  ): Promise<ResourceAssignmentView[]> {
+    const project = await this.repo.projectById(viewer.organizationId, projectId);
+    if (!project) throw new ProjectNotFoundError(projectId);
+
+    const rows = await this.repo.resourceAssignmentsByProject(
+      viewer.organizationId,
+      projectId,
+      taskId,
+    );
+
+    const resourceIds = rows
+      .map((r) => r.resourceId)
+      .filter((id): id is Uuid => id !== null);
+    const laborRoleIds = rows
+      .map((r) => r.laborRoleId)
+      .filter((id): id is Uuid => id !== null);
+    const [resources, laborRoles] = await Promise.all([
+      this.repo.resourcesByIds(resourceIds),
+      this.repo.laborRolesByIds(laborRoleIds),
+    ]);
+    const resourceName = new Map(resources.map((r) => [r.id, r.name]));
+    const laborRoleName = new Map(laborRoles.map((r) => [r.id, r.name]));
+
+    const assignments: ResourceAssignmentView[] = rows.map((a) => ({
+      id: a.id,
+      taskId: a.taskId,
+      resourceName: a.resourceId ? resourceName.get(a.resourceId) ?? null : null,
+      laborRoleName: a.laborRoleId ? laborRoleName.get(a.laborRoleId) ?? null : null,
+      quantity: a.quantity ?? null,
+      unit: a.unit ?? null,
+      // 🔒 notas internas — proyectadas por rol abajo.
+      notes: a.notes ?? null,
+    }));
+    return projectResourceAssignmentsForRole(assignments, viewer.role);
   }
 }
 
