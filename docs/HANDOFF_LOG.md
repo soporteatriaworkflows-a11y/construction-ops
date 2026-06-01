@@ -1515,3 +1515,158 @@ Resultado global: PASS (exit code 0)
 
 ### Agentes activos al cierre
 - Ninguno.
+
+---
+
+## 2026-06-01 — Oleada 4A.1 (auth/RLS local): apertura + contrato + deps (Fases 0–5)
+
+### Estado
+- **Oleada 4A.1 aprobada (secuencial).** Rama `integration/wave-4a-auth-local`
+  desde `main` (`a6981f0`), publicada. `main` intacta.
+- **Auditoría (Fase 1)**: `profiles` (id=auth.users.id, `organization_id` NOT
+  NULL = membresía single-org, `role` admin/gerencia/presupuestos/obra/compras/
+  consulta) y `organizations` ya existen. `app.current_org()`/`current_role()`
+  leen claims JWT custom (`organization_id`/`user_role`); **0** políticas usan
+  `auth.uid()`. `proxy.ts` = stub pass-through. Todo es **demo** (sin protección
+  real). Conclusión: **reutilizar `profiles`** (no duplicar), añadir resolución
+  por `auth.uid()`→`profiles` con compat demo.
+- **AUTH_CONTRACT v1 congelado** (`docs/AUTH_CONTRACT.md`): modos
+  `APP_AUTH_MODE`×`READ_MODEL_SOURCE` sin fallback; `AuthenticatedViewer`
+  server-side; mapeo `profiles.role`→`ViewerRole`; matriz ruta×rol;
+  deny-by-default. Punteros en API_CONTRACTS/DATABASE_SCHEMA/READ_MODEL_CONTRACT;
+  ownership 4A.1 de `agent-db-rls` en AGENT_REGISTRY; placeholders en
+  `.env.example` (`APP_AUTH_MODE`, `NEXT_PUBLIC_SUPABASE_*`; **sin** valores
+  reales; `service_role` no en frontend).
+- **Deps instaladas**: `@supabase/supabase-js` **2.106.2** (MIT) +
+  `@supabase/ssr` **0.10.3** (MIT); peer cumplida; sin AGPL/enterprise.
+
+### Próximo paso (esta sesión)
+- Fase 5: validar base documental + commit doc + push.
+- Fase 6: lanzar **solo** `agent-db-rls` (worktree aislado). Fase 7: RLS runtime
+  local (previo 32/32 + nuevos tests auth). Fase 9: preservar en
+  `backup/wave4a-auth-db-local`. **NO** integrar ni merge a `main`. **NO** UI/
+  proxy/remoto.
+
+### Agentes activos al cierre
+- Ninguno (aún no se lanza `agent-db-rls`).
+
+---
+
+## 2026-06-01 — Oleada 4A.1: agent-db-rls completado y preservado (Fases 6–9)
+
+### Estado
+- **`agent-db-rls` lanzado** en worktree aislado (desde `f637d67`). Se
+  interrumpió por límite de sesión tras implementar migración + seed + tests
+  auth, **sin commitear**. **Continuación por el orquestador**: recuperado el WIP
+  del worktree, validado a verde.
+- **Preservado en `backup/wave4a-auth-db-local` (`58de9c3`, pusheado)**.
+  Parent = `f637d67`. **NO integrado** a `integration/wave-4a-auth-local` ni
+  `main`.
+
+### Entregable (4 archivos, +401)
+- `supabase/migrations/20260601090000_auth_identity_helpers.sql`: helpers
+  `app.current_org()`/`current_role()`/`current_org_user()` que resuelven
+  identidad real (`auth.uid()`→`profiles`) con **COALESCE** a claims demo
+  (compat). `_jwt_claims()` neutraliza claims ausentes/malformados;
+  `_auth_uid()` prefiere `auth.uid()` y cae a `sub`; `_profile_org/_role`
+  **SECURITY DEFINER** (evita recursión RLS, solo la fila propia). **Deny-by-
+  default** (NULL ⇒ sin filas). GRANT EXECUTE a `authenticated`.
+- `supabase/seeds/0004_auth_org_b_and_no_membership.sql`: org B + roles
+  variados (cubre los 4 ViewerRole) + **usuario sin membresía**; sanitizado,
+  idempotente, patrón `auth.users` condicional.
+- `scripts/rls-runtime/run.ts` (+15 tests auth) y `supabase/config.toml`
+  (registro seed 0004).
+- **Reutiliza `profiles` single-org** — sin tablas nuevas (regla de no-duplicación).
+
+### Validación (PASS)
+- **RLS runtime 47/47** (Docker local): 14 migraciones + 4 seeds; **32 previos**
+  (compat) + **15 auth**: `current_org/role` desde profiles sin claim;
+  aislamiento real A/B; sin sesión→`NULL`→deny; sin membresía→`NULL`→deny;
+  cross-org INSERT/UPDATE bloqueado; rol admin puede INSERT profile, rol obra no
+  (WITH CHECK); prioridad del claim demo. Supabase detenido. Sin remoto.
+- typecheck/lint 0 · **410 tests** (incl. regresión RLS estática) · build OK ·
+  gm 22/22 · gm:import 9/9 · validador 214/0 · diff/status limpios · **sin
+  secretos/.env/privados**.
+
+### Próximo paso
+- A la espera de aprobación para **integrar `backup/wave4a-auth-db-local` →
+  `integration/wave-4a-auth-local`** (merge + revalidación) y luego diagnóstico
+  de **4A.2** (browser/server client, sesión SSR, `proxy.ts`, viewer real,
+  login/logout/reset). **NO** integrado aún.
+
+### Agentes activos al cierre
+- Ninguno (`agent-db-rls` finalizó; entregable preservado, no integrado).
+
+---
+
+## 2026-06-01 — Integración formal Oleada 4A.1 (auth/RLS DB) en integration/wave-4a-auth-local
+
+### Estado
+- **Integración aprobada.** `git merge --no-ff backup/wave4a-auth-db-local`
+  (`58de9c3`) sobre `integration/wave-4a-auth-local` (`8adfbca`) → merge
+  **`adeafbe`**, **sin conflictos** (4 archivos, +401). `main` intacta
+  (`a6981f0`). Remoto no conectado.
+
+### Auditoría de la implementación integrada
+- **14 migraciones, 4 seeds**. La migración `20260601090000_auth_identity_helpers.sql`
+  tiene **0 `CREATE TABLE`** ⇒ **reutiliza `profiles`/`organizations`** (single-org
+  v1, sin tablas nuevas de usuarios/membresía/org/roles).
+- Helpers canónicos: `_jwt_claims`, `_auth_uid`, `_profile_org`, `_profile_role`,
+  `current_org`, `current_role`, `current_org_user`. Regla de identidad:
+  **prefiere `auth.uid()`**, fallback controlado a claim `sub` (compat
+  demo/Postgres puro), **NULL → deny-by-default**. Org/rol desde
+  `profiles.organization_id`/`profiles.role` por `auth.uid()`; nunca org del
+  navegador. `SECURITY DEFINER` + `search_path` fijo solo en `_profile_org/_role`
+  (evita recursión RLS, lee solo la fila propia). `GRANT EXECUTE` mínimos.
+
+### Validación (PASS)
+- **RLS runtime 47/47** (Docker local): 14 migraciones + 4 seeds; **32 previos**
+  (compat) + **15 auth** (aislamiento real A/B, sin sesión→deny, sin
+  membresía→deny, cross-org INSERT/UPDATE bloqueado, rol admin vs obra, prioridad
+  claim demo). Supabase detenido. Sin remoto.
+- typecheck/lint 0 · **410 tests** · build OK · gm 22/22 · gm:import 9/9 ·
+  validador 214/0 · diff/status limpios · **sin secretos/.env/privados**.
+
+### Pendiente (4A.2)
+- Clientes browser/server Supabase, sesión SSR por cookies, refresh en
+  `proxy.ts`, viewer real (sustituir `getDemoViewer` en modo `supabase`),
+  protección de rutas, UI login/logout/forgot/reset/callback. `READ_MODEL_SOURCE`
+  permanece `fixture`. B-004 (Realtime Windows) deuda técnica.
+
+### Estado / próximo paso
+- Commit doc `docs: record wave 4a1 auth db rls integration validation` + push
+  `origin integration/wave-4a-auth-local`. **NO** merge a `main`.
+
+### Agentes activos al cierre
+- Ninguno.
+
+---
+
+## 2026-06-01 — Oleada 4A.2 (runtime SSR): contrato + implementación (Fases 0–4)
+
+### Estado
+- Rama `integration/wave-4a-auth-runtime` desde 4A.1 (`7c2f729`), publicada.
+  `main` intacta (`a6981f0`).
+- **AUTH_RUNTIME_CONTRACT v1 congelado** (`docs/AUTH_RUNTIME_CONTRACT.md`).
+  Role-map fuente única en `server/auth/role-map.ts` (**admin→internal**;
+  refina AUTH_CONTRACT). Punteros en API_CONTRACTS/READ_MODEL_CONTRACT; ownership
+  4A.2 en AGENT_REGISTRY.
+- **Runtime SSR implementado por el orquestador** (antes de la UI):
+  `lib/supabase/{env,client,server,proxy}.ts` (`@supabase/ssr`, cookies
+  `getAll`/`setAll`); `server/auth/{types,errors,role-map,session,resolve-viewer,
+  routes,index}.ts`; `apps/web/proxy.ts` (Next 16: refresh + `getClaims()` guard,
+  **no** `getSession()`; demo passthrough; redirecciones seguras; anti
+  open-redirect); `app/page.tsx` (→`/dashboard`); guard de `/api/exports` (modo
+  supabase: viewer autenticado + anti-escalamiento de perfil ≤ ViewerRole).
+
+### Validación (PASS)
+- typecheck/lint 0 · **423 tests** (410 + **13 auth**) · build OK (`/api/exports`
+  + Proxy) · gm 22/22 · gm:import 9/9 · validador 214/0 · diff limpio · sin secretos.
+
+### Próximo paso (esta sesión)
+- Fase 4: commit `feat(auth): ...` + push. Fase 5: lanzar **solo**
+  `agent-frontend-boq` (UI `(auth)/`). Fase 7: preservar en `backup/wave4a-auth-ui`.
+  **NO** integrar UI; **NO** merge a `main`; **NO** remoto/Vercel.
+
+### Agentes activos al cierre
+- Ninguno (aún no se lanza `agent-frontend-boq`).

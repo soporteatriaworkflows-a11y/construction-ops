@@ -39,10 +39,20 @@ const SUPPLIER_PRODUCT_A = '00000000-0000-0000-0000-000000000111';
 const TASK_A = '0d000000-0000-0000-0000-000000000002';
 const TASK_A_SUB = '0d000000-0000-0000-0000-000000000003';
 
-// IDs nuevos (org B) — creados por este test (idempotentes).
+// IDs de org B — ahora sembrados por supabase/seeds/0004 (microfase auth 4A.1).
+// setupOrgB() abajo los reutiliza con ON CONFLICT DO NOTHING (no-op si ya están).
 const ORG_B = '00000000-0000-0000-0000-0000000000a2';
 const USER_B_ADMIN = '00000000-0000-0000-0000-0000000000b7';
 const PROJECT_B = '00000000-0000-0000-0000-0000000000c2';
+
+// --- Auth 4A.1 (resolución por auth.uid() -> profiles, sin claim de org) ---
+// Perfiles de org A (seed 0001) y B (seed 0004) usados para el modo identidad
+// real: se fija request.jwt.claims.sub = id del profile, SIN organization_id ni
+// user_role, forzando a app.current_org()/current_role() a leer profiles.
+const USER_A_OBRA = '00000000-0000-0000-0000-0000000000b4'; // role 'obra' (site)
+const USER_B_GERENCIA = '00000000-0000-0000-0000-0000000000b8'; // role 'gerencia'
+// Usuario autenticado SIN membresía (auth.users sin profile) — seed 0004.
+const USER_NO_PROFILE = '00000000-0000-0000-0000-0000000000bf';
 
 type Claims = Record<string, unknown> | null;
 
@@ -95,7 +105,11 @@ async function asUser<T>(
 
 const claimsA: Claims = { organization_id: ORG_A, user_role: 'admin', sub: USER_A_ADMIN };
 const claimsB: Claims = { organization_id: ORG_B, user_role: 'admin', sub: USER_B_ADMIN };
-const claimsNoOrg: Claims = { user_role: 'admin', sub: USER_A_ADMIN };
+// "Sin organización": identidad SIN membresía. Antes bastaba con omitir el
+// claim organization_id; ahora app.current_org() también resuelve por
+// auth.uid()->profiles, así que el sub debe ser un usuario SIN profile
+// (USER_NO_PROFILE, seed 0004) para que la organización efectiva sea NULL.
+const claimsNoOrg: Claims = { user_role: 'admin', sub: USER_NO_PROFILE };
 
 async function setupOrgB(): Promise<void> {
   // Crea la segunda organización y un proyecto, como superusuario (sin RLS).
@@ -392,6 +406,130 @@ async function main(): Promise<void> {
     depCrossBlocked = true;
   }
   check('planning: B no puede crear dependencia sobre tareas de A (WITH CHECK)', depCrossBlocked);
+
+  // ===========================================================================
+  // 11) AUTH 4A.1 — identidad REAL resuelta por auth.uid() -> profiles.
+  //     Modo: claims SOLO con `sub` = id del profile, SIN organization_id ni
+  //     user_role. app.current_org()/current_role() deben resolver por profiles.
+  //     (Coexiste con el modo claims-demo de los tests 1..10, ya verde.)
+  // ===========================================================================
+  console.log('\n--- AUTH 4A.1: identidad real por auth.uid() -> profiles ---');
+
+  // Claims de "sesión real": solo el sub (como entrega Supabase Auth). Sin org.
+  const realA: Claims = { sub: USER_A_ADMIN, role: 'authenticated' };
+  const realAObra: Claims = { sub: USER_A_OBRA, role: 'authenticated' };
+  const realB: Claims = { sub: USER_B_GERENCIA, role: 'authenticated' };
+  const realNoProfile: Claims = { sub: USER_NO_PROFILE, role: 'authenticated' };
+  const noSession: Claims = null; // sin request.jwt.claims => sin auth.uid().
+
+  // 11a) current_org() resuelve la org desde profiles (sin claim de org).
+  const orgFromProfile = await asUser(realA, async (q) => {
+    const [{ org }] = await q<{ org: string | null }[]>`SELECT app.current_org() AS org`;
+    return org;
+  });
+  check(
+    'auth: current_org() resuelve org A desde profiles (sin claim org)',
+    orgFromProfile === ORG_A,
+    `got=${orgFromProfile}`,
+  );
+
+  // 11b) current_role() resuelve el rol desde profiles (sin claim user_role).
+  const roleFromProfile = await asUser(realA, async (q) => {
+    const [{ r }] = await q<{ r: string | null }[]>`SELECT app.current_role() AS r`;
+    return r;
+  });
+  check(
+    'auth: current_role() resuelve rol admin desde profiles (sin claim rol)',
+    roleFromProfile === 'admin',
+    `got=${roleFromProfile}`,
+  );
+
+  // 11c) Usuario real de A ve su proyecto y NO el de B (aislamiento por uid).
+  const realASees = await asUser(realA, async (q) => {
+    const rows = await q<{ id: string }[]>`SELECT id FROM projects`;
+    return rows.map((r) => r.id);
+  });
+  check('auth: usuario real A ve su proyecto', realASees.includes(PROJECT_A));
+  check('auth: usuario real A NO ve proyecto de B', !realASees.includes(PROJECT_B));
+
+  // 11d) Usuario real de B ve su proyecto y NO el de A (y viceversa).
+  const realBSees = await asUser(realB, async (q) => {
+    const rows = await q<{ id: string }[]>`SELECT id FROM projects`;
+    return rows.map((r) => r.id);
+  });
+  check('auth: usuario real B ve su proyecto', realBSees.includes(PROJECT_B));
+  check('auth: usuario real B NO ve proyecto de A', !realBSees.includes(PROJECT_A));
+
+  // 11e) Sin sesión (sin claims => sin auth.uid()): deny-by-default, 0 filas.
+  const noSessionRows = await asUser(noSession, async (q) => {
+    const [{ org }] = await q<{ org: string | null }[]>`SELECT app.current_org() AS org`;
+    const rows = await q<{ id: string }[]>`SELECT id FROM projects`;
+    return { org, count: rows.length };
+  });
+  check('auth: sin sesión => current_org() NULL', noSessionRows.org === null, `org=${noSessionRows.org}`);
+  check('auth: sin sesión => 0 proyectos (deny-by-default)', noSessionRows.count === 0, `rows=${noSessionRows.count}`);
+
+  // 11f) Usuario autenticado SIN membresía (auth.uid sin profile): deny, 0 filas.
+  const noProfile = await asUser(realNoProfile, async (q) => {
+    const [{ org }] = await q<{ org: string | null }[]>`SELECT app.current_org() AS org`;
+    const rows = await q<{ id: string }[]>`SELECT id FROM projects`;
+    return { org, count: rows.length };
+  });
+  check('auth: sin membresía => current_org() NULL', noProfile.org === null, `org=${noProfile.org}`);
+  check('auth: sin membresía => 0 proyectos (deny-by-default)', noProfile.count === 0, `rows=${noProfile.count}`);
+
+  // 11g) Cross-org WRITE bloqueada en modo real: A no inserta en org B.
+  let realInsBlocked = false;
+  try {
+    await asUser(realA, async (q) => {
+      await q`INSERT INTO projects (organization_id, code, name, status)
+              VALUES (${ORG_B}, 'X', 'X', 'active')`;
+    });
+  } catch {
+    realInsBlocked = true;
+  }
+  check('auth: cross-org INSERT bloqueado en modo real (WITH CHECK)', realInsBlocked);
+
+  // 11h) Cross-org UPDATE filtra 0 filas en modo real (A sobre proyecto de B).
+  const realUpd = await asUser(realA, async (q) => {
+    const res = await q`UPDATE projects SET name = 'HACKED' WHERE id = ${PROJECT_B}`;
+    return res.count;
+  });
+  check('auth: cross-org UPDATE no afecta filas en modo real (0 filas)', realUpd === 0, `count=${realUpd}`);
+
+  // 11i) Autorización por rol resuelto desde profiles:
+  //   profiles_insert exige app.current_role() = 'admin'. El admin real de A
+  //   puede crear un profile en su org; el rol 'obra' (insuficiente) no.
+  //   Se usa el id de USER_NO_PROFILE (existe en auth.users por el seed 0004,
+  //   satisface el FK profiles_id_auth_users_fk, y aún no tiene profile). Ambos
+  //   intentos corren en transacciones con ROLLBACK, así que no se pisan.
+  const adminCanInsertProfile = await asUser(realA, async (q) => {
+    const res = await q`
+      INSERT INTO profiles (id, organization_id, full_name, email, role)
+      VALUES (${USER_NO_PROFILE}, ${ORG_A}, 'Nuevo', 'nuevo@example.test', 'consulta')`;
+    return res.count;
+  });
+  check('auth: rol admin (por profiles) puede INSERT profile en su org', adminCanInsertProfile === 1, `count=${adminCanInsertProfile}`);
+
+  let obraInsertBlocked = false;
+  try {
+    await asUser(realAObra, async (q) => {
+      await q`
+        INSERT INTO profiles (id, organization_id, full_name, email, role)
+        VALUES (${USER_NO_PROFILE}, ${ORG_A}, 'Nuevo2', 'nuevo2@example.test', 'consulta')`;
+    });
+  } catch {
+    obraInsertBlocked = true;
+  }
+  check('auth: rol insuficiente (obra) NO puede INSERT profile (WITH CHECK)', obraInsertBlocked);
+
+  // 11j) Compat: el modo claims-demo SIGUE funcionando junto al modo real.
+  //   Con claim organization_id explícito, el COALESCE prioriza el claim.
+  const claimOverrides = await asUser(claimsA, async (q) => {
+    const [{ org }] = await q<{ org: string | null }[]>`SELECT app.current_org() AS org`;
+    return org;
+  });
+  check('auth: claim organization_id sigue teniendo prioridad (compat demo)', claimOverrides === ORG_A, `got=${claimOverrides}`);
 
   // --- Resumen ---
   console.log(`\nRESULTADO RLS RUNTIME: ${pass} PASS / ${fail} FAIL`);
