@@ -78,7 +78,9 @@ Los archivos `.md` de cada agente viven en `.claude/agents/`.
 ### agent-exports
 - `apps/web/modules/exports/`
 - `apps/web/server/exports/`
+- `apps/web/app/api/exports/`
 - `apps/web/tests/unit/exports/`
+- `scripts/export-fixtures/`
 
 ### agent-qa
 - `apps/web/tests/regression/`
@@ -281,11 +283,38 @@ Contrato: `docs/PLANNING_CONTRACT.md`. Sin solape de archivos entre agentes.
   fixture UI compatible; loading/error/empty; responsive básico. **Cero** cálculo
   monetario/CPM en React (consume DTOs); **no** toca DB.
 
-### agent-exports (Oleada 3)
-- Exportador XLSX con 4 perfiles.
-- Exportador PDF con marca de agua.
-- Auditoría de exportaciones.
-- Tests de privacidad por perfil PASAN.
+### Ownership congelado — Oleada 3C (exportaciones)
+
+Contrato: `docs/EXPORT_PROFILES_CONTRACT.md` (v1). Ejecución **secuencial**
+(único agente de la oleada). Sin solape de archivos con otros agentes.
+
+**agent-exports (3C)** — ownership exclusivo:
+- `apps/web/modules/exports/` (dominio de exportación puro y testeable:
+  perfiles, whitelist, generadores XLSX/PDF/CSV).
+- `apps/web/server/exports/` (orquestación server-side; consume `ReadModelPort`).
+- `apps/web/app/api/exports/` (route handlers de descarga; content-type;
+  nombres sanitizados; errores sin stack).
+- `apps/web/tests/unit/exports/` (privacidad por perfil, totales, formato COP,
+  Excel reabierto programáticamente, PDF válido, CSV, filenames, content-types,
+  errores, tamaño, ausencia de recálculo/tablas crudas/datos privados).
+- `scripts/export-fixtures/` (fixture sanitizado para pruebas de exportación).
+
+**NO tocar**: DB, migraciones, seeds, RLS, pricing, cost-domain, planning,
+read-model canónico (`apps/web/lib/contracts/read-model.ts`), pantallas
+existentes ni contratos congelados (cambios solo vía INTEGRATION_REQUESTS).
+**No** instalar dependencias (las aprueba el orquestador). **No** conectar DB
+remota. **No** usar datos privados / Excel real. **No** AGPL / enterprise.
+**No** escribir temporales sensibles. **No** recalcular finanzas. **No**
+implementar `.mpp` ni XML MS Project.
+
+### agent-exports (Oleada 3) — criterios de finalización
+- 5 formatos MVP: `xlsx-client`, `xlsx-internal`, `pdf-client`,
+  `pdf-management`, `csv-schedule`.
+- 4 perfiles con whitelist server-side aplicada antes de serializar.
+- `ExportService.generate` + route handlers + content-types + filenames.
+- Tests de privacidad por perfil PASAN; sin fuga de campos internos en cliente.
+- Excel válido (reapertura programática); PDF válido; CSV correcto.
+- gm:regression 22/22 + gm:import 9/9 intactos (cero recálculo financiero).
 
 ### agent-qa (Oleada 4)
 - `docs/QA_REPORT.md` con resultado completo.

@@ -584,6 +584,30 @@ El redondeo visual **no** modifica snapshots, cálculos ni regresión.
 
 ---
 
+## Exportaciones (Oleada 3C) — ver `docs/EXPORT_PROFILES_CONTRACT.md`
+
+El módulo de exportaciones (`agent-exports`) consume **DTOs ya proyectados por
+rol** del `ReadModelPort` canónico; **no** accede a tablas crudas ni recalcula
+finanzas. Contrato de código congelado:
+
+```ts
+type ExportProfile = 'client' | 'site' | 'management' | 'internal'; // = ViewerRole
+type ExportFormat  = 'xlsx-client' | 'xlsx-internal' | 'pdf-client'
+                   | 'pdf-management' | 'csv-schedule';
+interface ExportRequest { profile; projectId; estimateVersionId?; format;
+  includeSchedule?; includeProgress?; requestedBy; requestedAt; }
+interface ExportResult  { fileName; contentType; buffer; sizeBytes;
+  generatedAt; profile; }
+interface ExportService { generate(request: ExportRequest): Promise<ExportResult>; }
+```
+
+Route handlers de descarga bajo `apps/web/app/api/exports/` (content-type por
+formato; nombres sanitizados; errores sin stack). La whitelist por perfil y los
+formatos MVP están congelados en `docs/EXPORT_PROFILES_CONTRACT.md` (v1).
+**Sin `.mpp` ni XML MS Project** en esta oleada.
+
+---
+
 ## Reglas de cambio del contrato
 
 1. Modificar tipos públicos exige actualizar este documento y notificar a los consumidores.

@@ -80,6 +80,8 @@ Gestor: pnpm 11.5.0 (Corepack). Lockfile: `pnpm-lock.yaml`.
 | @radix-ui/react-slot | ^1.2.4 | MIT | Primitiva `Slot` (`asChild`) para componentes base shadcn/ui |
 | recharts | ^3.8.1 | MIT | Gráficos del dashboard (agent-dashboard, Oleada 3A). Solo frontend |
 | frappe-gantt | ^1.2.2 | MIT | Vista Gantt de planning (agent-planning, Oleada 3B). Solo frontend; import dinámico (DOM/SVG) |
+| exceljs | ^4.4.0 | MIT | Generación XLSX de exportaciones (agent-exports, Oleada 3C). Solo server-side |
+| @react-pdf/renderer | ^4.5.1 | MIT | Generación PDF de exportaciones (agent-exports, Oleada 3C). Solo server-side; peer React ^19 |
 
 ### apps/web — devDependencies
 | Paquete | Rango | Licencia | Uso |
@@ -91,8 +93,20 @@ Gestor: pnpm 11.5.0 (Corepack). Lockfile: `pnpm-lock.yaml`.
 >
 > **`recharts` ^3.8.1 (MIT)** instalado en Oleada 3A (dashboard).
 > **`frappe-gantt` ^1.2.2 (MIT)** instalado en Oleada 3B (vista Gantt de planning).
-> **Diferidas a oleadas posteriores** (NO instaladas): `exceljs` y
-> `@react-pdf/renderer` (exports, Oleada 3C). Se solicitarán vía
-> `docs/INTEGRATION_REQUESTS.md` cuando su oleada lo requiera. Nota: el
-> importador de Excel usa `xlsx` (lectura); las exportaciones `.xlsx`
-> usarán `exceljs` más adelante.
+> **`exceljs` ^4.4.0 (MIT)** y **`@react-pdf/renderer` ^4.5.1 (MIT)** instalados
+> en Oleada 3C (exports, rama `integration/wave-3c`). Solo server-side. Nota: el
+> importador de Excel usa `xlsx` (lectura); las exportaciones `.xlsx` usan
+> `exceljs` (escritura).
+
+## Notas de licencias transitivas (Oleada 3C — 2026-06-01)
+
+- **`jszip`** (transitiva de `exceljs`, empaqueta el `.xlsx`): doble licencia
+  **`MIT OR GPL-3.0-or-later`**. Se **elige MIT** (permisiva). No es AGPL; no
+  contamina. ✅ Aceptada.
+- **`@img/sharp-win32-x64`** (`Apache-2.0 AND LGPL-3.0-or-later`): binario nativo
+  de `sharp` **preexistente** (optimización de imágenes de Next 16, aprobado en
+  Paso 0), no introducido por 3C. LGPL en librería nativa enlazada
+  dinámicamente. ✅ Aceptada (sin cambio).
+- Escaneo `pnpm licenses list` tras instalar `exceljs` + `@react-pdf/renderer`:
+  **sin AGPL**, **sin paquetes enterprise**, **sin `ag-grid-enterprise`**.
+  `@react-pdf/renderer` usa fuentes por defecto (sin fuentes privadas embebidas).

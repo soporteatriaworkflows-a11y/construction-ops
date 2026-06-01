@@ -53,18 +53,14 @@ Ninguno.
   servicios no esenciales y el RLS runtime pasó 21/21. Revisar antes de
   implementar funcionalidades Realtime o antes de producción. Ver
   `docs/OPEN_QUESTIONS.md#B-004`.
-- **B-005 — Espejo DTO de planning duplicado en el dominio (Oleada 3B)**:
-  `apps/web/modules/planning/types.ts` redeclara los DTOs del read-model
-  (`ScheduleTaskView`, `DependencyView`, `MilestoneView`, `CriticalPathSummary`)
-  consumidos por `view-model.ts`/`gantt-mapping.ts`, en paralelo a la definición
-  **canónica** en `apps/web/lib/contracts/read-model.ts`. Son estructuralmente
-  compatibles (typecheck/tests/build PASS); el único campo divergente
-  (`financialProgressPct` en la `ScheduleTaskView` del dominio) está **sin uso**
-  (código muerto). El puerto/DTOs que la página y los repositorios consumen son
-  fuente única. NO es bug funcional ni viola la fuente única de cálculo (CPM tiene
-  una sola fuente en `modules/planning`). Plegar el espejo al contrato se difiere
-  a limpieza de Oleada 3C (la colisión de nombre `ScheduleSummary` dominio vs
-  read-model exige aliasing; no se refactoriza sobre un merge ya validado).
+- **B-005 — Espejo DTO de planning duplicado en el dominio (Oleada 3B)** ✅
+  **RESUELTO 2026-06-01** (Oleada 3C, `integration/wave-3c`): `types.ts` ahora
+  re-exporta los DTOs/enums de planning desde la **fuente única**
+  `apps/web/lib/contracts/read-model.ts` y conserva solo tipos de dominio puro;
+  se eliminó el campo muerto `financialProgressPct` y el `ScheduleSummaryView`
+  sin uso. Validación: typecheck/lint 0, 389 tests, build (`/planning`),
+  gm 22/22 + 9/9, diff limpio; cero regresiones (1 archivo, 252→176 líneas).
+  Ver `docs/OPEN_QUESTIONS.md#B-005`.
 
 ---
 
