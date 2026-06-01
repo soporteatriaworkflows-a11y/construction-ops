@@ -72,6 +72,7 @@ Ninguno.
 | 2026-05-30 | orquestador (merge Oleada 2B a main `47fcfb3`) | ✅ PASS post-merge | **309 tests** (80 adapters); gm 22/22 + 9/9; sin cambios de DB ⇒ RLS 21/21 vigente; sin scraping/API inventada; tag `wave-2b-homecenter-adapter-v1` |
 | 2026-05-31 | orquestador (integración Oleada 3A en `integration/wave-3a`) | ✅ PASS pre-merge | read-model canónico cableado a la UI; **356 tests**; gm 22/22 + 9/9; dev smoke 8/8 HTTP 200 datos reales; sin merge a main |
 | 2026-05-31 | orquestador (merge Oleada 3A a main `d1f0920`) | ✅ PASS post-merge | **356 tests**; gm 22/22 + 9/9; 1 `ReadModelPort`/`getReadModel`; sin dev-read-model/mocks activos; sin cambios de DB ⇒ RLS 21/21 vigente; tag `wave-3a-functional-read-model-ui-v1` |
+| 2026-06-01 | orquestador (integración Oleada 3B en `integration/wave-3b` `595e5a5`) | ✅ PASS pre-merge | planning DB+RLS+read-model+dominio CPM+`/planning`+Gantt; **389 tests**; **RLS runtime 32/32** (24 tablas FORCE); gm 22/22 + 9/9; dev smoke **9/9 HTTP 200**; CPM server-side; sin merge a main |
 
 ## Validación Oleada 1.5 (rama `feature/wave-1.5-local-rls`, 2026-05-30)
 
@@ -291,4 +292,42 @@ ni `apps/web/lib/db/schema.ts` ⇒ **RLS runtime 21/21** de Oleada 1.5 vigente.
 **B-004** (Realtime) deuda técnica no bloqueante.
 
 **Recomendación:** ✅ **APROBAR merge `integration/wave-3a` → `main`** (queda a
+decisión del usuario; este ciclo NO hace merge).
+
+## Validación integración Oleada 3B (rama `integration/wave-3b`, 2026-06-01)
+
+Integración formal de la planificación: merge `--no-ff` de
+`continuation/wave3b-planning-ui` (db `560b2cc` + ui `41abbe2` combinados) →
+merge commit **`595e5a5`**. Sin conflictos. **Sin merge a `main`.**
+
+**Reconciliación:** read-model canónico único (`apps/web/lib/contracts/read-model.ts`);
+`/planning` consume `getReadModel().getSchedule(getDemoViewer(), projectId)` real
+(0 accesores TEMP); `view-model` consume el `ScheduleSummary` canónico del
+read-model; CPM/ruta crítica/holguras **solo en `apps/web/modules/planning/`**
+(0 en React); frappe-gantt con import dinámico client-side + CSS vendorizado
+(su `exports` v1.2.2 no expone `dist/*.css`); nav `/planning`.
+
+**Resultados (todo PASS):** typecheck 0 · lint 0 · **389 tests** · build Next
+16.2.6 (rutas `/planning` + previas) · `gm:regression` **22/22** · `gm:import`
+**9/9** · `validate-claude-agents` **214/0/0** · `git diff --check` limpio.
+
+**RLS runtime real (Docker local): 32/32 PASS** — `db reset` aplicó **13
+migraciones + 3 seeds** sin errores; **24 tablas con RLS FORCE**; 21 previos + 11
+planning (aislamiento org A/B en las 4 tablas, usuario sin org sin acceso,
+`progress_entries` append-only UPDATE/DELETE denegados, INSERT autorizado, WITH
+CHECK cross-org en tarea/dependencia). Sin remoto.
+
+**Dev smoke (`READ_MODEL_SOURCE=fixture`): 9/9 rutas HTTP 200** — `/`, `/login`,
+`/projects`, `/estimates`, `/apu`, `/quantities`, `/catalog`, `/dashboard`,
+`/planning`. `/planning` muestra "Cronograma de obra", resumen, tareas, hitos,
+dependencias, % avance y **Diagrama de Gantt** con datos reales del fixture
+sanitizado; sin 500.
+
+**Privacidad:** ruta crítica/holguras/avance financiero/`external_reference`/
+responsables/recursos internos son role-gated (omitidos para `client`). Cero
+cálculo monetario/CPM en React. Compatibilidad MS Project reservada (sin export
+en 3B). Excel ignorado; sin `.env`/`package-lock`; sin `ag-grid-enterprise`; sin
+AGPL. **B-004** (Realtime) deuda técnica no bloqueante.
+
+**Recomendación:** ✅ **APROBAR merge `integration/wave-3b` → `main`** (queda a
 decisión del usuario; este ciclo NO hace merge).

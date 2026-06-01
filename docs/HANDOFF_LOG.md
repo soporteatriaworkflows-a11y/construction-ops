@@ -1349,3 +1349,39 @@ Resultado global: PASS (exit code 0)
 
 ### Agentes activos al cierre
 - Ninguno.
+
+## 2026-06-01 — Integración formal Oleada 3B en integration/wave-3b (orchestrator)
+
+### Merge
+- `git merge --no-ff continuation/wave3b-planning-ui` (= db `560b2cc` + ui
+  `41abbe2` combinados) → **merge commit `595e5a5`**. **Sin conflictos.** Los
+  docs de 3b (PLANNING_CONTRACT, etc.) se conservaron (la continuation parte de
+  main y no los borra).
+
+### Reconciliación
+- Read-model canónico único `apps/web/lib/contracts/read-model.ts`; `/planning`
+  consume `getReadModel().getSchedule(getDemoViewer(), projectId)` real (0
+  accesores TEMP). CPM/ruta crítica/holguras **solo en `modules/planning`**
+  (verificado: 0 en `app/`+`components/`). frappe-gantt dinámico client-side +
+  CSS vendorizado; nav `/planning`. Las dos `ScheduleSummary` (dominio vs
+  read-model) son capas distintas por contrato; la UI consume la canónica.
+
+### Validación (todo PASS)
+- typecheck 0 · lint 0 · **389 tests** · build Next 16.2.6 (rutas `/planning` +
+  previas) · `gm:regression` 22/22 · `gm:import` 9/9 · `validate-claude-agents`
+  214/0/0 · `git diff --check` limpio.
+- **RLS runtime real 32/32** (Docker local): `db reset` aplicó **13 migraciones +
+  3 seeds**; **24 tablas con RLS FORCE**; 21 previos + 11 planning. Sin remoto.
+- **Dev smoke 9/9 rutas HTTP 200** (incl. `/planning` con Cronograma + Gantt +
+  tareas/hitos/avance reales). Servidor detenido tras el smoke.
+- Privacidad backend-first (holguras/ruta crítica/financiero/`external_reference`/
+  responsables role-gated); cero cálculo monetario/CPM en React; MS Project
+  reservado (sin export en 3B). B-004 (Realtime) deuda técnica no bloqueante.
+
+### Estado / próximo paso
+- Commit doc `chore: integrate and validate wave 3b planning gantt` + push a
+  `origin integration/wave-3b`. **NO merge a `main`** (espera aprobación).
+- Recomendación: **APROBAR merge `integration/wave-3b` → `main`**.
+
+### Agentes activos al cierre
+- Ninguno.
