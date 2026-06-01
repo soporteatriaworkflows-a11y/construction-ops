@@ -1639,3 +1639,34 @@ Resultado global: PASS (exit code 0)
 
 ### Agentes activos al cierre
 - Ninguno.
+
+---
+
+## 2026-06-01 — Oleada 4A.2 (runtime SSR): contrato + implementación (Fases 0–4)
+
+### Estado
+- Rama `integration/wave-4a-auth-runtime` desde 4A.1 (`7c2f729`), publicada.
+  `main` intacta (`a6981f0`).
+- **AUTH_RUNTIME_CONTRACT v1 congelado** (`docs/AUTH_RUNTIME_CONTRACT.md`).
+  Role-map fuente única en `server/auth/role-map.ts` (**admin→internal**;
+  refina AUTH_CONTRACT). Punteros en API_CONTRACTS/READ_MODEL_CONTRACT; ownership
+  4A.2 en AGENT_REGISTRY.
+- **Runtime SSR implementado por el orquestador** (antes de la UI):
+  `lib/supabase/{env,client,server,proxy}.ts` (`@supabase/ssr`, cookies
+  `getAll`/`setAll`); `server/auth/{types,errors,role-map,session,resolve-viewer,
+  routes,index}.ts`; `apps/web/proxy.ts` (Next 16: refresh + `getClaims()` guard,
+  **no** `getSession()`; demo passthrough; redirecciones seguras; anti
+  open-redirect); `app/page.tsx` (→`/dashboard`); guard de `/api/exports` (modo
+  supabase: viewer autenticado + anti-escalamiento de perfil ≤ ViewerRole).
+
+### Validación (PASS)
+- typecheck/lint 0 · **423 tests** (410 + **13 auth**) · build OK (`/api/exports`
+  + Proxy) · gm 22/22 · gm:import 9/9 · validador 214/0 · diff limpio · sin secretos.
+
+### Próximo paso (esta sesión)
+- Fase 4: commit `feat(auth): ...` + push. Fase 5: lanzar **solo**
+  `agent-frontend-boq` (UI `(auth)/`). Fase 7: preservar en `backup/wave4a-auth-ui`.
+  **NO** integrar UI; **NO** merge a `main`; **NO** remoto/Vercel.
+
+### Agentes activos al cierre
+- Ninguno (aún no se lanza `agent-frontend-boq`).

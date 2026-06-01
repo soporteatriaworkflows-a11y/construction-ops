@@ -344,6 +344,25 @@ cost-domain, read-model frontend, Vercel, remoto. **No** instalar dependencias
 `service_role` en frontend. **No** secretos en repo. **No** multi-org. **No**
 modificar contratos congelados (cambios vía INTEGRATION_REQUESTS).
 
+### Ownership congelado — Oleada 4A.2 (runtime SSR + UI auth)
+
+Contrato: `docs/AUTH_RUNTIME_CONTRACT.md` (v1). Ejecución **secuencial**.
+
+**Runtime SSR (orquestador)** — `apps/web/lib/supabase/`,
+`apps/web/server/auth/`, `apps/web/proxy.ts`, ajustes mínimos en
+`apps/web/app/page.tsx`, `apps/web/server/read-model/` (selector de viewer),
+`apps/web/app/api/exports/route.ts` (guard + anti-escalamiento). Patrón
+`@supabase/ssr` (`getAll`/`setAll`; `getClaims()` como guard; **no**
+`getSession()` server-side; **no** `auth-helpers-nextjs`). Sin remoto/Vercel.
+
+**agent-frontend-boq (4A.2)** — ownership exclusivo UI:
+- `apps/web/app/(auth)/` (login/logout/forgot/reset/callback + `actions.ts`).
+- `apps/web/components/auth/`.
+- `apps/web/tests/unit/auth-ui/`.
+**NO tocar**: DB, migraciones, seeds, RLS, `proxy.ts`, `apps/web/server/auth/`,
+read-model, exports, planning, pricing, cost-domain, Vercel, remoto. **No**
+instalar librerías nuevas. **No** `service_role` en frontend. **No** secretos.
+
 ### agent-qa (Oleada 4)
 - `docs/QA_REPORT.md` con resultado completo.
 - Sin FAIL bloqueante para release.

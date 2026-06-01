@@ -626,3 +626,14 @@ server-side** desde la sesión y la membresía (`profiles` por `auth.uid()`);
 nunca desde el navegador ni query params; deny-by-default sin membresía. Mapeo
 `profiles.role`→`ViewerRole` y matriz ruta×rol congelados en AUTH_CONTRACT. El
 guard de UI/route **no** reemplaza RLS.
+
+---
+
+## Runtime de autenticación (Oleada 4A.2) — ver `docs/AUTH_RUNTIME_CONTRACT.md`
+
+Sesión SSR con `@supabase/ssr` (cookies `getAll`/`setAll`; guard de Proxy con
+`auth.getClaims()`, nunca `getSession()` server-side). `resolveViewer()` elige
+viewer por `APP_AUTH_MODE` (`demo`→`getDemoViewer`; `supabase`→
+`resolveAuthenticatedViewer` desde sesión→`profiles`), sin fallback silencioso.
+`/api/exports` en modo `supabase` exige viewer autenticado y **no** permite
+escalamiento de perfil por query (perfil efectivo ≤ `ViewerRole`).

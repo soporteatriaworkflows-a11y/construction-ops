@@ -302,3 +302,10 @@ En modo `APP_AUTH_MODE=supabase`+`READ_MODEL_SOURCE=db`, el `ViewerContext` se
 construye desde el `AuthenticatedViewer` (sesión → `profiles` por `auth.uid()`),
 sustituyendo a `getDemoViewer()` (solo demo/fixture). `organizationId` y `role`
 se derivan de la membresía; nunca de input del navegador. Deny-by-default.
+
+## Selector de viewer por modo (Oleada 4A.2) — ver `docs/AUTH_RUNTIME_CONTRACT.md`
+
+`resolveViewer({ mode })`: `APP_AUTH_MODE=demo` ⇒ `getDemoViewer()` (fixture);
+`APP_AUTH_MODE=supabase` ⇒ `resolveAuthenticatedViewer()` (sesión→`profiles`→
+`AuthenticatedViewer`→`ViewerContext`), deny-by-default sin sesión/membresía.
+Sin fallback silencioso. `READ_MODEL_SOURCE` permanece `fixture` por defecto.

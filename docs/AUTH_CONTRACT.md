@@ -108,15 +108,17 @@ export interface AuthenticatedViewer {
 ### Mapeo congelado `profiles.role` → `ViewerRole` (v1)
 | `profiles.role` | `ViewerRole` | Racional |
 |---|---|---|
-| `admin` | `management` | Gestión total + financiero |
+| `admin` | `internal` | Acceso técnico completo (superset) — refinado en 4A.2 |
 | `gerencia` | `management` | Visión financiera/gerencial |
 | `presupuestos` | `internal` | Técnico interno (APU/BOQ/trazabilidad) |
 | `compras` | `internal` | Proveedores/SKU/compras (interno) |
 | `obra` | `site` | Ejecución/cronograma sin precios de compra |
 | `consulta` | `client` | Solo lectura, proyección más restrictiva |
 
-> Mapeo **frozen v1**; ajustable solo vía INTEGRATION_REQUESTS. La proyección de
-> privacidad por `ViewerRole` ya existe (read-model + exports).
+> Mapeo **frozen v1**; ajustable solo vía INTEGRATION_REQUESTS. **Fuente única en
+> runtime**: `apps/web/server/auth/role-map.ts` (ver `docs/AUTH_RUNTIME_CONTRACT.md`
+> §3). `admin`→`internal` se **refinó** en 4A.2 (antes `management`). La
+> proyección de privacidad por `ViewerRole` ya existe (read-model + exports).
 
 ### Matriz mínima ruta×rol (acceso de lectura)
 | Ruta | client | site | management | internal |
