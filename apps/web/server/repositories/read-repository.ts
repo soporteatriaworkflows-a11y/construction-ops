@@ -13,7 +13,7 @@
  * Drizzle, de modo que nunca se conecta silenciosamente.
  */
 
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, asc } from 'drizzle-orm';
 
 import { db as defaultDb, schema } from '@/lib/db';
 import type { Uuid } from '@/lib/contracts/read-model';
@@ -186,5 +186,100 @@ export class DrizzleReadRepository {
       .select()
       .from(schema.quantityLines)
       .where(inArray(schema.quantityLines.quantityGroupId, [...groupIds]));
+  }
+
+  /* --- Planificación (Oleada 3B — PLANNING_CONTRACT §3) ---
+   *
+   * Todas filtran por `organizationId` (defensa en profundidad) además de RLS.
+   * Sólo lectura; el ensamblado de DTOs lo hace `compute-planning`.
+   */
+
+  /** Tareas del cronograma de un proyecto (orden por `sortOrder`). */
+  async scheduleTasksByProject(organizationId: Uuid, projectId: Uuid) {
+    return this.db
+      .select()
+      .from(schema.scheduleTasks)
+      .where(
+        and(
+          eq(schema.scheduleTasks.organizationId, organizationId),
+          eq(schema.scheduleTasks.projectId, projectId),
+        ),
+      )
+      .orderBy(asc(schema.scheduleTasks.sortOrder));
+  }
+
+  /** Dependencias entre tareas de un proyecto. */
+  async taskDependenciesByProject(organizationId: Uuid, projectId: Uuid) {
+    return this.db
+      .select()
+      .from(schema.taskDependencies)
+      .where(
+        and(
+          eq(schema.taskDependencies.organizationId, organizationId),
+          eq(schema.taskDependencies.projectId, projectId),
+        ),
+      );
+  }
+
+  /**
+   * Entradas de avance físico de un proyecto (append-only), opcionalmente
+   * filtradas por tarea. Orden cronológico ascendente por `recordedAt`.
+   */
+  async progressEntriesByProject(
+    organizationId: Uuid,
+    projectId: Uuid,
+    taskId?: Uuid,
+  ) {
+    const conditions = [
+      eq(schema.progressEntries.organizationId, organizationId),
+      eq(schema.progressEntries.projectId, projectId),
+    ];
+    if (taskId !== undefined) {
+      conditions.push(eq(schema.progressEntries.taskId, taskId));
+    }
+    return this.db
+      .select()
+      .from(schema.progressEntries)
+      .where(and(...conditions))
+      .orderBy(asc(schema.progressEntries.recordedAt));
+  }
+
+  /**
+   * Asignaciones de recursos de un proyecto, opcionalmente filtradas por tarea.
+   */
+  async resourceAssignmentsByProject(
+    organizationId: Uuid,
+    projectId: Uuid,
+    taskId?: Uuid,
+  ) {
+    const conditions = [
+      eq(schema.resourceAssignments.organizationId, organizationId),
+      eq(schema.resourceAssignments.projectId, projectId),
+    ];
+    if (taskId !== undefined) {
+      conditions.push(eq(schema.resourceAssignments.taskId, taskId));
+    }
+    return this.db
+      .select()
+      .from(schema.resourceAssignments)
+      .where(and(...conditions));
+  }
+
+  /** Recursos por ids (para resolver nombres en asignaciones). */
+  async resourcesByIds(ids: readonly Uuid[]) {
+    if (ids.length === 0) return [];
+    return this.db
+      .select()
+      .from(schema.resources)
+      .where(inArray(schema.resources.id, [...ids]));
+  }
+
+  /** Roles de mano de obra por ids (para resolver nombres en asignaciones). */
+  async laborRolesByIds(ids: readonly Uuid[]) {
+    if (ids.length === 0) return [];
+    return this.db
+      .select()
+      .from(schema.laborRoles)
+      .where(inArray(schema.laborRoles.id, [...ids]));
   }
 }
