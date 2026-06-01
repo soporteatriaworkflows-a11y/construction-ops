@@ -1266,3 +1266,41 @@ Resultado global: PASS (exit code 0)
 
 ### Agentes activos al cierre
 - Ninguno (ambos finalizaron por límite, incompletos).
+
+## 2026-05-31 — Oleada 3B: continuación db-rls COMPLETADA (orchestrator)
+
+### Estrategia
+- Continuación **secuencial** (no paralela) para reducir consumo. Rama
+  `continuation/wave3b-db-planning` desde `backup/wave3b-db-planning` (`89bfab7`).
+- `agent-db-rls` recuperó el WIP con `git merge --ff-only 89bfab7` (los worktrees
+  parten de `main`; `89bfab7` desciende de `main` ⇒ ff sin redo) y completó.
+
+### Completado (db-rls)
+- `getSchedule/listProgressEntries/listResourceAssignments` en
+  `FixtureReadModelRepository` y `DrizzleReadModelRepository` (proyección por rol:
+  `client` sin holguras/ruta crítica/`financialProgressPct`/`external_reference`/
+  `createdBy`/notas).
+- `supabase/seeds/0003_demo_planning.sql` (cronograma demo sanitizado) +
+  `config.toml`. Tests `planning-fixture.test.ts` + `planning-drizzle.test.ts`.
+- Harness `scripts/rls-runtime/run.ts`: +11 pruebas de planning.
+
+### Validación
+- typecheck 0 · lint 0 · **378 tests** · build OK · gm:regression 22/22 ·
+  gm:import 9/9.
+- **RLS runtime real (Docker local): 32/32 PASS** (21 previos + **11 planning**:
+  aislamiento A/B en las 4 tablas, sin-org, `progress_entries` append-only,
+  WITH CHECK cross-org en tareas/dependencias; **24 tablas con RLS FORCE**).
+  `db reset` aplicó 13 migraciones + 3 seeds sin errores. Sin remoto.
+
+### Preservación
+- `backup/wave3b-db-planning-complete` (`560b2cc`, pusheada);
+  `continuation/wave3b-db-planning` adelantada a `560b2cc`. WIP original
+  `89bfab7` y `main` intactos. 12 backups.
+
+### Estado / próximo paso
+- **db-rls 3B COMPLETO y validado.** Falta `agent-planning` (UI/Gantt): reanudar
+  secuencialmente desde `backup/wave3b-planning-ui` (`6f4dab9`). Luego integración
+  3B. NO integrado; NO merge.
+
+### Agentes activos al cierre
+- Ninguno.
