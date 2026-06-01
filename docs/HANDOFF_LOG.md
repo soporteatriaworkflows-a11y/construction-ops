@@ -1435,5 +1435,36 @@ Resultado global: PASS (exit code 0)
 - `getDemoViewer()` solo demo/dev; auth real/sesión = prerrequisito del modo `db`.
   B-004 (Realtime en Windows) deuda técnica no bloqueante.
 
+---
+
+## 2026-06-01 — Oleada 3C (exports): apertura + B-005 resuelto (Fases 0–1)
+
+### Estado
+- **Oleada 3C aprobada (secuencial).** Rama `integration/wave-3c` creada desde
+  `main` (`82f9e86`) y publicada (`-u origin`). `main` intacta.
+- **B-005 RESUELTO** (Fase 1): `apps/web/modules/planning/types.ts` ahora
+  re-exporta los DTOs/enums de planning (`ScheduleTaskView`, `DependencyView`,
+  `MilestoneView`, `ProgressEntryView`, `ResourceAssignmentView`,
+  `CriticalPathSummary`, `ScheduleTaskStatus`, `DependencyType`) desde la fuente
+  única `apps/web/lib/contracts/read-model.ts` y conserva solo tipos de dominio
+  puro. Eliminados el campo muerto `financialProgressPct` y `ScheduleSummaryView`
+  sin uso. Superficie pública de `@/modules/planning` estable (re-exports vía
+  `index`). Sin tocar CPM/holguras/proyección/DB/migraciones/seeds/RLS.
+- Validación post-refactor (PASS): typecheck/lint 0, **389 tests**, build
+  (`/planning`), gm 22/22 + 9/9, `git diff --check` limpio. 1 archivo
+  (`types.ts`, 252→176 líneas). Commit `refactor(planning): fold duplicated DTO
+  mirrors into canonical read model`.
+
+### Próximo paso (esta sesión)
+- Fase 2: congelar `docs/EXPORT_PROFILES_CONTRACT.md` (v1) + actualizar contratos.
+- Fase 3: solicitar/instalar `exceljs` + `@react-pdf/renderer` (licencias).
+- Fase 4: ownership `agent-exports` en AGENT_REGISTRY.
+- Fase 5: commit documental + push.
+- Fase 6: lanzar **solo** `agent-exports` (worktree aislado). Fase 7: preservar
+  en `backup/wave3c-exports`. **NO** integrar ni merge a `main`.
+
+### Agentes activos al cierre
+- Ninguno (aún no se lanza `agent-exports`).
+
 ### Agentes activos al cierre
 - Ninguno.

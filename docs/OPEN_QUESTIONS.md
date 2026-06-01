@@ -30,6 +30,27 @@ _Sin blockers activos._
 
 ## BLOCKERS resueltos
 
+### B-005 — Espejo DTO de planning duplicado en el dominio  ✅ RESUELTO
+- **Estado**: RESUELTO el 2026-06-01 (Oleada 3C, rama `integration/wave-3c`),
+  commit `refactor(planning): fold duplicated DTO mirrors into canonical read model`.
+- **Origen**: registrado durante el merge de Oleada 3B (deuda no bloqueante).
+  `apps/web/modules/planning/types.ts` redeclaraba los DTOs del read-model
+  (`ScheduleTaskView`, `DependencyView`, `MilestoneView`, `ProgressEntryView`,
+  `ResourceAssignmentView`, `CriticalPathSummary`) y los enums
+  (`ScheduleTaskStatus`, `DependencyType`) en paralelo a la definición canónica
+  en `apps/web/lib/contracts/read-model.ts`, con un campo muerto
+  `financialProgressPct` en la copia de `ScheduleTaskView`.
+- **Resolución**: `types.ts` ahora **re-exporta** esos DTOs/enums desde el
+  contrato canónico (fuente única) y conserva exclusivamente los tipos de
+  dominio puro (entrada/salida del CPM). Se eliminó el campo muerto
+  `financialProgressPct` y el `ScheduleSummaryView` sin uso. La superficie
+  pública de `@/modules/planning` se conserva estable (re-exports vía `index`).
+  Sin cambios en reglas CPM, holguras, proyección por rol, DB, migraciones,
+  seeds ni RLS.
+- **Validación**: typecheck/lint 0, **389 tests**, build (`/planning`),
+  gm 22/22 + 9/9, `git diff --check` limpio. Cero regresiones. Un solo archivo
+  modificado (`types.ts`, 252→176 líneas).
+
 ### B-003 — Docker Desktop: content store corrupto (bloqueaba RLS runtime)  ✅ RESUELTO
 - **Estado**: RESUELTO el 2026-05-30 (Oleada 1.5, rama `feature/wave-1.5-local-rls`).
 - **Síntoma original**: `supabase start` y `docker pull` fallaban con

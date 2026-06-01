@@ -1,14 +1,16 @@
 /**
  * types.ts — Tipos del dominio de planificación (Oleada 3B).
  *
- * Propiedad: agent-planning. Espejo EXACTO de `docs/PLANNING_CONTRACT.md §2`
- * (dominio puro) y `§3` (DTOs del read-model). NO inventa campos.
+ * Propiedad: agent-planning. Espejo de `docs/PLANNING_CONTRACT.md §2` (dominio
+ * puro). NO inventa campos.
  *
- * IMPORTANTE (paralelización): db-rls añade en su worktree el read-model de
- * planning (`getSchedule`) y los DTOs en `@/lib/contracts/read-model`. Mientras
- * eso no esté en este worktree, agent-planning declara aquí los DTOs con la
- * forma EXACTA del contrato para compilar. El orquestador deduplicará en
- * integración (canónico = db-rls / contrato congelado).
+ * B-005 (resuelto 2026-06-01): los DTOs del read-model (`ScheduleTaskView`,
+ * `DependencyView`, `MilestoneView`, `ProgressEntryView`,
+ * `ResourceAssignmentView`, `CriticalPathSummary`) y los enums compartidos
+ * (`ScheduleTaskStatus`, `DependencyType`) tienen FUENTE ÚNICA en
+ * `@/lib/contracts/read-model`. Este archivo los re-exporta (sin redeclararlos)
+ * para conservar estable la superficie de `@/modules/planning`, y define
+ * exclusivamente los tipos de dominio puro (entrada/salida del CPM).
  */
 
 import type {
@@ -17,6 +19,12 @@ import type {
   IsoDateTime,
   Uuid,
 } from '@/lib/utils/types';
+// Enums compartidos con la DB/read-model: FUENTE ÚNICA en el contrato canónico
+// (B-005 resuelto 2026-06-01). Se importan aquí para tipar el dominio puro.
+import type {
+  ScheduleTaskStatus,
+  DependencyType,
+} from '@/lib/contracts/read-model';
 
 export type {
   DecimalString,
@@ -26,25 +34,22 @@ export type {
 } from '@/lib/utils/types';
 
 /* ----------------------------------------------------------------------------
- * Enums (espejo de los CHECK de la DB — PLANNING_CONTRACT §1.5)
+ * Enums y DTOs del read-model — FUENTE ÚNICA en `@/lib/contracts/read-model`
+ * (B-005 resuelto 2026-06-01). El dominio los consume del contrato canónico;
+ * ya no se redeclaran aquí. Se re-exportan para mantener estable la superficie
+ * pública de `@/modules/planning` (consumida por componentes y la página).
  * ------------------------------------------------------------------------- */
 
-/** Estado de una tarea de cronograma. */
-export type ScheduleTaskStatus =
-  | 'not_started'
-  | 'in_progress'
-  | 'completed'
-  | 'blocked'
-  | 'cancelled';
-
-/**
- * Tipo de dependencia entre tareas (precedence relationships):
- *  - `FS` Finish-to-Start: el sucesor inicia cuando termina el predecesor.
- *  - `SS` Start-to-Start: el sucesor inicia cuando inicia el predecesor.
- *  - `FF` Finish-to-Finish: el sucesor termina cuando termina el predecesor.
- *  - `SF` Start-to-Finish: el sucesor termina cuando inicia el predecesor.
- */
-export type DependencyType = 'FS' | 'SS' | 'FF' | 'SF';
+export type {
+  ScheduleTaskStatus,
+  DependencyType,
+  ScheduleTaskView,
+  DependencyView,
+  MilestoneView,
+  ProgressEntryView,
+  ResourceAssignmentView,
+  CriticalPathSummary,
+} from '@/lib/contracts/read-model';
 
 /* ----------------------------------------------------------------------------
  * Tipos de dominio puro (PLANNING_CONTRACT §2)
@@ -168,84 +173,4 @@ export class PlanningError extends Error {
     // Mantiene la cadena de prototipos correcta al extender Error.
     Object.setPrototypeOf(this, PlanningError.prototype);
   }
-}
-
-/* ----------------------------------------------------------------------------
- * DTOs del read-model (PLANNING_CONTRACT §3) — declarados aquí mientras db-rls
- * no los publique en `@/lib/contracts/read-model`. Forma EXACTA del contrato.
- * El orquestador deduplica en integración (canónico = db-rls).
- * ------------------------------------------------------------------------- */
-
-/** Tarea proyectada para la UI. Campos 🔒 omitidos para rol `client`. */
-export interface ScheduleTaskView {
-  id: Uuid;
-  wbsCode: string;
-  name: string;
-  parentTaskId?: Uuid | null;
-  plannedStart: IsoDate;
-  plannedEnd: IsoDate;
-  plannedDurationDays: DecimalString;
-  progressPct: DecimalString;
-  status: ScheduleTaskStatus;
-  isMilestone: boolean;
-  sortOrder: number;
-  // 🔒 (omitidos para client):
-  totalFloatDays?: DecimalString;
-  freeFloatDays?: DecimalString;
-  isCritical?: boolean;
-  financialProgressPct?: DecimalString;
-}
-
-/** Dependencia proyectada para la UI. */
-export interface DependencyView {
-  predecessorTaskId: Uuid;
-  successorTaskId: Uuid;
-  dependencyType: DependencyType;
-  lagDays: DecimalString;
-}
-
-/** Hito proyectado para la UI. */
-export interface MilestoneView {
-  id: Uuid;
-  name: string;
-  date: IsoDate;
-  status: ScheduleTaskStatus;
-}
-
-/** Registro de avance proyectado para la UI (campos 🔒 omitidos). */
-export interface ProgressEntryView {
-  id: Uuid;
-  taskId: Uuid;
-  recordedAt: IsoDateTime;
-  physicalProgressPct: DecimalString;
-  // 🔒 financialProgressPct?, notes?
-}
-
-/** Asignación de recurso proyectada para la UI (internos 🔒). */
-export interface ResourceAssignmentView {
-  id: Uuid;
-  taskId: Uuid;
-  resourceName?: string | null;
-  laborRoleName?: string | null;
-  quantity?: DecimalString | null;
-  unit?: string | null;
-}
-
-/** Resumen de ruta crítica para la UI (🔒 management/internal). */
-export interface CriticalPathSummary {
-  criticalTaskIds: Uuid[];
-  projectStart: IsoDate;
-  projectEnd: IsoDate;
-  durationDays: DecimalString;
-}
-
-/** Resumen de cronograma del read-model (DTO consumido por la página). */
-export interface ScheduleSummaryView {
-  projectId: Uuid;
-  tasks: ScheduleTaskView[];
-  dependencies: DependencyView[];
-  milestones: MilestoneView[];
-  physicalProgressPct: DecimalString;
-  /** 🔒 management/internal; omitido para `client`. */
-  criticalPath?: CriticalPathSummary;
 }
