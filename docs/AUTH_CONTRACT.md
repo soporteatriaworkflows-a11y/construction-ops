@@ -184,3 +184,19 @@ SSR por cookies, `proxy.ts`, viewer real cableado, login/logout/reset UI,
 
 **Nunca en esta oleada**: Supabase remoto, `supabase link`, `db push`, deploy,
 cambios en Vercel, `service_role` en frontend, secretos en repo, multi-org.
+
+---
+
+## Estado de implementación (4A.1 — DB/RLS integrado en `integration/wave-4a-auth-local`)
+
+- **Helpers SQL implementados** (migración `20260601090000_auth_identity_helpers.sql`,
+  merge `adeafbe`): `app._jwt_claims()`, `app._auth_uid()`, `app._profile_org(uid)`,
+  `app._profile_role(uid)` (SECURITY DEFINER, search_path fijo), `app.current_org()`,
+  `app.current_role()`, `app.current_org_user()`. Resolución `auth.uid()`→`profiles`
+  con COALESCE a claims demo; **deny-by-default**. Reutiliza `profiles` single-org;
+  **sin tablas nuevas**.
+- **RLS runtime 47/47 PASS** (32 previos compat + 15 auth). Validado solo en local
+  (Supabase Docker); **sin remoto**.
+- **Pendiente (4A.2)**: clientes browser/server, sesión SSR por cookies, `proxy.ts`,
+  viewer real (sustituir `getDemoViewer` en modo `supabase`), rutas públicas/UI.
+  `READ_MODEL_SOURCE=fixture` por defecto (sin cambio a `db` en runtime aún).

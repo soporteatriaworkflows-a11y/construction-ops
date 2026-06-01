@@ -630,3 +630,4 @@ derivado server-side (sin float); campos `wbs_code`/`dependency_type`/`lag_days`
 |-------|--------|-----------|-------|
 | 2026-05-31 | **Planning congelado v1** (`schedule_tasks`, `task_dependencies`, `progress_entries`, `resource_assignments`) — Oleada 3B | (db-rls) | orchestrator |
 | 2026-06-01 | **Auth/RLS por identidad (Oleada 4A.1)** — helpers de identidad real (`auth.uid()`→`profiles`) con compat demo; membresía single-org reutilizando `profiles` (sin tablas nuevas). Ver `docs/AUTH_CONTRACT.md` | (db-rls) | orchestrator |
+| 2026-06-01 | **Integración 4A.1** (merge `adeafbe`) — helpers de identidad real integrados; RLS runtime 47/47; reutiliza `profiles`/`organizations` (sin tablas nuevas) | (db-rls) | orchestrator |

@@ -1596,3 +1596,46 @@ Resultado global: PASS (exit code 0)
 
 ### Agentes activos al cierre
 - Ninguno (`agent-db-rls` finalizó; entregable preservado, no integrado).
+
+---
+
+## 2026-06-01 — Integración formal Oleada 4A.1 (auth/RLS DB) en integration/wave-4a-auth-local
+
+### Estado
+- **Integración aprobada.** `git merge --no-ff backup/wave4a-auth-db-local`
+  (`58de9c3`) sobre `integration/wave-4a-auth-local` (`8adfbca`) → merge
+  **`adeafbe`**, **sin conflictos** (4 archivos, +401). `main` intacta
+  (`a6981f0`). Remoto no conectado.
+
+### Auditoría de la implementación integrada
+- **14 migraciones, 4 seeds**. La migración `20260601090000_auth_identity_helpers.sql`
+  tiene **0 `CREATE TABLE`** ⇒ **reutiliza `profiles`/`organizations`** (single-org
+  v1, sin tablas nuevas de usuarios/membresía/org/roles).
+- Helpers canónicos: `_jwt_claims`, `_auth_uid`, `_profile_org`, `_profile_role`,
+  `current_org`, `current_role`, `current_org_user`. Regla de identidad:
+  **prefiere `auth.uid()`**, fallback controlado a claim `sub` (compat
+  demo/Postgres puro), **NULL → deny-by-default**. Org/rol desde
+  `profiles.organization_id`/`profiles.role` por `auth.uid()`; nunca org del
+  navegador. `SECURITY DEFINER` + `search_path` fijo solo en `_profile_org/_role`
+  (evita recursión RLS, lee solo la fila propia). `GRANT EXECUTE` mínimos.
+
+### Validación (PASS)
+- **RLS runtime 47/47** (Docker local): 14 migraciones + 4 seeds; **32 previos**
+  (compat) + **15 auth** (aislamiento real A/B, sin sesión→deny, sin
+  membresía→deny, cross-org INSERT/UPDATE bloqueado, rol admin vs obra, prioridad
+  claim demo). Supabase detenido. Sin remoto.
+- typecheck/lint 0 · **410 tests** · build OK · gm 22/22 · gm:import 9/9 ·
+  validador 214/0 · diff/status limpios · **sin secretos/.env/privados**.
+
+### Pendiente (4A.2)
+- Clientes browser/server Supabase, sesión SSR por cookies, refresh en
+  `proxy.ts`, viewer real (sustituir `getDemoViewer` en modo `supabase`),
+  protección de rutas, UI login/logout/forgot/reset/callback. `READ_MODEL_SOURCE`
+  permanece `fixture`. B-004 (Realtime Windows) deuda técnica.
+
+### Estado / próximo paso
+- Commit doc `docs: record wave 4a1 auth db rls integration validation` + push
+  `origin integration/wave-4a-auth-local`. **NO** merge a `main`.
+
+### Agentes activos al cierre
+- Ninguno.
