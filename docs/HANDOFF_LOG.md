@@ -1385,3 +1385,55 @@ Resultado global: PASS (exit code 0)
 
 ### Agentes activos al cierre
 - Ninguno.
+
+---
+
+## 2026-06-01 — Merge de Oleada 3B a `main` (aprobado) + tag estable
+
+### Estado
+- **Merge aprobado por el usuario.** `git merge --no-ff integration/wave-3b`
+  sobre `main` (base `352825f`) → merge commit **`40118a5`**, **sin conflictos**
+  (44 archivos, +5221/-11). Squash/rebase/force-push NO usados.
+- Tag anotado **`wave-3b-planning-gantt-v1`** sobre el HEAD documental.
+
+### Validación post-merge (todo PASS)
+- typecheck 0 · lint 0 · **389 tests** (27 archivos) · build Next 16.2.6
+  (rutas incl. `/planning`) · `gm:regression` 22/22 · `gm:import` 9/9 (±0.01 COP)
+  · `validate-claude-agents` 214/0/0 · `git diff --check` limpio.
+- **RLS runtime real 32/32** (Docker local): `db reset` aplicó **13 migraciones +
+  3 seeds**; **24 tablas con RLS FORCE** (aislamiento A/B, sin-org, cross-org
+  WITH CHECK, `progress_entries` append-only). Supabase detenido. Sin remoto.
+- **Dev smoke 9/9 rutas HTTP 200** (`READ_MODEL_SOURCE=fixture`): `/`, `/login`,
+  `/projects`, `/estimates`, `/apu`, `/quantities`, `/catalog`, `/dashboard`,
+  `/planning`. `/planning` renderiza "Cronograma de obra", resumen, **Tareas**,
+  **Hitos**, **Diagrama de Gantt** (frappe-gantt); rol `management` ve columnas
+  **Holgura** + **Crítica**; sin fugas (`external_reference`/descuento/margen=0);
+  sin 500. Servidor detenido tras el smoke.
+
+### Reconciliación / deuda registrada
+- Read-model **canónico único** en `apps/web/lib/contracts/read-model.ts`
+  (`ReadModelPort` + `ScheduleSummary` + DTOs); `/planning` consume
+  `getReadModel().getSchedule(getDemoViewer(), projectId)` (0 accesores TEMP de
+  planning). CPM/ruta crítica/holguras **solo en `modules/planning`** (0 en
+  `app/`+`components/`). frappe-gantt dinámico client-side + CSS vendorizado; nav
+  `/planning`.
+- **B-005 (deuda no bloqueante)**: el módulo de dominio `modules/planning/types.ts`
+  conserva un **espejo interno** de los DTOs de read-model (`ScheduleTaskView`,
+  `DependencyView`, `MilestoneView`, `CriticalPathSummary`) consumido por
+  `view-model.ts`/`gantt-mapping.ts`. Es estructuralmente compatible; el único
+  campo divergente (`financialProgressPct` en la `ScheduleTaskView` del dominio)
+  está **sin uso** (código muerto). El read-model canónico (puerto + DTOs que la
+  página/repositorios consumen) es fuente única. Plegar el espejo al contrato se
+  difiere a limpieza de 3C (colisión de nombre `ScheduleSummary` dominio vs
+  read-model exige aliasing; no se refactoriza sobre un merge ya validado).
+
+### Estado / próximo paso
+- `git push origin main` + `git push origin wave-3b-planning-gantt-v1`.
+- **Oleada 3B CERRADA.** `integration/wave-3b` conservada temporalmente; backups
+  y continuations conservados. Próximo: **Oleada 3C (exports)** — propuesta
+  documental entregada; NO lanzada (sin agentes, sin rama, sin deps).
+- `getDemoViewer()` solo demo/dev; auth real/sesión = prerrequisito del modo `db`.
+  B-004 (Realtime en Windows) deuda técnica no bloqueante.
+
+### Agentes activos al cierre
+- Ninguno.

@@ -53,6 +53,18 @@ Ninguno.
   servicios no esenciales y el RLS runtime pasó 21/21. Revisar antes de
   implementar funcionalidades Realtime o antes de producción. Ver
   `docs/OPEN_QUESTIONS.md#B-004`.
+- **B-005 — Espejo DTO de planning duplicado en el dominio (Oleada 3B)**:
+  `apps/web/modules/planning/types.ts` redeclara los DTOs del read-model
+  (`ScheduleTaskView`, `DependencyView`, `MilestoneView`, `CriticalPathSummary`)
+  consumidos por `view-model.ts`/`gantt-mapping.ts`, en paralelo a la definición
+  **canónica** en `apps/web/lib/contracts/read-model.ts`. Son estructuralmente
+  compatibles (typecheck/tests/build PASS); el único campo divergente
+  (`financialProgressPct` en la `ScheduleTaskView` del dominio) está **sin uso**
+  (código muerto). El puerto/DTOs que la página y los repositorios consumen son
+  fuente única. NO es bug funcional ni viola la fuente única de cálculo (CPM tiene
+  una sola fuente en `modules/planning`). Plegar el espejo al contrato se difiere
+  a limpieza de Oleada 3C (la colisión de nombre `ScheduleSummary` dominio vs
+  read-model exige aliasing; no se refactoriza sobre un merge ya validado).
 
 ---
 
@@ -73,6 +85,7 @@ Ninguno.
 | 2026-05-31 | orquestador (integración Oleada 3A en `integration/wave-3a`) | ✅ PASS pre-merge | read-model canónico cableado a la UI; **356 tests**; gm 22/22 + 9/9; dev smoke 8/8 HTTP 200 datos reales; sin merge a main |
 | 2026-05-31 | orquestador (merge Oleada 3A a main `d1f0920`) | ✅ PASS post-merge | **356 tests**; gm 22/22 + 9/9; 1 `ReadModelPort`/`getReadModel`; sin dev-read-model/mocks activos; sin cambios de DB ⇒ RLS 21/21 vigente; tag `wave-3a-functional-read-model-ui-v1` |
 | 2026-06-01 | orquestador (integración Oleada 3B en `integration/wave-3b` `595e5a5`) | ✅ PASS pre-merge | planning DB+RLS+read-model+dominio CPM+`/planning`+Gantt; **389 tests**; **RLS runtime 32/32** (24 tablas FORCE); gm 22/22 + 9/9; dev smoke **9/9 HTTP 200**; CPM server-side; sin merge a main |
+| 2026-06-01 | orquestador (merge Oleada 3B a main `40118a5`) | ✅ PASS post-merge | sin conflictos; **389 tests**; build (`/planning`); gm 22/22 + 9/9; validador 214/0; **RLS runtime 32/32** (13 migraciones + 3 seeds, 24 tablas FORCE); dev smoke **9/9 HTTP 200** (sin fugas internas; rol management ve Holgura/Crítica); read-model canónico único; CPM solo en `modules/planning`; B-005 (espejo DTO interno, campo muerto) deuda no bloqueante; tag `wave-3b-planning-gantt-v1` |
 
 ## Validación Oleada 1.5 (rama `feature/wave-1.5-local-rls`, 2026-05-30)
 
