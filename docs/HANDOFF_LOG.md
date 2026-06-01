@@ -1304,3 +1304,48 @@ Resultado global: PASS (exit code 0)
 
 ### Agentes activos al cierre
 - Ninguno.
+
+## 2026-06-01 — Oleada 3B: continuación planning-ui COMPLETADA (orchestrator)
+
+### Estrategia
+- Continuación **secuencial**. Rama `continuation/wave3b-planning-ui` = WIP
+  planning (`6f4dab9`) **combinado con el read-model db completo (`560b2cc`)**
+  (sin overlap de archivos) → `2793bbf`, para cablear la UI al `getSchedule()`
+  real sin accesor TEMP. `agent-planning` recuperó la base con
+  `git merge --ff-only 2793bbf`.
+
+### Completado
+- **agent-planning**: dominio (`modules/planning/{gantt-mapping,view-model,index}`)
+  + componentes (`GanttChart` frappe-gantt dinámico, `ScheduleTable`,
+  `PlanningSummary`, `ScheduleStatusBadge`).
+- **orchestrator (completar interrumpido)**: página
+  `apps/web/app/(dashboard)/planning/page.tsx` cableada a
+  `getReadModel().getSchedule(getDemoViewer(), projectId)`; tests
+  `tests/unit/planning/planning-domain.test.ts` (CPM/ciclo/holgura/hito/
+  dependencias FS-SS-FF-SF/privacidad por rol); enlace nav `/planning` en el
+  layout; reconciliación `view-model` → `ScheduleSummary` canónico de
+  `@/lib/contracts/read-model`; CSS de frappe-gantt **vendorizado** (su `exports`
+  v1.2.2 no expone `dist/*.css`); `ganttRef any→unknown`.
+
+### Validación
+- typecheck 0 · lint 0 · **389 tests** · build Next 16.2.6 (ruta `/planning`) ·
+  gm:regression 22/22 · gm:import 9/9.
+- **Dev smoke `/planning` HTTP 200** (74 KB) con "Cronograma de obra", "Diagrama
+  de Gantt", tareas, hitos, avance reales del fixture sanitizado; sin 500; rutas
+  previas siguen 200. Servidor detenido tras el smoke.
+- Privacidad: ruta crítica/holguras solo rol autorizado (no `client`); cero
+  cálculo monetario/CPM en React (CPM en `modules/planning`).
+
+### Preservación
+- `backup/wave3b-planning-ui-complete` (`41abbe2`, pusheada); continuation
+  adelantada a `41abbe2`. WIP originales (`6f4dab9`, `89bfab7`) y `db-complete`
+  (`560b2cc`) intactos. `main` intacta. 13 backups.
+
+### Estado / próximo paso
+- **3B COMPLETO** (db `560b2cc` + ui `41abbe2`), combinado y validado end-to-end
+  en `continuation/wave3b-planning-ui` (`41abbe2`). Listo para el **ciclo de
+  integración 3B** hacia `integration/wave-3b` (incluye RLS runtime 32/32 ya
+  validado por db). NO integrado; NO merge.
+
+### Agentes activos al cierre
+- Ninguno.
