@@ -24,6 +24,7 @@
 import type {
   DecimalString,
   EstimateVersionStatus,
+  IsoDate,
   IsoDateTime,
   ProjectStatus,
   ResourceType,
@@ -34,6 +35,7 @@ import type {
 export type {
   DecimalString,
   EstimateVersionStatus,
+  IsoDate,
   IsoDateTime,
   ProjectStatus,
   ResourceType,
@@ -194,6 +196,103 @@ export interface ProgressSummary {
 }
 
 /* ----------------------------------------------------------------------------
+ * 2.b DTOs de PLANIFICACIÓN (Oleada 3B — PLANNING_CONTRACT §3)
+ *
+ * Extienden el read-model sin romper v1. Reglas idénticas: dinero/porcentajes/
+ * duraciones como `DecimalString`; fechas ISO. La proyección por rol OMITE los
+ * campos 🔒 (holguras/ruta crítica/avance financiero/`externalReference`/
+ * responsables/notas) para rol `client`. La ruta crítica/holguras se calculan
+ * server-side con `apps/web/modules/planning/` (cero cálculo en React).
+ * ------------------------------------------------------------------------- */
+
+/** Estado de una tarea del cronograma. */
+export type ScheduleTaskStatus =
+  | 'not_started'
+  | 'in_progress'
+  | 'completed'
+  | 'blocked'
+  | 'cancelled';
+
+/** Tipo de dependencia entre tareas (MS Project: FS/SS/FF/SF). */
+export type DependencyType = 'FS' | 'SS' | 'FF' | 'SF';
+
+export interface ScheduleTaskView {
+  id: Uuid;
+  wbsCode: string;
+  name: string;
+  parentTaskId?: Uuid | null;
+  plannedStart: IsoDate;
+  plannedEnd: IsoDate;
+  plannedDurationDays: DecimalString;
+  progressPct: DecimalString;
+  status: ScheduleTaskStatus;
+  isMilestone: boolean;
+  sortOrder: number;
+  // 🔒 omitidos para `client` (holguras/ruta crítica/avance financiero):
+  /** 🔒 holgura total (días) — solo roles autorizados. */
+  totalFloatDays?: DecimalString;
+  /** 🔒 holgura libre (días) — solo roles autorizados. */
+  freeFloatDays?: DecimalString;
+  /** 🔒 pertenece a la ruta crítica — solo roles autorizados. */
+  isCritical?: boolean;
+}
+
+export interface DependencyView {
+  predecessorTaskId: Uuid;
+  successorTaskId: Uuid;
+  dependencyType: DependencyType;
+  lagDays: DecimalString;
+}
+
+export interface MilestoneView {
+  id: Uuid;
+  name: string;
+  date: IsoDate;
+  status: ScheduleTaskStatus;
+}
+
+export interface ProgressEntryView {
+  id: Uuid;
+  taskId: Uuid;
+  recordedAt: IsoDateTime;
+  physicalProgressPct: DecimalString;
+  // 🔒 omitidos para `client`:
+  /** 🔒 avance financiero derivado server-side. */
+  financialProgressPct?: DecimalString | null;
+  /** 🔒 observaciones privadas. */
+  notes?: string | null;
+}
+
+export interface ResourceAssignmentView {
+  id: Uuid;
+  taskId: Uuid;
+  resourceName?: string | null;
+  laborRoleName?: string | null;
+  quantity?: DecimalString | null;
+  unit?: string | null;
+  // 🔒 notas internas omitidas para `client`:
+  notes?: string | null;
+}
+
+/** Resumen de ruta crítica (🔒 management/internal/site). */
+export interface CriticalPathSummary {
+  criticalTaskIds: Uuid[];
+  projectStart: IsoDate;
+  projectEnd: IsoDate;
+  durationDays: DecimalString;
+}
+
+export interface ScheduleSummary {
+  projectId: Uuid;
+  tasks: ScheduleTaskView[];
+  dependencies: DependencyView[];
+  milestones: MilestoneView[];
+  physicalProgressPct: DecimalString;
+  /** 🔒 ruta crítica/holguras (omitida para `client`; opcional hasta cablear el dominio en integración). */
+  criticalPath?: CriticalPathSummary;
+}
+
+/* ----------------------------------------------------------------------------
  * 3. Puerto canónico (READ_MODEL_CONTRACT §5)
  * ------------------------------------------------------------------------- */
 
@@ -215,4 +314,20 @@ export interface ReadModelPort {
   listQuantities(viewer: ViewerContext, projectScopeId?: Uuid): Promise<QuantityGroupView[]>;
   listCatalogResources(viewer: ViewerContext): Promise<CatalogResourceView[]>;
   getDashboardSummary(viewer: ViewerContext, projectId: Uuid): Promise<DashboardSummary>;
+
+  /* --- Planificación (Oleada 3B — PLANNING_CONTRACT §3) --- */
+  /** Cronograma proyectado por rol (tareas/dependencias/hitos; ruta crítica 🔒). */
+  getSchedule(viewer: ViewerContext, projectId: Uuid): Promise<ScheduleSummary>;
+  /** Histórico de avance físico (append-only) de un proyecto o una tarea. */
+  listProgressEntries(
+    viewer: ViewerContext,
+    projectId: Uuid,
+    taskId?: Uuid,
+  ): Promise<ProgressEntryView[]>;
+  /** Asignaciones de recursos/mano de obra de un proyecto o una tarea. */
+  listResourceAssignments(
+    viewer: ViewerContext,
+    projectId: Uuid,
+    taskId?: Uuid,
+  ): Promise<ResourceAssignmentView[]>;
 }

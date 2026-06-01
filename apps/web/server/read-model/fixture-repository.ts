@@ -23,11 +23,16 @@ import type {
   CatalogResourceView,
   ChapterSummary,
   DashboardSummary,
+  DependencyType,
   EstimateSummary,
+  ProgressEntryView,
   ProjectListItem,
   ProjectOverview,
   QuantityGroupView,
   ReadModelPort,
+  ResourceAssignmentView,
+  ScheduleSummary,
+  ScheduleTaskStatus,
   Uuid,
   ViewerContext,
 } from '@/lib/contracts/read-model';
@@ -38,7 +43,17 @@ import {
   type EstimateComputation,
   type EstimateComputationInput,
 } from './compute';
-import { projectDashboardForRole } from './types';
+import {
+  computeSchedule,
+  type RawScheduleTask,
+  type RawTaskDependency,
+} from './compute-planning';
+import {
+  projectDashboardForRole,
+  projectProgressEntriesForRole,
+  projectResourceAssignmentsForRole,
+  projectScheduleForRole,
+} from './types';
 import {
   EstimateVersionNotFoundError,
   ProjectNotFoundError,
@@ -87,6 +102,7 @@ interface FixtureShape {
       | 'other';
     unit: string;
   }[];
+  laborRoles: { id: Uuid; organizationId: Uuid; code: string; name: string }[];
   apuTemplates: {
     id: Uuid;
     organizationId: Uuid;
@@ -139,6 +155,54 @@ interface FixtureShape {
     calculatedQuantity: string;
     sortOrder: number;
   }[];
+  planning: {
+    scheduleTasks: {
+      id: Uuid;
+      projectId: Uuid;
+      projectScopeId?: Uuid | null;
+      chapterId?: Uuid | null;
+      parentTaskId?: Uuid | null;
+      wbsCode: string;
+      name: string;
+      description?: string | null;
+      plannedStart: string;
+      plannedEnd: string;
+      plannedDurationDays: string;
+      progressPct: string;
+      status: ScheduleTaskStatus;
+      isMilestone: boolean;
+      sortOrder: number;
+      externalReference?: string | null;
+    }[];
+    taskDependencies: {
+      id: Uuid;
+      projectId: Uuid;
+      predecessorTaskId: Uuid;
+      successorTaskId: Uuid;
+      dependencyType: DependencyType;
+      lagDays: string;
+    }[];
+    progressEntries: {
+      id: Uuid;
+      projectId: Uuid;
+      taskId: Uuid;
+      recordedAt: string;
+      physicalProgressPct: string;
+      financialProgressPct?: string | null;
+      notes?: string | null;
+      createdBy?: Uuid | null;
+    }[];
+    resourceAssignments: {
+      id: Uuid;
+      projectId: Uuid;
+      taskId: Uuid;
+      resourceId?: Uuid | null;
+      laborRoleId?: Uuid | null;
+      quantity?: string | null;
+      unit?: string | null;
+      notes?: string | null;
+    }[];
+  };
   estimateTotals: { area_construida: string };
 }
 
@@ -344,5 +408,103 @@ export class FixtureReadModelRepository implements ReadModelPort {
       lastUpdatedAt: input.lastUpdatedAt,
     });
     return projectDashboardForRole(full, viewer.role);
+  }
+
+  /* --- Planificación (Oleada 3B — PLANNING_CONTRACT §3) --- */
+
+  /** Tareas crudas del proyecto, mapeadas al espejo de `compute-planning`. */
+  private rawTasks(projectId: Uuid): RawScheduleTask[] {
+    return fixture.planning.scheduleTasks
+      .filter((t) => t.projectId === projectId)
+      .map((t) => ({
+        id: t.id,
+        parentTaskId: t.parentTaskId ?? null,
+        wbsCode: t.wbsCode,
+        name: t.name,
+        plannedStart: t.plannedStart,
+        plannedEnd: t.plannedEnd,
+        plannedDurationDays: t.plannedDurationDays,
+        progressPct: t.progressPct,
+        status: t.status,
+        isMilestone: t.isMilestone,
+        sortOrder: t.sortOrder,
+        externalReference: t.externalReference ?? null,
+      }));
+  }
+
+  /** Dependencias crudas del proyecto. */
+  private rawDependencies(projectId: Uuid): RawTaskDependency[] {
+    return fixture.planning.taskDependencies
+      .filter((d) => d.projectId === projectId)
+      .map((d) => ({
+        predecessorTaskId: d.predecessorTaskId,
+        successorTaskId: d.successorTaskId,
+        dependencyType: d.dependencyType,
+        lagDays: d.lagDays,
+      }));
+  }
+
+  async getSchedule(viewer: ViewerContext, projectId: Uuid): Promise<ScheduleSummary> {
+    if (!this.isViewerOrg(viewer) || projectId !== fixture.project.id) {
+      throw new ProjectNotFoundError(projectId);
+    }
+    const full = computeSchedule({
+      projectId,
+      tasks: this.rawTasks(projectId),
+      dependencies: this.rawDependencies(projectId),
+    });
+    // Proyección por rol: `client` no recibe holguras/ruta crítica.
+    return projectScheduleForRole(full, viewer.role);
+  }
+
+  async listProgressEntries(
+    viewer: ViewerContext,
+    projectId: Uuid,
+    taskId?: Uuid,
+  ): Promise<ProgressEntryView[]> {
+    if (!this.isViewerOrg(viewer) || projectId !== fixture.project.id) {
+      throw new ProjectNotFoundError(projectId);
+    }
+    const entries: ProgressEntryView[] = fixture.planning.progressEntries
+      .filter((e) => e.projectId === projectId && (taskId === undefined || e.taskId === taskId))
+      // Append-only: orden cronológico ascendente estable por recordedAt.
+      .sort((a, b) => a.recordedAt.localeCompare(b.recordedAt))
+      .map((e) => ({
+        id: e.id,
+        taskId: e.taskId,
+        recordedAt: e.recordedAt,
+        physicalProgressPct: e.physicalProgressPct,
+        // 🔒 financialProgressPct/notes se incluyen aquí; la proyección por rol
+        // los OMITE para `client`. `createdBy` no se expone en el DTO.
+        financialProgressPct: e.financialProgressPct ?? null,
+        notes: e.notes ?? null,
+      }));
+    return projectProgressEntriesForRole(entries, viewer.role);
+  }
+
+  async listResourceAssignments(
+    viewer: ViewerContext,
+    projectId: Uuid,
+    taskId?: Uuid,
+  ): Promise<ResourceAssignmentView[]> {
+    if (!this.isViewerOrg(viewer) || projectId !== fixture.project.id) {
+      throw new ProjectNotFoundError(projectId);
+    }
+    const resourceName = new Map(fixture.resources.map((r) => [r.id, r.name]));
+    const laborRoleName = new Map(fixture.laborRoles.map((r) => [r.id, r.name]));
+
+    const assignments: ResourceAssignmentView[] = fixture.planning.resourceAssignments
+      .filter((a) => a.projectId === projectId && (taskId === undefined || a.taskId === taskId))
+      .map((a) => ({
+        id: a.id,
+        taskId: a.taskId,
+        resourceName: a.resourceId ? resourceName.get(a.resourceId) ?? null : null,
+        laborRoleName: a.laborRoleId ? laborRoleName.get(a.laborRoleId) ?? null : null,
+        quantity: a.quantity ?? null,
+        unit: a.unit ?? null,
+        // 🔒 notas internas; la proyección por rol las OMITE para `client`.
+        notes: a.notes ?? null,
+      }));
+    return projectResourceAssignmentsForRole(assignments, viewer.role);
   }
 }

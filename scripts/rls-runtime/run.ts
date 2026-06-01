@@ -28,13 +28,16 @@ const CONN =
 
 const sql = postgres(CONN, { max: 1, onnotice: () => {} });
 
-// IDs sembrados (org A) — ver supabase/seeds/0001 y 0002.
+// IDs sembrados (org A) — ver supabase/seeds/0001, 0002 y 0003.
 const ORG_A = '00000000-0000-0000-0000-0000000000a1';
 const USER_A_ADMIN = '00000000-0000-0000-0000-0000000000b1';
 const PROJECT_A = '00000000-0000-0000-0000-0000000000c1';
 const VERSION_A = '00000000-0000-0000-0000-000000000311';
 const APU_A = '00000000-0000-0000-0000-000000000201';
 const SUPPLIER_PRODUCT_A = '00000000-0000-0000-0000-000000000111';
+// Planning (seed 0003): tarea de mampostería de org A.
+const TASK_A = '0d000000-0000-0000-0000-000000000002';
+const TASK_A_SUB = '0d000000-0000-0000-0000-000000000003';
 
 // IDs nuevos (org B) — creados por este test (idempotentes).
 const ORG_B = '00000000-0000-0000-0000-0000000000a2';
@@ -152,7 +155,12 @@ async function main(): Promise<void> {
     FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
     WHERE n.nspname = 'public' AND c.relkind = 'r'
       AND c.relrowsecurity AND c.relforcerowsecurity`;
-  check('Pre-flight: 20 tablas con RLS FORCE', rlsTables === '20', `rlsTables=${rlsTables}`);
+  // 20 tablas de Oleada 1 + 4 de planning (Oleada 3B) = 24.
+  check('Pre-flight: 24 tablas con RLS FORCE', rlsTables === '24', `rlsTables=${rlsTables}`);
+
+  const [{ count: taskCount }] = await sql<{ count: string }[]>`
+    SELECT count(*)::text AS count FROM schedule_tasks WHERE id = ${TASK_A}`;
+  check('Pre-flight: seed planning A aplicado', taskCount === '1', `taskCount=${taskCount}`);
 
   await ensureGrants();
   await setupOrgB();
@@ -288,6 +296,102 @@ async function main(): Promise<void> {
     return res.count;
   });
   check('estimate_versions draft: UPDATE permitido en la org (1 fila)', draftUpd === 1, `count=${draftUpd}`);
+
+  // === 10) PLANNING — aislamiento org A/B en las 4 tablas ===
+  // 10a) A ve sus tareas; B no ve ninguna tarea de A.
+  const aSeesTasks = await asUser(claimsA, async (q) => {
+    const rows = await q<{ id: string }[]>`SELECT id FROM schedule_tasks`;
+    return rows.map((r) => r.id);
+  });
+  check('planning: A ve su tarea de cronograma', aSeesTasks.includes(TASK_A));
+
+  const bSeesTasks = await asUser(claimsB, async (q) => {
+    const rows = await q<{ id: string }[]>`SELECT id FROM schedule_tasks`;
+    return rows.map((r) => r.id);
+  });
+  check('planning: B NO ve tareas de A', !bSeesTasks.includes(TASK_A));
+
+  // 10b) Aislamiento en las 4 tablas para B (no ve nada de A).
+  const bPlanningCounts = await asUser(claimsB, async (q) => {
+    const [{ t }] = await q<{ t: string }[]>`SELECT count(*)::text AS t FROM schedule_tasks`;
+    const [{ d }] = await q<{ d: string }[]>`SELECT count(*)::text AS d FROM task_dependencies`;
+    const [{ p }] = await q<{ p: string }[]>`SELECT count(*)::text AS p FROM progress_entries`;
+    const [{ r }] = await q<{ r: string }[]>`SELECT count(*)::text AS r FROM resource_assignments`;
+    return { t, d, p, r };
+  });
+  check(
+    'planning: B no ve dependencias/avances/recursos de A (4 tablas vacías)',
+    bPlanningCounts.t === '0' &&
+      bPlanningCounts.d === '0' &&
+      bPlanningCounts.p === '0' &&
+      bPlanningCounts.r === '0',
+    JSON.stringify(bPlanningCounts),
+  );
+
+  // 10c) Usuario sin organización no ve tareas de cronograma.
+  const noOrgTasks = await asUser(claimsNoOrg, async (q) => {
+    const rows = await q<{ id: string }[]>`SELECT id FROM schedule_tasks`;
+    return rows.length;
+  });
+  check('planning: usuario sin organización no ve tareas', noOrgTasks === 0, `rows=${noOrgTasks}`);
+
+  // 10d) A puede leer y escribir avance autorizado en su propia tarea.
+  const authoredEntry = await asUser(claimsA, async (q) => {
+    const [{ id }] = await q<{ id: string }[]>`
+      INSERT INTO progress_entries
+        (organization_id, project_id, task_id, recorded_at, physical_progress_pct)
+      VALUES (${ORG_A}, ${PROJECT_A}, ${TASK_A}, now(), 50)
+      RETURNING id`;
+    return id;
+  });
+  check('planning: A puede INSERT avance en su tarea (autorizado)', !!authoredEntry);
+
+  // 10e) progress_entries es APPEND-ONLY: sin UPDATE ni DELETE.
+  const appendOnly = await asUser(
+    claimsA,
+    async (q) => {
+      const upd = await q`UPDATE progress_entries SET physical_progress_pct = 1 WHERE task_id = ${TASK_A}`;
+      const del = await q`DELETE FROM progress_entries WHERE task_id = ${TASK_A}`;
+      return { updCount: upd.count, delCount: del.count };
+    },
+  );
+  check('planning: progress_entries UPDATE denegado (0 filas)', appendOnly.updCount === 0, `upd=${appendOnly.updCount}`);
+  check('planning: progress_entries DELETE denegado (0 filas)', appendOnly.delCount === 0, `del=${appendOnly.delCount}`);
+
+  // 10f) A NO puede colgar una tarea de su org sobre el proyecto de B (WITH CHECK).
+  let crossProjectBlocked = false;
+  try {
+    await asUser(claimsA, async (q) => {
+      await q`INSERT INTO schedule_tasks
+                (organization_id, project_id, wbs_code, name, planned_start, planned_end, planned_duration_days)
+              VALUES (${ORG_A}, ${PROJECT_B}, 'X', 'X', '2026-06-01', '2026-06-02', 1)`;
+    });
+  } catch {
+    crossProjectBlocked = true;
+  }
+  check('planning: A no puede crear tarea sobre proyecto de B (WITH CHECK)', crossProjectBlocked);
+
+  // 10g) B NO puede UPDATE una tarea de A (USING filtra 0 filas).
+  const bUpdTaskA = await asUser(claimsB, async (q) => {
+    const res = await q`UPDATE schedule_tasks SET name = 'HACKED' WHERE id = ${TASK_A}`;
+    return res.count;
+  });
+  check('planning: B no puede UPDATE tarea de A (0 filas)', bUpdTaskA === 0, `count=${bUpdTaskA}`);
+
+  // 10h) A NO puede crear una dependencia que apunte a tareas inexistentes para su org
+  //      (las tareas de la dependencia deben ser de la misma org — WITH CHECK).
+  let depCrossBlocked = false;
+  try {
+    await asUser(claimsB, async (q) => {
+      // B intenta crear una dependencia usando tareas de A (que B no ve).
+      await q`INSERT INTO task_dependencies
+                (organization_id, project_id, predecessor_task_id, successor_task_id, dependency_type)
+              VALUES (${ORG_B}, ${PROJECT_B}, ${TASK_A}, ${TASK_A_SUB}, 'FS')`;
+    });
+  } catch {
+    depCrossBlocked = true;
+  }
+  check('planning: B no puede crear dependencia sobre tareas de A (WITH CHECK)', depCrossBlocked);
 
   // --- Resumen ---
   console.log(`\nRESULTADO RLS RUNTIME: ${pass} PASS / ${fail} FAIL`);
