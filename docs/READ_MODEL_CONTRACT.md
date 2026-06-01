@@ -295,3 +295,10 @@ El `ReadModelPort` se **extiende** (no rompe v1) con planificación, definida en
   proyección por rol (holguras/ruta crítica/avance financiero/`external_reference`/
   responsables son 🔒). Ruta crítica/holguras se calculan server-side con el
   dominio `apps/web/modules/planning/` (cero en React).
+
+## Viewer real (Oleada 4A) — ver `docs/AUTH_CONTRACT.md`
+
+En modo `APP_AUTH_MODE=supabase`+`READ_MODEL_SOURCE=db`, el `ViewerContext` se
+construye desde el `AuthenticatedViewer` (sesión → `profiles` por `auth.uid()`),
+sustituyendo a `getDemoViewer()` (solo demo/fixture). `organizationId` y `role`
+se derivan de la membresía; nunca de input del navegador. Deny-by-default.

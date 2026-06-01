@@ -13,6 +13,8 @@
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.4",
     "@react-pdf/renderer": "^4.5.1",
+    "@supabase/ssr": "^0.10.3",
+    "@supabase/supabase-js": "^2.106.2",
     "ag-grid-community": "^35.3.0",
     "ag-grid-react": "^35.3.0",
     "class-variance-authority": "^0.7.1",

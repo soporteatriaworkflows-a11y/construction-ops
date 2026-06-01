@@ -82,6 +82,8 @@ Gestor: pnpm 11.5.0 (Corepack). Lockfile: `pnpm-lock.yaml`.
 | frappe-gantt | ^1.2.2 | MIT | Vista Gantt de planning (agent-planning, Oleada 3B). Solo frontend; import dinámico (DOM/SVG) |
 | exceljs | ^4.4.0 | MIT | Generación XLSX de exportaciones (agent-exports, Oleada 3C). Solo server-side |
 | @react-pdf/renderer | ^4.5.1 | MIT | Generación PDF de exportaciones (agent-exports, Oleada 3C). Solo server-side; peer React ^19 |
+| @supabase/supabase-js | ^2.106.2 | MIT | Cliente oficial Supabase (auth + DB) — Oleada 4A. Clave publishable/anon (pública); service_role NUNCA en frontend |
+| @supabase/ssr | ^0.10.3 | MIT | Sesión SSR por cookies (Supabase) — Oleada 4A. Peer `@supabase/supabase-js ^2.105.3` (cumplida) |
 
 ### apps/web — devDependencies
 | Paquete | Rango | Licencia | Uso |

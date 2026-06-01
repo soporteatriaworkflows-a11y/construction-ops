@@ -1515,3 +1515,37 @@ Resultado global: PASS (exit code 0)
 
 ### Agentes activos al cierre
 - Ninguno.
+
+---
+
+## 2026-06-01 — Oleada 4A.1 (auth/RLS local): apertura + contrato + deps (Fases 0–5)
+
+### Estado
+- **Oleada 4A.1 aprobada (secuencial).** Rama `integration/wave-4a-auth-local`
+  desde `main` (`a6981f0`), publicada. `main` intacta.
+- **Auditoría (Fase 1)**: `profiles` (id=auth.users.id, `organization_id` NOT
+  NULL = membresía single-org, `role` admin/gerencia/presupuestos/obra/compras/
+  consulta) y `organizations` ya existen. `app.current_org()`/`current_role()`
+  leen claims JWT custom (`organization_id`/`user_role`); **0** políticas usan
+  `auth.uid()`. `proxy.ts` = stub pass-through. Todo es **demo** (sin protección
+  real). Conclusión: **reutilizar `profiles`** (no duplicar), añadir resolución
+  por `auth.uid()`→`profiles` con compat demo.
+- **AUTH_CONTRACT v1 congelado** (`docs/AUTH_CONTRACT.md`): modos
+  `APP_AUTH_MODE`×`READ_MODEL_SOURCE` sin fallback; `AuthenticatedViewer`
+  server-side; mapeo `profiles.role`→`ViewerRole`; matriz ruta×rol;
+  deny-by-default. Punteros en API_CONTRACTS/DATABASE_SCHEMA/READ_MODEL_CONTRACT;
+  ownership 4A.1 de `agent-db-rls` en AGENT_REGISTRY; placeholders en
+  `.env.example` (`APP_AUTH_MODE`, `NEXT_PUBLIC_SUPABASE_*`; **sin** valores
+  reales; `service_role` no en frontend).
+- **Deps instaladas**: `@supabase/supabase-js` **2.106.2** (MIT) +
+  `@supabase/ssr` **0.10.3** (MIT); peer cumplida; sin AGPL/enterprise.
+
+### Próximo paso (esta sesión)
+- Fase 5: validar base documental + commit doc + push.
+- Fase 6: lanzar **solo** `agent-db-rls` (worktree aislado). Fase 7: RLS runtime
+  local (previo 32/32 + nuevos tests auth). Fase 9: preservar en
+  `backup/wave4a-auth-db-local`. **NO** integrar ni merge a `main`. **NO** UI/
+  proxy/remoto.
+
+### Agentes activos al cierre
+- Ninguno (aún no se lanza `agent-db-rls`).
