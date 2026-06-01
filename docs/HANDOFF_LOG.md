@@ -1516,3 +1516,58 @@ Resultado global: PASS (exit code 0)
 
 ### Agentes activos al cierre
 - Ninguno (`agent-exports` finalizó; entregable preservado, no integrado).
+
+---
+
+## 2026-06-01 — Oleada 3C: integración formal de exports en integration/wave-3c
+
+### Estado
+- **Integración aprobada por el usuario.** `git merge --no-ff
+  backup/wave3c-exports` (`49daeb1`) sobre `integration/wave-3c` (`3063b45`) →
+  merge commit **`4b904db`**, **sin conflictos** (15 archivos, +2200). `main` NO
+  tocada.
+- **AVISO `origin/main`**: `git fetch` detectó que `origin/main` avanzó a
+  **`b09158f`** por un **PR de GitHub "Integration/wave 3c (#1)"** que el usuario
+  fusionó (= `integration/wave-3c`@`2621d3b`: B-005 + contrato + deps; **sin** el
+  código de exports). `main` **local** permanece en `82f9e86`; el orquestador no
+  tocó `main` ni trajo `b09158f`. A reconciliar en el futuro merge 3C → `main`.
+
+### Auditoría de la implementación integrada
+- 5 formatos: `xlsx-client`, `xlsx-internal` (exceljs), `pdf-client`,
+  `pdf-management` (@react-pdf/renderer), `csv-schedule`. 4 perfiles
+  (`client`/`site`/`management`/`internal` = `ViewerRole`).
+- `ExportService` recibe `ReadModelPort` inyectado; **0 acceso a tablas crudas**
+  (grep db/drizzle/postgres = 0); **0 recálculo financiero** (montos vienen de
+  DTOs proyectados; `Decimal` Q9 `ROUND_HALF_UP` solo presentación). Archivos en
+  memoria; filename sanitizado; content-type/disposition correctos; errores JSON
+  sin stack; límite de tamaño; **sin `.mpp`/XML MS Project**.
+
+### Validación (PASS)
+- typecheck/lint 0 · **410 tests** · build OK (`/api/exports`) · gm 22/22 ·
+  gm:import 9/9 · validador 214/0/0 · `git diff --check` limpio · Excel ignorado.
+- **Fase 5 — RLS runtime**: el merge **no tocó** `supabase/`/`schema.ts`/
+  `rls-runtime` ⇒ **RLS runtime 32/32 de 3B sigue vigente** (no se levantó Docker).
+- **Smoke 6/6 HTTP 200** (proyecto fixture `…010`): content-type + content-
+  disposition + filename sanitizado + bytes>0; PDF `%PDF`, XLSX `PK`(zip), CSV ok;
+  CSV cliente **sin** `external_reference` ni tokens internos; CSV internal con
+  columna autorizada. Negativos (mismatch / sin projectId / formato inválido
+  `mpp`) → **400** JSON sin stack. Servidor detenido tras el smoke.
+
+### Privacidad por perfil
+- Proyección server-side (ViewerContext.role = profile); cliente sin
+  descuentos/ahorros/margen/compra/proveedor/SKU/URL/sourceReference/
+  external_reference/holguras/ruta crítica/avance financiero; `xlsx-internal` solo
+  `internal`; `pdf-management` solo `management`. Verificado por tests + smoke.
+
+### Notas no bloqueantes
+- `scripts/export-fixtures/` no creado (se reutiliza el fixture del read-model).
+- `external_reference` queda vacío hasta extensión contractual del DTO.
+- Auth real/sesión pendiente (modo `db`). B-004 (Realtime Windows) deuda técnica.
+
+### Estado / próximo paso
+- Commit doc `docs: record wave 3c exports integration validation` + push
+  `origin integration/wave-3c`. **NO** merge a `main` (espera aprobación).
+- HEAD final `integration/wave-3c` tras docs: ver reporte.
+
+### Agentes activos al cierre
+- Ninguno.
