@@ -13,6 +13,7 @@ import {
   ClipboardList,
   LayoutDashboard,
   Hash,
+  CalendarRange,
 } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -45,6 +46,11 @@ const NAV_ITEMS = [
     href: '/quantities',
     label: 'Cantidades',
     icon: Hash,
+  },
+  {
+    href: '/planning',
+    label: 'Cronograma',
+    icon: CalendarRange,
   },
 ] as const;
 
