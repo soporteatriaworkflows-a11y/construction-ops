@@ -1468,3 +1468,51 @@ Resultado global: PASS (exit code 0)
 
 ### Agentes activos al cierre
 - Ninguno.
+
+---
+
+## 2026-06-01 — Oleada 3C: agent-exports completado y preservado (Fases 6–7)
+
+### Estado
+- **`agent-exports` lanzado** en worktree aislado (desde `integration/wave-3c`
+  `2621d3b`). Se interrumpió por límite de sesión tras implementar el módulo
+  (tipos, `format-cop`, `filename`, `profile-validator`, 5 generadores,
+  `ExportService`, `route.ts`) **sin tests, sin validar y sin commitear**.
+- **Continuación por el orquestador** (patrón establecido): recuperado el WIP del
+  worktree; **fix mínimo** en `route.ts` (body `Response`: `Uint8Array`→vista
+  `ArrayBuffer`); añadidos `apps/web/tests/unit/exports/` (**21 tests**).
+- **Preservado en `backup/wave3c-exports` (`49daeb1`, pusheado)**. Parent =
+  `2621d3b` (integrable después). **NO integrado** a `integration/wave-3c` ni
+  `main`.
+
+### Entregable
+- 5 formatos MVP: `xlsx-client`, `xlsx-internal` (exceljs), `pdf-client`,
+  `pdf-management` (@react-pdf/renderer), `csv-schedule`.
+- 4 perfiles (`client`/`site`/`management`/`internal` = `ViewerRole`); proyección
+  **server-side** (consume DTOs ya proyectados del read-model; **sin** tablas
+  crudas, **sin** recálculo financiero, dinero `DecimalString` + Q9).
+- `route.ts` GET `/api/exports`: validación perfil×formato, content-type,
+  filename sanitizado, errores tipados sin stack, generación en memoria, límite
+  de tamaño.
+
+### Validación (PASS)
+- typecheck/lint 0 · **410 tests** (389 + 21 exports) · build OK (`/api/exports`)
+  · gm 22/22 · gm:import 9/9 · `git diff --check` limpio.
+- **Smoke endpoints 6/6 HTTP 200** (xlsx-client/internal, pdf-client/management,
+  csv-schedule client/internal) con content-types y bytes correctos; negativos
+  (mismatch/sin projectId/formato inválido) → **400** JSON sin stack; CSV cliente
+  **sin fugas** ni columna `external_reference`.
+
+### Notas / deuda
+- `scripts/export-fixtures/` no creado (tests usan el read-model fixture vía
+  `getDemoViewer`).
+- `external_reference` queda vacío en el CSV: el DTO `ScheduleTaskView` canónico
+  no lo expone; futura extensión del contrato si se requiere su valor real.
+
+### Próximo paso
+- A la espera de aprobación del usuario para **integrar `backup/wave3c-exports`
+  → `integration/wave-3c`** (merge + validación) y luego, con aprobación,
+  `integration/wave-3c` → `main`. **NO** integrado aún.
+
+### Agentes activos al cierre
+- Ninguno (`agent-exports` finalizó; entregable preservado, no integrado).
