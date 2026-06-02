@@ -13,7 +13,7 @@
  */
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Lock, Mail } from 'lucide-react';
@@ -37,7 +37,7 @@ interface LoginState {
   loading: boolean;
 }
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -196,5 +196,29 @@ export default function LoginPage() {
         </div>
       </form>
     </AuthCard>
+  );
+}
+
+/**
+ * Export por defecto envuelto en Suspense.
+ * `useSearchParams()` requiere un límite de Suspense en Next 16 (CSR bailout).
+ * Ver: https://nextjs.org/docs/messages/missing-suspense-with-csr-bailout
+ */
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <AuthCard
+          title="Inicio de sesión"
+          description="Ingresa a tu cuenta de organización"
+        >
+          <p className="text-center text-sm text-gray-500" role="status">
+            Cargando…
+          </p>
+        </AuthCard>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }
