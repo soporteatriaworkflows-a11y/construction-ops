@@ -1670,3 +1670,46 @@ Resultado global: PASS (exit code 0)
 
 ### Agentes activos al cierre
 - Ninguno (aún no se lanza `agent-frontend-boq`).
+
+---
+
+## 2026-06-02 — Oleada 4A.2: recuperación tras apagado + preservación UI
+
+### Estado
+- Auditoría de recuperación tras apagado inesperado. **Escenario D**:
+  `agent-frontend-boq` ya había sido lanzado (worktree
+  `.claude/worktrees/agent-acc61fa6aec4fac2d`, base `0149655`) y dejó el
+  entregable de UI auth **completo pero sin commitear** (WIP del worktree).
+- Runtime SSR 4A.2 (`19246a5`) confirmado **íntegro** en
+  `integration/wave-4a-auth-runtime` (local = `origin`). `main` intacta
+  (`a6981f0`). Sin stash, sin conflictos.
+- **UI recuperada y preservada** (no se relanzó el agente):
+  `(auth)/login` (mock→supabase real), `(auth)/forgot-password`,
+  `(auth)/reset-password`, `(auth)/logout`, `(auth)/auth/callback` (PKCE +
+  anti open-redirect vía `sanitizeNext`), `components/auth/*`
+  (AuthCard, FormError, FormSuccess, helpers) y tests `tests/unit/auth-ui/*`.
+
+### Validación del entregado recuperado (PASS)
+- typecheck 0 · lint 0 · **452 tests PASS** (423 previos + 29 auth-ui).
+- **Build de producción**: 1er intento FALLÓ (`/login` usaba `useSearchParams()`
+  sin Suspense — CSR bailout Next 16). Aplicado fix mínimo (extraer `LoginForm`
+  + `<Suspense>`). 2º intento **build OK** (16/16 rutas; Proxy presente;
+  `READ_MODEL_SOURCE=fixture`).
+- Sin secretos, sin `.env.local` trackeado, sin privados/Excel real.
+
+### Acciones
+- Commit UI en rama del worktree: `90f571c`
+  `feat(frontend-boq): wave 4a.2 auth UI (login/forgot/reset/logout/callback)`.
+- Fix de build: `c9063ad`
+  `fix(frontend-boq): wrap login useSearchParams in Suspense (Next 16 build)`.
+- Preservado en `backup/wave4a-auth-ui` (`c9063ad`), publicado a `origin`.
+- **NO** se integró la UI al runtime. **NO** merge a `main`. **NO** remoto
+  Supabase. **NO** Vercel (`READ_MODEL_SOURCE=fixture` sin cambios).
+
+### Próximo paso
+- Integrar `backup/wave4a-auth-ui` → `integration/wave-4a-auth-runtime` (checklist
+  de merge: typecheck/lint/test/build/gm/validador) en sesión dedicada. Luego
+  evaluar reconciliación 4A → `main`. No iniciar Oleada 4B.
+
+### Agentes activos al cierre
+- Ninguno.
