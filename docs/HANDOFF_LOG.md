@@ -1,5 +1,46 @@
 # Handoff Log
 
+## 2026-06-02 — Cierre Oleada 4A: merge a `main` + tag
+
+### Estado
+- **Merge Oleada 4A a `main`**: `git merge --no-ff integration/wave-4a-auth-runtime`
+  (`cc61eec`) → merge **`de37d15`**, **sin conflictos** (44 archivos, +3185/-133).
+- Incluye: DB/RLS 4A.1 (migración `auth_identity_helpers` + seed `0004`,
+  identidad `auth.uid()`→`profiles`, single-org v1, sin tablas nuevas);
+  runtime SSR (`@supabase/ssr`, `getAll/setAll`, Proxy Next 16 con `getClaims()`
+  sin `getSession()`, viewer real, role-map, anti open-redirect); UI auth
+  (`(auth)/*` + `components/auth/*` + fix Suspense `/login`); guard `/api/exports`.
+
+### Validación post-merge (PASS en `main`)
+- typecheck/lint 0 · **452 tests** · build (Proxy + rutas auth + `/api/exports`)
+  · gm 22/22 · gm:import 9/9 · validador 214/0/0 · diff limpio.
+- **RLS runtime 47/47** (14 migraciones + 4 seeds limpios; Supabase local Docker;
+  detenido al cierre). **Smoke demo 6/6 HTTP 200** (`/`→`/dashboard`,
+  dashboard/projects/planning/login, `/api/exports` PDF; sin 500).
+- Sin secretos; `.env.local` ignorado; sin privados; Excel real ignorado.
+
+### Tag y push
+- Tag anotado **`wave-4a-auth-local-v1`** ("Wave 4A validated: Supabase Auth SSR
+  proxy UI and local RLS identity"). `git push origin main` + push del tag.
+- Commit docs `docs: record wave 4a auth merge validation`.
+
+### Configuración de producción (Vercel) — sin cambios desde el repo
+- **Vercel debe permanecer `APP_AUTH_MODE=demo` + `READ_MODEL_SOURCE=fixture`**
+  (configurado manualmente por la usuaria). Supabase remoto **NO conectado**;
+  sin `link`/`db push`/deploy. Demo pública sanitizada preservada.
+
+### Próximo paso (sin lanzar)
+- **Oleada 4A.3 — Supabase remoto controlado + login online** (microfase manual
+  de la usuaria: crear proyecto remoto, aplicar migraciones, vars Vercel
+  `APP_AUTH_MODE=supabase` manteniendo `READ_MODEL_SOURCE=fixture`, verificar
+  login online; luego evaluar `READ_MODEL_SOURCE=db`; rollback a demo+fixture).
+- **Oleada 4B NO iniciada.** B-004 (Realtime Windows) deuda no bloqueante.
+
+### Agentes activos al cierre
+- Ninguno.
+
+---
+
 ## 2026-06-02 — Oleada 4A.2: integración UI auth + smoke local end-to-end
 
 ### Estado
