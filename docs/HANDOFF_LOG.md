@@ -1,5 +1,40 @@
 # Handoff Log
 
+## 2026-06-02 — Oleada 4A.3b: merge PG17 a `main` + bootstrap real del esquema remoto
+
+### Estado
+- **Merge de paridad PG17 a `main`**: `git merge --no-ff integration/wave-4a3-remote-bootstrap`
+  → merge commit **`139dd52`**, sin conflictos (4 archivos: `config.toml` + 3 docs).
+  `main = origin/main = 139dd52`. Tag **`wave-4a3-pg17-bootstrap-ready-v1`** (pre-bootstrap).
+- **Bootstrap real del esquema remoto**: `supabase db push --linked` (una sola vez,
+  **sin `--include-seed`**) sobre `construction-ops-prod` (ref `jab…pdii`). Aplicó las
+  **14 migraciones** en orden; "Finished supabase db push." Único aviso: `NOTICE`
+  `pgcrypto already exists` (benigno). El prompt `[Y/n]` se auto-confirmó en entorno no-TTY.
+
+### Validación
+- **Post-merge local** (`main`): `config.toml` `major_version = 17`; typecheck/lint 0,
+  **452 tests**, build (rutas auth + `/api/exports` + Proxy), gm:regression 22/22,
+  gm:import PASS, validate-agents 214/0/0, `git diff --check` limpio.
+- **Pre-flight remoto**: 14 pendientes, Remote en blanco, orden correcto.
+- **Post-push**: `migration list --linked` ⇒ **14/14 Local = Remote**, ninguna pendiente.
+  Git tree limpio (solo memoria del orquestador).
+
+### Restricciones respetadas
+- **Seeds NO ejecutados** (sin `--include-seed`); **usuarios NO creados**; sin SQL/Table
+  Editor; sin `db pull`/`migration repair`; sin Database Password en comando/logs/docs;
+  sin `--password`/`SUPABASE_DB_PASSWORD`; **Vercel intacto** (`APP_AUTH_MODE=demo` +
+  `READ_MODEL_SOURCE=fixture`). Sin force-push/reset/rebase. **4B NO iniciada.**
+
+### Rollback / estado funcional
+- Remoto: **esquema presente (14 migraciones), SIN datos funcionales** (sin org/usuarios reales).
+- Mantener Vercel en `demo` + `fixture` hasta crear admin/login online (4A.3c).
+- Si fallara un bootstrap futuro antes de datos reales: evaluar corrección puntual o
+  **recrear proyecto remoto vacío**; **NO** usar `migration repair` automáticamente.
+
+### Próximo paso (pendiente de autorización)
+- **Oleada 4A.3c**: crear organización + usuario admin inicial seguro y conectar login
+  online manteniendo `READ_MODEL_SOURCE=fixture`.
+
 ## 2026-06-02 — Oleada 4A.3 + 4A.3a: vínculo remoto controlado + paridad PG17 + dry-run
 
 ### Estado

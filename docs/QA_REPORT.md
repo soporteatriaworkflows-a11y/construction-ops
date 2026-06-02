@@ -9,6 +9,25 @@ cada ciclo de validación.
 
 ---
 
+## Oleada 4A.3b — bootstrap real del esquema remoto (2026-06-02)
+
+> Merge de paridad PG17 a `main` (`139dd52`) + `supabase db push --linked` (una vez,
+> sin seeds) sobre `construction-ops-prod`.
+
+- **Post-merge `main`** ✅: `config.toml` `major_version = 17`; typecheck/lint 0,
+  **452 tests**, build, gm:regression 22/22, gm:import PASS, validate-agents 214/0/0,
+  `git diff --check` limpio. Tag `wave-4a3-pg17-bootstrap-ready-v1`.
+- **Push real** `db push --linked` ✅: 14 migraciones aplicadas en orden (único aviso
+  `NOTICE pgcrypto already exists`, benigno). "Finished supabase db push."
+- **Post-push** `migration list --linked` ✅: **14/14 Local = Remote**, ninguna pendiente.
+- **Seeds NO ejecutados** · **usuarios NO creados** · sin SQL/`migration repair` ·
+  **Vercel intacto** (`demo`+`fixture`). Tag `wave-4a3-remote-schema-bootstrap-v1`.
+- **Estado remoto**: esquema presente, **sin datos funcionales** (sin org/usuarios reales).
+
+**Resultado microfase**: ✅ PASS. Esquema remoto listo; pendiente 4A.3c (org + admin + login online).
+
+---
+
 ## Oleada 4A.3a — paridad local Postgres 17 + dry-run remoto (2026-06-02)
 
 > Microfase de bootstrap remoto en `integration/wave-4a3-remote-bootstrap`. Solo
