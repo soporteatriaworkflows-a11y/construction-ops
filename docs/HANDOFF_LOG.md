@@ -1,5 +1,48 @@
 # Handoff Log
 
+## 2026-06-02 — Oleada 4A.2: integración UI auth + smoke local end-to-end
+
+### Estado
+- **UI auth integrada** en `integration/wave-4a-auth-runtime`:
+  `git merge --no-ff backup/wave4a-auth-ui` (`c9063ad`) → merge **`5c60339`**,
+  **sin conflictos** (11 archivos, +1106; HANDOFF_LOG 3-way → versión runtime).
+- Auditoría de runtime SSR + UI conforme a `AUTH_RUNTIME_CONTRACT`: browser
+  client publishable-only; server client `getAll/setAll`; Proxy Next 16 con
+  `getClaims()` (no `getSession()`), deny-by-default y `sanitizeNext`; viewer
+  real sesión→`profiles` (org/rol server-side, mapeo único); `/api/exports`
+  con anti-escalamiento `isSameOrLessPrivileged`.
+
+### Validación post-merge (PASS)
+- typecheck/lint 0 · **452 tests** (+29 auth-ui) · build (Proxy + `(auth)/*` +
+  `/api/exports`) · gm 22/22 · gm:import 9/9 · validador 214/0/0 · diff limpio.
+- Excel ignorado; sin `.env`/`.env.local`/lock/privados/secretos.
+
+### Smoke local (Supabase local Docker, sin remoto)
+- `supabase start -x realtime,studio,storage-api,imgproxy,edge-runtime,logflare,
+  vector` + `db reset` (**14 migr + 4 seeds**) + **RLS runtime 47/47**.
+- `.env.local` (ignorado): `APP_AUTH_MODE=supabase`, `READ_MODEL_SOURCE=fixture`,
+  URL/publishable local. Usuarios seed con contraseña **efímera local** (no en repo).
+- 13 pasos PASS: `/login` 200; deny sin sesión (`/login?next=…`); credenciales
+  inválidas→error legible; login admin→sesión; `/dashboard` auth 200; `/login`
+  auth→`/dashboard`; `/api/exports` sin sesión bloqueado; **escalamiento
+  client→internal/management 403**, propio 200; export 200 (PDF); logout→cookie
+  borrada; forgot→recover 200 + **Mailpit**; callback sin code→`/login?error`;
+  **demo** `/dashboard` 200 sin Supabase.
+- `supabase stop` al cierre; helper temporal `_smoke-login.mjs` eliminado.
+
+### Decisiones / próximo paso
+- Documentado en DECISIONS (4 filas 4A.2), QA_REPORT (sección 4A.2),
+  INTEGRATION_REQUESTS (frontend-boq ✅), AUTH_RUNTIME_CONTRACT §11.
+- Commit docs `docs: record wave 4a2 auth runtime ui integration and local smoke`
+  + push `origin integration/wave-4a-auth-runtime`. **NO** merge a `main`.
+- **Recomendado:** aprobar merge acumulado Oleada 4A → `main` (decisión usuario).
+  No iniciar Oleada 4B. Supabase remoto no conectado; Vercel intacto (demo fixture).
+
+### Agentes activos al cierre
+- Ninguno.
+
+---
+
 ## 2026-05-29 — Sesión inicial
 - Estado: repositorio creado, estructura de carpetas inicializada
 - Decisión tomada: Drizzle ORM

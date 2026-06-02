@@ -146,3 +146,29 @@ no `/\`, sin esquema/host). Cualquier otro valor ⇒ se ignora (→ `/dashboard`
 
 Supabase remoto, `supabase link`/`db push`, deploy, Vercel, `READ_MODEL_SOURCE=db`
 en runtime de la app (default `fixture`), multi-org, creación de proyectos (4B).
+
+---
+
+## 11. Estado de integración (2026-06-02)
+
+**UI auth integrada** en `integration/wave-4a-auth-runtime` (merge `--no-ff`
+`5c60339`, sin conflictos). UI propiedad de `agent-frontend-boq`:
+`app/(auth)/{login,forgot-password,reset-password,logout,auth/callback}`,
+`components/auth/*`, `tests/unit/auth-ui/*`. `/login` envuelve
+`useSearchParams` en `<Suspense>` (requisito de build Next 16).
+
+**Smoke local validado** (Supabase local Docker, sin remoto):
+- `db reset` 14 migraciones + 4 seeds; **RLS runtime 47/47**.
+- Proxy: público `/login` 200; protegido sin sesión → `/login?next=…`;
+  `/` sin sesión → `/login`; con sesión `/login`/`/` → `/dashboard`.
+- Viewer real: login `signInWithPassword` (browser) → cookies SSR
+  (`sb-127-auth-token`) → `getClaims()` server-side; deny sin sesión/membresía.
+- `/api/exports`: sin sesión bloqueado por Proxy; **anti-escalamiento**
+  client→internal/management = `403`; perfil propio = `200` (PDF válido).
+- Logout limpia cookie y redirige a `/login`.
+- Forgot-password: `recover` 200 + correo en Mailpit (`http://127.0.0.1:54324`);
+  mensaje UI neutral (no revela existencia del correo).
+- **Modo demo** (`APP_AUTH_MODE=demo`, fixture): `/dashboard` 200 sin Supabase
+  (demo pública preservada).
+
+Pendiente: aprobación del usuario para el merge acumulado de Oleada 4A → `main`.

@@ -343,3 +343,58 @@ AGPL. **B-004** (Realtime) deuda técnica no bloqueante.
 
 **Recomendación:** ✅ **APROBAR merge `integration/wave-3b` → `main`** (queda a
 decisión del usuario; este ciclo NO hace merge).
+
+---
+
+## Validación de integración — Oleada 4A.2 (auth runtime + UI) — 2026-06-02
+
+> Validación de integración por el orquestador en
+> `integration/wave-4a-auth-runtime` (pre-merge). QA integral formal = Oleada 4.
+
+**Merge:** `git merge --no-ff backup/wave4a-auth-ui` → `5c60339`, **sin
+conflictos** (11 archivos, +1106). Runtime SSR (`19246a5`) + UI auth integrados.
+
+**Auditoría de implementación (contrato `AUTH_RUNTIME_CONTRACT`):**
+- Browser client `createBrowserClient` solo con clave **publishable** (0 secretos).
+- Server client `createServerClient` con cookies SSR `getAll()`/`setAll()` (sin
+  adaptadores legacy `get/set/remove`).
+- Proxy Next 16 (`proxy.ts`): refresh + **`getClaims()`** como guard (NUNCA
+  `getSession()`); rutas públicas/protegidas; deny-by-default; `sanitizeNext`
+  (anti open-redirect: `//`, `/\`, esquemas, control chars).
+- Viewer real: sesión→`profiles` por `auth.uid()`; `organizationId`/rol
+  server-side; mapeo único `role-map.ts`; deny sin sesión/membresía/rol; **org
+  y rol nunca desde el navegador**.
+- `/api/exports`: modo supabase exige viewer; **anti-escalamiento** vía
+  `isSameOrLessPrivileged` (perfil ≤ ViewerRole).
+
+**Resultados (todo PASS):** typecheck 0 · lint 0 · **452 tests** (+29 auth-ui) ·
+build Next 16.2.6 (Proxy + `(auth)/*` + `/api/exports`) · `gm:regression`
+**22/22** · `gm:import` **9/9** · `validate-claude-agents` **214/0/0** ·
+`git diff --check` limpio.
+
+**Smoke local (Supabase local Docker, sin remoto):**
+- `supabase start` (sin realtime/studio/storage/imgproxy/edge/logflare/vector) +
+  `db reset` (**14 migraciones + 4 seeds** limpios) + **RLS runtime 47/47**.
+- 1) `/login` 200. 2) `/dashboard` sin sesión → `/login?next=/dashboard`.
+  3) credenciales inválidas → "Invalid login credentials" (mapeado a mensaje
+  legible, sin stack). 4) login admin → sesión + cookies SSR. 5) `/dashboard`
+  auth → 200. 6) `/login` auth → `/dashboard`. 7) `/api/exports` sin sesión →
+  bloqueado por Proxy (307 `/login`). 8) escalamiento client→internal **403**,
+  client→management **403**, client→client **200**. 9) export autorizado **200**
+  (PDF `%PDF`, `Content-Disposition: attachment`, `X-Export-Profile: client`).
+  10) logout → cookie `Max-Age=0` + `/login`. 11) forgot → `recover` 200 +
+  **Mailpit** "Reset Your Password". 12) `/reset-password` 200, callback sin code
+  → `/login?error`. 13) **demo** (`APP_AUTH_MODE=demo`) → `/dashboard` 200 sin
+  Supabase, `/api/exports` 200.
+
+**Privacidad/seguridad:** sin `service_role` en frontend; `.env.local` **ignorado**
+(no trackeado); contraseñas de prueba **efímeras locales** (no en repo/docs);
+Excel privado ignorado; sin `.env`/lock/privados; sin AGPL/enterprise.
+
+**Deudas no bloqueantes:** B-004 (Realtime en Docker/Windows). Nota: `/api/exports`
+sin sesión responde **307→/login** (Proxy lo intercepta antes del handler `401`);
+deny equivalente — el 401 del handler aplica si se invoca fuera del matcher.
+
+**Recomendación:** ✅ **APROBAR merge acumulado de Oleada 4A
+(`integration/wave-4a-auth-runtime`) → `main`** (queda a decisión del usuario;
+este ciclo NO hace merge). Sin remoto; Vercel en demo fixture intacto.
