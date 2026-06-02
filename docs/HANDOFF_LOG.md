@@ -1,5 +1,30 @@
 # Handoff Log
 
+## 2026-06-02 — Oleada 4A.3 + 4A.3a: vínculo remoto controlado + paridad PG17 + dry-run
+
+### Estado
+- **4A.3 (read-only)**: Supabase CLI **2.102.0** autenticada por la usuaria (TTY)
+  y `supabase link --project-ref jabddbccmhrxztfzpdii` → `Finished supabase link.`
+  Proyecto remoto `construction-ops-prod` (org `oxexzrzkzksgwjaihnjf`, West US Oregon).
+  Auditoría read-only: **remoto vacío** (`migration list --linked`: 14 locales con
+  columna Remote en blanco); `supabase/.temp/` ignorado (`.gitignore:24`).
+  Detectado mismatch: remoto **PG 17.6.1** vs `config.toml` `major_version = 15`.
+- **4A.3a (esta sesión)** sobre rama **`integration/wave-4a3-remote-bootstrap`**
+  (desde `main` `d3617c3`; `main` intacta): paridad local a PG17, revalidación
+  local completa y **`db push --dry-run --linked`** (sin push real).
+
+### Cambios
+- `supabase/config.toml`: `major_version` **15 → 17** (local, reversible).
+- Docs: `DECISIONS.md` (4A.3 + 4A.3a), `HANDOFF_LOG.md`, `QA_REPORT.md`.
+
+### Restricciones respetadas
+- Sin `db push` real, sin `--include-seed`, sin `db pull`/`migration repair`,
+  sin SQL/seeds/usuarios remotos, sin tocar Vercel ni variables de entorno,
+  sin secretos, sin Database Password en comandos/logs/docs. Vercel permanece
+  `APP_AUTH_MODE=demo` + `READ_MODEL_SOURCE=fixture`. **4B NO iniciada.**
+
+<!-- RESULTADOS_4A3A: completar tras Fases 3-7 (start PG17 / db reset / RLS / tc-lint-test-build-gm / push rama / dry-run) -->
+
 ## 2026-06-02 — Cierre Oleada 4A: merge a `main` + tag
 
 ### Estado

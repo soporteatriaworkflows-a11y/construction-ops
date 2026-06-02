@@ -9,6 +9,26 @@ cada ciclo de validación.
 
 ---
 
+## Oleada 4A.3a — paridad local Postgres 17 + dry-run remoto (2026-06-02)
+
+> Microfase de bootstrap remoto en `integration/wave-4a3-remote-bootstrap`. Solo
+> alineación local + `db push --dry-run` (sin push real). Validación read-only.
+
+- **Contexto**: remoto `construction-ops-prod` vinculado y **vacío** (0 migraciones).
+  Mismatch resuelto en local: `config.toml` `major_version` 15 → **17** (paridad con
+  remoto PG 17.6.1).
+- **Revalidación local en PG17** (pendiente de ejecutar en esta sesión): `supabase start`
+  (major 17) + `db reset` (14 migraciones + 4 seeds) + **RLS runtime 47/47**.
+- **Validación general** (pendiente): typecheck/lint 0, ≥452 tests, build, gm 22/22,
+  gm:import 9/9, validate-agents 214/0/0.
+- **Dry-run** `db push --dry-run --linked`: debe listar **14 migraciones** en orden,
+  **sin seeds**, **sin** aplicar cambios; remoto continúa con 0 migraciones.
+- **Sin** cambios remotos · **Vercel intacto** (`demo` + `fixture`).
+
+<!-- RESULTADOS_4A3A: completar con cifras reales tras ejecutar Fases 3-7 -->
+
+---
+
 ## Última auditoría
 
 - **Fecha**: 2026-05-30
