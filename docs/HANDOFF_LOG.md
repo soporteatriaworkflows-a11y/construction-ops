@@ -23,7 +23,24 @@
   sin secretos, sin Database Password en comandos/logs/docs. Vercel permanece
   `APP_AUTH_MODE=demo` + `READ_MODEL_SOURCE=fixture`. **4B NO iniciada.**
 
-<!-- RESULTADOS_4A3A: completar tras Fases 3-7 (start PG17 / db reset / RLS / tc-lint-test-build-gm / push rama / dry-run) -->
+### Resultados (PASS)
+- **PG17 local**: volumen PG15 incompatible → `supabase stop --no-backup` (descarte
+  local) + `supabase start` ⇒ `server_version 17.6`. `db reset`: 14 migraciones +
+  4 seeds limpios. **RLS runtime 47/47** (org A/B aisladas, sin sesión/sin membresía
+  bloqueados, cross-org bloqueado, compat demo). Stack detenido al cierre.
+- **Validación general**: typecheck/lint 0, **452 tests** (32 archivos), build
+  (rutas auth + `/api/exports` + Proxy), gm:regression **22/22**, gm:import PASS,
+  validate-agents **214/0/0**, `git diff --check` limpio.
+- **Commit paridad**: `8a76a75` `chore(supabase): align local postgres major
+  version with remote pg17` (4 archivos: config.toml + 3 docs); rama pusheada.
+- **`db push --dry-run --linked`**: lista exactamente **14 migraciones** en orden
+  cronológico, **sin seeds**, sin aplicar. `migration list --linked` post-dry-run:
+  **remoto sigue con 0 migraciones** (columna Remote en blanco).
+- **Sin push real**, sin SQL/seeds/usuarios remotos, **Vercel intacto**.
+
+### Próximo paso
+- Pendiente de autorización explícita: **push real** `supabase db push --linked`
+  (sin `--include-seed`) en sesión posterior, con backup/rollback definido.
 
 ## 2026-06-02 — Cierre Oleada 4A: merge a `main` + tag
 
