@@ -316,6 +316,53 @@ implementar `.mpp` ni XML MS Project.
 - Excel válido (reapertura programática); PDF válido; CSV correcto.
 - gm:regression 22/22 + gm:import 9/9 intactos (cero recálculo financiero).
 
+### Ownership congelado — Oleada 4A.1 (auth/RLS local — DB)
+
+Contrato: `docs/AUTH_CONTRACT.md` (v1). Ejecución **secuencial** (único agente
+de la microfase: `agent-db-rls`). Sin solape con otros agentes.
+
+**agent-db-rls (4A.1)** — ownership exclusivo:
+- `supabase/migrations/` (cambios **mínimos**: helpers de identidad real; sin
+  duplicar `profiles`/`organizations`).
+- `supabase/policies/` y políticas RLS dentro de migraciones.
+- `supabase/seeds/` (seeds locales sanitizados con `auth.users` + `profiles`).
+- `apps/web/lib/db/schema.ts` (solo si requiere ajustes mínimos de membresía).
+- `scripts/rls-runtime/` (harness + nuevos tests auth runtime).
+- Documentación de handoff permitida.
+
+Responsabilidad: **reutilizar** `profiles` como membresía single-org (NO crear
+tablas equivalentes); helpers SQL que resuelvan identidad real
+(`auth.uid()`→`profiles`) manteniendo compatibilidad con el harness demo (claims
+JWT); rol autorizado (mapeo del AUTH_CONTRACT); **RLS runtime obligatorio**
+(previo **32/32** + nuevos tests: autenticado con org, sin sesión→deny, sin
+membresía→deny, org A/B aislada, cross-org→deny, rol válido vs insuficiente,
+deny-by-default); seeds sanitizados; cero remoto.
+
+**NO tocar**: UI, `apps/web/proxy.ts`, páginas, exports, planning, pricing,
+cost-domain, read-model frontend, Vercel, remoto. **No** instalar dependencias
+(las aprueba el orquestador). **No** `supabase link`/`db push`. **No**
+`service_role` en frontend. **No** secretos en repo. **No** multi-org. **No**
+modificar contratos congelados (cambios vía INTEGRATION_REQUESTS).
+
+### Ownership congelado — Oleada 4A.2 (runtime SSR + UI auth)
+
+Contrato: `docs/AUTH_RUNTIME_CONTRACT.md` (v1). Ejecución **secuencial**.
+
+**Runtime SSR (orquestador)** — `apps/web/lib/supabase/`,
+`apps/web/server/auth/`, `apps/web/proxy.ts`, ajustes mínimos en
+`apps/web/app/page.tsx`, `apps/web/server/read-model/` (selector de viewer),
+`apps/web/app/api/exports/route.ts` (guard + anti-escalamiento). Patrón
+`@supabase/ssr` (`getAll`/`setAll`; `getClaims()` como guard; **no**
+`getSession()` server-side; **no** `auth-helpers-nextjs`). Sin remoto/Vercel.
+
+**agent-frontend-boq (4A.2)** — ownership exclusivo UI:
+- `apps/web/app/(auth)/` (login/logout/forgot/reset/callback + `actions.ts`).
+- `apps/web/components/auth/`.
+- `apps/web/tests/unit/auth-ui/`.
+**NO tocar**: DB, migraciones, seeds, RLS, `proxy.ts`, `apps/web/server/auth/`,
+read-model, exports, planning, pricing, cost-domain, Vercel, remoto. **No**
+instalar librerías nuevas. **No** `service_role` en frontend. **No** secretos.
+
 ### agent-qa (Oleada 4)
 - `docs/QA_REPORT.md` con resultado completo.
 - Sin FAIL bloqueante para release.

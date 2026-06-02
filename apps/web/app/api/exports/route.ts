@@ -29,6 +29,8 @@ import {
 } from '@/modules/exports/types';
 import type { ExportFormat, ExportProfile } from '@/modules/exports/types';
 import { FORMAT_PROFILE_COMPAT, FORMAT_CONTENT_TYPE } from '@/modules/exports/types';
+import { resolveAuthMode } from '@/lib/supabase/env';
+import { resolveAuthenticatedViewer, isSameOrLessPrivileged } from '@/server/auth';
 
 const VALID_FORMATS = Object.keys(FORMAT_PROFILE_COMPAT) as ExportFormat[];
 const VALID_PROFILES = ['client', 'site', 'management', 'internal'] as ExportProfile[];
@@ -70,13 +72,31 @@ export async function GET(request: NextRequest): Promise<Response> {
     return errorResponse(400, 'Parámetro "projectId" requerido.');
   }
 
+  // --- Guard de autenticación (AUTH_RUNTIME_CONTRACT §8) ---
+  // Modo demo: fixture sanitizado, sin sesión. Modo supabase: exige viewer
+  // autenticado y NO permite escalamiento de perfil por query param.
+  const mode = resolveAuthMode();
+  let requestedBy = '00000000-0000-4000-8000-000000000000';
+  if (mode === 'supabase') {
+    let viewer;
+    try {
+      viewer = await resolveAuthenticatedViewer();
+    } catch {
+      return errorResponse(401, 'Sesión requerida.');
+    }
+    // Anti-escalamiento: el perfil solicitado debe ser igual o menos
+    // privilegiado que el ViewerRole autenticado (deny-by-default).
+    if (!isSameOrLessPrivileged(profile, viewer.role)) {
+      return errorResponse(403, 'Perfil no autorizado para la sesión actual.');
+    }
+    requestedBy = viewer.userId;
+  }
+
   // Construir el servicio de exportación
   const readModel = getReadModel({ env: process.env });
   const exportService = createExportService(readModel);
 
   const requestedAt = new Date().toISOString();
-  // En producción, requestedBy vendría de la sesión auth. Demo: UUID fijo.
-  const requestedBy = '00000000-0000-4000-8000-000000000000';
 
   try {
     const result = await exportService.generate({
