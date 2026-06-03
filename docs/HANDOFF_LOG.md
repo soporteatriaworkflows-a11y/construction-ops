@@ -1,5 +1,42 @@
 # Handoff Log
 
+## 2026-06-02 — CIERRE Oleada 4B.1: merge a `main` + migración remota de proyectos
+
+### Estado
+- `git merge --no-ff integration/wave-4b1-real-projects` (`1f5f908`) → merge **`10ac567`**,
+  **sin conflictos** (27 archivos, +2549/-26). `main = origin/main = 10ac567`.
+- Tags: **`wave-4b1-projects-code-ready-v1`** (pre-migración) y
+  **`wave-4b1-projects-remote-ready-v1`** (post-migración + docs).
+
+### Validación post-merge (todo PASS en `main`)
+- typecheck/lint 0, **505 tests**, build OK (`/projects` ƒ, `/projects/[id]` ƒ,
+  `/projects/new`), gm:regression **22/22**, gm:import PASS, validate-agents **214/0/0**,
+  `git diff --check` limpio. Migración `20260602120000_projects_authorship.sql` presente.
+
+### Migración remota aplicada (controlada)
+- `db push --dry-run --linked` ⇒ **exactamente 1** migración pendiente
+  (`20260602120000_projects_authorship.sql`), **0 seeds**, sin diferencias inesperadas.
+- `db push --linked` (SIN `--include-seed`) ⇒ "Applying migration … Finished".
+- `migration list --linked` ⇒ **15/15 Local = Remote**, ninguna pendiente.
+- **Seeds NO ejecutados** · **proyectos remotos NO creados** · sin SQL manual · sin
+  `migration repair` · sin service-role.
+
+### Estado remoto
+- Esquema **15/15** (14 previas + `projects_authorship`: `description`+`created_by`).
+  Org `GRUPO ICONIC` + 1 profile admin. **Sin proyectos reales aún.**
+
+### Vercel (sin cambios — debe mantenerse)
+- `APP_AUTH_MODE=supabase` + `READ_MODEL_SOURCE=fixture`. El cambio a `db` es **acción
+  manual pendiente de la usuaria**.
+
+### Próximo paso manual (de la usuaria, fuera de este entorno)
+- Cambiar **solo** `READ_MODEL_SOURCE` de `fixture` → `db` en Vercel, redeploy, y crear
+  el **primer proyecto real** desde la interfaz (smoke remoto controlado).
+- **Rollback**: volver a `READ_MODEL_SOURCE=fixture` + redeploy.
+
+### Restricciones
+- Sin tocar Vercel/variables; sin `db pull`/`migration repair`; **4B.2 / 4C NO iniciadas.**
+
 ## 2026-06-02 — Oleada 4B.1 (Fases 2–5): vertical slice real de proyectos (validado, NO mergeado)
 
 ### Estado

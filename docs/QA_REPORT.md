@@ -9,6 +9,24 @@ cada ciclo de validación.
 
 ---
 
+## CIERRE Oleada 4B.1 — merge a `main` + migración remota de proyectos (2026-06-02)
+
+> `main = origin/main = 10ac567` (merge `--no-ff` de `1f5f908`, sin conflictos).
+> Tags `wave-4b1-projects-code-ready-v1` y `wave-4b1-projects-remote-ready-v1`.
+
+- **Post-merge `main`** ✅: typecheck/lint 0, **505 tests**, build OK, gm:regression
+  **22/22**, gm:import PASS, validate-agents **214/0/0**, `git diff --check` limpio.
+- **Dry-run remoto** ✅: exactamente **1** migración pendiente
+  (`20260602120000_projects_authorship.sql`), **0 seeds**, sin diferencias inesperadas.
+- **Push real** `db push --linked` (sin `--include-seed`) ✅: migración aplicada.
+- **`migration list --linked`** ✅: **15/15 Local = Remote**, ninguna pendiente.
+- **Seeds NO ejecutados** · **proyectos remotos NO creados** · sin SQL manual · sin
+  `migration repair` · sin service-role · **Vercel intacto** (`supabase`+`fixture`).
+- **Pendiente (manual, usuaria)**: cambiar `READ_MODEL_SOURCE` `fixture`→`db` + redeploy +
+  crear primer proyecto real (smoke remoto). Rollback = `fixture` + redeploy.
+
+---
+
 ## Oleada 4B.1 — vertical slice real de proyectos (validación local) (2026-06-02)
 
 > Rama `integration/wave-4b1-real-projects` (`2397323`). **NO** mergeado a `main`.

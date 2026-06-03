@@ -1,8 +1,10 @@
 # PROJECTS_CRUD_CONTRACT — Oleada 4B.1 (vertical slice real de proyectos)
 
-> **Estado:** CONGELADO v1 (2026-06-02) — **IMPLEMENTADO y validado** en
-> `integration/wave-4b1-real-projects` (`2397323`): RLS runtime 58/58, 505 tests,
-> build OK. NO mergeado a `main` (pendiente smoke interactivo `db` + autorización).
+> **Estado:** CONGELADO v1 (2026-06-02) — **IMPLEMENTADO, validado y MERGEADO a `main`**
+> (`10ac567`; tags `wave-4b1-projects-code-ready-v1` / `wave-4b1-projects-remote-ready-v1`).
+> RLS runtime 58/58, 505 tests, build OK. Migración `projects_authorship` aplicada al
+> remoto (**15/15 Local = Remote**, sin seeds). **Vercel sigue `supabase`+`fixture`**;
+> activar `READ_MODEL_SOURCE=db` + smoke remoto es acción manual pendiente de la usuaria.
 > Propiedad del contrato: `agent-orchestrator`.
 > Implementan: `agent-db-rls` (esquema + repositorio de escritura + RLS) y
 > `agent-frontend-boq` (server action + UI). Cambios al contrato pasan por
