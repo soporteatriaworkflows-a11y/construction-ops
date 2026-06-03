@@ -17,6 +17,18 @@ import { Button } from '@/components/ui/button';
 import { isCreationModeEnabled } from '../mode-guard';
 import { NewProjectForm } from './new-project-form';
 
+/**
+ * Render en REQUEST-TIME (no prerender estático).
+ *
+ * El mode-guard depende de `APP_AUTH_MODE`/`READ_MODEL_SOURCE`, que son variables
+ * de entorno de SERVIDOR resueltas en runtime. Sin esta directiva, Next genera
+ * `/projects/new` de forma estática en build (esta página no usa `cookies()`/
+ * `headers()`), horneando el resultado del guard con los defaults de build
+ * (`demo`+`fixture`) ⇒ siempre mostraba "Modo demostración activo" aunque en
+ * producción `READ_MODEL_SOURCE=db`. `force-dynamic` evalúa el guard por petición.
+ */
+export const dynamic = 'force-dynamic';
+
 export default function NewProjectPage() {
   const canCreate = isCreationModeEnabled();
 

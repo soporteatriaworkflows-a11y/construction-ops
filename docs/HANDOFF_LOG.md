@@ -1,5 +1,43 @@
 # Handoff Log
 
+## 2026-06-03 — Fix 4B.1: bloqueo incorrecto de `/projects/new` (prerender estático del mode-guard)
+
+### Estado
+- Rama **`fix/wave4b1-project-creation-mode-guard`** desde `main`@`ef995b9` (`main` intacta).
+  Producción en `supabase`+`fixture` (rollback de la usuaria) mientras se investiga.
+
+### Diagnóstico (causa raíz)
+- En modo `db`, `/projects` y `/projects/[id]` funcionaban, pero `/projects/new` mostraba
+  "Modo demostración activo." pese a `READ_MODEL_SOURCE=db` en Vercel. Causa: `/projects/new`
+  es un Server Component **sin APIs dinámicas** (no usa `cookies()`/`headers()`), así que
+  Next lo **prerenderizó estáticamente en build** (build output: `○ /projects/new` vs
+  `ƒ /projects`). `isCreationModeEnabled()` lee `APP_AUTH_MODE`/`READ_MODEL_SOURCE`
+  (env de servidor) en **build-time**, donde los defaults son `demo`+`fixture` ⇒ el guard
+  quedó horneado en `false`. En runtime se servía el HTML estático sin re-evaluar.
+- La **server action** `createProjectAction` SÍ guarda en request-time (correcto); el bug
+  era solo del render de la página.
+
+### Fix (mínimo)
+- `apps/web/app/(dashboard)/projects/new/page.tsx`: `export const dynamic = 'force-dynamic'`
+  ⇒ render request-time; el guard se evalúa por petición con el env de runtime. Build
+  ahora muestra **`ƒ /projects/new`**. Sin cambios de UI/seguridad: el requisito sigue
+  siendo `supabase`+`db`; la action conserva su guard.
+- Test de regresión `apps/web/tests/unit/projects/route-config.test.ts` (la página declara
+  `force-dynamic`). La matriz del guard y el guard de la action ya estaban cubiertos en
+  `action.test.ts`.
+
+### Validación (local)
+- typecheck/lint 0, **507 tests** (+2), build OK (`/projects/new` ahora `ƒ`),
+  gm:regression 22/22, gm:import PASS, validate-agents 214/0/0, `git diff --check` limpio.
+
+### Restricciones
+- Sin tocar Vercel/variables; sin DB/RLS/remoto; sin escritura remota; sin service-role.
+  **NO merge a `main`. 4B.2/4C NO iniciadas.**
+
+### Próximo paso (pendiente de autorización)
+- Revisar reporte → si OK: merge a `main` (solo código; **no** requiere migración remota),
+  luego la usuaria reintenta `READ_MODEL_SOURCE=db` + redeploy + smoke de creación.
+
 ## 2026-06-02 — CIERRE Fix 4B.1: merge a `main` + migración remota correctiva (16/16)
 
 ### Estado
