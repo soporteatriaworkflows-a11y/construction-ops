@@ -1,5 +1,44 @@
 # Handoff Log
 
+## 2026-06-02 — CIERRE Oleada 4A.3: Supabase remoto + autenticación online validada
+
+### Estado
+- `main = origin/main = 32b7937`. Tag de cierre **`wave-4a3-online-auth-validated-v1`**.
+- **Auditoría read-only remota**: `supabase migration list --linked` ⇒ **14/14 Local =
+  Remote**, ninguna pendiente. PostgreSQL **17** remoto. Org inicial `GRUPO ICONIC`,
+  **1** profile admin. **Seeds demo remotos: 0** (sin datos de presupuesto reales).
+
+### Smoke online real (confirmado MANUALMENTE por la usuaria en producción)
+- Producción: `https://construction-ops-psi.vercel.app`.
+- Vercel activo: `APP_AUTH_MODE=supabase` + `READ_MODEL_SOURCE=fixture`;
+  `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` /
+  `NEXT_PUBLIC_APP_URL` configuradas.
+- Flujo validado: `/login` visible → credenciales válidas del admin → sesión creada →
+  redirect `/dashboard` → dashboard fixture sanitizado visible. **`/logout` =
+  comprobación final manual pendiente** de la usuaria (eliminar sesión → redirect
+  `/login` → nuevo login funcional).
+- Seguridad confirmada: sin secret/service-role en frontend; sin datos reales de
+  presupuesto expuestos; **`READ_MODEL_SOURCE=db` NO activado** (sigue `fixture`).
+
+### Cierre técnico 4A.3 (resumen de la microfase completa)
+- 4A.3: link controlado read-only; 4A.3a: paridad PG17 + `db push --dry-run`;
+  4A.3b: merge PG17 a `main` + `db push --linked` (14/14, sin seeds/usuarios);
+  4A.3c: creación manual de org/admin + fix de inlining `NEXT_PUBLIC_*` (merge `ad8f32b`)
+  + smoke online real. **Oleada 4A.3 CERRADA.**
+
+### Restricciones respetadas
+- Sin tocar Vercel ni variables; sin `db push/pull/repair`; sin SQL/seeds/usuarios
+  remotos; sin service-role; sin deploy manual; sin force-push/reset/rebase; sin borrar
+  ramas/tags/backups. **Oleada 4B NO iniciada.**
+
+### Rollback disponible
+- Volver a `APP_AUTH_MODE=demo` + `READ_MODEL_SOURCE=fixture` + redeploy.
+
+### Próximo paso (propuesto, NO iniciado)
+- **Oleada 4B — creación real de proyectos desde la UI** con `READ_MODEL_SOURCE=db`
+  (contrato → repo DB → server action → UI → tests → smoke local → smoke remoto).
+  Requiere autorización explícita.
+
 ## 2026-06-02 — Oleada 4A.3c: merge del fix de login online a `main` + tag
 
 ### Estado

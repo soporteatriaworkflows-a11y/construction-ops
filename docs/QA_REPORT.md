@@ -9,6 +9,29 @@ cada ciclo de validación.
 
 ---
 
+## CIERRE Oleada 4A.3 — Supabase remoto + autenticación online validada (2026-06-02)
+
+> Cierre técnico de la microfase 4A.3 completa. `main = origin/main = 32b7937`.
+> Tag `wave-4a3-online-auth-validated-v1`.
+
+- **Auditoría read-only remota** ✅: `supabase migration list --linked` ⇒ **14/14
+  Local = Remote**, ninguna pendiente. PostgreSQL **17**. Org `GRUPO ICONIC`, 1 profile
+  admin (rol `admin`). **Seeds demo remotos: 0**.
+- **Smoke online real** ✅ (confirmado manualmente por la usuaria en
+  `https://construction-ops-psi.vercel.app`): `/login` visible → login admin válido →
+  sesión creada → redirect `/dashboard` → dashboard fixture sanitizado visible.
+  **`/logout` = comprobación final manual pendiente** (eliminar sesión → `/login` →
+  re-login funcional).
+- **Privacidad/seguridad** ✅: sin secret/service-role en frontend; clave publishable/anon
+  (pública); sin datos reales de presupuesto expuestos; **`READ_MODEL_SOURCE=db` NO
+  activado** (sigue `fixture`).
+- **Vercel** (debe mantenerse): `APP_AUTH_MODE=supabase` + `READ_MODEL_SOURCE=fixture`.
+  Rollback = `demo` + `fixture` + redeploy.
+- **Restricciones**: DB remota intacta (sin push/pull/repair/SQL/seeds/usuarios); sin
+  deploy manual; sin force-push. **4B NO iniciada.**
+
+---
+
 ## Oleada 4A.3c — fix login online (merge a `main`) (2026-06-02)
 
 > Merge `--no-ff` de `fix/wave4a3-online-login` (`834029c`) a `main` → merge `ad8f32b`,
