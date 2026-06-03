@@ -363,6 +363,32 @@ Contrato: `docs/AUTH_RUNTIME_CONTRACT.md` (v1). Ejecución **secuencial**.
 read-model, exports, planning, pricing, cost-domain, Vercel, remoto. **No**
 instalar librerías nuevas. **No** `service_role` en frontend. **No** secretos.
 
+### Ownership congelado — Oleada 4B.1 (vertical slice real de proyectos)
+
+Contrato: `docs/PROJECTS_CRUD_CONTRACT.md` (v1). Ejecución **secuencial**
+(db-rls → frontend-boq). Sin tocar Vercel ni remoto productivo.
+
+**agent-db-rls (4B.1)** — ownership exclusivo:
+- Migración nueva `supabase/migrations/<ts>_projects_authorship.sql`
+  (`projects.description` + `projects.created_by`), reversible.
+- `apps/web/server/projects/` (repositorio de escritura `ProjectsWriteRepository`:
+  `createProject`, `getProjectById`; tipos `CreateProjectInput`/`ProjectDetailView`
+  como fuente única) + impl fixture/db.
+- RLS runtime extendido en `scripts/rls-runtime/run.ts`; tests del repo; seed
+  sanitizado estrictamente necesario; `docs/DATABASE_SCHEMA.md`.
+**NO tocar**: UI, `app/(dashboard)/projects/`, auth runtime, exports, planning,
+pricing, cost-domain, Vercel, remoto. **No** service-role en flujo de app.
+
+**agent-frontend-boq (4B.1)** — ownership exclusivo:
+- `apps/web/app/(dashboard)/projects/` (página lista, `actions.ts` server action,
+  detalle `[id]/page.tsx`, formulario "+ Nuevo proyecto") + componentes asociados.
+- Tests UI/unitarios de la action y el formulario.
+**NO tocar**: DB, migraciones, seeds, RLS, repositorio de escritura (consume su
+interfaz), auth runtime (`apps/web/server/auth/` — solo consume `resolveAuthenticatedViewer`),
+exports, planning, pricing, cost-domain, Vercel, remoto. **No** recibir
+`organization_id`/`created_by`/`role` del navegador. **No** service-role. **No**
+instalar librerías nuevas.
+
 ### agent-qa (Oleada 4)
 - `docs/QA_REPORT.md` con resultado completo.
 - Sin FAIL bloqueante para release.
