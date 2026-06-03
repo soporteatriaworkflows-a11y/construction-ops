@@ -9,6 +9,24 @@ cada ciclo de validación.
 
 ---
 
+## Fix 4B.1 — bloqueo de `/projects/new` por prerender estático (2026-06-03)
+
+> Rama `fix/wave4b1-project-creation-mode-guard` (NO mergeada). Solo código (sin migración).
+
+- **Síntoma**: en modo `db`, `/projects/new` mostraba "Modo demostración activo." pese a
+  `READ_MODEL_SOURCE=db`. (`/projects` y `/projects/[id]` OK.)
+- **Causa raíz** ✅: `/projects/new` se prerenderizaba **estáticamente** (`○`) por no usar
+  APIs dinámicas; `isCreationModeEnabled()` se evaluaba en **build-time** con defaults
+  `demo`+`fixture` ⇒ guard horneado en `false`. La server action guardaba bien
+  (request-time); el bug era solo el render de la página.
+- **Fix**: `export const dynamic = 'force-dynamic'` en `/projects/new/page.tsx` ⇒
+  request-time. Build pasa de `○` a **`ƒ /projects/new`**. Sin cambios de seguridad.
+- **Validación local** ✅: typecheck/lint 0, **507 tests** (+2: regresión route-config),
+  build OK, gm 22/22, gm:import PASS, validate-agents 214/0/0, `git diff --check` limpio.
+- **Sin** escritura remota; **Vercel intacto**; **NO merge a main**. No requiere migración.
+
+---
+
 ## CIERRE Fix 4B.1 — merge a `main` + migración remota correctiva (2026-06-02)
 
 > `main = origin/main = 82c2fa7` (merge `--no-ff` de `ab08b28`, sin conflictos).
