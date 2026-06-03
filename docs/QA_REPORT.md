@@ -9,6 +9,48 @@ cada ciclo de validación.
 
 ---
 
+## Oleada 4B.1 — vertical slice real de proyectos (validación local) (2026-06-02)
+
+> Rama `integration/wave-4b1-real-projects` (`2397323`). **NO** mergeado a `main`.
+> Contrato `docs/PROJECTS_CRUD_CONTRACT.md` v1.
+
+### Implementación (secuencial db-rls → frontend-boq)
+- **DB/RLS** (backup `backup/wave4b1-projects-db` `3a403bd`): migración
+  `20260602120000_projects_authorship.sql` (`description` + `created_by` FK profiles
+  ON DELETE SET NULL + índice); módulo `apps/web/server/projects/` con
+  `ProjectsWriteRepository` (`createProject`/`getProjectById`), impl db (RLS-bound, **sin
+  service-role**) + fixture (escritura no soportada), validación pura + generación de
+  `code` (slug + anti-colisión 23505), selector por `READ_MODEL_SOURCE`.
+- **UI** (backup `backup/wave4b1-projects-ui` `6f41fd4`): server action
+  `createProjectAction` (viewer real server-side; ignora org/created_by/code/id/role del
+  navegador; redirect Next 16 fuera del try/catch), `mode-guard` (creación solo
+  `supabase`+`db`), lista por `resolveViewer()`, formulario `/projects/new`, detalle
+  `/projects/[id]` con `notFound()` cross-org.
+
+### Resultados (todo PASS)
+- typecheck 0, lint 0, **505 tests** (37 archivos; +44 sobre 461: validación/repo/selector/
+  action), build OK (`/projects` ƒ, `/projects/[id]` ƒ, `/projects/new`), gm:regression
+  **22/22**, gm:import PASS, validate-agents **214/0/0**, `git diff --check` limpio.
+- **RLS runtime 58/58** (47 previos + 11 de projects): INSERT en org del viewer OK +
+  visible en SELECT; `created_by` = autor; aislamiento SELECT A/B; getById cross-org → 0
+  filas; sin sesión → deny (SELECT+INSERT); sin membresía → deny; INSERT con
+  `organization_id` ajeno (spoofing) → rechazado por `WITH CHECK`.
+- **Smoke HTTP demo+fixture**: `/projects` 200, `/projects/new` 200, `/login` 200;
+  "+ Nuevo proyecto" **deshabilitado** en demo (`aria-disabled`, title "Disponible en
+  modo supabase+db"). La demo pública (fixture) sigue operativa.
+
+### Pendiente (no bloqueante para revisión)
+- **Smoke interactivo en navegador en modo `db`** (login real → crear → ver en lista →
+  abrir detalle): validado a nivel **DB (RLS 58/58)** + **unit (action/mode-guard/
+  validación)** + **build**; falta la confirmación manual con sesión real local (los
+  seeds no fijan contraseña de login). Recomendado antes del smoke remoto.
+
+### Restricciones respetadas
+- Sin tocar Vercel ni remoto productivo; sin escritura remota; sin service-role; sin
+  secretos; sin `package.json`. **NO merge a `main`. 4C NO iniciada.**
+
+---
+
 ## CIERRE Oleada 4A.3 — Supabase remoto + autenticación online validada (2026-06-02)
 
 > Cierre técnico de la microfase 4A.3 completa. `main = origin/main = 32b7937`.

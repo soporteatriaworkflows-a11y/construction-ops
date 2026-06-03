@@ -1,6 +1,9 @@
 # PROJECTS_CRUD_CONTRACT — Oleada 4B.1 (vertical slice real de proyectos)
 
-> **Estado:** CONGELADO v1 (2026-06-02). Propiedad del contrato: `agent-orchestrator`.
+> **Estado:** CONGELADO v1 (2026-06-02) — **IMPLEMENTADO y validado** en
+> `integration/wave-4b1-real-projects` (`2397323`): RLS runtime 58/58, 505 tests,
+> build OK. NO mergeado a `main` (pendiente smoke interactivo `db` + autorización).
+> Propiedad del contrato: `agent-orchestrator`.
 > Implementan: `agent-db-rls` (esquema + repositorio de escritura + RLS) y
 > `agent-frontend-boq` (server action + UI). Cambios al contrato pasan por
 > `docs/INTEGRATION_REQUESTS.md`.
