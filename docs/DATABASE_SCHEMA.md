@@ -120,23 +120,29 @@ necesariamente un rol de fila; se trata en el perfil de exports).
 | name | TEXT | NOT NULL | |
 | status | TEXT | NOT NULL | CHECK; DEFAULT 'active' |
 | client_reference | TEXT | NULL | 🔒 referencia comercial |
-| location | TEXT | NULL | |
+| location | TEXT | NULL | "Ciudad" en la UI 4B.1 |
+| description | TEXT | NULL | descripción libre (4B.1; mig. 20260602120000) |
 | start_date | DATE | NULL | |
 | estimated_end_date | DATE | NULL | |
+| created_by | UUID | NULL | FK profiles; autor (4B.1; mig. 20260602120000) |
 | created_at | TIMESTAMPTZ | NOT NULL | |
 | updated_at | TIMESTAMPTZ | NOT NULL | |
 6. **PK**: `id`.
-7. **FK**: `organization_id → organizations(id)`.
-8. **ON DELETE**: org CASCADE.
+7. **FK**: `organization_id → organizations(id)`; `created_by → profiles(id)`.
+8. **ON DELETE**: org CASCADE; created_by SET NULL (preserva historial).
 9. **organization_id**: directo.
-10. **RLS**: por organización.
-11. **Índices**: PK; `(organization_id)`; UNIQUE `(organization_id, code)`.
+10. **RLS**: por organización (sin cambios en 4B.1; `created_by` se setea
+    server-side = `viewer.profileId`; no se endurece `projects_insert`).
+11. **Índices**: PK; `(organization_id)`; `(created_by)`; UNIQUE `(organization_id, code)`.
 12. **Integridad**: `status IN ('active','archived','closed')`.
 13. **Enums**: `status`.
 14. **Inmutabilidad**: —.
 15. **Snapshot**: —.
 16. 🔒 INTERNO: `client_reference` (dato comercial; no a cliente).
 17. **Dudas**: catálogo de `status` definitivo (provisional).
+18. **4B.1**: la columna `code` se autogenera server-side (slug del `name` +
+    anti-colisión `-2/-3…`); "Ciudad" de la UI persiste en `location` (no se
+    crea columna `city`). Ver `docs/PROJECTS_CRUD_CONTRACT.md`.
 
 ### `project_scopes`
 1. **Tabla**: `project_scopes`

@@ -107,13 +107,20 @@ export const projects = pgTable(
     status: text("status").notNull().default("active"),
     clientReference: text("client_reference"),
     location: text("location"),
+    description: text("description"),
     startDate: date("start_date"),
     estimatedEndDate: date("estimated_end_date"),
+    // Autor del proyecto (4B.1). Nullable; ON DELETE SET NULL preserva el
+    // historial al borrar un perfil. Migración 20260602120000.
+    createdBy: uuid("created_by").references(() => profiles.id, {
+      onDelete: "set null",
+    }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
     index("projects_organization_id_idx").on(t.organizationId),
+    index("projects_created_by_idx").on(t.createdBy),
     uniqueIndex("projects_org_code_uq").on(t.organizationId, t.code),
     check("projects_status_valid", sql`${t.status} IN ('active','archived','closed')`),
   ],
