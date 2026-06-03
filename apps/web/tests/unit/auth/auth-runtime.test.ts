@@ -56,6 +56,45 @@ describe('auth/env — modos y matriz', () => {
       publishableKey: 'pub_local',
     });
   });
+
+  it('getPublicSupabaseEnv: PUBLISHABLE_KEY tiene prioridad sobre ANON_KEY', () => {
+    const env = {
+      NEXT_PUBLIC_SUPABASE_URL: 'http://localhost:54321',
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'pub_local',
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: 'anon_legacy',
+    };
+    expect(getPublicSupabaseEnv(env).publishableKey).toBe('pub_local');
+  });
+
+  it('getPublicSupabaseEnv: usa ANON_KEY como fallback de compatibilidad', () => {
+    const env = {
+      NEXT_PUBLIC_SUPABASE_URL: 'http://localhost:54321',
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: 'anon_legacy',
+    };
+    expect(getPublicSupabaseEnv(env)).toEqual({
+      url: 'http://localhost:54321',
+      publishableKey: 'anon_legacy',
+    });
+  });
+
+  it('getPublicSupabaseEnv: sin argumentos resuelve desde process.env (path navegador)', () => {
+    const OLD_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const OLD_KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+    try {
+      process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://localhost:54321';
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = 'pub_runtime';
+      expect(getPublicSupabaseEnv()).toEqual({
+        url: 'http://localhost:54321',
+        publishableKey: 'pub_runtime',
+      });
+    } finally {
+      if (OLD_URL === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+      else process.env.NEXT_PUBLIC_SUPABASE_URL = OLD_URL;
+      if (OLD_KEY === undefined)
+        delete process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+      else process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = OLD_KEY;
+    }
+  });
 });
 
 describe('auth/role-map — mapeo y anti-escalamiento', () => {
