@@ -531,6 +531,105 @@ async function main(): Promise<void> {
   });
   check('auth: claim organization_id sigue teniendo prioridad (compat demo)', claimOverrides === ORG_A, `got=${claimOverrides}`);
 
+  // ===========================================================================
+  // 12) PROJECTS 4B.1 — escritura real con autoría + aislamiento por org.
+  //     Migración 20260602120000 (description + created_by). Cubre el contrato
+  //     PROJECTS_CRUD_CONTRACT §9. Usa la identidad real (sub=profile, sin claim
+  //     de org), igual que el flujo de la app. Todo en tx con ROLLBACK.
+  // ===========================================================================
+  console.log('\n--- PROJECTS 4B.1: escritura real, autoría y aislamiento ---');
+
+  // 12pre) Migración aplicada: columnas description + created_by presentes.
+  const [{ count: colCount }] = await sql<{ count: string }[]>`
+    SELECT count(*)::text AS count
+    FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'projects'
+      AND column_name IN ('description','created_by')`;
+  check('projects: columnas description + created_by existen', colCount === '2', `cols=${colCount}`);
+
+  // 12a) INSERT en la org del viewer (modo real) ⇒ OK; created_by = autor;
+  //      organization_id = org del viewer; aparece en SELECT de esa org.
+  const created = await asUser(realA, async (q) => {
+    const [row] = await q<{ id: string; organization_id: string; created_by: string | null }[]>`
+      INSERT INTO projects (organization_id, created_by, code, name, status, location, description)
+      VALUES (app.current_org(), app.current_org_user(), 'proy-4b1-a', 'Proyecto 4B1 A', 'active', 'Bogota', 'desc')
+      RETURNING id, organization_id, created_by`;
+    const seen = await q<{ id: string }[]>`SELECT id FROM projects WHERE id = ${row!.id}`;
+    return { row: row!, visible: seen.length === 1 };
+  });
+  check('projects: INSERT del viewer crea fila en su org', created.row.organization_id === ORG_A, `org=${created.row.organization_id}`);
+  check('projects: created_by = autor (app.current_org_user)', created.row.created_by === USER_A_ADMIN, `by=${created.row.created_by}`);
+  check('projects: el proyecto creado aparece en SELECT de su org', created.visible);
+
+  // 12b) Aislamiento A/B: B NO ve el proyecto recién creado por A.
+  //      (Se recrea dentro de la misma tx para poder observarlo desde B.)
+  const isolation = await asUser(
+    claimsB,
+    async (q) => {
+      const rows = await q<{ id: string }[]>`SELECT id FROM projects WHERE code = 'proy-iso-a'`;
+      return rows.length;
+    },
+    async (q) => {
+      // Setup (superusuario): inserta un proyecto de A directamente.
+      await q`INSERT INTO projects (organization_id, created_by, code, name, status)
+              VALUES (${ORG_A}, ${USER_A_ADMIN}, 'proy-iso-a', 'Iso A', 'active')`;
+    },
+  );
+  check('projects: B NO ve un proyecto de A (aislamiento SELECT)', isolation === 0, `rows=${isolation}`);
+
+  // 12c) getById cross-org ⇒ 0 filas (B no puede leer el proyecto de A por id).
+  const crossById = await asUser(claimsB, async (q) => {
+    const rows = await q<{ id: string }[]>`SELECT id FROM projects WHERE id = ${PROJECT_A}`;
+    return rows.length;
+  });
+  check('projects: getById cross-org devuelve 0 filas', crossById === 0, `rows=${crossById}`);
+
+  // 12d) Sin sesión ⇒ INSERT y SELECT denegados.
+  const noSessionProj = await asUser(noSession, async (q) => {
+    const rows = await q<{ id: string }[]>`SELECT id FROM projects`;
+    return rows.length;
+  });
+  check('projects: sin sesión no ve proyectos (deny)', noSessionProj === 0, `rows=${noSessionProj}`);
+  let noSessionInsBlocked = false;
+  try {
+    await asUser(noSession, async (q) => {
+      await q`INSERT INTO projects (organization_id, code, name, status)
+              VALUES (${ORG_A}, 'x', 'x', 'active')`;
+    });
+  } catch {
+    noSessionInsBlocked = true;
+  }
+  check('projects: sin sesión no puede INSERT (deny)', noSessionInsBlocked);
+
+  // 12e) Sin membresía (auth.uid sin profile) ⇒ INSERT y SELECT denegados.
+  const noMembershipProj = await asUser(realNoProfile, async (q) => {
+    const rows = await q<{ id: string }[]>`SELECT id FROM projects`;
+    return rows.length;
+  });
+  check('projects: sin membresía no ve proyectos (deny)', noMembershipProj === 0, `rows=${noMembershipProj}`);
+  let noMembershipInsBlocked = false;
+  try {
+    await asUser(realNoProfile, async (q) => {
+      await q`INSERT INTO projects (organization_id, code, name, status)
+              VALUES (app.current_org(), 'x', 'x', 'active')`;
+    });
+  } catch {
+    noMembershipInsBlocked = true;
+  }
+  check('projects: sin membresía no puede INSERT (deny)', noMembershipInsBlocked);
+
+  // 12f) Spoofing: A intenta INSERT con organization_id de B ⇒ rechazado (WITH CHECK).
+  let spoofBlocked = false;
+  try {
+    await asUser(realA, async (q) => {
+      await q`INSERT INTO projects (organization_id, created_by, code, name, status)
+              VALUES (${ORG_B}, app.current_org_user(), 'spoof', 'Spoof', 'active')`;
+    });
+  } catch {
+    spoofBlocked = true;
+  }
+  check('projects: INSERT con organization_id de otra org rechazado (spoofing/WITH CHECK)', spoofBlocked);
+
   // --- Resumen ---
   console.log(`\nRESULTADO RLS RUNTIME: ${pass} PASS / ${fail} FAIL`);
   if (fail > 0) {
