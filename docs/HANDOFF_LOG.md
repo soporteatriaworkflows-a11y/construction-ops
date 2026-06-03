@@ -1,5 +1,49 @@
 # Handoff Log
 
+## 2026-06-02 — Oleada 4A.3c (fix): cablear el login online a Supabase (inlining NEXT_PUBLIC)
+
+### Estado
+- Rama de fix **`fix/wave4a3-online-login`** desde `main`@`1ce654e` (`main` intacta).
+  Vercel sigue en `APP_AUTH_MODE=demo` + `READ_MODEL_SOURCE=fixture` (restaurado por
+  la usuaria); **no se tocó Vercel, ni variables remotas, ni la DB remota**.
+
+### Diagnóstico (causa raíz)
+- En modo `supabase`, el submit de `/login` mostraba el error genérico, **sin** request
+  a `/auth/v1/token` y **sin** intento en los Auth logs ⇒ `signInWithPassword()` nunca
+  se ejecutaba. Causa: `createClient()` (navegador) llamaba `getPublicSupabaseEnv()`
+  **sin argumentos**; esa función lee `env.NEXT_PUBLIC_*` de forma **indirecta**
+  (`env = process.env` por defecto). Next solo inyecta en el bundle del navegador las
+  referencias **literales** `process.env.NEXT_PUBLIC_*`; el acceso indirecto queda
+  `undefined` ⇒ `AuthConfigError` lanzado, capturado en el `catch` de `handleSubmit`
+  ⇒ mensaje genérico. (Las navegaciones a `/forgot-password` eran el `<Link>` legítimo,
+  no un submit accidental.)
+
+### Cambios (solo archivos del orquestador + 1 de frontend-boq, sin rediseño)
+- `apps/web/lib/supabase/client.ts`: pasa un objeto con referencias **literales**
+  `process.env.NEXT_PUBLIC_SUPABASE_URL/PUBLISHABLE_KEY/ANON_KEY` a
+  `getPublicSupabaseEnv()` ⇒ Next las inyecta en el navegador. (fix raíz)
+- `apps/web/server/auth/login-flow.ts` (**nuevo**, orquestador): `runPasswordLogin`
+  puro y testeable (1 sola llamada a `signInWithPassword`, error legible, redirección
+  `next` sanitizada anti open-redirect, sin redirigir en error).
+- `apps/web/app/(auth)/login/page.tsx` (frontend-boq): `handleSubmit` delega en
+  `runPasswordLogin`. Diseño/copy/layout **idénticos**.
+- Tests: `tests/unit/auth/login-flow.test.ts` (**nuevo**, 6 casos) +
+  `tests/unit/auth/auth-runtime.test.ts` (3 casos de env: prioridad PUBLISHABLE,
+  fallback ANON, resolución sin args desde `process.env`).
+
+### Validación (todo PASS)
+- typecheck 0, lint 0, **461 tests** (33 archivos, +9), build OK (rutas auth + Proxy +
+  `/api/exports`), gm:regression **22/22**, gm:import PASS, validate-agents **214/0/0**,
+  `git diff --check` limpio. Sin secretos, sin privados, sin `.env.local` staged.
+
+### Restricciones respetadas
+- Sin tocar Vercel/variables remotas; sin `db push/pull/repair`; sin SQL/seeds/usuarios
+  remotos; sin service-role; sin secretos; sin force-push/reset; **4B NO iniciada**.
+
+### Próximo paso (pendiente de autorización)
+- Autorizar merge de `fix/wave4a3-online-login` a `main` y luego, en sesión aparte,
+  cambiar Vercel a `APP_AUTH_MODE=supabase` para validar login online real (4A.3c).
+
 ## 2026-06-02 — Oleada 4A.3b: merge PG17 a `main` + bootstrap real del esquema remoto
 
 ### Estado

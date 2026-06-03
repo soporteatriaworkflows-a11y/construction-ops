@@ -27,7 +27,7 @@ import {
   isValidEmailFormat,
   isValidPasswordLength,
 } from '@/components/auth/auth-helpers';
-import { sanitizeNext } from '@/server/auth/routes';
+import { runPasswordLogin } from '@/server/auth/login-flow';
 import { createClient } from '@/lib/supabase/client';
 
 interface LoginState {
@@ -82,23 +82,24 @@ function LoginForm() {
 
     try {
       const supabase = createClient();
-      const { error } = await supabase.auth.signInWithPassword({
-        email: form.email.trim(),
-        password: form.password,
-      });
+      const result = await runPasswordLogin(
+        supabase.auth,
+        form.email,
+        form.password,
+        searchParams.get('next'),
+      );
 
-      if (error) {
+      if (!result.ok) {
         setForm((prev) => ({
           ...prev,
           loading: false,
-          error: toReadableAuthError(error),
+          error: result.error,
         }));
         return;
       }
 
-      // Redirección segura usando sanitizeNext (prevención de open redirect).
-      const next = sanitizeNext(searchParams.get('next'), '/dashboard');
-      router.push(next);
+      // Redirección segura ya sanitizada por runPasswordLogin (anti open redirect).
+      router.push(result.redirectTo ?? '/dashboard');
     } catch (err) {
       setForm((prev) => ({
         ...prev,
