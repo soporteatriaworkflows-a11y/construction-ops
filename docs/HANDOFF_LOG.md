@@ -1,5 +1,47 @@
 # Handoff Log
 
+## 2026-06-02 — Fix 4B.1: error de membresía en modo `db` (grants `app` + recursión RLS profiles)
+
+### Estado
+- Rama **`fix/wave4b1-membership-resolution`** desde `main`@`939af74` (`main` intacta).
+  Producción en rollback por la usuaria: `APP_AUTH_MODE=supabase` + `READ_MODEL_SOURCE=fixture`.
+
+### Diagnóstico (causa raíz DOBLE, demostrada localmente)
+- **#1 Grants faltantes**: las migraciones nunca otorgaron a `authenticated` `USAGE`
+  sobre el esquema `app` ni `EXECUTE` sobre sus funciones de identidad. El harness RLS
+  lo concedía en **runtime** (`ensureGrants`), enmascarando el hueco. En Supabase remoto
+  el esquema `app` no es accesible por defecto ⇒ la 1ª política que invoca
+  `app.current_org()` falla con **"permission denied for schema app"**;
+  `resolveAuthenticatedViewer()` (que lee `profiles` primero) lo reporta como
+  **"El usuario no tiene membresía."**. Reproducido local con migraciones puras.
+- **#2 Recursión RLS en `profiles`**: la política `profiles_select`
+  (`organization_id = app.current_org()`) obliga a `current_org()` a leer `profiles`,
+  re-evaluando la política. Con migrador SIN `BYPASSRLS` (postgres remoto), el lookup
+  `SECURITY DEFINER` NO salta RLS ⇒ **recursión infinita** ("stack depth limit exceeded").
+  Reproducido local emulando los helpers en `SECURITY INVOKER`.
+
+### Fix (migración `20260602130000_fix_membership_app_grants_and_profiles_self_rls.sql`)
+- `GRANT USAGE ON SCHEMA app` + `GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA app` a
+  `authenticated` (+ default privileges para funciones futuras).
+- Reemplaza `profiles_select` por `profiles_self_select USING (id = (SELECT app._auth_uid()))`
+  — self-read sin `current_org()`, rompe la recursión, **más estricto** (no expone perfiles
+  de terceros). Aislamiento por organización intacto; RLS sigue FORCE.
+- Harness `scripts/rls-runtime/run.ts`: `ensureGrants` ya **no** concede `app`
+  (solo `public`, que emula defaults de plataforma) ⇒ ahora valida los grants de la
+  migración; +3 checks (self-read, deny terceros, anti-recursión emulando INVOKER).
+
+### Validación (local)
+- **RLS runtime 61/61** (58 + 3 nuevos). typecheck/lint 0, **505 tests**, build OK,
+  gm:regression 22/22, gm:import PASS, validate-agents 214/0/0, `git diff --check` limpio.
+
+### Restricciones
+- Sin tocar Vercel/variables; sin escritura remota; sin `db push/pull`/`migration repair`;
+  sin SQL remoto; sin service-role. **NO merge a `main`. 4B.2/4C NO iniciadas.**
+
+### Próximo paso (pendiente de autorización)
+- Revisar reporte → si OK: merge a `main` + `db push --dry-run`/`--linked` de la nueva
+  migración al remoto, luego la usuaria reintenta `READ_MODEL_SOURCE=db` + smoke.
+
 ## 2026-06-02 — CIERRE Oleada 4B.1: merge a `main` + migración remota de proyectos
 
 ### Estado

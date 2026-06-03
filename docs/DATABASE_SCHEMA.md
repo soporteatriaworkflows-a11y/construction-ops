@@ -48,6 +48,18 @@
   permite (ver reglas de inmutabilidad por tabla).
 - Tablas hijas sin `organization_id` directo: RLS por JOIN al padre.
 
+#### Excepción `profiles` (migración `20260602130000`, hotfix 4B.1)
+`profiles` NO usa la política base `organization_id = current_org()` para `SELECT`:
+eso causaba **recursión RLS** (current_org() lee `profiles`, que re-evalúa la
+política) cuando el migrador carece de `BYPASSRLS` (Supabase remoto). En su lugar:
+`profiles_self_select USING (id = (SELECT app._auth_uid()))` — cada usuario lee
+**solo su propia fila** por `auth.uid()`, sin invocar `current_org()`. Así
+`current_org()`/`current_role()` resuelven leyendo esa fila propia sin recursión.
+Además, la migración concede `USAGE` sobre el esquema `app` y `EXECUTE` sobre sus
+funciones de identidad al rol `authenticated` (sin esto, en remoto las políticas
+fallan con "permission denied for schema app"). Listado de miembros de la
+organización: diferido a un mecanismo no recursivo en oleada posterior.
+
 ### Roles del sistema (en `profiles.role`)
 `admin` · `gerencia` · `presupuestos` · `obra` · `compras` · `consulta`
 (rol "cliente" es un perfil de **exportación/lectura restringida**, no
