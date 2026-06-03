@@ -1,5 +1,32 @@
 # Handoff Log
 
+## 2026-06-02 — Oleada 4A.3c: merge del fix de login online a `main` + tag
+
+### Estado
+- `git merge --no-ff fix/wave4a3-online-login` (`834029c`) → merge **`ad8f32b`**,
+  **sin conflictos** (8 archivos, +272/-12). `main` ahora = `ad8f32b`.
+  Tag **`wave-4a3-online-login-fix-v1`**.
+
+### Validación post-merge (todo PASS en `main`)
+- typecheck 0, lint 0, **461 tests** (33 archivos), build (rutas auth + Proxy +
+  `/api/exports`), gm:regression **22/22**, gm:import PASS, validate-agents **214/0/0**,
+  `git diff --check` limpio. Sin secretos/privados/`.env.local` staged.
+- Auditoría de archivos en `main`: `client.ts` usa referencias **literales**
+  `process.env.NEXT_PUBLIC_SUPABASE_URL/PUBLISHABLE_KEY` (+ fallback `ANON_KEY`);
+  `login/page.tsx` delega en `runPasswordLogin` (copy/layout intactos); sin cambios en
+  DB/migraciones/seeds/Proxy/exports/dashboard/fixture/Vercel.
+
+### Restricciones respetadas
+- DB remota intacta (14/14 migraciones; sin push/pull/repair/SQL/seeds/usuarios;
+  sin service-role). **Vercel intacto** (`APP_AUTH_MODE=demo` + `READ_MODEL_SOURCE=fixture`).
+  Sin deploy manual; sin force-push/reset/rebase destructivo; sin borrar ramas/tags/backups.
+  **Oleada 4B NO iniciada.**
+
+### Próximo paso (manual, de la usuaria — fuera de este entorno)
+- Activar `APP_AUTH_MODE=supabase` en Vercel (manteniendo `READ_MODEL_SOURCE=fixture`),
+  redeploy y probar login online real con el admin de `GRUPO ICONIC`.
+- Rollback inmediato disponible: volver a `APP_AUTH_MODE=demo` + `READ_MODEL_SOURCE=fixture`.
+
 ## 2026-06-02 — Oleada 4A.3c (fix): cablear el login online a Supabase (inlining NEXT_PUBLIC)
 
 ### Estado

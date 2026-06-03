@@ -9,6 +9,29 @@ cada ciclo de validación.
 
 ---
 
+## Oleada 4A.3c — fix login online (merge a `main`) (2026-06-02)
+
+> Merge `--no-ff` de `fix/wave4a3-online-login` (`834029c`) a `main` → merge `ad8f32b`,
+> **sin conflictos** (8 archivos, +272/-12).
+
+- **Causa raíz**: el cliente de navegador resolvía `NEXT_PUBLIC_*` de forma **indirecta**
+  (`env.X` con `env = process.env`); Next/Turbopack solo inyecta en el bundle las
+  referencias **literales** `process.env.NEXT_PUBLIC_*`, así que en el navegador quedaban
+  `undefined` y `getPublicSupabaseEnv()` lanzaba **antes** de `signInWithPassword()`
+  (error genérico, sin request a `/auth/v1/token`, sin log de Auth).
+- **Fix**: `client.ts` pasa referencias literales inyectables; submit extraído a
+  `server/auth/login-flow.ts` (`runPasswordLogin`, puro: 1 sola llamada a Supabase,
+  error legible, redirección `next` sanitizada anti open-redirect). Diseño/copy intactos.
+- **Post-merge `main` (`ad8f32b`)** ✅: typecheck 0, lint 0, **461 tests** (33 archivos),
+  build (rutas auth + Proxy + `/api/exports`), gm:regression **22/22**, gm:import PASS,
+  validate-agents **214/0/0**, `git diff --check` limpio.
+- **DB remota intacta** (14/14 migraciones; sin push/pull/repair/SQL/seeds/usuarios);
+  **Vercel intacto** (`APP_AUTH_MODE=demo` + `READ_MODEL_SOURCE=fixture`).
+- **Activación online pendiente** (paso manual de la usuaria). Rollback = `demo`+`fixture`.
+  Tag `wave-4a3-online-login-fix-v1`. **4B NO iniciada.**
+
+---
+
 ## Oleada 4A.3b — bootstrap real del esquema remoto (2026-06-02)
 
 > Merge de paridad PG17 a `main` (`139dd52`) + `supabase db push --linked` (una vez,
