@@ -1,5 +1,39 @@
 # Handoff Log
 
+## 2026-06-02 — CIERRE Fix 4B.1: merge a `main` + migración remota correctiva (16/16)
+
+### Estado
+- `git merge --no-ff fix/wave4b1-membership-resolution` (`ab08b28`) → merge **`82c2fa7`**,
+  **sin conflictos** (7 archivos, +186/-5). `main = origin/main = 82c2fa7`.
+- Tags: **`wave-4b1-membership-fix-code-ready-v1`** (pre-migración) y
+  **`wave-4b1-membership-fix-remote-ready-v1`** (post + docs).
+
+### Validación post-merge (todo PASS en `main`)
+- typecheck/lint 0, **505 tests**, build OK, gm:regression **22/22**, gm:import PASS,
+  validate-agents **214/0/0**, `git diff --check` limpio.
+
+### Migración remota correctiva (controlada)
+- `db push --dry-run --linked` ⇒ **exactamente 1** pendiente
+  (`20260602130000_fix_membership_app_grants_and_profiles_self_rls.sql`), **0 seeds**.
+- `db push --linked` (SIN `--include-seed`) ⇒ "Applying migration … Finished".
+- `migration list --linked` ⇒ **16/16 Local = Remote**, ninguna pendiente.
+- **Seeds NO ejecutados** · **proyectos remotos NO creados** · sin SQL manual · sin
+  `migration repair` · sin service-role.
+
+### Estado remoto
+- **16/16** (incluye grants `app` a `authenticated` + `profiles_self_select`). El esquema
+  remoto ya no recursará ni fallará por permisos al resolver el viewer en modo `db`.
+
+### Vercel (sin cambios — debe mantenerse)
+- `APP_AUTH_MODE=supabase` + `READ_MODEL_SOURCE=fixture`.
+
+### Próximo paso manual (de la usuaria)
+- Cambiar **solo** `READ_MODEL_SOURCE` `fixture`→`db` + redeploy + repetir el smoke de
+  creación de proyecto. **Rollback**: `READ_MODEL_SOURCE=fixture` + redeploy.
+
+### Restricciones
+- Sin tocar Vercel/variables; sin `db pull`/`migration repair`; **4B.2/4C NO iniciadas.**
+
 ## 2026-06-02 — Fix 4B.1: error de membresía en modo `db` (grants `app` + recursión RLS profiles)
 
 ### Estado

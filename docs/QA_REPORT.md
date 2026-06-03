@@ -9,6 +9,24 @@ cada ciclo de validación.
 
 ---
 
+## CIERRE Fix 4B.1 — merge a `main` + migración remota correctiva (2026-06-02)
+
+> `main = origin/main = 82c2fa7` (merge `--no-ff` de `ab08b28`, sin conflictos).
+> Tags `wave-4b1-membership-fix-code-ready-v1` / `wave-4b1-membership-fix-remote-ready-v1`.
+
+- **Post-merge `main`** ✅: typecheck/lint 0, **505 tests**, build OK, gm:regression
+  **22/22**, gm:import PASS, validate-agents **214/0/0**, `git diff --check` limpio.
+- **Dry-run remoto** ✅: exactamente **1** migración pendiente
+  (`20260602130000_fix_membership_app_grants_and_profiles_self_rls.sql`), **0 seeds**.
+- **Push real** `db push --linked` (sin `--include-seed`) ✅: migración aplicada.
+- **`migration list --linked`** ✅: **16/16 Local = Remote**, ninguna pendiente.
+- **Seeds NO ejecutados** · **proyectos remotos NO creados** · sin SQL manual · sin
+  `migration repair` · sin service-role · **Vercel intacto** (`supabase`+`fixture`).
+- **Pendiente (manual, usuaria)**: `READ_MODEL_SOURCE` `fixture`→`db` + redeploy + repetir
+  smoke de creación. Rollback = `fixture` + redeploy.
+
+---
+
 ## Fix 4B.1 — membresía en modo `db` (grants `app` + recursión RLS profiles) (2026-06-02)
 
 > Rama `fix/wave4b1-membership-resolution` (NO mergeada). Migración
