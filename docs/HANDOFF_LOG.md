@@ -1,5 +1,28 @@
 # Handoff Log
 
+## 2026-06-03 — CIERRE Fix `/projects/new`: merge a `main` + tag
+
+### Estado
+- `git merge --no-ff fix/wave4b1-project-creation-mode-guard` (`9e9dd96`) → merge
+  **`1999ffb`**, **sin conflictos** (5 archivos, +102). `main = origin/main = 1999ffb`.
+  Tag **`wave-4b1-project-creation-route-fix-v1`**.
+
+### Validación post-merge (todo PASS en `main`)
+- Directiva `export const dynamic = 'force-dynamic'` presente en `/projects/new/page.tsx`.
+- typecheck/lint 0, **507 tests**, build OK con **`ƒ /projects/new`** (antes `○`),
+  gm:regression **22/22**, gm:import PASS, validate-agents **214/0/0**, `git diff --check`
+  limpio.
+- Requisito de creación intacto (`supabase`+`db`); guard de la server action sin cambios;
+  sin cambios en DB/migraciones/RLS/seeds/dashboard/exports/Vercel.
+
+### Remoto / Vercel
+- Supabase remoto intacto: **16/16 Local = Remote**, seeds 0, proyectos 0. **Sin** `db push`
+  (este fix es solo código). Vercel sin cambios: `APP_AUTH_MODE=supabase` + `READ_MODEL_SOURCE=fixture`.
+
+### Próximo paso manual (de la usuaria)
+- Cambiar `READ_MODEL_SOURCE` `fixture`→`db` + redeploy → abrir `/projects/new` (debe
+  mostrar el formulario) → crear proyecto → listar → abrir detalle. Rollback = `fixture` + redeploy.
+
 ## 2026-06-03 — Fix 4B.1: bloqueo incorrecto de `/projects/new` (prerender estático del mode-guard)
 
 ### Estado

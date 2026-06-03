@@ -9,6 +9,21 @@ cada ciclo de validación.
 
 ---
 
+## CIERRE Fix `/projects/new` — merge a `main` (2026-06-03)
+
+> `main = origin/main = 1999ffb` (merge `--no-ff` de `9e9dd96`, sin conflictos).
+> Tag `wave-4b1-project-creation-route-fix-v1`.
+
+- **Post-merge `main`** ✅: directiva `force-dynamic` presente; typecheck/lint 0,
+  **507 tests**, build OK con **`ƒ /projects/new`** (antes `○`), gm:regression **22/22**,
+  gm:import PASS, validate-agents **214/0/0**, `git diff --check` limpio.
+- **Solo código** (sin migración): remoto intacto **16/16**, seeds 0, proyectos 0.
+  **Vercel intacto** (`supabase`+`fixture`).
+- **Pendiente (manual, usuaria)**: `READ_MODEL_SOURCE` `fixture`→`db` + redeploy + smoke de
+  creación (`/projects/new` debe mostrar formulario). Rollback = `fixture` + redeploy.
+
+---
+
 ## Fix 4B.1 — bloqueo de `/projects/new` por prerender estático (2026-06-03)
 
 > Rama `fix/wave4b1-project-creation-mode-guard` (NO mergeada). Solo código (sin migración).
