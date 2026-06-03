@@ -9,6 +9,30 @@ cada ciclo de validación.
 
 ---
 
+## Fix 4B.1 — membresía en modo `db` (grants `app` + recursión RLS profiles) (2026-06-02)
+
+> Rama `fix/wave4b1-membership-resolution` (NO mergeada). Migración
+> `20260602130000_fix_membership_app_grants_and_profiles_self_rls.sql`.
+
+- **Síntoma remoto**: con `READ_MODEL_SOURCE=db`, `/projects` mostraba "El usuario no
+  tiene membresía." (login/logout OK). Rollback a `fixture` por la usuaria; 0 proyectos
+  remotos creados.
+- **Causa raíz #1 (grants)** ✅ demostrada: migraciones sin `GRANT USAGE`/`EXECUTE` de
+  `app` a `authenticated`; el harness los daba en runtime (enmascaraba). En remoto ⇒
+  "permission denied for schema app" en la 1ª lectura (`profiles`).
+- **Causa raíz #2 (recursión)** ✅ demostrada: `profiles_select` basada en
+  `current_org()` recursa cuando el `SECURITY DEFINER` no salta RLS (postgres remoto sin
+  `BYPASSRLS`) ⇒ "stack depth limit exceeded".
+- **Fix**: migración concede `USAGE`/`EXECUTE` de `app` a `authenticated`; reemplaza
+  `profiles_select` por `profiles_self_select` (self-read por `auth.uid()`, sin
+  `current_org()`). Harness deja de enmascarar y valida los grants; +3 checks.
+- **Validación local** ✅: **RLS runtime 61/61** (58+3), typecheck/lint 0, **505 tests**,
+  build OK, gm 22/22, gm:import PASS, validate-agents 214/0/0, `git diff --check` limpio.
+- **Sin** escritura remota; **Vercel intacto**; **NO merge a main**. Pendiente:
+  merge + `db push` de la migración + reintento `db` por la usuaria.
+
+---
+
 ## CIERRE Oleada 4B.1 — merge a `main` + migración remota de proyectos (2026-06-02)
 
 > `main = origin/main = 10ac567` (merge `--no-ff` de `1f5f908`, sin conflictos).

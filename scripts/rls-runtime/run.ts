@@ -140,13 +140,15 @@ async function setupOrgB(): Promise<void> {
     ON CONFLICT (id) DO NOTHING`;
 }
 
-// Concede los privilegios de tabla/esquema que Supabase otorga por defecto al
-// rol `authenticated`. NO afecta RLS (que filtra filas); solo permite que el
-// rol intente el acceso para que RLS sea lo que decida. Idempotente.
+// Concede SOLO los privilegios que la PLATAFORMA Supabase otorga por defecto al
+// rol `authenticated` en una base real (USAGE en `public` + DML en tablas de
+// `public`, vía default privileges del rol postgres). NO concede USAGE/EXECUTE
+// sobre el esquema `app`: eso DEBE proveerlo una migración (20260602130000), y el
+// harness lo valida en lugar de enmascararlo. Así, si un entorno (p. ej. Supabase
+// remoto) carece de esos grants, el harness lo detecta con "permission denied for
+// schema app" en lugar de pasar en verde engañosamente. Idempotente.
 async function ensureGrants(): Promise<void> {
   await sql.unsafe('GRANT USAGE ON SCHEMA public TO authenticated');
-  await sql.unsafe('GRANT USAGE ON SCHEMA app TO authenticated');
-  await sql.unsafe('GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA app TO authenticated');
   await sql.unsafe(
     'GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authenticated',
   );
@@ -629,6 +631,50 @@ async function main(): Promise<void> {
     spoofBlocked = true;
   }
   check('projects: INSERT con organization_id de otra org rechazado (spoofing/WITH CHECK)', spoofBlocked);
+
+  // ===========================================================================
+  // 13) MEMBERSHIP FIX 4B.1 — grants de `app` + self-read NO recursivo en profiles.
+  //     Migración 20260602130000. El harness YA NO concede app usage/execute
+  //     (ver ensureGrants): que las secciones AUTH/PROJECTS anteriores pasen
+  //     demuestra que la migración otorga USAGE/EXECUTE de `app` a authenticated
+  //     (causa #1, "permission denied for schema app" en remoto).
+  // ===========================================================================
+  console.log('\n--- MEMBERSHIP 4B.1: grants app + self-read profiles sin recursion ---');
+
+  // 13a) Self-read: A ve EXACTAMENTE su propia fila de profiles; no la de terceros.
+  const selfRead = await asUser(realA, async (q) => {
+    const own = await q<{ id: string }[]>`SELECT id FROM profiles WHERE id = ${USER_A_ADMIN}`;
+    const others = await q<{ id: string }[]>`SELECT id FROM profiles WHERE id <> ${USER_A_ADMIN}`;
+    return { own: own.length, others: others.length };
+  });
+  check('membership: A lee su propio profile (self-read)', selfRead.own === 1, `own=${selfRead.own}`);
+  check('membership: A NO ve perfiles de terceros (deny-by-default)', selfRead.others === 0, `others=${selfRead.others}`);
+
+  // 13b) Regresión anti-recursión (causa #2): se emula el `postgres` remoto SIN
+  //      BYPASSRLS poniendo los lookups de identidad en SECURITY INVOKER (en la
+  //      misma tx, revertido por ROLLBACK). Con la política self-based, leer
+  //      profiles y projects NO debe recursar ("stack depth limit exceeded").
+  let noRecursion = false;
+  let recursionDetail = '';
+  try {
+    const res = await asUser(
+      realA,
+      async (q) => {
+        const own = await q<{ id: string }[]>`SELECT id FROM profiles WHERE id = ${USER_A_ADMIN}`;
+        const proj = await q<{ n: number }[]>`SELECT count(*)::int AS n FROM projects`;
+        return { own: own.length, proj: proj[0]!.n };
+      },
+      async (q) => {
+        await q.unsafe('ALTER FUNCTION app._profile_org(uuid) SECURITY INVOKER');
+        await q.unsafe('ALTER FUNCTION app._profile_role(uuid) SECURITY INVOKER');
+      },
+    );
+    noRecursion = res.own === 1 && res.proj >= 1;
+    recursionDetail = `own=${res.own} proj=${res.proj}`;
+  } catch (e) {
+    recursionDetail = (e as Error).message;
+  }
+  check('membership: sin BYPASSRLS (INVOKER) no hay recursion RLS en profiles', noRecursion, recursionDetail);
 
   // --- Resumen ---
   console.log(`\nRESULTADO RLS RUNTIME: ${pass} PASS / ${fail} FAIL`);
