@@ -637,3 +637,17 @@ viewer por `APP_AUTH_MODE` (`demo`→`getDemoViewer`; `supabase`→
 `resolveAuthenticatedViewer` desde sesión→`profiles`), sin fallback silencioso.
 `/api/exports` en modo `supabase` exige viewer autenticado y **no** permite
 escalamiento de perfil por query (perfil efectivo ≤ `ViewerRole`).
+
+---
+
+## Escritura de proyectos (Oleada 4B.1) — ver `docs/PROJECTS_CRUD_CONTRACT.md`
+
+Primera capa de **escritura** real (el `ReadModelPort` sigue siendo solo lectura).
+`ProjectsWriteRepository` (`apps/web/server/projects/`): `createProject(viewer,
+input)` y `getProjectById(viewer, id)`. `CreateProjectInput` permitido desde el
+navegador = `{ name, city, description?, initialStatus? }`. `organization_id`
+(= `app.current_org()` por RLS), `created_by` (= `viewer.profileId`), `code`
+(autogenerado), `id` y timestamps se derivan **server-side**; nunca del navegador.
+"Ciudad" persiste en `projects.location`. Creación exige `APP_AUTH_MODE=supabase` +
+`READ_MODEL_SOURCE=db`; en `demo`/`fixture` la creación está deshabilitada. Cliente
+RLS-bound (sin service-role); cross-org ⇒ 404 amable.

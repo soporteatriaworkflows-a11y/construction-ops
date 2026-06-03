@@ -1,5 +1,30 @@
 # Handoff Log
 
+## 2026-06-02 — Oleada 4B.1 (Fase 1): contrato congelado del vertical slice de proyectos
+
+### Estado
+- Rama **`integration/wave-4b1-real-projects`** desde `main`@`cb988be` (publicada).
+  `main` intacta. Logout online confirmado por la usuaria; 4A.3 cerrada.
+- Auditoría read-only previa: `migration list --linked` ⇒ **14/14 Local = Remote**.
+
+### Diagnóstico del esquema previo (`projects`)
+- RLS por organización ya existente (SELECT/INSERT/UPDATE/DELETE en `app.current_org()`).
+- **Faltan** `created_by` y `description`; usa `location` (no `city`); `code` es
+  `NOT NULL UNIQUE(org,code)` y no está en el input. `ReadModelPort` es **solo lectura**.
+
+### Contrato congelado (Fase 1)
+- `docs/PROJECTS_CRUD_CONTRACT.md` v1 + actualizaciones en `API_CONTRACTS.md`,
+  `AGENT_REGISTRY.md` (ownership 4B.1), `DECISIONS.md`, `INTEGRATION_REQUESTS.md`.
+- Plan: db-rls (migración `created_by`+`description`, repo de escritura, RLS runtime) →
+  frontend-boq (server action + UI lista/detalle/formulario). Ejecución **secuencial**.
+
+### Restricciones
+- Sin tocar Vercel ni remoto productivo; sin `db push/pull` en remoto; creación solo en
+  `supabase`+`db` local; sin service-role; sin secretos. **4C NO iniciada.**
+
+### Próximo paso
+- Fase 2: lanzar `agent-db-rls` (worktree aislado) desde la rama de integración.
+
 ## 2026-06-02 — CIERRE Oleada 4A.3: Supabase remoto + autenticación online validada
 
 ### Estado
