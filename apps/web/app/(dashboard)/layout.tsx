@@ -15,6 +15,16 @@ import {
   Hash,
   CalendarRange,
 } from 'lucide-react';
+import { readModelModeLabel } from '@/lib/utils/mode-label';
+
+/**
+ * Render REQUEST-TIME de todo el segmento autenticado. La app va detrás de auth
+ * (proxy) y su contenido depende del viewer y del modo (`READ_MODEL_SOURCE`)
+ * resueltos en runtime; no debe prerenderizarse estáticamente ni hornear datos
+ * de demostración. Esto cubre `/apu`, `/catalog`, `/quantities`, `/planning`,
+ * además del footer mode-aware de abajo.
+ */
+export const dynamic = 'force-dynamic';
 
 const NAV_ITEMS = [
   {
@@ -55,6 +65,7 @@ const NAV_ITEMS = [
 ] as const;
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
+  const mode = readModelModeLabel();
   return (
     <div className="flex min-h-screen bg-gray-50">
       {/* Sidebar */}
@@ -92,9 +103,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           </ul>
         </nav>
 
-        {/* Footer del sidebar */}
+        {/* Footer del sidebar — etiqueta de modo resuelta en request-time */}
         <div className="border-t border-gray-200 px-4 py-3">
-          <p className="text-xs text-gray-400">Oleada 3A — fixture</p>
+          <p className="text-xs text-gray-400">{mode.label}</p>
         </div>
       </aside>
 

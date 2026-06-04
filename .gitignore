@@ -33,3 +33,6 @@ supabase/.branches/
 # ── Sistema ────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
+
+# ── Vercel CLI (vínculo local; nunca versionar) ─────────────────
+.vercel

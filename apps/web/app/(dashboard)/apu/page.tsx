@@ -17,15 +17,20 @@ import {
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatCOP } from '@/lib/utils/format';
-import { getReadModel, getDemoViewer } from '@/server/read-model';
+import { getReadModel } from '@/server/read-model';
+import { resolveViewer } from '@/server/auth/resolve-viewer';
+
+// Render request-time: viewer real por modo (db=autenticado, fixture=demo).
+// En modo `db` consulta la organización real; nunca hornea datos de demostración.
+export const dynamic = 'force-dynamic';
 
 export default async function ApuPage() {
   const rm = getReadModel();
-  const viewer = getDemoViewer();
   let apus: Awaited<ReturnType<typeof rm.listApus>> = [];
   let error: string | null = null;
 
   try {
+    const viewer = await resolveViewer();
     apus = await rm.listApus(viewer);
   } catch (e) {
     error = e instanceof Error ? e.message : 'Error al cargar APU';

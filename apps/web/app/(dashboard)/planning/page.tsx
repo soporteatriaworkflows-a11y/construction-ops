@@ -11,38 +11,38 @@
 import { CalendarRange } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
 import { EmptyState } from '@/components/shared/empty-state';
-import { getReadModel, getDemoViewer } from '@/server/read-model';
+import { getReadModel } from '@/server/read-model';
+import { resolveViewer } from '@/server/auth/resolve-viewer';
 import { buildPlanningViewModel, mapScheduleToGantt } from '@/modules/planning';
 import { PlanningSummary } from '@/components/planning/planning-summary';
 import { ScheduleTable } from '@/components/planning/schedule-table';
 import { GanttChart } from '@/components/planning/gantt-chart';
 
-// Proyecto piloto del fixture sanitizado (modo demo/dev).
-const DEMO_PROJECT_ID = '00000000-0000-4000-8000-000000000010';
+// Render request-time: viewer real por modo (db=autenticado, fixture=demo).
+// En modo `db` el cronograma proviene del proyecto real; sin proyectos ⇒ empty state.
+export const dynamic = 'force-dynamic';
 
 export default async function PlanningPage() {
   const rm = getReadModel();
-  const viewer = getDemoViewer();
-  const canSeeCriticalPath = viewer.role !== 'client';
 
-  // Resolver proyecto (nombre para el encabezado).
-  let projectId = DEMO_PROJECT_ID;
+  // Viewer real por modo + proyecto activo derivado de la lista real (sin UUID demo).
+  let projectId: string | null = null;
   let projectName = 'Proyecto';
+  let canSeeCriticalPath = true;
+  let summary: Awaited<ReturnType<typeof rm.getSchedule>> | null = null;
+  let error: string | null = null;
   try {
+    const viewer = await resolveViewer();
+    canSeeCriticalPath = viewer.role !== 'client';
     const projects = await rm.listProjects(viewer);
-    const p = projects.find((x) => x.id === DEMO_PROJECT_ID) ?? projects[0];
+    const p = projects[0];
     if (p) {
       projectId = p.id;
       projectName = p.name;
     }
-  } catch {
-    // se maneja abajo con el cronograma
-  }
-
-  let summary: Awaited<ReturnType<typeof rm.getSchedule>> | null = null;
-  let error: string | null = null;
-  try {
-    summary = await rm.getSchedule(viewer, projectId);
+    if (projectId) {
+      summary = await rm.getSchedule(viewer, projectId);
+    }
   } catch (e) {
     error = e instanceof Error ? e.message : 'Error al cargar el cronograma';
   }

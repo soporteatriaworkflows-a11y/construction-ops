@@ -11,8 +11,12 @@ import { PageHeader } from '@/components/shared/page-header';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Badge } from '@/components/ui/badge';
 import { formatCOP, RESOURCE_TYPE_LABELS } from '@/lib/utils/format';
-import { getReadModel, getDemoViewer } from '@/server/read-model';
+import { getReadModel } from '@/server/read-model';
+import { resolveViewer } from '@/server/auth/resolve-viewer';
 import type { CatalogResourceView } from '@/lib/contracts/read-model';
+
+// Render request-time: viewer real por modo (db=autenticado, fixture=demo).
+export const dynamic = 'force-dynamic';
 
 const RESOURCE_TYPE_ORDER = [
   'material',
@@ -37,11 +41,11 @@ const RESOURCE_TYPE_VARIANT: Record<
 
 export default async function CatalogPage() {
   const rm = getReadModel();
-  const viewer = getDemoViewer();
   let resources: CatalogResourceView[] = [];
   let error: string | null = null;
 
   try {
+    const viewer = await resolveViewer();
     resources = await rm.listCatalogResources(viewer);
   } catch (e) {
     error = e instanceof Error ? e.message : 'Error al cargar catálogo';

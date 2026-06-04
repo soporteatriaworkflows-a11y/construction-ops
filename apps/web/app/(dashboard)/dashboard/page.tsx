@@ -93,15 +93,13 @@ export default async function DashboardPage() {
           description="Aún no hay proyectos en esta organización. Crea el primero para ver el resumen financiero."
           action={
             canCreate ? (
-              <Link href="/projects/new">
-                <Button size="sm">Crear primer proyecto</Button>
-              </Link>
+              <Button asChild size="sm">
+                <Link href="/projects/new">Crear primer proyecto</Link>
+              </Button>
             ) : (
-              <Link href="/projects">
-                <Button size="sm" variant="outline">
-                  Ir a proyectos
-                </Button>
-              </Link>
+              <Button asChild size="sm" variant="outline">
+                <Link href="/projects">Ir a proyectos</Link>
+              </Button>
             )
           }
         />
