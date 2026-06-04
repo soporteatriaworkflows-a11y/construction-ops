@@ -1,5 +1,51 @@
 # Handoff Log
 
+## 2026-06-04 — Fix 4B.1: `/dashboard` maneja DB vacía sin proyecto demo (rama)
+
+### Estado
+- Rama **`fix/wave4b1-empty-db-dashboard-build`** desde `main`@`49bd113` (`main` intacta,
+  sin merge). Producción Vercel intacta: `APP_AUTH_MODE=supabase` + `READ_MODEL_SOURCE=fixture`.
+
+### Diagnóstico
+- Síntoma: deploy manual con `READ_MODEL_SOURCE=db` conectó a Postgres
+  (`[read-model] fuente activa: db`) pero el build falló en prerender:
+  `Error occurred prerendering page "/dashboard"` →
+  `ProjectNotFoundError: 00000000-0000-4000-8000-000000000010`.
+- Causa raíz: `app/(dashboard)/dashboard/page.tsx` (1) era **estática** (`○`, sin señal
+  dinámica) por usar `getDemoViewer()` y (2) **hardcodeaba** `DEMO_PROJECT_ID` invocando
+  `getDashboardSummary(viewer, DEMO_PROJECT_ID)` sin try/catch. En modo `db` con base
+  productiva vacía, `projectById` → `null` → `ProjectNotFoundError` durante el prerender
+  del build. Único causante: el `/dashboard`. Las hermanas (`/apu`, `/catalog`,
+  `/quantities`, `/estimates`, `/planning`) ya manejaban lista vacía o capturaban el error.
+
+### Fix mínimo
+- `/dashboard` → request-time: `export const dynamic = 'force-dynamic'` + `await resolveViewer()`
+  (viewer real por modo; dinámica intrínseca vía cookies, como `/projects/new`).
+- Proyecto activo derivado de `listProjects(viewer)` + helper puro `selectActiveProjectId`
+  (sin UUID demo). Si no hay proyectos → **empty state** con CTA a `/projects/new`
+  (gated por `isCreationModeEnabled`) o a `/projects`. `getDashboardSummary` envuelto en
+  try/catch. Aviso "Modo fixture" condicionado a `READ_MODEL_SOURCE=fixture`.
+- Sin tocar migraciones/RLS/seeds/contratos. Sin fallback silencioso db→fixture.
+
+### Validación (todo PASS)
+- typecheck 0, lint 0, **520 tests** (+12 nuevos), build fixture PASS con **`ƒ /dashboard`**
+  (antes `○`). gm:regression **22/22**, gm:import PASS, validate-agents **214/0/0**,
+  `git diff --check` limpio.
+- **Build modo `db` (Postgres LOCAL) PASS** en dos escenarios: (A) DB sembrada y
+  (B) **DB vacía** (proyectos truncados localmente → 2 orgs, 10 profiles, 0 proyectos):
+  ambos compilan, `/dashboard` dinámica (no prerenderizada), sin `ProjectNotFoundError`.
+
+### Remoto / Vercel
+- **Supabase remoto NO tocado** (todo el trabajo fue contra Postgres local 127.0.0.1).
+  Sin `db push`/`db pull`/repair/SQL remoto/seeds remotos/proyectos remotos. Remoto
+  permanece **16/16**, seeds 0, proyectos 0. **Vercel sin cambios** (vars intactas).
+- El stack local de Supabase se levantó excluyendo `realtime` (contenedor unhealthy en
+  Windows, ajeno al fix). La DB local quedó con proyectos truncados (reversible con
+  `supabase db reset`).
+
+### Próximo paso
+- Revisión del orquestador para autorizar merge a `main`. NO se hizo merge.
+
 ## 2026-06-04 — CIERRE hardening `/projects/new`: merge a `main` + tag
 
 ### Estado
