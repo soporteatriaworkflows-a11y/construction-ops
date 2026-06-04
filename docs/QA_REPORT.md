@@ -9,6 +9,23 @@ cada ciclo de validación.
 
 ---
 
+## CIERRE hardening `/projects/new` — merge a `main` (2026-06-04)
+
+> `main = origin/main = 0ad7f56` (merge `--no-ff` de `7b112cc`, sin conflictos).
+> Tag `wave-4b1-project-creation-runtime-hardening-v1`.
+
+- **Post-merge `main`** ✅: `/projects/new` conserva `force-dynamic` + `await resolveViewer()`
+  (dinámica intrínseca); typecheck/lint 0, **508 tests**, build con **`ƒ /projects/new`**
+  (sin prerender; ausente del `prerender-manifest`), gm:regression **22/22**, gm:import PASS,
+  validate-agents **214/0/0**, `git diff --check` limpio.
+- **Solo código** (sin migración): remoto intacto **16/16**, seeds 0, proyectos 0.
+  **Vercel intacto** (`supabase`+`fixture`).
+- **Hipótesis ambiental** (caché estática/edge obsoleta) **aún no confirmada como certeza**.
+- **Pendiente (manual, usuaria)**: `READ_MODEL_SOURCE` `fixture`→`db` + **redeploy SIN Build
+  Cache** + smoke `/projects/new`. Rollback = `fixture` + redeploy.
+
+---
+
 ## Fix 4B.1 (residual) — `/projects/new` intrínsecamente dinámica (2026-06-03)
 
 > Rama `fix/wave4b1-runtime-creation-env` (NO mergeada). Solo código (sin migración).

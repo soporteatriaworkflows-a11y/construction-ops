@@ -1,5 +1,35 @@
 # Handoff Log
 
+## 2026-06-04 — CIERRE hardening `/projects/new`: merge a `main` + tag
+
+### Estado
+- `git merge --no-ff fix/wave4b1-runtime-creation-env` (`7b112cc`) → merge **`0ad7f56`**,
+  **sin conflictos** (5 archivos, +102/-8). `main = origin/main = 0ad7f56`.
+  Tag **`wave-4b1-project-creation-runtime-hardening-v1`**.
+
+### Validación post-merge (todo PASS en `main`)
+- `/projects/new/page.tsx` conserva `export const dynamic = 'force-dynamic'` **y**
+  `await resolveViewer()` (señal dinámica intrínseca vía cookies).
+- typecheck/lint 0, **508 tests**, build con **`ƒ /projects/new`** (sin prerender; ausente
+  del `prerender-manifest`), gm:regression **22/22**, gm:import PASS, validate-agents
+  **214/0/0**, `git diff --check` limpio. Server action conserva su guard independiente.
+- Sin cambios en DB/migraciones/RLS/seeds/Vercel/fixture.
+
+### Hipótesis ambiental (pendiente de confirmar)
+- El bloqueo productivo residual NO se reprodujo con artefacto limpio; hipótesis principal:
+  **caché estática/edge obsoleta** de despliegues previos (cuando la ruta era `○`). Aún
+  **no es certeza absoluta**. El hardening (dinámica intrínseca) evita futuro cacheo
+  estático y debe superar el artefacto viejo en un deploy con build limpio.
+
+### Remoto / Vercel
+- Supabase remoto intacto: **16/16 Local = Remote**, seeds 0, proyectos 0. **Sin** `db push`
+  (solo código). Vercel sin cambios: `APP_AUTH_MODE=supabase` + `READ_MODEL_SOURCE=fixture`.
+
+### Próximo paso manual (de la usuaria)
+- Esperar el deployment automático del merge → cambiar `READ_MODEL_SOURCE` `fixture`→`db`
+  → **redeploy SIN reutilizar Build Cache** → probar `/projects/new` (debe mostrar el
+  formulario). Rollback = `READ_MODEL_SOURCE=fixture` + redeploy.
+
 ## 2026-06-03 — Fix 4B.1 (residual): `/projects/new` intrínsecamente dinámica + diagnóstico
 
 ### Estado
