@@ -1,5 +1,46 @@
 # Handoff Log
 
+## 2026-06-04 — CIERRE fix `/dashboard` DB vacía: merge a `main` + tag
+
+### Estado
+- `git merge --no-ff fix/wave4b1-empty-db-dashboard-build` (`d1aa929`) → merge **`b942f3f`**,
+  **sin conflictos** (6 archivos, +331/-25). `main = origin/main = b942f3f`.
+  Tag **`wave-4b1-empty-db-dashboard-ready-v1`**.
+
+### Validación post-merge (todo PASS en `main`)
+- `/dashboard`: conserva `export const dynamic = 'force-dynamic'` + `await resolveViewer()`;
+  **sin `DEMO_PROJECT_ID`** ni `getDemoViewer`; deriva el proyecto activo de
+  `listProjects(viewer)` + `selectActiveProjectId`; empty state con CTA a `/projects/new`;
+  `getDashboardSummary` en try/catch; sin fallback silencioso db→fixture.
+- `/projects/new`: conserva `force-dynamic` + `await resolveViewer()` + guard `supabase`+`db`.
+- typecheck/lint 0, **520 tests**, build con **`ƒ /dashboard`** y **`ƒ /projects/new`**,
+  gm:regression **22/22**, gm:import PASS, validate-agents **214/0/0**, `git diff --check` limpio.
+- Sin cambios en DB/migraciones/RLS/seeds/contratos/Vercel/`DATABASE_URL`/fixture (solo tests nuevos).
+
+### Causa raíz / fix (resumen)
+- Causa: `/dashboard` se prerenderizaba estática y resolvía un UUID demo fijo; en modo `db`
+  con base remota vacía, `getDashboardSummary` lanzaba `ProjectNotFoundError` en prerender y
+  Vercel abortaba el build.
+- Fix: dashboard request-time + viewer real + selección de proyecto visible real + empty state.
+
+### Remoto / Vercel
+- **Solo código.** Supabase remoto intacto: **16/16 Local = Remote**, seeds 0, proyectos 0.
+  Sin `db push`/`db pull`/repair/SQL/seeds/proyectos remotos/service-role.
+- Vercel **sin cambios**: `APP_AUTH_MODE=supabase` + `READ_MODEL_SOURCE=fixture`;
+  `DATABASE_URL` ya configurada privadamente por la usuaria (NO expuesta).
+- **Smoke remoto pendiente** (manual de la usuaria).
+
+### Deuda técnica registrada
+- Rutas hermanas estáticas `/apu`, `/catalog`, `/quantities`, `/planning` usan `getDemoViewer()`
+  y se prerenderizan en build; antes de uso productivo multitenant deben migrarse a viewer real
+  request-time (`resolveViewer` + `force-dynamic`). No bloquea el build ni la creación del primer
+  proyecto. Registrada en `docs/INTEGRATION_REQUESTS.md`.
+
+### Próximo paso manual (de la usuaria)
+- Esperar deployment automático → cambiar `READ_MODEL_SOURCE` `fixture`→`db` → **redeploy SIN
+  Build Cache** → probar `/projects/new`, crear primer proyecto, listar, abrir detalle.
+  Rollback = `READ_MODEL_SOURCE=fixture` + redeploy. **4B.2/4C NO iniciadas.**
+
 ## 2026-06-04 — Fix 4B.1: `/dashboard` maneja DB vacía sin proyecto demo (rama)
 
 ### Estado

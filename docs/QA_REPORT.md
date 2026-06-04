@@ -9,6 +9,32 @@ cada ciclo de validación.
 
 ---
 
+## CIERRE fix `/dashboard` DB vacía — merge a `main` (2026-06-04)
+
+> `main = origin/main = b942f3f` (merge `--no-ff` de `d1aa929`, sin conflictos).
+> Tag `wave-4b1-empty-db-dashboard-ready-v1`.
+
+- **Causa raíz**: `/dashboard` se prerenderizaba estáticamente y dependía de un UUID demo fijo
+  (`DEMO_PROJECT_ID`) durante el prerender; en modo `db` con base remota vacía,
+  `getDashboardSummary` lanzaba `ProjectNotFoundError` y el build de Vercel abortaba.
+- **Fix**: dashboard request-time (`force-dynamic` + `await resolveViewer()`), proyecto activo
+  derivado de `listProjects(viewer)` (`selectActiveProjectId`, sin UUID demo), empty state con CTA
+  a `/projects/new`, `getDashboardSummary` en try/catch, sin fallback silencioso db→fixture.
+- **Post-merge `main`** ✅: typecheck/lint 0, **520 tests**, build con **`ƒ /dashboard`** y
+  **`ƒ /projects/new`**, gm:regression **22/22**, gm:import PASS, validate-agents **214/0/0**,
+  `git diff --check` limpio.
+- **Builds en modo `db` (Postgres LOCAL) PASS** (verificados en rama): (A) DB sembrada y
+  (B) **DB vacía** (2 orgs / 10 profiles / 0 proyectos) — ambos compilan, `/dashboard` dinámica,
+  sin `ProjectNotFoundError`.
+- **Solo código** (sin migración): remoto intacto **16/16**, seeds 0, proyectos 0.
+  **Vercel intacto** (`supabase`+`fixture`; `DATABASE_URL` privada, no expuesta).
+- **Deuda**: rutas hermanas estáticas `/apu`,`/catalog`,`/quantities`,`/planning` deben migrarse
+  a viewer real request-time antes de uso productivo multitenant.
+- **Pendiente (manual, usuaria)**: `READ_MODEL_SOURCE` `fixture`→`db` + **redeploy SIN Build
+  Cache** + smoke de creación de proyecto. Rollback = `fixture` + redeploy.
+
+---
+
 ## CIERRE hardening `/projects/new` — merge a `main` (2026-06-04)
 
 > `main = origin/main = 0ad7f56` (merge `--no-ff` de `7b112cc`, sin conflictos).
