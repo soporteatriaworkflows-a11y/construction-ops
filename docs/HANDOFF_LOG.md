@@ -1,5 +1,54 @@
 # Handoff Log
 
+## 2026-06-03 — Fix 4B.1 (residual): `/projects/new` intrínsecamente dinámica + diagnóstico
+
+### Estado
+- Rama **`fix/wave4b1-runtime-creation-env`** desde `main`@`17b9e07` (`main` intacta).
+  Producción en `supabase`+`fixture` (rollback de la usuaria) mientras se investiga.
+
+### Diagnóstico (auditoría profunda — el código YA era correcto)
+- Síntoma: con `READ_MODEL_SOURCE=db` en Vercel, `/projects/new` seguía mostrando "Modo
+  demostración activo" pese a que `17b9e07` (force-dynamic) estaba desplegado y `/projects`
+  sí leía `db`.
+- **Evidencia recolectada (todo confirma código correcto):**
+  1. Grep: **no hay accesos literales** `process.env.APP_AUTH_MODE/READ_MODEL_SOURCE` en
+     código de app (solo tests) ⇒ Next no inyecta valores en build.
+  2. Chunk compilado: `resolveAuthMode(a=process.env){...a.APP_AUTH_MODE...}` e
+     `isCreationModeEnabled` lee `a.READ_MODEL_SOURCE` con `a=process.env` ⇒ **lectura
+     runtime indirecta, sin inlining/congelado**.
+  3. Build: `/projects/new` es `ƒ`, **sin** HTML/RSC prerenderizado y **ausente** del
+     `prerender-manifest` ⇒ `force-dynamic` es efectivo.
+  4. El Proxy local (mismo `resolveAuthMode`) devolvió 307 a `/login` ⇒ leyó
+     `APP_AUTH_MODE=supabase` en runtime desde el bundle.
+- **Conclusión**: no hay defecto de código; el guard evalúa request-time correctamente.
+  El bloqueo residual en producción es **ambiental**: caché estática/edge OBSOLETA de
+  `/projects/new` de los despliegues previos (cuando la ruta era `○` static, con el
+  mensaje demo horneado), no invalidada por el redeploy (posible "Redeploy" con build
+  cache reusado).
+
+### Fix (endurecimiento honesto — no repite el anterior)
+- `/projects/new/page.tsx`: ahora `async` y resuelve `await resolveViewer()` (lee
+  `cookies()` en modo supabase) ⇒ **señal dinámica intrínseca** idéntica a `/projects`.
+  Vercel NO sirve rutas dinámicas intrínsecas desde caché estática/edge, de modo que el
+  próximo deploy supera definitivamente cualquier HTML estático obsoleto. Se conserva
+  `force-dynamic`. Defensa en profundidad: la creación es ruta protegida; ya no se confía
+  solo en el Proxy (la server action mantiene su guard auth+modo).
+- Test `route-config.test.ts`: + assert de señal dinámica intrínseca (`await resolveViewer`
+  / `export default async function`).
+
+### Validación (local)
+- typecheck/lint 0, **508 tests** (+1), build con **`ƒ /projects/new`** (sin prerender),
+  gm:regression 22/22, gm:import PASS, validate-agents 214/0/0, `git diff --check` limpio.
+
+### Recomendación de despliegue (clave)
+- Al mergear: forzar **build limpio sin caché** en Vercel y **purgar la caché del proyecto**
+  antes de reintentar `READ_MODEL_SOURCE=db`. Verificar con hard refresh / `curl` con
+  cache-busting. Rollback = `fixture` + redeploy.
+
+### Restricciones
+- Sin tocar Vercel/variables; sin DB/RLS/remoto; sin escritura remota; sin service-role.
+  **NO merge a `main`. 4B.2/4C NO iniciadas.**
+
 ## 2026-06-03 — CIERRE Fix `/projects/new`: merge a `main` + tag
 
 ### Estado

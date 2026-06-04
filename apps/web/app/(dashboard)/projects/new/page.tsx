@@ -14,22 +14,37 @@ import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
 import { Button } from '@/components/ui/button';
+import { resolveViewer } from '@/server/auth/resolve-viewer';
 import { isCreationModeEnabled } from '../mode-guard';
 import { NewProjectForm } from './new-project-form';
 
 /**
- * Render en REQUEST-TIME (no prerender estático).
+ * Render en REQUEST-TIME (no prerender estático ni cacheo estático/edge).
  *
- * El mode-guard depende de `APP_AUTH_MODE`/`READ_MODEL_SOURCE`, que son variables
- * de entorno de SERVIDOR resueltas en runtime. Sin esta directiva, Next genera
- * `/projects/new` de forma estática en build (esta página no usa `cookies()`/
- * `headers()`), horneando el resultado del guard con los defaults de build
- * (`demo`+`fixture`) ⇒ siempre mostraba "Modo demostración activo" aunque en
- * producción `READ_MODEL_SOURCE=db`. `force-dynamic` evalúa el guard por petición.
+ * El mode-guard depende de `APP_AUTH_MODE`/`READ_MODEL_SOURCE` (env de SERVIDOR
+ * en runtime). Doble salvaguarda para garantizar evaluación por petición:
+ *  1) `export const dynamic = 'force-dynamic'` (flag explícito).
+ *  2) Señal DINÁMICA INTRÍNSECA: la página resuelve el viewer (que en modo
+ *     `supabase` lee `cookies()`), exactamente como `/projects`. Así Next la trata
+ *     como dinámica de forma intrínseca y Vercel NO puede servirla desde una caché
+ *     estática/edge previa (cuando la ruta era `○`), que es lo que mantenía el
+ *     mensaje "Modo demostración activo" pese a `READ_MODEL_SOURCE=db` en runtime.
+ * Además es defensa en profundidad: la creación es una ruta protegida; no se
+ * confía solo en el Proxy. La server action conserva su propio guard de auth+modo.
  */
 export const dynamic = 'force-dynamic';
 
-export default function NewProjectPage() {
+export default async function NewProjectPage() {
+  // Señal dinámica intrínseca + defensa en profundidad (igual que /projects).
+  // En modo supabase lee cookies(); el Proxy ya redirige si no hay sesión.
+  try {
+    await resolveViewer();
+  } catch {
+    // Sin sesión válida en modo supabase: el Proxy redirige a /login antes de
+    // llegar aquí. Si se llegara sin viewer, no se expone el formulario: la
+    // escritura real la sigue protegiendo el guard de la server action.
+  }
+
   const canCreate = isCreationModeEnabled();
 
   if (!canCreate) {
