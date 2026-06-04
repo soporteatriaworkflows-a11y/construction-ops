@@ -9,6 +9,33 @@ cada ciclo de validación.
 
 ---
 
+## CIERRE estabilización de producción 4B.1 — db mode + deploy (2026-06-04)
+
+> `main = origin/main = c6d0ad1` (merge `--no-ff` de `c2f5373`, sin conflictos).
+> Production deploy READY → `https://construction-ops-psi.vercel.app`.
+
+- **Diagnóstico**: (1) CTAs no navegaban por `<Link><Button></Button></Link>`
+  (`<a><button></button></a>`, interactivo anidado); (2) `/apu`,`/catalog`,`/quantities`,
+  `/planning` estáticas y `/estimates` con `getDemoViewer()` exponían demo/fixture en `db`;
+  (3) footer hardcodeado `Oleada 3A — fixture`.
+- **Fix**: CTAs → `Button asChild` + `Link`; rutas hermanas + layout → `force-dynamic` +
+  `resolveViewer()` (viewer real en db, demo en fixture), `/planning` sin UUID demo, empty
+  state honesto; footer mode-aware (`readModelModeLabel`: db="Datos reales").
+- **Validación** ✅: typecheck/lint 0, **546 tests** (+26), build fixture (rutas dashboard
+  todas `ƒ`), **build `db` LOCAL vacío y sembrado** PASS, gm:regression **22/22**, gm:import
+  PASS, validate-agents **214/0/0**, `git diff --check` limpio.
+- **Preview Vercel** READY (build production-like en infra Vercel; Preview protegido por SSO
+  del equipo ⇒ 401 a todo, esperado). **Production** READY + smoke del dominio: `/login` 200;
+  `/`,`/dashboard`,`/projects`,`/apu`,`/catalog`,`/quantities`,`/planning`,`/estimates` ⇒
+  **307 → /login** (deny-by-default, sin fixture público, sin 500).
+- **Sin escrituras remotas** de proyectos; variables de Vercel **no modificadas**; pruebas de
+  DB contra Postgres **local**. Sin secretos impresos ni en disco.
+- **Pendiente (manual, usuaria)**: login + crear primer proyecto desde `/projects/new`
+  (listar, abrir detalle). Verificación autenticada de footer "Datos reales", CTAs y ausencia
+  de fixture requiere sesión (solo la usuaria). Rollback = `READ_MODEL_SOURCE=fixture` + redeploy.
+
+---
+
 ## CIERRE fix `/dashboard` DB vacía — merge a `main` (2026-06-04)
 
 > `main = origin/main = b942f3f` (merge `--no-ff` de `d1aa929`, sin conflictos).

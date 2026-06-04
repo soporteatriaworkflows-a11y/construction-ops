@@ -1,5 +1,55 @@
 # Handoff Log
 
+## 2026-06-04 — CIERRE estabilización de producción 4B.1: db mode + deploy
+
+### Estado
+- Rama `fix/wave4b1-production-stabilization` (`c2f5373`) → merge `--no-ff` a `main`
+  (**`c6d0ad1`**, sin conflictos, 12 archivos, +264/-42). **Production deploy READY**
+  (`dpl_5AbsYetRgwnoq9nnPxk3jZEU6SV2`) aliased a `https://construction-ops-psi.vercel.app`.
+- Vínculo Vercel verificado: scope `soporteatriaworkflows-8854s-projects`, proyecto
+  `construction-ops` (NO `construction-ops-1rqh`). `.vercel` ignorado.
+
+### Diagnóstico (estado mixto en producción)
+- **CTAs rotos** (`+ Nuevo proyecto`, `Crear primer proyecto`): se renderizaban como
+  `<Link href="/projects/new"><Button>…</Button></Link>` ⇒ HTML `<a><button></button></a>`
+  (interactivo anidado inválido); el click en el `<button>` no dispara la navegación del
+  ancla. Causa de "aparecen pero no navegan".
+- **Fixture/demo en db mode**: `/apu`, `/catalog`, `/quantities`, `/planning` eran estáticas
+  (`○`) y `/estimates` usaba `getDemoViewer()`; en `db` resolvían la **org demo** (o servían
+  HTML horneado del build con datos de ENTRE PATIOS), en vez de la org real.
+- **Footer**: hardcodeado `Oleada 3A — fixture` en el layout.
+
+### Fix integral
+- CTAs → `<Button asChild><Link href="/projects/new">…</Link></Button>` (ancla navegable)
+  en `/projects` (2 CTAs) y `/dashboard`.
+- Rutas hermanas → `export const dynamic = 'force-dynamic'` + `await resolveViewer()`
+  (viewer real en `db`, demo en `fixture`); `/planning` sin UUID demo; empty state honesto
+  en `db` vacío. El layout es `force-dynamic` (cubre el segmento autenticado).
+- Footer → `readModelModeLabel()` (`db` ⇒ "Datos reales", `fixture` ⇒ "Modo demostración");
+  helper puro `apps/web/lib/utils/mode-label.ts`.
+
+### Validación
+- typecheck/lint 0, **546 tests** (+26), build fixture PASS (todas las rutas dashboard `ƒ`),
+  **build `db` LOCAL** (vacío y sembrado) PASS, gm 22/22, gm:import, validador 214/0/0,
+  `git diff --check` limpio.
+- **Preview Vercel READY** (build production-like en su infra; sin secretos en disco). El
+  Preview responde 401 a todo por **Deployment Protection (SSO)** del equipo (no es la app).
+- **Production READY** + smoke del dominio: `/login` 200; `/`, `/dashboard`, `/projects`,
+  `/apu`, `/catalog`, `/quantities`, `/planning`, `/estimates` ⇒ **307 → /login?next=…**
+  (deny-by-default, sin fixture público, sin 500). `APP_AUTH_MODE=supabase` activo en runtime.
+
+### Remoto / Vercel
+- **Sin escrituras remotas de proyectos**, sin `db push`/`db pull`/repair/SQL/seeds remotos/
+  service-role. Variables de Vercel **no modificadas** (solo se listaron NOMBRES). Toda prueba
+  de DB fue contra Postgres **local** (reseteado a seeds sanitizados).
+
+### Pendiente / rollback
+- **Única acción manual de la usuaria**: iniciar sesión en `construction-ops-psi.vercel.app`
+  y crear el primer proyecto desde `/projects/new` (luego listar y abrir detalle).
+- Rollback: `READ_MODEL_SOURCE=fixture` + redeploy.
+- Deuda menor: `app/api/exports/route.ts` (3C, agent-exports) conserva import muerto
+  `getDemoViewer` (no afecta auth: usa `resolveAuthenticatedViewer`). **4B.2/4C NO iniciadas.**
+
 ## 2026-06-04 — CIERRE fix `/dashboard` DB vacía: merge a `main` + tag
 
 ### Estado
