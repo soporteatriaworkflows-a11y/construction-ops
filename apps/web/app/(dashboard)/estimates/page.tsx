@@ -16,7 +16,11 @@ import {
 } from '@/components/ui/card';
 import { formatCOP, formatDateTime, formatNumber, formatPct } from '@/lib/utils/format';
 import { BudgetBoqGrid } from '@/components/budget/budget-boq-grid';
-import { getReadModel, getDemoViewer } from '@/server/read-model';
+import { getReadModel } from '@/server/read-model';
+import { resolveViewer } from '@/server/auth/resolve-viewer';
+
+// Render request-time: viewer real por modo (db=autenticado, fixture=demo).
+export const dynamic = 'force-dynamic';
 
 // ---------------------------------------------------------------------------
 // Reglas AIU del fixture (estáticas — ya incluidas en el estimateSummary)
@@ -38,7 +42,24 @@ export default async function EstimatesPage({ searchParams }: PageProps) {
   const projectId = typeof params['projectId'] === 'string' ? params['projectId'] : undefined;
 
   const rm = getReadModel();
-  const viewer = getDemoViewer();
+
+  // Viewer real por modo (supabase=autenticado, demo=fixture). Sin sesión válida
+  // en modo supabase el proxy ya redirige a /login; defensa: empty state honesto.
+  let viewer: Awaited<ReturnType<typeof resolveViewer>>;
+  try {
+    viewer = await resolveViewer();
+  } catch {
+    return (
+      <div>
+        <PageHeader title="Presupuesto" />
+        <EmptyState
+          icon={ClipboardList}
+          title="Sin presupuesto"
+          description="Aún no hay presupuestos para esta organización."
+        />
+      </div>
+    );
+  }
 
   // Resolver el proyecto y su alcance "Primer piso" para títulos. Una sola
   // resolución que devuelve valores `const` (sin reasignar variables usadas en JSX).

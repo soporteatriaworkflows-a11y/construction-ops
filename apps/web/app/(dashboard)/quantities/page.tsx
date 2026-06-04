@@ -17,11 +17,15 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { formatNumber, CALCULATION_MODE_LABELS } from '@/lib/utils/format';
-import { getReadModel, getDemoViewer } from '@/server/read-model';
+import { getReadModel } from '@/server/read-model';
+import { resolveViewer } from '@/server/auth/resolve-viewer';
+import type { ViewerContext } from '@/lib/contracts/read-model';
+
+// Render request-time: viewer real por modo (db=autenticado, fixture=demo).
+export const dynamic = 'force-dynamic';
 
 export default async function QuantitiesPage() {
   const rm = getReadModel();
-  const viewer = getDemoViewer();
 
   // Para cantidades necesitamos el scopeId del primer proyecto
   let scopeId: string | null = null;
@@ -29,7 +33,9 @@ export default async function QuantitiesPage() {
   let scopeName = '';
   let loadError: string | null = null;
 
+  let viewer: ViewerContext | null = null;
   try {
+    viewer = await resolveViewer();
     const projects = await rm.listProjects(viewer);
     if (projects.length > 0) {
       const first = projects[0]!;
@@ -51,7 +57,7 @@ export default async function QuantitiesPage() {
 
   let groups: Awaited<ReturnType<typeof rm.listQuantities>> = [];
 
-  if (scopeId && !loadError) {
+  if (viewer && scopeId && !loadError) {
     try {
       groups = await rm.listQuantities(viewer, scopeId);
     } catch (e) {

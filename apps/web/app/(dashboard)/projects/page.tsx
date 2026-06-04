@@ -89,12 +89,12 @@ export default async function ProjectsPage() {
         description="Gestión de proyectos de construcción y sus alcances"
         actions={
           canCreate ? (
-            <Link href="/projects/new">
-              <Button size="sm">
+            <Button asChild size="sm">
+              <Link href="/projects/new">
                 <Plus className="h-4 w-4" aria-hidden="true" />
                 Nuevo proyecto
-              </Button>
-            </Link>
+              </Link>
+            </Button>
           ) : (
             <Button
               size="sm"
@@ -116,9 +116,9 @@ export default async function ProjectsPage() {
           description="Aún no hay proyectos registrados en esta organización."
           action={
             canCreate ? (
-              <Link href="/projects/new">
-                <Button size="sm">Crear primer proyecto</Button>
-              </Link>
+              <Button asChild size="sm">
+                <Link href="/projects/new">Crear primer proyecto</Link>
+              </Button>
             ) : (
               <Button size="sm" disabled>
                 Crear primer proyecto
