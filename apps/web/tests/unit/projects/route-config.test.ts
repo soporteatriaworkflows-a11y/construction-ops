@@ -30,4 +30,12 @@ describe('projects/new — configuración de render', () => {
     // El guard se invoca dentro del componente, no como constante a nivel módulo.
     expect(source).toMatch(/const\s+canCreate\s*=\s*isCreationModeEnabled\(\)/);
   });
+
+  it('usa una señal dinámica intrínseca (resolveViewer/cookies) como `/projects`', () => {
+    // Además del flag force-dynamic, la página resuelve el viewer (lee cookies en
+    // modo supabase) para que Next la trate como dinámica intrínseca y Vercel no la
+    // sirva desde una caché estática/edge previa.
+    expect(source).toMatch(/await\s+resolveViewer\(\)/);
+    expect(source).toMatch(/export\s+default\s+async\s+function/);
+  });
 });

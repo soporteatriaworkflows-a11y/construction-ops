@@ -9,6 +9,27 @@ cada ciclo de validación.
 
 ---
 
+## Fix 4B.1 (residual) — `/projects/new` intrínsecamente dinámica (2026-06-03)
+
+> Rama `fix/wave4b1-runtime-creation-env` (NO mergeada). Solo código (sin migración).
+
+- **Diagnóstico (código ya correcto)** ✅: sin literales `process.env.*` (no inlining);
+  chunk compilado lee `a.READ_MODEL_SOURCE`/`a.APP_AUTH_MODE` con `a=process.env`
+  (runtime); `/projects/new` es `ƒ`, sin prerender ni entrada en `prerender-manifest`
+  (force-dynamic efectivo); el Proxy local leyó `supabase` en runtime (307→/login).
+  **Conclusión: el guard evalúa request-time correctamente; el bloqueo residual en prod
+  es caché estática/edge OBSOLETA de despliegues previos (`○`), no defecto de código.**
+- **Fix (endurecimiento)**: `/projects/new` ahora `async` + `await resolveViewer()`
+  (señal dinámica intrínseca vía `cookies()`, como `/projects`) + se conserva
+  `force-dynamic`. Vercel no sirve rutas dinámicas intrínsecas desde caché estática ⇒
+  el próximo deploy supera el HTML obsoleto. Defensa en profundidad (no solo Proxy).
+- **Validación local** ✅: typecheck/lint 0, **508 tests** (+1), build con `ƒ /projects/new`
+  (sin prerender), gm 22/22, gm:import PASS, validate-agents 214/0/0, `git diff --check` limpio.
+- **Recomendación de deploy**: build limpio sin caché + purgar caché del proyecto antes de
+  reintentar `db`. Rollback = `fixture` + redeploy. Sin escritura remota; Vercel intacto.
+
+---
+
 ## CIERRE Fix `/projects/new` — merge a `main` (2026-06-03)
 
 > `main = origin/main = 1999ffb` (merge `--no-ff` de `9e9dd96`, sin conflictos).
