@@ -32,6 +32,7 @@ const sql = postgres(CONN, { max: 1, onnotice: () => {} });
 const ORG_A = '00000000-0000-0000-0000-0000000000a1';
 const USER_A_ADMIN = '00000000-0000-0000-0000-0000000000b1';
 const PROJECT_A = '00000000-0000-0000-0000-0000000000c1';
+const SCOPE_A = '00000000-0000-0000-0000-0000000000d1'; // alcance "Primer Piso" (seed 0002)
 const VERSION_A = '00000000-0000-0000-0000-000000000311';
 const APU_A = '00000000-0000-0000-0000-000000000201';
 const SUPPLIER_PRODUCT_A = '00000000-0000-0000-0000-000000000111';
@@ -229,6 +230,57 @@ async function main(): Promise<void> {
     return rows.length;
   });
   check('Usuario sin organización no ve proyectos', noOrgRows === 0, `rows=${noOrgRows}`);
+
+  // === 5b) project_scopes — aislamiento por org (vía proyecto padre), 4B.2 ===
+  // A ve su propio alcance (Primer Piso de PROJECT_A).
+  const aSeesScope = await asUser(claimsA, async (q) => {
+    const rows = await q<{ id: string }[]>`SELECT id FROM project_scopes`;
+    return rows.map((r) => r.id);
+  });
+  check('scopes: A ve su propio alcance', aSeesScope.includes(SCOPE_A));
+
+  // B NO ve los alcances de A (cross-org bloqueado en SELECT).
+  const bSeesScope = await asUser(claimsB, async (q) => {
+    const rows = await q<{ id: string }[]>`SELECT id FROM project_scopes`;
+    return rows.map((r) => r.id);
+  });
+  check('scopes: B NO ve el alcance de A', !bSeesScope.includes(SCOPE_A));
+
+  // A puede INSERT un alcance en SU proyecto (WITH CHECK pasa) — incl. description/created_by.
+  const aInsertOwn = await asUser(claimsA, async (q) => {
+    const rows = await q<{ id: string }[]>`
+      INSERT INTO project_scopes (project_id, code, name, scope_type, description, created_by)
+      VALUES (${PROJECT_A}, 'P2', 'Segundo Piso', 'floor', 'desc', ${USER_A_ADMIN})
+      RETURNING id`;
+    return rows.length;
+  });
+  check('scopes: A puede INSERT alcance en su proyecto (WITH CHECK)', aInsertOwn === 1);
+
+  // A NO puede INSERT un alcance en el proyecto de B (cross-org WITH CHECK lanza).
+  let scopeCrossBlocked = false;
+  try {
+    await asUser(claimsA, async (q) => {
+      await q`INSERT INTO project_scopes (project_id, code, name, scope_type)
+              VALUES (${PROJECT_B}, 'X', 'X', 'floor')`;
+    });
+  } catch {
+    scopeCrossBlocked = true;
+  }
+  check('scopes: A no puede INSERT alcance en proyecto de B (WITH CHECK)', scopeCrossBlocked);
+
+  // B NO puede UPDATE el alcance de A (0 filas por USING).
+  const bUpdScopeA = await asUser(claimsB, async (q) => {
+    const res = await q`UPDATE project_scopes SET name = 'HACKED' WHERE id = ${SCOPE_A}`;
+    return res.count;
+  });
+  check('scopes: B no puede UPDATE alcance de A (0 filas)', bUpdScopeA === 0, `count=${bUpdScopeA}`);
+
+  // Usuario sin organización no ve alcances.
+  const noOrgScopes = await asUser(claimsNoOrg, async (q) => {
+    const rows = await q<{ id: string }[]>`SELECT id FROM project_scopes`;
+    return rows.length;
+  });
+  check('scopes: usuario sin organización no ve alcances', noOrgScopes === 0, `rows=${noOrgScopes}`);
 
   // === 6) price_observations append-only ===
   // Setup (superusuario): inserta una observación de precio para org A.

@@ -169,14 +169,16 @@ necesariamente un rol de fila; se trata en el perfil de exports).
 | name | TEXT | NOT NULL | |
 | scope_type | TEXT | NOT NULL | CHECK |
 | status | TEXT | NOT NULL | DEFAULT 'active' |
+| description | TEXT | NULL | descripción libre (4B.2; mig. 20260604120000) |
+| created_by | UUID | NULL | FK profiles; autor (4B.2; mig. 20260604120000) |
 | created_at | TIMESTAMPTZ | NOT NULL | |
 | updated_at | TIMESTAMPTZ | NOT NULL | |
 6. **PK**: `id`.
-7. **FK**: `project_id → projects(id)`; `parent_scope_id → project_scopes(id)`.
-8. **ON DELETE**: project CASCADE; parent SET NULL.
+7. **FK**: `project_id → projects(id)`; `parent_scope_id → project_scopes(id)`; `created_by → profiles(id)`.
+8. **ON DELETE**: project CASCADE; parent SET NULL; created_by SET NULL (preserva historial).
 9. **organization_id**: derivado vía `project_id → projects`.
-10. **RLS**: por JOIN a `projects` (misma organización).
-11. **Índices**: PK; `(project_id)`; `(parent_scope_id)`; UNIQUE `(project_id, code)`.
+10. **RLS**: por JOIN a `projects` (misma organización; sin cambios en 4B.2).
+11. **Índices**: PK; `(project_id)`; `(parent_scope_id)`; `(created_by)`; UNIQUE `(project_id, code)`.
 12. **Integridad**: `scope_type IN ('floor','tower','stage','package','unit','modification','other')`; sin ciclos en jerarquía (validación a nivel de app/dominio).
 13. **Enums**: `scope_type`, `status`.
 14. **Inmutabilidad**: —.

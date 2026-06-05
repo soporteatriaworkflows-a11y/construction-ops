@@ -1,5 +1,84 @@
 # Handoff Log
 
+## 2026-06-04 — 4B.2 implementado: alcances reales (migración + repo + UI + tests)
+
+### Estado
+- Rama `integration/wave-4b2-real-scopes`. Aprobación de migración recibida.
+- **Migración aplicada al remoto** ⇒ **17/17 Local = Remote** (sin seeds, sin proyectos
+  remotos). Dry-run mostró exactamente 1 migración esperada antes del push.
+
+### Migración (autorizada)
+- `20260604120000_project_scopes_authorship.sql` (aditiva, reversible):
+  `project_scopes` += `description text`, `created_by uuid REFERENCES profiles(id)
+  ON DELETE SET NULL` + índice `project_scopes_created_by_idx`. Sin cambios de RLS.
+- Local: `db reset` aplicó 17 migraciones + 4 seeds; columnas verificadas. **RLS runtime
+  67/67** (incluye 6 checks nuevos de `project_scopes`: SELECT/INSERT/UPDATE cross-org,
+  WITH CHECK por proyecto padre, deny sin org).
+
+### Implementación
+- Contrato congelado `docs/SCOPES_CRUD_CONTRACT.md` (v1).
+- `apps/web/server/scopes/`: `insertScope`/`listScopesByProject`/`getScopeById`
+  (selector por `READ_MODEL_SOURCE` sin fallback; db RLS-bound sin service-role;
+  fixture solo lectura). `code` autogenerado + anti-colisión; `created_by`/`status`/
+  `project_id` server-side; proyecto validado por visibilidad RLS.
+- `apps/web/lib/scopes/scope-types.ts` (constantes client-safe — evita arrastrar
+  `postgres` al bundle del navegador).
+- UI: `/projects/[id]` sección **Alcances** (lista + CTA `Button asChild`+`Link` +
+  empty state honesto); `/projects/[id]/scopes/new` (form: nombre, tipo select 7
+  valores default `floor`, descripción; hidden `projectId` validado server-side);
+  `/projects/[id]/scopes/[scopeId]` (detalle + placeholder de presupuesto 4B.3).
+  Todas `ƒ` (layout force-dynamic + resolveViewer). `scope_type` como select; footer ya
+  mode-aware desde 4B.1.
+
+### Validación
+- typecheck/lint 0, **588 tests** (+42 de scopes), build fixture + build `db` LOCAL
+  (vacío y con proyecto+alcance) PASS, gm 22/22, gm:import, validador 214/0/0,
+  RLS runtime 67/67, `git diff --check` limpio.
+
+### Pendiente
+- Preview + merge `--no-ff` + Production (Vercel CLI). Acción manual final de la usuaria:
+  crear el alcance `PRIMER PISO` desde la UI (no se crea desde terminal). Rollback estable:
+  tag `wave-4b1-real-projects-production-v1`. 4B.3/4C NO iniciadas.
+
+## 2026-06-04 — 4B.2 Fase 1: diagnóstico de scopes — STOP por migración requerida
+
+### Estado
+- Rama `integration/wave-4b2-real-scopes` desde `main`@`9770639` (`main` intacta).
+- **DETENIDO tras el diagnóstico** (Fase 1) porque se requiere una **migración nueva**;
+  pendiente de **aprobación explícita de la usuaria** antes de continuar (regla del prompt).
+
+### Diagnóstico del esquema `project_scopes` (migración `20260530090200`)
+- Columnas: `id` (uuid PK), `project_id` (FK→projects, NOT NULL, ON DELETE CASCADE),
+  `parent_scope_id` (FK self, nullable), `code` (text NOT NULL, único por proyecto),
+  `name` (text NOT NULL), `scope_type` (text NOT NULL, CHECK floor/tower/stage/package/
+  unit/modification/other), `status` (text NOT NULL DEFAULT 'active', CHECK active/archived),
+  `created_at`, `updated_at`. Trigger `set_updated_at`.
+- Relación con organización: **transitiva** vía `projects.organization_id` (no hay columna
+  org directa en scopes).
+- **RLS suficiente**: `project_scopes` con `ENABLE`+`FORCE` y policy `project_scopes_all`
+  (FOR ALL, USING+WITH CHECK por `app.current_org()` del proyecto padre). Aislamiento
+  cross-org ya garantizado para SELECT/INSERT/UPDATE/DELETE. **No requiere migración de RLS.**
+- Lectura existente: `read-repository.scopesByProject` (consumida por `getProjectOverview`).
+  **No existe** repositorio de escritura de scopes (solo `server/projects` escribe projects).
+
+### Conclusión
+- El esquema **NO es suficiente** para el objetivo 4B.2: falta `description` (el formulario
+  pide nombre + descripción) y, por paridad de autoría con `projects`, conviene `created_by`.
+  `code`/`scope_type` son NOT NULL ⇒ se resuelven server-side (code autogenerado; scope_type
+  con default/select).
+- **Migración nueva ESTRICTAMENTE NECESARIA** (aditiva, reversible), espejo de
+  `20260602120000_projects_authorship`:
+  `ALTER TABLE project_scopes ADD COLUMN description text, ADD COLUMN created_by uuid
+  REFERENCES profiles(id) ON DELETE SET NULL;` + índice `project_scopes_created_by_idx`.
+- Remoto actual: 16/16. Aplicarla sería la 17.ª migración ⇒ requiere `db push` controlado.
+
+### Acción solicitada (UNA aprobación)
+- Autorizar: (1) crear y validar localmente la migración de authorship de scopes;
+  (2) `supabase db push --dry-run` y, si OK, `db push --linked` (sin `--include-seed`) a remoto;
+  (3) implementar contrato + repo de escritura (RLS ya OK) + UI `/projects/[id]/scopes` + tests;
+  (4) Preview + Production. **Nada de esto se ejecuta sin tu OK.** Rollback estable actual:
+  tag `wave-4b1-real-projects-production-v1`.
+
 ## 2026-06-04 — 4B.1 CERRADA: smoke productivo real exitoso (DB mode)
 
 ### Estado
