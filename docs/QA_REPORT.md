@@ -9,6 +9,18 @@ cada ciclo de validación.
 
 ---
 
+## CIERRE 4B.3 — smoke productivo real de presupuesto + V01 (2026-06-04)
+
+> Verificación MANUAL de la usuaria en `https://construction-ops-psi.vercel.app`
+> (`supabase`+`db`). Tag `wave-4b3-real-estimates-production-v1`.
+
+- **Presupuesto remoto real creado desde la UI**: `PRESUPUESTO BASE` con **V01** activa
+  (ENTRE PATIOS → PRIMER PISO) ✅. Conteos: 0 capítulos / 0 ítems ✅. Placeholder de
+  importación de Excel visible ✅. **Sin fixture en DB mode** ✅.
+- **Oleada 4B.3 CERRADA.** Siguiente: 4C.1 (importación controlada de Excel a V01).
+
+---
+
 ## 4B.3 — presupuesto inicial + V01: validación local + migración remota (2026-06-04)
 
 > Rama `integration/wave-4b3-real-estimates`. Migración `20260604130000` ⇒ **18/18**.

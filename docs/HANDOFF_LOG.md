@@ -1,5 +1,25 @@
 # Handoff Log
 
+## 2026-06-04 — 4B.3 CERRADA: smoke productivo real de presupuesto + V01
+
+### Estado
+- **Oleada 4B.3 CERRADA.** Smoke manual verificado por la usuaria en producción
+  (`construction-ops-psi.vercel.app`, `supabase`+`db`). `main = origin/main = bef4786`.
+- Tag estable: **`wave-4b3-real-estimates-production-v1`**.
+
+### Smoke productivo verificado (usuaria)
+- ENTRE PATIOS → PRIMER PISO → **presupuesto remoto real creado desde la UI**:
+  `PRESUPUESTO BASE` con **versión inicial V01** (activa, funcional). Conteos: **0 capítulos,
+  0 ítems**. Placeholder "La importación del Excel estará disponible en la siguiente fase."
+- Footer "Datos reales"; producción DB real; **sin datos fixture**. create/list/detail
+  verificados end-to-end.
+
+### Siguiente bloque
+- **Oleada 4C.1 — importación controlada de Excel hacia la V01 activa** (flujo de dos pasos:
+  preview sin escritura → confirmación transaccional). Rama `integration/wave-4c1-excel-import`.
+  Reutilizar parser/fixtures de `gm:import`; no usar el Excel privado real; detenerse y pedir
+  aprobación si se requiere migración.
+
 ## 2026-06-04 — 4B.3 desplegado: merge a `main` + Production READY
 
 ### Estado
