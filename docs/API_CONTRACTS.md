@@ -665,3 +665,20 @@ el aislamiento es transitivo vía `projects.organization_id` (policy `project_sc
 sin cambios). Migración aditiva `20260604120000_project_scopes_authorship` añadió
 `description` + `created_by`. Creación exige `supabase`+`db`; cliente RLS-bound (sin
 service-role). Constantes client-safe en `@/lib/scopes/scope-types`.
+
+## Escritura de presupuestos (Oleada 4B.3) — ver `docs/ESTIMATES_CRUD_CONTRACT.md`
+
+`EstimatesWriteRepository` (`apps/web/server/estimates/`):
+`insertEstimateWithInitialVersion(viewer, scopeId, input)`,
+`listEstimatesByScope(viewer, scopeId)`, `listVisibleEstimates(viewer)`,
+`getEstimateById(viewer, estimateId)`, `getEstimateActiveVersion(viewer, estimateId)`.
+`CreateEstimateInput` permitido desde el navegador = `{ name, description? }`. La
+creación usa la RPC **`public.create_estimate_with_initial_version(p_scope_id,
+p_code, p_name, p_description)`** `SECURITY INVOKER` (sin `p_created_by`): inserta
+estimate (`status='active'`) + versión **V01** (`draft`) atómicamente, derivando
+`created_by` de `app._auth_uid()`. `code` autogenerado; `project_scope_id` validado
+por visibilidad RLS (cross-org ⇒ `ScopeNotFoundError`). "Versión activa" = mayor
+`version_number`. Migración aditiva `20260604130000` añadió `estimates.description`
++ `created_by`. Creación exige `supabase`+`db`; RLS-bound (sin service-role); RPC
+ejecutable solo por `authenticated` (revocada de PUBLIC/anon). `/estimates` lista los
+presupuestos visibles de la organización.

@@ -431,15 +431,18 @@ necesariamente un rol de fila; se trata en el perfil de exports).
 | project_scope_id | UUID | NOT NULL | FK project_scopes |
 | code | TEXT | NOT NULL | |
 | name | TEXT | NOT NULL | |
-| status | TEXT | NOT NULL | DEFAULT 'draft' |
+| status | TEXT | NOT NULL | DEFAULT 'draft'; creado `active` (4B.3) |
+| description | TEXT | NULL | descripción libre (4B.3; mig. 20260604130000) |
+| created_by | UUID | NULL | FK profiles; autor (4B.3; mig. 20260604130000) |
 | created_at | TIMESTAMPTZ | NOT NULL | |
 | updated_at | TIMESTAMPTZ | NOT NULL | |
-6-8. PK `id`; FK `project_scope_id → project_scopes(id)` ON DELETE CASCADE.
-9. derivado vía `project_scope_id → projects`. 10. RLS por JOIN.
-11. **Índices**: PK; `(project_scope_id)`; UNIQUE `(project_scope_id, code)`.
+6-8. PK `id`; FK `project_scope_id → project_scopes(id)` ON DELETE CASCADE; `created_by → profiles(id)` ON DELETE SET NULL.
+9. derivado vía `project_scope_id → projects`. 10. RLS por JOIN (sin cambios en 4B.3).
+11. **Índices**: PK; `(project_scope_id)`; `(created_by)`; UNIQUE `(project_scope_id, code)`.
 12. **Integridad**: `status IN ('draft','active','archived')`.
 13. **Enums**: `status`.
 14-15. —. 16. 🔒 INTERNO: —. 17. **Dudas**: —.
+18. **RPC (4B.3)**: `public.create_estimate_with_initial_version(p_scope_id, p_code, p_name, p_description)` `SECURITY INVOKER` crea estimate (`active`) + V01 (`draft`) atómicamente; `created_by` derivado de `app._auth_uid()` (sin parámetro de autor); `GRANT EXECUTE` solo a `authenticated` (revocado de PUBLIC/anon).
 
 ### `estimate_versions`
 1. **Tabla**: `estimate_versions` 2. **Propósito**: versión congelable de un presupuesto (snapshot financiero).

@@ -410,6 +410,28 @@ Contrato: `docs/SCOPES_CRUD_CONTRACT.md` (v1). Integrado por el orquestador
 **NO tocar**: DB/migraciones/RLS/repositorio (consume su interfaz), Vercel, remoto.
 **No** recibir `organization_id`/`created_by`/`status`/`code` del navegador.
 
+### Ownership congelado — Oleada 4B.3 (presupuesto inicial por alcance)
+
+Contrato: `docs/ESTIMATES_CRUD_CONTRACT.md` (v1). Migración remota aprobada.
+
+**agent-db-rls (4B.3)** — ownership:
+- Migración `20260604130000_estimates_authorship_and_atomic_create.sql`
+  (`estimates.description`+`created_by`; RPC `create_estimate_with_initial_version`
+  `SECURITY INVOKER`, autor derivado, grants endurecidos), reversible.
+- `apps/web/server/estimates/` (`EstimatesWriteRepository` + impl fixture/db).
+- RLS runtime extendido (`scripts/rls-runtime/run.ts`, +10 checks de estimates).
+**NO tocar**: UI, auth runtime (solo consume), Vercel. **No** service-role.
+
+**agent-frontend-boq (4B.3)** — ownership:
+- `apps/web/app/(dashboard)/projects/[id]/scopes/[scopeId]/` sección Presupuestos +
+  `estimates/new`, `estimates/[estimateId]`, `estimates/actions.ts`, formularios y
+  `estimate-format.ts`; reintegración de `apps/web/app/(dashboard)/estimates/page.tsx`
+  como listado real.
+- Tests UI/route-config de estimates.
+**NO tocar**: DB/migraciones/RLS/repositorio (consume su interfaz), Vercel, remoto.
+**No** recibir `organization_id`/`created_by`/`status`/`code`/`project_scope_id`
+sin validar del navegador.
+
 ### agent-qa (Oleada 4)
 - `docs/QA_REPORT.md` con resultado completo.
 - Sin FAIL bloqueante para release.

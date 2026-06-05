@@ -10,18 +10,33 @@
  */
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Tag, Layers, Calendar, FileText, FolderOpen } from 'lucide-react';
+import {
+  ArrowLeft,
+  Tag,
+  Layers,
+  Calendar,
+  FileText,
+  FolderOpen,
+  ClipboardList,
+  Plus,
+  ChevronRight,
+} from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/shared/empty-state';
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { formatDateTime } from '@/lib/utils/format';
+import { formatDate, formatDateTime } from '@/lib/utils/format';
 import { resolveViewer } from '@/server/auth/resolve-viewer';
 import { getScopesWriteRepository, ScopeNotFoundError } from '@/server/scopes';
+import { getEstimatesWriteRepository } from '@/server/estimates';
+import type { EstimateListItem } from '@/server/estimates';
+import { isCreationModeEnabled } from '../../../mode-guard';
 import { SCOPE_TYPE_LABELS } from '../../scope-labels';
 
 interface PageProps {
@@ -51,6 +66,20 @@ export default async function ScopeDetailPage({ params }: PageProps) {
   if (scope.projectId !== id) {
     notFound();
   }
+
+  // Cargar presupuestos del alcance (RLS-bound; cross-org ⇒ []).
+  let estimates: EstimateListItem[] = [];
+  let estimatesError: string | null = null;
+  try {
+    estimates = await getEstimatesWriteRepository().listEstimatesByScope(viewer, scopeId);
+  } catch (e) {
+    estimatesError = e instanceof Error ? e.message : 'Error al cargar presupuestos';
+  }
+
+  const canCreateEstimate = isCreationModeEnabled();
+  const newEstimateHref = `/projects/${id}/scopes/${scopeId}/estimates/new`;
+  const estimateHref = (estimateId: string) =>
+    `/projects/${id}/scopes/${scopeId}/estimates/${estimateId}`;
 
   return (
     <div>
@@ -131,13 +160,92 @@ export default async function ScopeDetailPage({ params }: PageProps) {
         </Card>
       </div>
 
-      {/* Presupuesto del alcance: siguiente fase (4B.3) */}
-      <div
-        className="mt-6 rounded-md border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700"
-        role="status"
-      >
-        El presupuesto de este alcance estará disponible en la siguiente fase.
-      </div>
+      {/* ------------------------------------------------------------------ */}
+      {/* Presupuestos del alcance (4B.3)                                      */}
+      {/* ------------------------------------------------------------------ */}
+      <section aria-label="Presupuestos del alcance" className="mt-8">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="flex items-center gap-2 text-base font-semibold text-gray-900">
+            <ClipboardList className="h-4 w-4 text-gray-500" aria-hidden="true" />
+            Presupuestos
+          </h2>
+          {canCreateEstimate ? (
+            <Button asChild size="sm">
+              <Link href={newEstimateHref}>
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                Nuevo presupuesto
+              </Link>
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              disabled
+              aria-disabled="true"
+              title="Disponible en modo supabase+db"
+            >
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              Nuevo presupuesto
+            </Button>
+          )}
+        </div>
+
+        {estimatesError ? (
+          <div
+            className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+            role="alert"
+            aria-live="assertive"
+          >
+            Error al cargar presupuestos: {estimatesError}
+          </div>
+        ) : estimates.length === 0 ? (
+          <EmptyState
+            icon={ClipboardList}
+            title="Sin presupuestos"
+            description="Este alcance todavía no tiene presupuestos registrados."
+            action={
+              canCreateEstimate ? (
+                <Button asChild size="sm">
+                  <Link href={newEstimateHref}>Crear primer presupuesto</Link>
+                </Button>
+              ) : (
+                <Button size="sm" disabled>
+                  Crear primer presupuesto
+                </Button>
+              )
+            }
+          />
+        ) : (
+          <ul role="list" className="space-y-3">
+            {estimates.map((estimate) => (
+              <li key={estimate.id}>
+                <Link
+                  href={estimateHref(estimate.id)}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-mono text-xs rounded bg-gray-100 px-2 py-0.5 text-gray-600">
+                        {estimate.code}
+                      </span>
+                      {estimate.status === 'active' && (
+                        <Badge variant="success">Vigente</Badge>
+                      )}
+                      {estimate.status === 'archived' && (
+                        <Badge variant="outline">Archivado</Badge>
+                      )}
+                    </div>
+                    <p className="mt-1 truncate font-medium text-gray-900">{estimate.name}</p>
+                    <p className="text-xs text-gray-400">
+                      Creado: {formatDate(estimate.createdAt)}
+                    </p>
+                  </div>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }

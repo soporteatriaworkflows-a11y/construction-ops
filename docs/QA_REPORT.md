@@ -9,6 +9,26 @@ cada ciclo de validación.
 
 ---
 
+## 4B.3 — presupuesto inicial + V01: validación local + migración remota (2026-06-04)
+
+> Rama `integration/wave-4b3-real-estimates`. Migración `20260604130000` ⇒ **18/18**.
+
+- **Migración** aditiva/reversible (`estimates.description`+`created_by` + RPC atómica);
+  dry-run = 1 migración esperada (sin seeds); push controlado. RLS sin cambios.
+- **Seguridad de la RPC** (ajuste obligatorio): SIN `p_created_by`; autor derivado de
+  `app._auth_uid()`; `SECURITY INVOKER`; `REVOKE FROM PUBLIC+anon` + `GRANT TO authenticated`
+  (ACL verificada sin `anon`).
+- **RLS runtime 77/77** (+10 estimates): autor derivado, V01, atomicidad (code-dup revierte,
+  sin huérfanos), cross-org WITH CHECK, deny sin sesión/membresía, anon sin EXECUTE.
+- **Tests** 623 (+35): validación pura, selector sin fallback, fixture, db-repo (RPC sin
+  p_created_by, anti-colisión, scope no visible ⇒ deny), route-config de UI.
+- **Builds**: fixture PASS; **db LOCAL vacío** PASS; **db LOCAL con estimate+V01** PASS.
+  Rutas de estimates `ƒ`. typecheck/lint 0, gm 22/22, gm:import, validador 214/0/0.
+- **Sin escrituras remotas** salvo la migración aprobada; sin seeds remotos; sin presupuesto
+  remoto creado desde terminal. Sin secretos impresos/en disco.
+
+---
+
 ## CIERRE 4B.2 — smoke productivo real de alcances (2026-06-04)
 
 > Verificación MANUAL de la usuaria en `https://construction-ops-psi.vercel.app`

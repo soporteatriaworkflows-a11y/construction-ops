@@ -45,6 +45,7 @@ const TASK_A_SUB = '0d000000-0000-0000-0000-000000000003';
 const ORG_B = '00000000-0000-0000-0000-0000000000a2';
 const USER_B_ADMIN = '00000000-0000-0000-0000-0000000000b7';
 const PROJECT_B = '00000000-0000-0000-0000-0000000000c2';
+const SCOPE_B = '00000000-0000-0000-0000-0000000000d2'; // alcance de B (creado en setup)
 
 // --- Auth 4A.1 (resolución por auth.uid() -> profiles, sin claim de org) ---
 // Perfiles de org A (seed 0001) y B (seed 0004) usados para el modo identidad
@@ -727,6 +728,113 @@ async function main(): Promise<void> {
     recursionDetail = (e as Error).message;
   }
   check('membership: sin BYPASSRLS (INVOKER) no hay recursion RLS en profiles', noRecursion, recursionDetail);
+
+  // ===========================================================================
+  // 14) ESTIMATES 4B.3 — RPC atómica create_estimate_with_initial_version.
+  //     Autor DERIVADO de app._auth_uid() (sin p_created_by). SECURITY INVOKER:
+  //     RLS aplica a ambos INSERT. Atomicidad: si un INSERT falla, no hay huérfanos.
+  // ===========================================================================
+  console.log('\n--- ESTIMATES 4B.3: RPC atómica estimate + V01 ---');
+
+  // 14a) Usuario real A crea estimate + V01; el autor se deriva de su identidad.
+  const estCreated = await asUser(realA, async (q) => {
+    const [est] = await q<{ id: string; created_by: string }[]>`
+      SELECT id, created_by
+      FROM public.create_estimate_with_initial_version(${SCOPE_A}, 'PB', 'Presupuesto Base', NULL)`;
+    const vers = await q<{ n: number; cb: string | null; st: string }[]>`
+      SELECT version_number AS n, created_by AS cb, status AS st
+      FROM estimate_versions WHERE estimate_id = ${est!.id}`;
+    return { est: est!, vers };
+  });
+  check('estimates: RPC crea estimate (status active) con autor derivado', estCreated.est.created_by === USER_A_ADMIN, `cb=${estCreated.est.created_by}`);
+  check('estimates: RPC crea exactamente la versión V01', estCreated.vers.length === 1 && estCreated.vers[0]!.n === 1, `vers=${estCreated.vers.length}`);
+  check('estimates: V01 en draft con autor derivado', estCreated.vers[0]?.st === 'draft' && estCreated.vers[0]?.cb === USER_A_ADMIN);
+
+  // 14b) Atomicidad: segundo RPC con el MISMO code en el MISMO scope ⇒ 23505 ⇒
+  //      toda la transacción revierte (no hay segundo estimate ni V01 huérfana).
+  const atomicity = await asUser(realA, async (q) => {
+    await q`SELECT public.create_estimate_with_initial_version(${SCOPE_A}, 'DUP', 'Uno', NULL)`;
+    // SAVEPOINT: en la app cada RPC es su propia transacción; aquí aislamos el
+    // fallo del 2.º RPC para no envenenar la tx del harness y poder contar después.
+    let dupBlocked = false;
+    await q.unsafe('SAVEPOINT sp_dup');
+    try {
+      await q`SELECT public.create_estimate_with_initial_version(${SCOPE_A}, 'DUP', 'Dos', NULL)`;
+    } catch {
+      dupBlocked = true;
+      await q.unsafe('ROLLBACK TO SAVEPOINT sp_dup');
+    }
+    const ests = await q<{ n: number }[]>`SELECT count(*)::int AS n FROM estimates WHERE project_scope_id = ${SCOPE_A} AND code = 'DUP'`;
+    const vers = await q<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM estimate_versions ev
+      JOIN estimates e ON e.id = ev.estimate_id
+      WHERE e.project_scope_id = ${SCOPE_A} AND e.code = 'DUP'`;
+    return { dupBlocked, ests: ests[0]!.n, vers: vers[0]!.n };
+  });
+  check('estimates: code duplicado revierte la transacción (23505)', atomicity.dupBlocked);
+  check('estimates: tras el duplicado queda 1 estimate (sin huérfanos)', atomicity.ests === 1, `n=${atomicity.ests}`);
+  check('estimates: tras el duplicado queda 1 versión (sin huérfanos)', atomicity.vers === 1, `n=${atomicity.vers}`);
+
+  // 14c) Cross-org: A intenta crear estimate sobre un scope de B ⇒ RLS WITH CHECK
+  //      revierte (excepción). El scope de B se prepara como superusuario en setup.
+  let estCrossBlocked = false;
+  try {
+    await asUser(
+      realA,
+      async (q) => {
+        await q`SELECT public.create_estimate_with_initial_version(${SCOPE_B}, 'X', 'X', NULL)`;
+      },
+      async (q) => {
+        await q`INSERT INTO project_scopes (id, project_id, code, name, scope_type)
+                VALUES (${SCOPE_B}, ${PROJECT_B}, 'SB', 'Scope B', 'floor')
+                ON CONFLICT (id) DO NOTHING`;
+      },
+    );
+  } catch {
+    estCrossBlocked = true;
+  }
+  check('estimates: A no puede crear estimate en scope de B (RLS WITH CHECK)', estCrossBlocked);
+
+  // 14d) Sin sesión ⇒ RPC abortada (no_session).
+  let estNoSessionBlocked = false;
+  try {
+    await asUser(noSession, async (q) => {
+      await q`SELECT public.create_estimate_with_initial_version(${SCOPE_A}, 'X', 'X', NULL)`;
+    });
+  } catch {
+    estNoSessionBlocked = true;
+  }
+  check('estimates: sin sesión la RPC aborta (deny)', estNoSessionBlocked);
+
+  // 14e) Sin membresía ⇒ RPC abortada (no_membership).
+  let estNoMembershipBlocked = false;
+  try {
+    await asUser(realNoProfile, async (q) => {
+      await q`SELECT public.create_estimate_with_initial_version(${SCOPE_A}, 'X', 'X', NULL)`;
+    });
+  } catch {
+    estNoMembershipBlocked = true;
+  }
+  check('estimates: sin membresía la RPC aborta (deny)', estNoMembershipBlocked);
+
+  // 14f) Grants: el rol `anon` NO puede ejecutar la RPC (permission denied).
+  let anonDenied = false;
+  {
+    const r = await sql.reserve();
+    try {
+      await r.unsafe('BEGIN');
+      await r.unsafe('SET LOCAL ROLE anon');
+      try {
+        await r`SELECT public.create_estimate_with_initial_version(${SCOPE_A}, 'X', 'X', NULL)`;
+      } catch {
+        anonDenied = true;
+      }
+      await r.unsafe('ROLLBACK');
+    } finally {
+      r.release();
+    }
+  }
+  check('estimates: rol anon NO puede ejecutar la RPC (grants)', anonDenied);
 
   // --- Resumen ---
   console.log(`\nRESULTADO RLS RUNTIME: ${pass} PASS / ${fail} FAIL`);
