@@ -46,11 +46,41 @@ export interface ImportItemPreview {
   subtotal: DecimalString;
 }
 
-/** Advertencia no bloqueante (p. ej. subtotal del Excel difiere del recalculado). */
-export interface ImportWarning {
-  code: 'subtotal_mismatch' | 'empty_row_skipped' | 'extra_sheet' | 'truncated_preview';
+/**
+ * Diagnóstico agregado de una fila/condición (client-safe). Reemplaza el aviso
+ * simple: el preview recorre TODA la hoja y agrupa problemas (errores bloqueantes
+ * y advertencias) en lugar de detenerse en el primero.
+ */
+export interface ImportIssue {
+  /** Fila REAL de Excel (1-based) cuando aplica; `null` si es global. */
+  row: number | null;
+  /** Clave de máquina del tipo de problema. */
+  kind:
+    | 'chapter_no_code'
+    | 'chapter_no_name'
+    | 'duplicate_chapter'
+    | 'duplicate_item'
+    | 'item_no_chapter'
+    | 'item_missing_field'
+    | 'item_non_numeric'
+    | 'negative_value'
+    | 'too_long'
+    | 'subtotal_mismatch'
+    | 'empty_rows_skipped'
+    | 'after_total_ignored'
+    | 'aiu_ignored'
+    | 'truncated_preview'
+    | 'no_data';
+  /** Código de capítulo/ítem involucrado (seguro). */
+  code?: string;
+  /** Descripción truncada de forma segura (sin volcar la fila completa). */
+  description?: string;
+  /** Mensaje/recomendación legible. */
   message: string;
 }
+
+/** @deprecated usar `ImportIssue`. Mantenido por compatibilidad de tipos. */
+export type ImportWarning = ImportIssue;
 
 /**
  * Resultado del Paso A (preview). NO incluye el archivo ni fórmulas; es
@@ -69,7 +99,12 @@ export interface ImportPreview {
   itemsSample: ImportItemPreview[];
   /** Si la muestra está truncada respecto al total. */
   itemsTruncated: boolean;
-  warnings: ImportWarning[];
+  /** Errores BLOQUEANTES agregados (si hay ≥1, la confirmación se rechaza). */
+  errors: ImportIssue[];
+  /** Advertencias no bloqueantes agregadas. */
+  warnings: ImportIssue[];
+  /** `true` si NO hay errores bloqueantes (preview confirmable). */
+  importable: boolean;
   /** SHA-256 (hex) del payload normalizado {chapters, items}. */
   digest: string;
 }

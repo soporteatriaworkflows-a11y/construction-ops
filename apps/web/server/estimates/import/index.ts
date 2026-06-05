@@ -25,6 +25,7 @@ import {
   EstimateNotFoundError,
   ImportDigestMismatchError,
   ImportFileError,
+  ImportHasErrorsError,
   ImportNotSupportedError,
   ImportVersionLockedError,
   ImportVersionNotEmptyError,
@@ -100,6 +101,10 @@ export async function confirmEstimateExcelImport(
   if (!expectedDigest || preview.digest !== expectedDigest) {
     throw new ImportDigestMismatchError();
   }
+  // No se confirma si el preview tiene errores bloqueantes (diagnóstico agregado).
+  if (!preview.importable) {
+    throw new ImportHasErrorsError();
+  }
 
   const supabase = await createClient();
   const { data, error } = await supabase.rpc('import_boq_into_version', {
@@ -159,6 +164,7 @@ export {
   ImportVersionNotEmptyError,
   ImportVersionLockedError,
   ImportDigestMismatchError,
+  ImportHasErrorsError,
   ImportNotSupportedError,
 } from './errors';
 export { ExcelParseError } from './parse';

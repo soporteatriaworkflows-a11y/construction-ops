@@ -20,6 +20,7 @@ import {
   ImportVersionNotEmptyError,
   ImportVersionLockedError,
   ImportDigestMismatchError,
+  ImportHasErrorsError,
   ImportNotSupportedError,
 } from '@/server/estimates/import';
 import { EstimateNotFoundError } from '@/server/estimates';
@@ -52,6 +53,7 @@ function sanitizeError(e: unknown): string {
   if (e instanceof ImportVersionNotEmptyError) return e.message;
   if (e instanceof ImportVersionLockedError) return e.message;
   if (e instanceof ImportDigestMismatchError) return e.message;
+  if (e instanceof ImportHasErrorsError) return e.message;
   if (e instanceof ImportNotSupportedError) return e.message;
   if (e instanceof EstimateNotFoundError) return 'El presupuesto no existe o no es accesible.';
   return 'No se pudo procesar el archivo. Verifica el formato e intenta de nuevo.';

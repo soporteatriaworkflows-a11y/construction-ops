@@ -7,20 +7,32 @@ Implementan: `agent-excel-mapper` (parser), `agent-db-rls` (RPC/repo),
 Mantiene la disciplina de 4B: deny-by-default, RLS, aislamiento por organización,
 IDs/owner server-side, sin fallback silencioso db→fixture, errores sanitizados.
 
-## §1 — Formato Excel V1 (congelado)
+## §1 — Formato Excel V1 (congelado; plantilla real de cotización, 4C.2)
 
 - Archivo **`.xlsx`** únicamente. Hoja requerida: **`COTIZACION 1 PISO`** (match por
   nombre normalizado; si falta, se listan las hojas detectadas en el error).
-- Columnas mapeadas por **encabezado** (no por posición): obligatorias `code`,
-  `description`, `unit`, `quantity`, `unit_price`; opcional `subtotal`. Sinónimos en
-  español aceptados (código/descripción/unidad/cantidad/v.unitario/v.total). Si faltan
-  los encabezados obligatorios ⇒ se bloquea (sin fallback por posición).
-- **Convención de filas** (v1): CHAPTER = `code`+`description` con `unit`/`quantity`/
-  `unit_price` vacíos; ITEM = `code`+`description`+`unit` con `quantity`/`unit_price`
-  numéricos (pertenece al último capítulo); fila vacía = ignorada.
-- SheetJS lee valores cacheados; **no evalúa fórmulas ni ejecuta macros**.
-- **No se usa el Excel privado real en desarrollo**: los tests construyen workbooks
-  sintéticos sanitizados en memoria.
+- **7 columnas** de la plantilla real: `A=CAP` (auxiliar), `B=ÍTEM` (code), `C=DESCRIPCIÓN`,
+  `D=UN`, `E=CANT.`, `F=VR. UNITARIO`, `G=VR. PARCIAL`. Las columnas se mapean por
+  **encabezado** (no por posición): obligatorias `code`(ÍTEM)/`description`/`unit`/`quantity`/
+  `unit_price`; `subtotal`(VR. PARCIAL) opcional (solo comparación). **La columna `CAP` es
+  auxiliar**: no se mapea, no es obligatoria, no bloquea ítems y no se usa como code. Sinónimos
+  ES con acentos. Si faltan encabezados obligatorios ⇒ se bloquea (sin fallback por posición).
+- **Convención de filas** (v1): CHAPTER = `code`(ÍTEM)+`description` con `unit`/`quantity`/
+  `unit_price` vacíos; ITEM = `code`+`description`+`unit` con `quantity`/`unit_price` numéricos
+  (pertenece al último capítulo); fila vacía = ignorada.
+- **Filas reservadas** (por descripción normalizada): `SUBTOTAL CAPITULO` ⇒ ignorada (sumario;
+  opcional comparar vs recalculado → warning); **`TOTAL COSTOS DIRECTOS` ⇒ cierra la lectura del
+  BOQ directo**; ADMINISTRACION/IMPREVISTOS/UTILIDAD/IVA/COSTOS INDIRECTOS/TOTAL COSTO/CONTROL DE
+  PAGOS/ANTICIPO/ACTAS/LIQUIDACION ⇒ ignoradas (AIU/pagos fuera de alcance 4C.2; serán fase
+  posterior).
+- **Fila reportada = fila REAL de Excel** (`blankrows:true` preserva la alineación pese a filas
+  vacías separadoras). El preview recorre TODA la hoja y agrupa el diagnóstico (no se detiene en
+  el primer problema): errores bloqueantes + advertencias con `{row, kind, code, description,
+  recommendation}` client-safe (descripciones truncadas; sin volcar filas completas a logs).
+- SheetJS lee valores cacheados (`raw:true` ⇒ números nativos, sin problema de separadores de
+  miles); **no evalúa fórmulas ni ejecuta macros**.
+- **No se usa el Excel privado real en desarrollo**: los tests construyen workbooks sintéticos
+  sanitizados en memoria reproduciendo la forma (7 columnas, CAP, SUBTOTAL, blancos, TOTAL, AIU).
 
 ## §2 — Preview → Confirmación (dos pasos, sin persistir el archivo)
 
@@ -57,6 +69,16 @@ ni del Excel.
 
 `bodySizeLimit` se configura en `apps/web/next.config.mjs`
 (`experimental.serverActions.bodySizeLimit = '4mb'`).
+
+## §4.b — Numeración duplicada (estrategia 4C.2, sin normalización silenciosa)
+
+Constraints auditados: `chapters` UNIQUE `(estimate_version_id, code)` ⇒ **código de capítulo
+único por versión**; `boq_items` SIN unique en `code`. Estrategia (Opción A, **sin migración**):
+- **Capítulo duplicado ⇒ ERROR bloqueante** (lo exige la BD): se reporta en el preview con su
+  código y se exige corregir el Excel. NUNCA se renumera ni se inventan códigos.
+- **Ítem duplicado ⇒ ADVERTENCIA** (la BD no lo restringe): se importa igual y se avisa.
+- No se añade `source_code` ni columna canónica en 4C.2 (queda como opción futura C si se
+  requiere conservar numeración histórica con código canónico separado).
 
 ## §5 — Política de sobrescritura
 

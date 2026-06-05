@@ -9,6 +9,23 @@ cada ciclo de validación.
 
 ---
 
+## 4C.2 — compatibilidad con plantilla real de cotización (2026-06-05)
+
+> Rama `integration/wave-4c1-excel-import` (fix de parser, **sin migración**). Remoto **19/19** intacto.
+
+- **Causa del fallo** (preview con Excel real): `SUBTOTAL CAPITULO` clasificado como capítulo
+  incompleto + número de fila desfasado por `blankrows:false`.
+- **Fix** (parser): `blankrows:true` (fila real), palabras reservadas (SUBTOTAL ignorado; TOTAL
+  COSTOS DIRECTOS cierra BOQ; AIU/pagos ignorados), 7 columnas (CAP auxiliar ignorada), diagnóstico
+  agregado (recorre toda la hoja), duplicados sin normalización (capítulo=error, ítem=warning),
+  confirmación bloqueada si hay errores.
+- **Tests** 651: parser reescrito (16 casos: forma real, fila real, agregado, duplicados,
+  subtotal, fatales). build fixture + db local PASS, gm 22/22, gm:import, validador 214/0/0.
+- **Privacidad/seguridad**: Excel privado real NO usado (workbooks sintéticos); sin migración;
+  no se confirmó importación (V01 vacía); sin escrituras remotas.
+
+---
+
 ## 4C.1 — importación de Excel: validación local + migración remota (2026-06-05)
 
 > Rama `integration/wave-4c1-excel-import`. Migración `20260604140000` ⇒ **19/19**.
