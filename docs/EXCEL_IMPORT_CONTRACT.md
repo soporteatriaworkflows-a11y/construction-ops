@@ -80,6 +80,32 @@ Constraints auditados: `chapters` UNIQUE `(estimate_version_id, code)` ⇒ **có
 - No se añade `source_code` ni columna canónica en 4C.2 (queda como opción futura C si se
   requiere conservar numeración histórica con código canónico separado).
 
+## §4.c — Normalización controlada y reversible de códigos (4C.3)
+
+El parser conserva **`sourceCode`** (código original) + **`sourceRow`** (fila real) y propone
+un **`canonicalCode`** que se persiste en `code`. NUNCA renumera en silencio: toda propuesta es
+visible y editable.
+- **Mapping por clave estable `rowType + sourceRow`** (NO por `sourceCode`: el mismo código puede
+  repetirse; solo una aparición específica se transforma). Cada propuesta lleva `{rowType,
+  sourceRow, sourceCode, canonicalCode, description, reason, requiresManualReview}`.
+- **Capítulos duplicados (numéricos)**: `canonicalCode` = siguiente entero **por encima del máximo**
+  de capítulo (algorítmico/genérico, no hardcodeado). Ej.: max=10 ⇒ 7→11, 8→12, 9→13, 10→14. La
+  primera aparición conserva su código.
+- **Ítems**: si el código sigue `^(\d+)\.(sufijo)$` y el prefijo difiere del capítulo canónico,
+  propagar `${canonicalChapter}.${sufijo}` (7.01→11.01; ítems `2.0x` bajo capítulo 3 → `3.0x`).
+- **Código no normalizable** (no numérico/sin patrón seguro bajo un capítulo renumerado) ⇒
+  `requiresManualReview=true`, se **bloquea** la confirmación hasta una edición manual válida (no
+  se inventan códigos).
+- **Persistencia**: migración `20260605120000_boq_source_traceability` añade `source_code text` +
+  `source_row integer` (+ CHECK `source_row IS NULL OR source_row > 0`) a `chapters` y `boq_items`;
+  la RPC `import_boq_into_version` (misma firma) inserta `code`=canónico, `source_code`,
+  `source_row`. Columnas nullable (compat con seeds/históricos).
+- **Validación server-side**: el navegador solo aporta la **intención de mapping** (`overrides`:
+  `{rowType, sourceRow, canonicalCode}`); capítulos/ítems/totales se reconstruyen y validan
+  server-side (códigos canónicos de capítulo únicos, referencias ítem→capítulo válidas, longitudes,
+  límites de payload). El **digest** del preview es del payload **ORIGINAL** (`sourceCode/sourceRow`)
+  para integridad del archivo; es estable ante overrides.
+
 ## §5 — Política de sobrescritura
 
 Importar SOLO si la versión activa (V01) está **vacía** (0 capítulos, 0 ítems) y es

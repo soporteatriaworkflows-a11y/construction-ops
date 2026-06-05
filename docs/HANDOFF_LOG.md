@@ -1,5 +1,83 @@
 # Handoff Log
 
+## 2026-06-05 — 4C.3 implementado: normalización reversible de códigos (migración aprobada)
+
+### Estado
+- Rama `integration/wave-4c3-source-normalization`. Migración aprobada (trazabilidad de origen).
+- **Migración aplicada al remoto** ⇒ **20/20 Local = Remote** (sin seeds, sin import remoto).
+  Dry-run = 1 migración esperada.
+
+### Migración (autorizada)
+- `20260605120000_boq_source_traceability.sql`: `chapters` y `boq_items` += `source_code text`
+  + `source_row integer` (+ CHECK `source_row IS NULL OR source_row > 0`). RPC
+  `import_boq_into_version` (MISMA firma) extendida: persiste `code`=canónico + `source_code` +
+  `source_row`. Mantiene SECURITY INVOKER, RLS, versión vacía/editable (FOR UPDATE), atomicidad,
+  subtotal recalculado, grants endurecidos. **RLS runtime 89/89** (+2: capítulo e ítem persisten
+  code canónico + source_code + source_row).
+
+### Implementación
+- Parser (`parse.ts`): conserva `sourceCode`/`sourceRow`; algoritmo **genérico** de capítulos
+  duplicados (max+1 ⇒ 7→11/8→12/9→13/10→14); propagación de prefijos de ítems (7.01→11.01;
+  histórico 2.0x bajo cap 3 → 3.0x); código ambiguo ⇒ `requiresManualReview` (bloquea). Mapping por
+  clave **`rowType:sourceRow`**. `overrides` (ediciones de la usuaria) reaplican el mapping; el
+  digest del preview es del payload **ORIGINAL** (integridad), estable ante overrides.
+- Servicio: `preview/confirm` aceptan `overrides`; **reconstrucción server-side** (el navegador solo
+  envía intención de mapping). UI "Revisar numeración" (tabla editable: fila/tipo/original/propuesto/
+  descripción/motivo/estado) + Revalidar; Confirmar solo si `importable` (sin errores ni revisiones
+  pendientes, canónicos únicos, V01 vacía, digest consistente).
+
+### Validación
+- typecheck/lint 0, **650 tests** (parser 4C.3 + UI), build fixture + db local PASS, gm 22/22,
+  gm:import, validador 214/0/0, RLS 89/89, `git diff --check` limpio. Excel privado real NO usado.
+
+### Pendiente
+- Preview + merge `--no-ff` + Production. Acción manual final: la usuaria sube primero el Excel
+  ORIGINAL (verifica sugerencias visibles 7→11/8→12/9→13/10→14) y, opcionalmente, la copia corregida.
+
+## 2026-06-05 — 4C.3 Fase 0: diagnóstico de normalización de códigos — STOP por migración
+
+### Estado
+- **4C.2 validada manualmente** por la usuaria (preview con Excel real: 10 capítulos aceptados,
+  132 ítems, total `$336.084.480`; errores agregados de capítulos duplicados 7/8/9/10 en filas
+  97/102/167/172; advertencias de ítems repetidos y subtotales). NO se confirmó importación; V01 vacía.
+- Rama `integration/wave-4c3-source-normalization` desde `main`@`8a7d4d5` (`main` intacta).
+- **DETENIDO tras el diagnóstico** (Fase 0): se requiere **migración nueva**; pendiente de
+  **aprobación explícita** antes de continuar (regla del prompt).
+
+### Diagnóstico de esquema
+- `chapters`: `code` (UNIQUE por versión), `name`, `sort_order`. **Sin** `source_code`/`source_row`.
+- `boq_items`: `code`, snapshots, `subtotal`, `sort_order`, `notes` (text). **Sin** campo de origen
+  estructurado; `notes` no sirve para capítulos ni es reversible/limpio.
+- RPC `import_boq_into_version(p_version_id, p_chapters jsonb, p_items jsonb)`: inserta capítulos/
+  ítems desde el JSONB; NO persiste metadatos de origen.
+
+### Conclusión
+- Para persistir `canonicalCode` (en `code`) conservando **`sourceCode` + `sourceRow`** (trazabilidad
+  reversible) en capítulos E ítems ⇒ **migración aditiva ESTRICTAMENTE NECESARIA**. La RPC se
+  extiende (misma firma `(uuid,jsonb,jsonb)`; el JSONB lleva claves extra `sourceCode`/`sourceRow`).
+- Propuesta `20260605120000_boq_source_traceability.sql` (aditiva, reversible):
+  `ALTER TABLE public.chapters ADD COLUMN source_code text, ADD COLUMN source_row integer;`
+  `ALTER TABLE public.boq_items ADD COLUMN source_code text, ADD COLUMN source_row integer;`
+  `CREATE OR REPLACE FUNCTION public.import_boq_into_version(...)` (misma firma) que además inserta
+  `source_code`/`source_row` desde el payload. DOWN: drop columns + restaurar la función 4C.1.
+- Remoto actual 19/19 ⇒ sería la 20.ª (requiere `db push` tras dry-run).
+
+### Estrategia (a implementar tras aprobación)
+- Parser conserva `sourceCode`+`sourceRow`; propone `canonicalCode`. **Capítulos duplicados
+  (numéricos)**: `canonicalCode` = siguiente entero por encima del máximo de capítulo (algorítmico,
+  no hardcodeado): max=10 ⇒ 7→11, 8→12, 9→13, 10→14. **Ítems**: si el prefijo no coincide con el
+  capítulo canónico, propagar prefijo conservando sufijo (`7.01`→`11.01`; `2.0x` bajo capítulo 3 →
+  `3.0x`). Código no-seguro (no numérico/sin patrón) ⇒ NO inventar; bloquear y pedir edición manual.
+- UI "Revisar numeración" (tabla editable: fila/tipo/original/propuesto/nombre/motivo/estado);
+  revalidar; confirmar solo si códigos de capítulo canónicos únicos + referencias válidas + digest
+  consistente + V01 vacía. Subtotales: backend sigue siendo fuente de verdad.
+
+### Acción solicitada (UNA aprobación)
+- Autorizar la migración `20260605120000` (columnas + extensión de RPC) para crearla/validarla local
+  (db reset + RLS runtime + tests), `db push --dry-run` y, si OK (1 migración, sin seeds), `db push`;
+  luego implementar parser+UI+tests+deploy. **Nada remoto sin OK.** Rollback estable: tag
+  `wave-4b3-real-estimates-production-v1`.
+
 ## 2026-06-05 — 4C.2: compatibilidad con plantilla real de cotización (parser, sin migración)
 
 ### Causa del fallo (preview con Excel real)

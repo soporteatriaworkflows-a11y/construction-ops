@@ -61,6 +61,13 @@ describe('flujo cliente de importación', () => {
     expect(source).toMatch(/useTransition/);
     expect(source).toMatch(/disabled=\{[^}]*pending/);
   });
+  it('sección "Revisar numeración" editable + Revalidar + envío de overrides (4C.3)', () => {
+    expect(source).toMatch(/Revisar numeración/);
+    expect(source).toMatch(/preview\.mappings\.map/);
+    expect(source).toMatch(/Revalidar/);
+    expect(source).toMatch(/fd\.set\('overrides'/);
+    expect(source).toMatch(/setOverrides/);
+  });
 });
 
 describe('actions de importación — seguridad', () => {

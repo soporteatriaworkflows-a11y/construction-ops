@@ -82,6 +82,39 @@ export interface ImportIssue {
 /** @deprecated usar `ImportIssue`. Mantenido por compatibilidad de tipos. */
 export type ImportWarning = ImportIssue;
 
+/** Tipo de fila normalizable. */
+export type RowType = 'chapter' | 'item';
+
+/**
+ * Propuesta de normalización de UN registro (capítulo o ítem). Clave estable:
+ * `rowType + sourceRow` (NO solo `sourceCode`: el mismo código puede repetirse).
+ */
+export interface NumberingMapping {
+  rowType: RowType;
+  /** Fila REAL de Excel (>0): clave estable junto con `rowType`. */
+  sourceRow: number;
+  /** Código original del Excel. */
+  sourceCode: string;
+  /** Código canónico propuesto (o el original si no cambia). */
+  canonicalCode: string;
+  /** Descripción truncada (segura). */
+  description: string;
+  /** Motivo de la propuesta. */
+  reason: string;
+  /** `true` si no hubo sugerencia segura ⇒ requiere edición manual antes de confirmar. */
+  requiresManualReview: boolean;
+}
+
+/** Override de mapping enviado por la usuaria (intención mínima, validada server-side). */
+export interface MappingOverride {
+  rowType: RowType;
+  sourceRow: number;
+  canonicalCode: string;
+}
+
+/** Longitud máxima de un código (capítulo/ítem) canónico u original. */
+export const MAX_CODE_LEN = 60;
+
 /**
  * Resultado del Paso A (preview). NO incluye el archivo ni fórmulas; es
  * client-safe. `digest` (SHA-256 del payload normalizado) ata el preview a la
@@ -103,9 +136,11 @@ export interface ImportPreview {
   errors: ImportIssue[];
   /** Advertencias no bloqueantes agregadas. */
   warnings: ImportIssue[];
-  /** `true` si NO hay errores bloqueantes (preview confirmable). */
+  /** Propuestas de normalización de códigos (capítulos/ítems con cambio o revisión). */
+  mappings: NumberingMapping[];
+  /** `true` si NO hay errores bloqueantes ni revisiones pendientes (confirmable). */
   importable: boolean;
-  /** SHA-256 (hex) del payload normalizado {chapters, items}. */
+  /** SHA-256 (hex) del payload ORIGINAL (sourceCode/sourceRow) — integridad del archivo. */
   digest: string;
 }
 
