@@ -1,5 +1,39 @@
 # Handoff Log
 
+## 2026-06-05 — 4C.3 implementado: normalización reversible de códigos (migración aprobada)
+
+### Estado
+- Rama `integration/wave-4c3-source-normalization`. Migración aprobada (trazabilidad de origen).
+- **Migración aplicada al remoto** ⇒ **20/20 Local = Remote** (sin seeds, sin import remoto).
+  Dry-run = 1 migración esperada.
+
+### Migración (autorizada)
+- `20260605120000_boq_source_traceability.sql`: `chapters` y `boq_items` += `source_code text`
+  + `source_row integer` (+ CHECK `source_row IS NULL OR source_row > 0`). RPC
+  `import_boq_into_version` (MISMA firma) extendida: persiste `code`=canónico + `source_code` +
+  `source_row`. Mantiene SECURITY INVOKER, RLS, versión vacía/editable (FOR UPDATE), atomicidad,
+  subtotal recalculado, grants endurecidos. **RLS runtime 89/89** (+2: capítulo e ítem persisten
+  code canónico + source_code + source_row).
+
+### Implementación
+- Parser (`parse.ts`): conserva `sourceCode`/`sourceRow`; algoritmo **genérico** de capítulos
+  duplicados (max+1 ⇒ 7→11/8→12/9→13/10→14); propagación de prefijos de ítems (7.01→11.01;
+  histórico 2.0x bajo cap 3 → 3.0x); código ambiguo ⇒ `requiresManualReview` (bloquea). Mapping por
+  clave **`rowType:sourceRow`**. `overrides` (ediciones de la usuaria) reaplican el mapping; el
+  digest del preview es del payload **ORIGINAL** (integridad), estable ante overrides.
+- Servicio: `preview/confirm` aceptan `overrides`; **reconstrucción server-side** (el navegador solo
+  envía intención de mapping). UI "Revisar numeración" (tabla editable: fila/tipo/original/propuesto/
+  descripción/motivo/estado) + Revalidar; Confirmar solo si `importable` (sin errores ni revisiones
+  pendientes, canónicos únicos, V01 vacía, digest consistente).
+
+### Validación
+- typecheck/lint 0, **650 tests** (parser 4C.3 + UI), build fixture + db local PASS, gm 22/22,
+  gm:import, validador 214/0/0, RLS 89/89, `git diff --check` limpio. Excel privado real NO usado.
+
+### Pendiente
+- Preview + merge `--no-ff` + Production. Acción manual final: la usuaria sube primero el Excel
+  ORIGINAL (verifica sugerencias visibles 7→11/8→12/9→13/10→14) y, opcionalmente, la copia corregida.
+
 ## 2026-06-05 — 4C.3 Fase 0: diagnóstico de normalización de códigos — STOP por migración
 
 ### Estado

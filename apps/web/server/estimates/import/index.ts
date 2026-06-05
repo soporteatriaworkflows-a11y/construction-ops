@@ -17,7 +17,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { resolveSource } from '@/server/read-model';
 import { getEstimatesWriteRepository } from '@/server/estimates';
-import { IMPORT_LIMITS, type ImportPreview, type ImportResult, type ImportStatus } from '@/lib/import/types';
+import { IMPORT_LIMITS, type ImportPreview, type ImportResult, type ImportStatus, type MappingOverride } from '@/lib/import/types';
 import { parseBoqWorkbook } from './parse';
 import type { AuthenticatedViewer } from '@/server/auth/types';
 import type { ViewerContext, Uuid } from '@/lib/contracts/read-model';
@@ -68,25 +68,27 @@ async function assertImportableVersion(
   return active.id;
 }
 
-/** Paso A — preview sin escritura. */
+/** Paso A — preview sin escritura. `overrides` reaplica las ediciones de códigos. */
 export async function previewEstimateExcelImport(
   viewer: AuthenticatedViewer,
   estimateId: Uuid,
   file: unknown,
+  overrides: MappingOverride[] = [],
 ): Promise<ImportPreview> {
   assertFile(file);
   await assertImportableVersion(viewer, estimateId);
   const buffer = Buffer.from(await file.arrayBuffer());
-  const { preview } = parseBoqWorkbook(buffer, file.name);
+  const { preview } = parseBoqWorkbook(buffer, file.name, overrides);
   return preview;
 }
 
-/** Paso B — confirmación: re-parse + digest + import atómico (RPC). */
+/** Paso B — confirmación: re-parse server-side + digest (integridad) + import atómico. */
 export async function confirmEstimateExcelImport(
   viewer: AuthenticatedViewer,
   estimateId: Uuid,
   file: unknown,
   expectedDigest: string,
+  overrides: MappingOverride[] = [],
 ): Promise<ImportResult> {
   if (resolveSource(process.env.READ_MODEL_SOURCE) !== 'db') {
     throw new ImportNotSupportedError();
@@ -95,13 +97,16 @@ export async function confirmEstimateExcelImport(
   const versionId = await assertImportableVersion(viewer, estimateId);
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const { preview, normalized } = parseBoqWorkbook(buffer, file.name);
+  // Reparseo server-side: NO se confía en capítulos/ítems/totales del navegador;
+  // solo en la intención de mapping (overrides). El payload final se reconstruye aquí.
+  const { preview, normalized } = parseBoqWorkbook(buffer, file.name, overrides);
 
-  // El archivo confirmado debe coincidir EXACTAMENTE con el del preview.
+  // Integridad: el archivo confirmado debe coincidir EXACTAMENTE con el del preview
+  // (digest del payload ORIGINAL, independiente de los overrides).
   if (!expectedDigest || preview.digest !== expectedDigest) {
     throw new ImportDigestMismatchError();
   }
-  // No se confirma si el preview tiene errores bloqueantes (diagnóstico agregado).
+  // No se confirma si quedan errores bloqueantes o revisiones manuales pendientes.
   if (!preview.importable) {
     throw new ImportHasErrorsError();
   }

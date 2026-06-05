@@ -9,6 +9,24 @@ cada ciclo de validación.
 
 ---
 
+## 4C.3 — normalización reversible de códigos (2026-06-05)
+
+> Rama `integration/wave-4c3-source-normalization`. Migración `20260605120000` ⇒ **20/20**.
+
+- **Migración** aditiva/reversible (`source_code`/`source_row` en `chapters`+`boq_items` + CHECK
+  `source_row>0`); RPC extendida (misma firma) persiste `code` canónico + origen. Dry-run = 1.
+- **RLS runtime 89/89** (+2: capítulo e ítem persisten `code` canónico + `source_code` + `source_row`;
+  atomicidad/doble-submit/cross-org/anon intactos).
+- **Tests** 650: parser 4C.3 (algoritmo determinista 7→11/8→12/9→13/10→14 + genérico; propagación de
+  prefijos; histórico 2.0x→3.0x; ambiguo bloqueado + override que resuelve; sourceCode/sourceRow
+  preservados; digest original estable ante overrides) + route-config de la UI "Revisar numeración".
+- **Seguridad**: el navegador solo envía intención de mapping (`overrides`); reconstrucción/validación
+  server-side; nada se renumera en silencio; reimport bloqueado; sin service-role.
+- **Builds**: fixture + db local PASS. typecheck/lint 0, gm 22/22, gm:import, validador 214/0/0.
+- **Privacidad**: Excel privado real NO usado (fixtures sintéticos); sin importación remota; V01 vacía.
+
+---
+
 ## 4C.2 — compatibilidad con plantilla real de cotización (2026-06-05)
 
 > Rama `integration/wave-4c1-excel-import` (fix de parser, **sin migración**). Remoto **19/19** intacto.

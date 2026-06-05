@@ -27,7 +27,34 @@ import { EstimateNotFoundError } from '@/server/estimates';
 import { resolveAuthenticatedViewer } from '@/server/auth/resolve-viewer';
 import { AuthError } from '@/server/auth/errors';
 import { isCreationModeEnabled } from '../../../../../../mode-guard';
-import type { ImportPreview, ImportResult } from '@/lib/import/types';
+import type { ImportPreview, ImportResult, MappingOverride } from '@/lib/import/types';
+
+/** Parsea de forma segura los overrides de mapping enviados por el cliente. */
+function parseOverrides(raw: FormDataEntryValue | null): MappingOverride[] {
+  if (typeof raw !== 'string' || raw.trim() === '') return [];
+  let data: unknown;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(data)) return [];
+  const out: MappingOverride[] = [];
+  for (const e of data.slice(0, IMPORT_OVERRIDE_LIMIT)) {
+    if (
+      e &&
+      typeof e === 'object' &&
+      ((e as { rowType?: unknown }).rowType === 'chapter' || (e as { rowType?: unknown }).rowType === 'item') &&
+      Number.isInteger((e as { sourceRow?: unknown }).sourceRow) &&
+      typeof (e as { canonicalCode?: unknown }).canonicalCode === 'string'
+    ) {
+      const o = e as MappingOverride;
+      out.push({ rowType: o.rowType, sourceRow: o.sourceRow, canonicalCode: o.canonicalCode.trim().slice(0, 60) });
+    }
+  }
+  return out;
+}
+const IMPORT_OVERRIDE_LIMIT = 6000;
 
 export type PreviewActionResult =
   | { ok: true; preview: ImportPreview }
@@ -77,7 +104,8 @@ export async function previewExcelImportAction(
   }
 
   try {
-    const preview = await previewEstimateExcelImport(viewer, estimateId, file);
+    const overrides = parseOverrides(formData.get('overrides'));
+    const preview = await previewEstimateExcelImport(viewer, estimateId, file, overrides);
     return { ok: true, preview };
   } catch (e) {
     const detectedSheets = e instanceof ExcelParseError ? e.detectedSheets : undefined;
@@ -105,7 +133,8 @@ export async function confirmExcelImportAction(
   }
 
   try {
-    const result = await confirmEstimateExcelImport(viewer, estimateId, file, digest);
+    const overrides = parseOverrides(formData.get('overrides'));
+    const result = await confirmEstimateExcelImport(viewer, estimateId, file, digest, overrides);
     return { ok: true, result };
   } catch (e) {
     return { ok: false, error: sanitizeError(e) };

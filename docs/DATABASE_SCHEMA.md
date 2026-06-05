@@ -444,6 +444,7 @@ necesariamente un rol de fila; se trata en el perfil de exports).
 14-15. —. 16. 🔒 INTERNO: —. 17. **Dudas**: —.
 18. **RPC (4B.3)**: `public.create_estimate_with_initial_version(p_scope_id, p_code, p_name, p_description)` `SECURITY INVOKER` crea estimate (`active`) + V01 (`draft`) atómicamente; `created_by` derivado de `app._auth_uid()` (sin parámetro de autor); `GRANT EXECUTE` solo a `authenticated` (revocado de PUBLIC/anon).
 19. **RPC (4C.1)**: `public.import_boq_into_version(p_version_id, p_chapters jsonb, p_items jsonb)` `SECURITY INVOKER` (mig. `20260604140000`) importa capítulos+ítems a una versión **vacía/editable** de forma atómica (`FOR UPDATE` + guard de versión vacía anti doble-submit); `subtotal` recalculado server-side (`quantity×unit_price`); devuelve `{chapterCount,itemCount,directTotal}`; `GRANT EXECUTE` solo a `authenticated` (revocado de PUBLIC/anon). NO crea tablas ni cambia RLS.
+20. **Trazabilidad de origen (4C.3, mig. `20260605120000`)**: `chapters` y `boq_items` += `source_code text` + `source_row integer` (CHECK `source_row IS NULL OR source_row > 0`, nullable). `code` = código **canónico** (validado, único por versión en chapters); `source_code`/`source_row` = código y fila ORIGINALES del Excel (trazabilidad reversible). La RPC `import_boq_into_version` (misma firma) los persiste desde el JSONB.
 
 ### `estimate_versions`
 1. **Tabla**: `estimate_versions` 2. **Propósito**: versión congelable de un presupuesto (snapshot financiero).

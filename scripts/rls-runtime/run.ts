@@ -844,10 +844,11 @@ async function main(): Promise<void> {
   // ===========================================================================
   console.log('\n--- IMPORT BOQ 4C.1: RPC atómica import_boq_into_version ---');
 
-  const impChapters = [{ code: 'CAP1', name: 'Preliminares', sortOrder: 0 }];
+  // 4C.3: `code` = canónico; se persisten source_code/source_row originales.
+  const impChapters = [{ code: '11', name: 'Preliminares', sortOrder: 0, sourceCode: '7', sourceRow: 97 }];
   const impItems = [
-    { chapterCode: 'CAP1', code: 'IT1', description: 'Excavación', unit: 'm3', quantity: '2', unitPrice: '3', sortOrder: 0 },
-    { chapterCode: 'CAP1', code: 'IT2', description: 'Relleno', unit: 'm3', quantity: '4', unitPrice: '5', sortOrder: 1 },
+    { chapterCode: '11', code: '11.01', description: 'Excavación', unit: 'm3', quantity: '2', unitPrice: '3', sortOrder: 0, sourceCode: '7.01', sourceRow: 98 },
+    { chapterCode: '11', code: '11.02', description: 'Relleno', unit: 'm3', quantity: '4', unitPrice: '5', sortOrder: 1, sourceCode: '7.02', sourceRow: 99 },
   ];
 
   // 15a) Import exitoso: conteos + directTotal recalculado (2*3 + 4*5 = 26).
@@ -861,12 +862,19 @@ async function main(): Promise<void> {
     // Subtotal recalculado server-side (no se confía en columna F del Excel).
     const sub = await q<{ subtotal: string; q: string; p: string }[]>`
       SELECT subtotal, quantity_snapshot AS q, unit_price_snapshot AS p
-      FROM boq_items WHERE estimate_version_id = ${vid} AND code = 'IT1'`;
-    return { res, vid, sub: sub[0]! };
+      FROM boq_items WHERE estimate_version_id = ${vid} AND code = '11.01'`;
+    // Trazabilidad: code canónico + source_code/source_row originales persistidos.
+    const ch = await q<{ code: string; source_code: string | null; source_row: number | null }[]>`
+      SELECT code, source_code, source_row FROM chapters WHERE estimate_version_id = ${vid}`;
+    const it = await q<{ code: string; source_code: string | null; source_row: number | null }[]>`
+      SELECT code, source_code, source_row FROM boq_items WHERE estimate_version_id = ${vid} AND code = '11.01'`;
+    return { res, vid, sub: sub[0]!, ch: ch[0]!, it: it[0]! };
   });
   check('import: conteos correctos (1 cap / 2 ítems)', imp.res.chapterCount === 1 && imp.res.itemCount === 2, JSON.stringify(imp.res));
   check('import: directTotal recalculado server-side = 26', Number(imp.res.directTotal) === 26, `dt=${imp.res.directTotal}`);
   check('import: subtotal recalculado = quantity × unit_price (6)', Number(imp.sub.subtotal) === 6, `sub=${imp.sub.subtotal}`);
+  check('import 4C.3: capítulo persiste code canónico (11) + source_code (7) + source_row (97)', imp.ch.code === '11' && imp.ch.source_code === '7' && imp.ch.source_row === 97, JSON.stringify(imp.ch));
+  check('import 4C.3: ítem persiste code canónico (11.01) + source_code (7.01) + source_row (98)', imp.it.code === '11.01' && imp.it.source_code === '7.01' && imp.it.source_row === 98, JSON.stringify(imp.it));
 
   // 15b) Doble importación bloqueada (versión ya no vacía) ⇒ revierte (savepoint).
   const dbl = await asUser(realA, async (q) => {

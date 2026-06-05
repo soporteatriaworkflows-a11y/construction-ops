@@ -452,6 +452,18 @@ Contrato: `docs/EXCEL_IMPORT_CONTRACT.md` (v1). Migración remota aprobada.
 **NO tocar**: migración/RLS/RPC (consume), Vercel. **No** persistir el archivo; **no** usar el
 Excel privado real en dev.
 
+### Ownership congelado — Oleada 4C.3 (normalización reversible de códigos)
+
+Contrato: `docs/EXCEL_IMPORT_CONTRACT.md §4.c` (v1). Migración remota aprobada.
+
+**agent-db-rls (4C.3)** — Migración `20260605120000_boq_source_traceability.sql`
+(`source_code`/`source_row` en `chapters`+`boq_items` + RPC extendida). RLS runtime +2.
+**agent-excel-mapper (4C.3)** — `parse.ts`: algoritmo de propuesta de canónicos + mapping
+por `rowType:sourceRow`; `lib/import/types.ts` (NumberingMapping/MappingOverride).
+**agent-frontend-boq (4C.3)** — UI "Revisar numeración" (import-flow) + actions con `overrides`.
+**NO** confiar en capítulos/ítems/totales del navegador (solo intención de mapping); reconstrucción
+server-side; nada se renumera en silencio.
+
 ### agent-qa (Oleada 4)
 - `docs/QA_REPORT.md` con resultado completo.
 - Sin FAIL bloqueante para release.
