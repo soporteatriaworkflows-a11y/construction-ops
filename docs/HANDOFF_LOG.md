@@ -1,5 +1,24 @@
 # Handoff Log
 
+## 2026-06-05 — 4C.3 CERRADA: smoke real de importación con normalización
+
+### Estado
+- **Oleada 4C.3 CERRADA.** Smoke manual verificado por la usuaria en producción
+  (`construction-ops-psi.vercel.app`, `supabase`+`db`). `main = origin/main = 4071be8`.
+- Tag estable: **`wave-4c3-real-excel-import-production-v1`**.
+
+### Smoke productivo verificado (usuaria)
+- ENTRE PATIOS → PRIMER PISO → PRESUPUESTO BASE → V01. Subió el **Excel histórico ORIGINAL**:
+  upload → preview → **sugerencias visibles** → normalización controlada → **Confirmar** →
+  banner verde "Importación completada". NO usó la copia corregida como fuente.
+- **Trazabilidad `source_code`/`source_row` aplicada** al archivo histórico original. **V01 ya
+  contiene datos reales** (presupuesto importado). upload→preview→normalize→import verificado.
+
+### Siguiente bloque
+- **Oleada 4D.1 — revisión operativa y visualización del presupuesto importado** (resumen
+  financiero + tabla de capítulos + detalle de capítulo con ítems BOQ + trazabilidad discreta).
+  Rama `integration/wave-4d1-budget-review`. Reutilizar esquema; sin migración salvo necesidad.
+
 ## 2026-06-05 — 4C.3 implementado: normalización reversible de códigos (migración aprobada)
 
 ### Estado

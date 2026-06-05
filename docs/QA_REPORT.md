@@ -9,6 +9,18 @@ cada ciclo de validación.
 
 ---
 
+## CIERRE 4C.3 — smoke real de importación con normalización (2026-06-05)
+
+> Verificación MANUAL de la usuaria en `https://construction-ops-psi.vercel.app` (`supabase`+`db`).
+> Tag `wave-4c3-real-excel-import-production-v1`.
+
+- **Excel histórico ORIGINAL importado desde la UI**: upload → preview → sugerencias visibles →
+  normalización controlada → Confirmar → "Importación completada" ✅. No usó la copia corregida.
+- **Trazabilidad `source_code`/`source_row`** aplicada; **V01 ya contiene datos reales** ✅.
+- **Oleada 4C.3 CERRADA.** Siguiente: 4D.1 (revisión operativa del presupuesto importado).
+
+---
+
 ## 4C.3 — normalización reversible de códigos (2026-06-05)
 
 > Rama `integration/wave-4c3-source-normalization`. Migración `20260605120000` ⇒ **20/20**.
