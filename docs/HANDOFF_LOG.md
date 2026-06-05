@@ -1,5 +1,36 @@
 # Handoff Log
 
+## 2026-06-05 — 4C.2: compatibilidad con plantilla real de cotización (parser, sin migración)
+
+### Causa del fallo (preview con Excel real)
+- `Fila 22: capítulo sin código o nombre`. Dos bugs: (1) la fila `SUBTOTAL CAPITULO`
+  (descripción presente, sin código/unidad/cantidad/precio) se clasificaba como **capítulo
+  incompleto** ⇒ error; (2) el número de fila era el índice del array **compactado**
+  (`blankrows:false` descartaba filas vacías) ⇒ desfase (fila real 23 → reportada 22).
+
+### Fix (solo parser; SIN migración)
+- `blankrows:true` ⇒ la fila reportada = **fila REAL de Excel** (alineada con separadores vacíos).
+- **Palabras reservadas** por descripción: `SUBTOTAL CAPITULO` ignorado; `TOTAL COSTOS DIRECTOS`
+  cierra el BOQ; AIU/control de pagos/actas/anticipo/liquidación ignorados (fuera de alcance).
+- Plantilla real de 7 columnas: `CAP`(auxiliar, ignorada), `ÍTEM`(code), `DESCRIPCIÓN`, `UN`,
+  `CANT.`, `VR. UNITARIO`, `VR. PARCIAL`(subtotal, solo comparación). Mapeo por encabezado.
+- **Diagnóstico AGREGADO**: el preview recorre toda la hoja y devuelve `errors[]`+`warnings[]`
+  `{row, kind, code, description, recommendation}` (no se detiene en el primero). Confirmación
+  bloqueada si hay errores (`ImportHasErrorsError`).
+- **Duplicados sin normalización silenciosa**: capítulo duplicado ⇒ ERROR (BD exige único por
+  versión); ítem duplicado ⇒ ADVERTENCIA (BD no lo restringe). **Opción A** (exigir corrección
+  del Excel), sin migración ni `source_code`.
+
+### Validación
+- typecheck/lint 0, **651 tests** (parser reescrito con forma real, 16 casos), build fixture +
+  db local PASS, gm 22/22, gm:import, validador 214/0/0, `git diff --check` limpio.
+- Excel privado real NO usado (workbooks sintéticos en memoria). **Sin migración** ⇒ no se toca
+  el remoto (sigue 19/19). NO se confirmó importación; V01 sigue vacía.
+
+### Pendiente
+- Preview + merge `--no-ff` + Production. Acción manual final: la usuaria vuelve a **analizar**
+  el Excel real desde la UI y comparte solo el **resumen de preview** o los **errores agregados**.
+
 ## 2026-06-05 — 4C.1 desplegado: merge a `main` + Production READY
 
 ### Estado

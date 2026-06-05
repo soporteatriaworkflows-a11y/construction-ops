@@ -151,12 +151,35 @@ export function ImportFlow({
               <Stat label="Total directo" value={formatCOP(preview.directTotal)} accent />
             </div>
 
+            {preview.errors.length > 0 && (
+              <div className="space-y-1 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                <p className="font-medium">
+                  {preview.errors.length} problema(s) deben corregirse antes de importar:
+                </p>
+                <ul className="space-y-1">
+                  {preview.errors.map((e, i) => (
+                    <li key={i} className="flex items-start gap-1.5">
+                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                      <span>
+                        {e.row !== null && <strong>Fila {e.row}: </strong>}
+                        {e.code ? <span className="font-mono">[{e.code}] </span> : null}
+                        {e.message}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             {preview.warnings.length > 0 && (
               <ul className="space-y-1 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
                 {preview.warnings.map((w, i) => (
                   <li key={i} className="flex items-start gap-1.5">
                     <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                    {w.message}
+                    <span>
+                      {w.row !== null && <strong>Fila {w.row}: </strong>}
+                      {w.message}
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -186,7 +209,13 @@ export function ImportFlow({
             </div>
 
             <div className="flex items-center gap-3 border-t border-gray-100 pt-3">
-              <Button type="button" onClick={confirm} disabled={pending} size="sm">
+              <Button
+                type="button"
+                onClick={confirm}
+                disabled={pending || !preview.importable}
+                title={preview.importable ? undefined : 'Corrige los errores antes de confirmar'}
+                size="sm"
+              >
                 {pending ? (
                   <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                 ) : (

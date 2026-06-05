@@ -25,7 +25,7 @@ import { createHash } from 'node:crypto';
 import Decimal from 'decimal.js';
 import * as XLSX from 'xlsx';
 import type { DecimalString } from '@/lib/utils/types';
-import { EXPECTED_SHEET, IMPORT_LIMITS, type ImportPreview, type ImportWarning } from '@/lib/import/types';
+import { EXPECTED_SHEET, IMPORT_LIMITS, type ImportPreview, type ImportIssue } from '@/lib/import/types';
 
 /** Payload normalizado que consume la RPC (server-only; no client-safe). */
 export interface NormalizedChapter {
@@ -66,14 +66,49 @@ export class ExcelParseError extends Error {
 }
 
 const HEADER_SYNONYMS: Record<string, string[]> = {
+  // `code` = columna ÍTEM (no la auxiliar CAP). La columna `CAP` NO tiene sinónimo
+  // ⇒ queda sin mapear y se ignora (solo metadato visual).
   code: ['code', 'codigo', 'item', 'no', 'no.'],
   description: ['description', 'descripcion', 'actividad', 'concepto', 'detalle'],
   unit: ['unit', 'unidad', 'und', 'un'],
   quantity: ['quantity', 'cantidad', 'cant', 'cant.'],
   unitPrice: ['unit_price', 'unitprice', 'v/unitario', 'vr unitario', 'vr. unitario', 'valor unitario', 'precio unitario', 'punit'],
-  subtotal: ['subtotal', 'sub_total', 'v/total', 'vr total', 'vr. total', 'valor total', 'total'],
+  // Incluye `VR. PARCIAL` (plantilla real) además de los sinónimos de total.
+  subtotal: ['subtotal', 'sub_total', 'v/total', 'vr total', 'vr. total', 'valor total', 'total', 'vr parcial', 'vr. parcial', 'v/parcial', 'valor parcial', 'parcial'],
 };
 const REQUIRED_FIELDS = ['code', 'description', 'unit', 'quantity', 'unitPrice'] as const;
+
+/**
+ * Filas de cierre/sumario que NO son capítulos ni ítems. Se comparan contra la
+ * DESCRIPCIÓN normalizada (sin tildes, minúsculas, prefijo). Tratamiento:
+ *  - `SUBTOTAL ...`              → ignorar (sumario de capítulo).
+ *  - `TOTAL COSTOS DIRECTOS`     → cierra la lectura del BOQ directo.
+ *  - AIU / control de pagos / actas → ignorar (fuera de alcance 4C.2).
+ */
+const RESERVED = {
+  subtotalChapter: ['subtotal capitulo', 'subtotal', 'sub total capitulo', 'subtotal cap'],
+  endOfDirect: ['total costos directos', 'total costo directo', 'total directo'],
+  afterDirect: [
+    'administracion',
+    'imprevistos',
+    'utilidad',
+    'utilidades',
+    'iva sobre utilidad',
+    'iva',
+    'costos indirectos',
+    'total costo',
+    'total costos',
+    'control de pagos',
+    'anticipo',
+    'actas',
+    'acta',
+    'liquidacion',
+  ],
+};
+
+function startsWithAny(value: string, prefixes: string[]): boolean {
+  return prefixes.some((p) => value === p || value.startsWith(p + ' ') || value.startsWith(p));
+}
 
 function norm(s: unknown): string {
   return String(s ?? '')
@@ -130,10 +165,13 @@ export function parseBoqWorkbook(buffer: Buffer, fileName: string): ParseResult 
   if (!worksheet) {
     throw new ExcelParseError(`No se pudo leer la hoja "${EXPECTED_SHEET}".`);
   }
+  // `blankrows: true` PRESERVA las filas vacías ⇒ el índice del array mapea 1:1 a la
+  // fila REAL de Excel (índice i → fila i+1). Imprescindible para reportar la fila
+  // visible correcta (antes se descartaban blancos y el número se desfasaba).
   const rows: unknown[][] = XLSX.utils.sheet_to_json(worksheet, {
     header: 1,
     raw: true,
-    blankrows: false,
+    blankrows: true,
     defval: null,
   });
 
@@ -161,25 +199,64 @@ export function parseBoqWorkbook(buffer: Buffer, fileName: string): ParseResult 
   const get = (row: unknown[], field: string): unknown =>
     colMap[field] === undefined ? null : row[colMap[field]!];
 
-  const warnings: ImportWarning[] = [];
+  const warnings: ImportIssue[] = [];
+  const errors: ImportIssue[] = [];
   const chapters: NormalizedChapter[] = [];
   const items: NormalizedItem[] = [];
+  const itemSubtotals: string[] = [];
   const chapterCodes = new Set<string>();
+  const itemCodes = new Set<string>();
   let currentChapter: string | null = null;
   let emptySkipped = 0;
+  let afterDirectIgnored = 0;
+  let stopped = false;
   const tol = new Decimal(IMPORT_LIMITS.subtotalToleranceCop);
+  const safeDesc = (d: string) => (d.length > 80 ? `${d.slice(0, 80)}…` : d);
 
-  for (let r = headerRowIdx + 1; r < rows.length; r++) {
+  // Recorre TODA la hoja (sin detenerse en el primer problema) usando la fila REAL.
+  for (let r = headerRowIdx + 1; r < rows.length && !stopped; r++) {
+    const excelRow = r + 1; // índice 0-based → fila real de Excel (header alineado)
     const row = rows[r] ?? [];
     const code = isBlank(get(row, 'code')) ? '' : String(get(row, 'code')).trim();
     const description = isBlank(get(row, 'description')) ? '' : String(get(row, 'description')).trim();
     const unit = isBlank(get(row, 'unit')) ? '' : String(get(row, 'unit')).trim();
     const qRaw = get(row, 'quantity');
     const pRaw = get(row, 'unitPrice');
+    const descNorm = norm(description);
 
-    const allEmpty = !code && !description && !unit && isBlank(qRaw) && isBlank(pRaw);
-    if (allEmpty) {
+    // Fila completamente vacía → ignorar.
+    if (!code && !description && !unit && isBlank(qRaw) && isBlank(pRaw)) {
       emptySkipped++;
+      continue;
+    }
+
+    // Palabras reservadas (por descripción), independientes de las demás columnas.
+    if (startsWithAny(descNorm, RESERVED.endOfDirect)) {
+      stopped = true; // cierra el BOQ directo; lo de abajo (AIU, etc.) se ignora.
+      break;
+    }
+    if (startsWithAny(descNorm, RESERVED.subtotalChapter)) {
+      // Sumario de capítulo: ignorar. Opcional: comparar contra el recalculado.
+      const fRaw = toDecimalString(get(row, 'subtotal'));
+      if (fRaw !== null && currentChapter) {
+        const recomputed = items.reduce(
+          (acc, it, idx) =>
+            it.chapterCode === currentChapter ? acc.plus(new Decimal(itemSubtotals[idx]!)) : acc,
+          new Decimal(0),
+        );
+        if (new Decimal(fRaw).minus(recomputed).abs().greaterThan(tol)) {
+          warnings.push({
+            row: excelRow,
+            kind: 'subtotal_mismatch',
+            code: currentChapter,
+            message: `El "SUBTOTAL CAPITULO" del Excel difiere del recalculado (se usa el recalculado).`,
+          });
+        }
+      }
+      continue;
+    }
+    if (startsWithAny(descNorm, RESERVED.afterDirect)) {
+      afterDirectIgnored++;
       continue;
     }
 
@@ -187,50 +264,66 @@ export function parseBoqWorkbook(buffer: Buffer, fileName: string): ParseResult 
 
     if (!looksItem) {
       // CHAPTER row
-      if (!code || !description) {
-        throw new ExcelParseError(`Fila ${r + 1}: capítulo sin código o nombre.`);
+      if (!code) {
+        errors.push({ row: excelRow, kind: 'chapter_no_code', description: safeDesc(description), message: 'Capítulo sin código en la columna ÍTEM.' });
+        continue;
+      }
+      if (!description) {
+        errors.push({ row: excelRow, kind: 'chapter_no_name', code, message: 'Capítulo sin nombre/descripción.' });
+        continue;
       }
       if (code.length > IMPORT_LIMITS.maxCodeLen) {
-        throw new ExcelParseError(`Fila ${r + 1}: código de capítulo demasiado largo.`);
+        errors.push({ row: excelRow, kind: 'too_long', code, message: 'Código de capítulo demasiado largo.' });
+        continue;
       }
       if (chapterCodes.has(code)) {
-        throw new ExcelParseError(`Fila ${r + 1}: código de capítulo duplicado "${code}".`);
+        // Duplicado: la BD exige code único por versión ⇒ BLOQUEANTE (no se normaliza).
+        errors.push({ row: excelRow, kind: 'duplicate_chapter', code, description: safeDesc(description), message: `Código de capítulo duplicado "${code}". Corrige el Excel (los códigos de capítulo deben ser únicos).` });
+        continue;
       }
       chapterCodes.add(code);
       chapters.push({ code, name: description.slice(0, IMPORT_LIMITS.maxDescriptionLen), sortOrder: chapters.length });
       currentChapter = code;
       if (chapters.length > IMPORT_LIMITS.maxChapters) {
-        throw new ExcelParseError(`Demasiados capítulos (máx ${IMPORT_LIMITS.maxChapters}).`);
+        errors.push({ row: excelRow, kind: 'too_long', message: `Demasiados capítulos (máx ${IMPORT_LIMITS.maxChapters}).` });
+        stopped = true;
       }
     } else {
       // ITEM row
       if (!currentChapter) {
-        throw new ExcelParseError(`Fila ${r + 1}: ítem sin un capítulo previo.`);
+        errors.push({ row: excelRow, kind: 'item_no_chapter', code: code || undefined, description: safeDesc(description), message: 'Ítem sin un capítulo previo.' });
+        continue;
       }
       if (!code || !description || !unit) {
-        throw new ExcelParseError(`Fila ${r + 1}: ítem sin código, descripción o unidad.`);
+        errors.push({ row: excelRow, kind: 'item_missing_field', code: code || undefined, description: safeDesc(description), message: 'Ítem sin código, descripción o unidad.' });
+        continue;
       }
       const qStr = toDecimalString(qRaw);
       const pStr = toDecimalString(pRaw);
       if (qStr === null || pStr === null) {
-        throw new ExcelParseError(`Fila ${r + 1}: cantidad o precio unitario no numérico.`);
+        errors.push({ row: excelRow, kind: 'item_non_numeric', code, message: 'Cantidad o precio unitario no numérico.' });
+        continue;
       }
       const q = new Decimal(qStr);
       const p = new Decimal(pStr);
       if (q.isNegative() || p.isNegative()) {
-        throw new ExcelParseError(`Fila ${r + 1}: cantidad o precio negativo.`);
+        errors.push({ row: excelRow, kind: 'negative_value', code, message: 'Cantidad o precio negativo.' });
+        continue;
       }
       if (code.length > IMPORT_LIMITS.maxCodeLen || unit.length > IMPORT_LIMITS.maxUnitLen) {
-        throw new ExcelParseError(`Fila ${r + 1}: código o unidad demasiado largo.`);
+        errors.push({ row: excelRow, kind: 'too_long', code, message: 'Código o unidad demasiado largo.' });
+        continue;
       }
+      // Duplicado de ítem: la BD NO lo restringe ⇒ ADVERTENCIA (no se normaliza).
+      if (itemCodes.has(code)) {
+        warnings.push({ row: excelRow, kind: 'duplicate_item', code, description: safeDesc(description), message: `Código de ítem repetido "${code}" (se importará igual; revisa la numeración).` });
+      }
+      itemCodes.add(code);
+
       const subtotal = q.times(p);
-      // Compara con el subtotal informado (columna F) si existe → advertencia.
       const fRaw = toDecimalString(get(row, 'subtotal'));
       if (fRaw !== null && new Decimal(fRaw).minus(subtotal).abs().greaterThan(tol)) {
-        warnings.push({
-          code: 'subtotal_mismatch',
-          message: `Fila ${r + 1}: el subtotal del Excel difiere del recalculado (se usa el recalculado).`,
-        });
+        warnings.push({ row: excelRow, kind: 'subtotal_mismatch', code, message: 'El subtotal informado en el Excel difiere del recalculado (se usa el recalculado).' });
       }
       items.push({
         chapterCode: currentChapter,
@@ -239,35 +332,45 @@ export function parseBoqWorkbook(buffer: Buffer, fileName: string): ParseResult 
         unit,
         quantity: q.toFixed(),
         unitPrice: p.toFixed(),
-        subtotal: subtotal.toFixed(),
         sortOrder: items.length,
-      } as NormalizedItem & { subtotal: DecimalString });
+      });
+      itemSubtotals.push(subtotal.toFixed());
       if (items.length > IMPORT_LIMITS.maxItems) {
-        throw new ExcelParseError(`Demasiados ítems (máx ${IMPORT_LIMITS.maxItems}).`);
+        errors.push({ row: excelRow, kind: 'too_long', message: `Demasiados ítems (máx ${IMPORT_LIMITS.maxItems}).` });
+        stopped = true;
       }
     }
   }
 
-  if (chapters.length === 0 || items.length === 0) {
-    throw new ExcelParseError('El archivo no contiene capítulos ni ítems reconocibles.');
-  }
   if (emptySkipped > 0) {
-    warnings.push({ code: 'empty_row_skipped', message: `${emptySkipped} fila(s) vacía(s) ignorada(s).` });
+    warnings.push({ row: null, kind: 'empty_rows_skipped', message: `${emptySkipped} fila(s) vacía(s) ignorada(s).` });
+  }
+  if (afterDirectIgnored > 0) {
+    warnings.push({ row: null, kind: 'aiu_ignored', message: `${afterDirectIgnored} fila(s) de AIU/control de pagos ignorada(s) (fuera de alcance).` });
+  }
+  if (chapters.length === 0 || items.length === 0) {
+    errors.push({ row: null, kind: 'no_data', message: 'El archivo no contiene capítulos ni ítems reconocibles.' });
   }
 
   // Totales y resumen por capítulo (recalculados).
   let directTotal = new Decimal(0);
   const chapterSubtotals = new Map<string, { items: number; sub: InstanceType<typeof Decimal> }>();
   for (const ch of chapters) chapterSubtotals.set(ch.code, { items: 0, sub: new Decimal(0) });
-  for (const it of items) {
-    const sub = new Decimal((it as NormalizedItem & { subtotal: string }).subtotal);
+  items.forEach((it, idx) => {
+    const sub = new Decimal(itemSubtotals[idx]!);
     directTotal = directTotal.plus(sub);
-    const agg = chapterSubtotals.get(it.chapterCode)!;
-    agg.items += 1;
-    agg.sub = agg.sub.plus(sub);
-  }
+    const agg = chapterSubtotals.get(it.chapterCode);
+    if (agg) {
+      agg.items += 1;
+      agg.sub = agg.sub.plus(sub);
+    }
+  });
 
   const SAMPLE = 50;
+  if (items.length > SAMPLE) {
+    warnings.push({ row: null, kind: 'truncated_preview', message: `Mostrando ${SAMPLE} de ${items.length} ítems.` });
+  }
+
   const preview: ImportPreview = {
     fileName,
     sheet: sheetName.trim(),
@@ -278,24 +381,23 @@ export function parseBoqWorkbook(buffer: Buffer, fileName: string): ParseResult 
       const agg = chapterSubtotals.get(ch.code)!;
       return { code: ch.code, name: ch.name, itemCount: agg.items, subtotal: agg.sub.toFixed() };
     }),
-    itemsSample: items.slice(0, SAMPLE).map((it) => ({
+    itemsSample: items.slice(0, SAMPLE).map((it, idx) => ({
       chapterCode: it.chapterCode,
       code: it.code,
       description: it.description,
       unit: it.unit,
       quantity: it.quantity,
       unitPrice: it.unitPrice,
-      subtotal: (it as NormalizedItem & { subtotal: string }).subtotal,
+      subtotal: itemSubtotals[idx]!,
     })),
     itemsTruncated: items.length > SAMPLE,
+    errors,
     warnings,
+    importable: errors.length === 0,
     digest: '',
   };
-  if (preview.itemsTruncated) {
-    warnings.push({ code: 'truncated_preview', message: `Mostrando ${SAMPLE} de ${items.length} ítems.` });
-  }
 
-  // Payload normalizado para la RPC (sin subtotal: lo recalcula la RPC también).
+  // Payload normalizado para la RPC (subtotal lo recalcula la RPC).
   const normalized: NormalizedImport = {
     chapters,
     items: items.map((it) => ({

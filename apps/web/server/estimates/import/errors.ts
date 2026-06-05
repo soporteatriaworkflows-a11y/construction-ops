@@ -47,6 +47,18 @@ export class ImportDigestMismatchError extends Error {
   }
 }
 
+/** El preview contiene errores bloqueantes; no se puede confirmar. */
+export class ImportHasErrorsError extends Error {
+  readonly code = 'import_has_errors' as const;
+  constructor(message?: string) {
+    super(
+      message ??
+        'El archivo contiene errores que deben corregirse antes de importar. Revisa el detalle de la vista previa.',
+    );
+    this.name = 'ImportHasErrorsError';
+  }
+}
+
 /** La importación no aplica en el modo actual (fixture). */
 export class ImportNotSupportedError extends Error {
   readonly code = 'import_not_supported' as const;
