@@ -9,6 +9,19 @@ cada ciclo de validación.
 
 ---
 
+## CIERRE 4B.1 — smoke productivo real verificado (2026-06-04)
+
+> Verificación MANUAL de la usuaria en `https://construction-ops-psi.vercel.app`
+> (`APP_AUTH_MODE=supabase` + `READ_MODEL_SOURCE=db`). Tag `wave-4b1-real-projects-production-v1`.
+
+- Login real Supabase ✅; footer **"Datos reales"** ✅.
+- `/projects` + CTA "+ Nuevo proyecto" + formulario ✅; **proyecto remoto real creado desde la
+  UI**: `ENTRE PATIOS` (Cali, Activo) ✅; redirect ✅; detalle `/projects/[id]` visible ✅.
+- **Sin datos fixture en producción (DB mode)** ✅. Flujo create → list → detail verificado.
+- **Oleada 4B.1 CERRADA.** Siguiente: 4B.2 (alcances reales por proyecto).
+
+---
+
 ## CIERRE estabilización de producción 4B.1 — db mode + deploy (2026-06-04)
 
 > `main = origin/main = c6d0ad1` (merge `--no-ff` de `c2f5373`, sin conflictos).

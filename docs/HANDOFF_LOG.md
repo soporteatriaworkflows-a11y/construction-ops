@@ -1,5 +1,30 @@
 # Handoff Log
 
+## 2026-06-04 — 4B.1 CERRADA: smoke productivo real exitoso (DB mode)
+
+### Estado
+- **Oleada 4B.1 CERRADA.** Smoke manual verificado por la usuaria en producción
+  (`https://construction-ops-psi.vercel.app`, `READ_MODEL_SOURCE=db`,
+  `APP_AUTH_MODE=supabase`). `main = origin/main = b782502`.
+- Tag estable: **`wave-4b1-real-projects-production-v1`**.
+
+### Smoke productivo verificado (usuaria)
+- Login real Supabase: funcional. Footer: **"Datos reales"**.
+- `/projects`: funcional. CTA **"+ Nuevo proyecto"**: funcional. Formulario: funcional.
+- **Proyecto remoto real creado** desde la UI: `ENTRE PATIOS` — ciudad `Cali` — estado Activo
+  — descripción "Presupuesto y seguimiento de obra — primer piso".
+- Redirect posterior: funcional. Detalle `/projects/[id]`: funcional y visible.
+- **NO aparecen datos fixture en producción (DB mode).** create/list/detail verificados.
+
+### Producción
+- DB real (Supabase remoto PG17). Fixture retirado de DB mode. Sin escrituras remotas desde
+  terminal; variables de Vercel no modificadas por el orquestador.
+
+### Siguiente bloque
+- **Oleada 4B.2 — vertical slice real de alcances (scopes) por proyecto.** Rama
+  `integration/wave-4b2-real-scopes`. Reutilizar esquema de `project_scopes` si es suficiente;
+  no ejecutar migración remota; detenerse y pedir aprobación si una migración fuera necesaria.
+
 ## 2026-06-04 — CIERRE estabilización de producción 4B.1: db mode + deploy
 
 ### Estado
