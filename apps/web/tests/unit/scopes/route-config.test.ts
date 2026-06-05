@@ -70,8 +70,9 @@ describe('/projects/[id]/scopes/[scopeId] — detalle', () => {
     expect(source).toMatch(/scope\.projectId\s*!==\s*id/);
   });
 
-  it('placeholder honesto de presupuesto del alcance', () => {
-    expect(source).toMatch(/presupuesto de este alcance estar[áa] disponible en la siguiente fase/i);
+  it('integra la sección de Presupuestos (4B.3): lista + CTA a estimates/new', () => {
+    expect(source).toMatch(/listEstimatesByScope\(/);
+    expect(source).toMatch(/estimates\/new/);
   });
 });
 

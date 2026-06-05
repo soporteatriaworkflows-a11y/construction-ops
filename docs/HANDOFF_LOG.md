@@ -1,5 +1,85 @@
 # Handoff Log
 
+## 2026-06-04 — 4B.3 implementado: presupuesto inicial real + V01 (migración aprobada)
+
+### Estado
+- Rama `integration/wave-4b3-real-estimates`. Aprobación de migración recibida con
+  **ajuste de seguridad obligatorio** (la RPC NO acepta `p_created_by`).
+- **Migración aplicada al remoto** ⇒ **18/18 Local = Remote** (sin seeds, sin presupuestos
+  remotos). Dry-run mostró exactamente 1 migración esperada.
+
+### Migración (autorizada + hardening)
+- `20260604130000_estimates_authorship_and_atomic_create.sql`: `estimates` += `description`
+  + `created_by` (FK profiles ON DELETE SET NULL) + índice; **RPC**
+  `public.create_estimate_with_initial_version(p_scope_id, p_code, p_name, p_description)`
+  `SECURITY INVOKER`, **autor derivado de `app._auth_uid()`** (helper canónico existente,
+  mig. 20260601090000; = `profiles.id` por el FK), inserta estimate (`active`) + V01 (`draft`)
+  atómicamente. Hardening: `SET search_path=public`, refs calificadas, `REVOKE ALL FROM
+  PUBLIC` + `FROM anon`, `GRANT EXECUTE TO authenticated` (verificado: ACL sin `anon`).
+- **RLS runtime 77/77** (+10 de estimates: autor derivado, V01, atomicidad/code-dup revierte,
+  cross-org WITH CHECK, deny sin sesión/membresía, anon sin EXECUTE).
+
+### Implementación
+- Contrato `docs/ESTIMATES_CRUD_CONTRACT.md` (v1).
+- `apps/web/server/estimates/`: `insertEstimateWithInitialVersion`/`listEstimatesByScope`/
+  `listVisibleEstimates`/`getEstimateById`/`getEstimateActiveVersion` (selector sin fallback;
+  db RLS-bound vía RPC; fixture solo lectura). "Versión activa" = mayor `version_number`.
+- UI request-time: sección Presupuestos en el detalle del alcance + `/estimates/new`
+  (form nombre+descripción, hidden `scopeId` validado, aviso V01) + `/estimates/[estimateId]`
+  (estado, proyecto/alcance, V01, 0 capítulos/0 ítems, placeholder Excel 4C). `/estimates`
+  reintegrada como listado real de presupuestos visibles (empty state honesto; demo en fixture).
+
+### Validación
+- typecheck/lint 0, **623 tests** (+35 de estimates), build fixture + build `db` LOCAL
+  (vacío y con estimate+V01) PASS, gm 22/22, gm:import, validador 214/0/0, RLS 77/77,
+  `git diff --check` limpio.
+
+### Pendiente
+- Preview + merge `--no-ff` + Production. Acción manual final de la usuaria: crear
+  `PRESUPUESTO BASE` desde la UI (no se crea desde terminal). Rollback estable: tag
+  `wave-4b2-real-scopes-production-v1`. **4C NO iniciada.**
+
+## 2026-06-04 — 4B.3 Fase 1: diagnóstico de estimates — STOP por migración requerida
+
+### Estado
+- Rama `integration/wave-4b3-real-estimates` desde `main`@`3247eb6` (`main` intacta).
+- **DETENIDO tras el diagnóstico** (Fase 1): se requiere **migración nueva**; pendiente de
+  **aprobación explícita de la usuaria** antes de continuar (regla del prompt).
+
+### Diagnóstico del esquema (migración `20260530090700`)
+- `estimates`: `id`, `project_scope_id` (FK→project_scopes, NOT NULL, CASCADE), `code`
+  (NOT NULL, único por scope), `name` (NOT NULL), `status` (NOT NULL DEFAULT `draft`,
+  CHECK draft/active/archived), `created_at`, `updated_at`. **Sin `description`, sin `created_by`.**
+- `estimate_versions`: `id`, `estimate_id` (FK, CASCADE), `version_number` (>=1, único por
+  estimate), `status` (CHECK draft/review/approved/issued/archived), **`created_by` (FK profiles,
+  nullable) ✅**, `created_at`, `approved_at`, `notes`.
+- **RLS suficiente** (`20260530091000`): `estimates_all` (FOR ALL, org vía scope→project) +
+  `estimate_versions_*` (select/insert/update/delete con org + inmutabilidad de emitidas).
+  No requiere migración de RLS.
+- **Versión activa = mayor `version_number`** (read-model `drizzle-repository` lo resuelve así);
+  no hay `active_version_id` ⇒ no requiere columna.
+- No existe repositorio de escritura de estimates ni función de creación.
+
+### Conclusión
+- Esquema **INSUFICIENTE** para 4B.3. **Migración nueva ESTRICTAMENTE NECESARIA** (aditiva,
+  reversible):
+  1. `ALTER TABLE estimates ADD COLUMN description text, ADD COLUMN created_by uuid
+     REFERENCES profiles(id) ON DELETE SET NULL;` + índice `estimates_created_by_idx`.
+  2. Función **`public.create_estimate_with_initial_version(p_scope_id, p_code, p_name,
+     p_description, p_created_by)`** `SECURITY INVOKER` (RLS aplica; sin service-role) que
+     inserta estimate (`status='active'`) + versión V01 (`version_number=1, status='draft'`)
+     en una sola transacción; `GRANT EXECUTE ... TO authenticated`. (Función, NO trigger:
+     los seeds insertan sus propias versiones ⇒ un trigger colisionaría.) Anti-colisión de
+     `code` por reintento app capturando 23505.
+- Remoto actual 17/17 ⇒ sería la 18.ª migración (requiere `db push` controlado tras dry-run).
+
+### Acción solicitada (UNA aprobación)
+- Autorizar: crear+validar la migración local (db reset + RLS runtime + tests),
+  `db push --dry-run` y, si OK (1 migración esperada, sin seeds), `db push --linked`; luego
+  implementar contrato + repo (`insertEstimateWithInitialVersion`/`listEstimatesByScope`/
+  `listVisibleEstimates`/`getEstimateById`/`getEstimateActiveVersion`) + UI + tests + deploy.
+  **Nada remoto sin OK.** Rollback estable: tag `wave-4b2-real-scopes-production-v1`.
+
 ## 2026-06-04 — 4B.2 CERRADA: smoke productivo real de alcances
 
 ### Estado
