@@ -1,5 +1,24 @@
 # Handoff Log
 
+## 2026-06-04 — 4B.2 desplegado: merge a `main` + Production READY
+
+### Estado
+- Rama `integration/wave-4b2-real-scopes` (`f75ecbf`) → merge `--no-ff` a `main`
+  (**`4e4c74a`**, sin conflictos). **Preview READY** (build production-like en infra
+  Vercel; tras SSO del equipo). **Production READY** (`dpl…5s30491ov`) aliased a
+  `https://construction-ops-psi.vercel.app`.
+- Smoke del dominio: `/login` 200; `/projects` y `/projects/[id]/scopes/new` ⇒
+  307 → /login (deny-by-default, sin 500, sin fixture público). Rutas de scopes vivas
+  y protegidas. Remoto **17/17**; sin escrituras remotas salvo la migración aprobada;
+  sin alcance remoto creado desde terminal.
+
+### Única acción manual final (usuaria)
+- Entrar a **ENTRE PATIOS** en producción y crear el alcance **`PRIMER PISO`**
+  (descripción "Alcance inicial para presupuesto de obra del primer piso") desde
+  `/projects/[id]/scopes/new`; luego listar y abrir su detalle.
+- Rollback estable: tag `wave-4b1-real-projects-production-v1` + `READ_MODEL_SOURCE=fixture`.
+- **4B.3** (versión inicial de presupuesto por alcance) y **4C** NO iniciadas.
+
 ## 2026-06-04 — 4B.2 implementado: alcances reales (migración + repo + UI + tests)
 
 ### Estado
