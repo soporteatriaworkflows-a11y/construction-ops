@@ -1,5 +1,24 @@
 # Handoff Log
 
+## 2026-06-04 — 4B.3 desplegado: merge a `main` + Production READY
+
+### Estado
+- Rama `integration/wave-4b3-real-estimates` (`28dd12f`) → merge `--no-ff` a `main`
+  (**`3d031bd`**, sin conflictos). **Preview READY** (build production-like en infra Vercel).
+  **Production READY** (`dpl…7q1gcw0kz`) aliased a `https://construction-ops-psi.vercel.app`.
+- Smoke del dominio: `/login` 200; `/estimates` y `/projects/[id]/scopes/[scopeId]/estimates/new`
+  ⇒ 307 → /login (deny-by-default, sin 500, sin fixture público). Rutas de estimates vivas
+  y protegidas. Remoto **18/18**; sin escrituras remotas salvo la migración aprobada; sin
+  presupuesto remoto creado desde terminal.
+
+### Única acción manual final (usuaria)
+- Entrar a **PRIMER PISO** (alcance de ENTRE PATIOS) en producción y crear **`PRESUPUESTO BASE`**
+  (descripción "Presupuesto inicial de obra para el primer piso") desde
+  `/projects/[id]/scopes/[scopeId]/estimates/new`; se generará su **V01** automáticamente;
+  luego abrir el detalle (V01 activa, 0 capítulos, 0 ítems).
+- Rollback estable: tag `wave-4b2-real-scopes-production-v1` + `READ_MODEL_SOURCE=fixture`.
+- **Oleada 4C** (importación real de Excel) NO iniciada.
+
 ## 2026-06-04 — 4B.3 implementado: presupuesto inicial real + V01 (migración aprobada)
 
 ### Estado
