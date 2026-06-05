@@ -1,5 +1,24 @@
 # Handoff Log
 
+## 2026-06-05 — 4C.1 desplegado: merge a `main` + Production READY
+
+### Estado
+- Rama `integration/wave-4c1-excel-import` (`e253c9a`) → merge `--no-ff` a `main`
+  (**`6f536f7`**, sin conflictos). **Preview READY** (build production-like en infra Vercel).
+  **Production READY** (`dpl…k8dm3fnxy`) aliased a `https://construction-ops-psi.vercel.app`.
+- Smoke del dominio: `/login` 200; `/estimates` y
+  `/projects/[id]/scopes/[scopeId]/estimates/[estimateId]/import` ⇒ 307 → /login
+  (deny-by-default, sin 500, sin fixture público). Ruta de importación viva y protegida.
+  Remoto **19/19**; sin escrituras remotas salvo la migración aprobada; sin importación
+  remota desde terminal; Excel privado real NO usado.
+
+### Única acción manual final (usuaria)
+- Entrar a **PRESUPUESTO BASE → V01 → Importar Excel** en producción, **subir el archivo real
+  `.xlsx`** (hoja `COTIZACION 1 PISO`), revisar la vista previa (capítulos/ítems/total +
+  advertencias) y **Confirmar importación**; el detalle mostrará los conteos reales y el total.
+- Rollback estable: tag `wave-4b3-real-estimates-production-v1` + `READ_MODEL_SOURCE=fixture`.
+- **Oleada 4C.2/4D NO iniciadas.**
+
 ## 2026-06-05 — 4C.1 implementado: importación de Excel atómica (migración aprobada)
 
 ### Estado
