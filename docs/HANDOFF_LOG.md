@@ -1,5 +1,46 @@
 # Handoff Log
 
+## 2026-06-04 — 4B.3 Fase 1: diagnóstico de estimates — STOP por migración requerida
+
+### Estado
+- Rama `integration/wave-4b3-real-estimates` desde `main`@`3247eb6` (`main` intacta).
+- **DETENIDO tras el diagnóstico** (Fase 1): se requiere **migración nueva**; pendiente de
+  **aprobación explícita de la usuaria** antes de continuar (regla del prompt).
+
+### Diagnóstico del esquema (migración `20260530090700`)
+- `estimates`: `id`, `project_scope_id` (FK→project_scopes, NOT NULL, CASCADE), `code`
+  (NOT NULL, único por scope), `name` (NOT NULL), `status` (NOT NULL DEFAULT `draft`,
+  CHECK draft/active/archived), `created_at`, `updated_at`. **Sin `description`, sin `created_by`.**
+- `estimate_versions`: `id`, `estimate_id` (FK, CASCADE), `version_number` (>=1, único por
+  estimate), `status` (CHECK draft/review/approved/issued/archived), **`created_by` (FK profiles,
+  nullable) ✅**, `created_at`, `approved_at`, `notes`.
+- **RLS suficiente** (`20260530091000`): `estimates_all` (FOR ALL, org vía scope→project) +
+  `estimate_versions_*` (select/insert/update/delete con org + inmutabilidad de emitidas).
+  No requiere migración de RLS.
+- **Versión activa = mayor `version_number`** (read-model `drizzle-repository` lo resuelve así);
+  no hay `active_version_id` ⇒ no requiere columna.
+- No existe repositorio de escritura de estimates ni función de creación.
+
+### Conclusión
+- Esquema **INSUFICIENTE** para 4B.3. **Migración nueva ESTRICTAMENTE NECESARIA** (aditiva,
+  reversible):
+  1. `ALTER TABLE estimates ADD COLUMN description text, ADD COLUMN created_by uuid
+     REFERENCES profiles(id) ON DELETE SET NULL;` + índice `estimates_created_by_idx`.
+  2. Función **`public.create_estimate_with_initial_version(p_scope_id, p_code, p_name,
+     p_description, p_created_by)`** `SECURITY INVOKER` (RLS aplica; sin service-role) que
+     inserta estimate (`status='active'`) + versión V01 (`version_number=1, status='draft'`)
+     en una sola transacción; `GRANT EXECUTE ... TO authenticated`. (Función, NO trigger:
+     los seeds insertan sus propias versiones ⇒ un trigger colisionaría.) Anti-colisión de
+     `code` por reintento app capturando 23505.
+- Remoto actual 17/17 ⇒ sería la 18.ª migración (requiere `db push` controlado tras dry-run).
+
+### Acción solicitada (UNA aprobación)
+- Autorizar: crear+validar la migración local (db reset + RLS runtime + tests),
+  `db push --dry-run` y, si OK (1 migración esperada, sin seeds), `db push --linked`; luego
+  implementar contrato + repo (`insertEstimateWithInitialVersion`/`listEstimatesByScope`/
+  `listVisibleEstimates`/`getEstimateById`/`getEstimateActiveVersion`) + UI + tests + deploy.
+  **Nada remoto sin OK.** Rollback estable: tag `wave-4b2-real-scopes-production-v1`.
+
 ## 2026-06-04 — 4B.2 CERRADA: smoke productivo real de alcances
 
 ### Estado
