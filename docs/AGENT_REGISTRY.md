@@ -389,6 +389,27 @@ exports, planning, pricing, cost-domain, Vercel, remoto. **No** recibir
 `organization_id`/`created_by`/`role` del navegador. **No** service-role. **No**
 instalar librerías nuevas.
 
+### Ownership congelado — Oleada 4B.2 (vertical slice real de alcances)
+
+Contrato: `docs/SCOPES_CRUD_CONTRACT.md` (v1). Integrado por el orquestador
+(autoría compartida db-rls/frontend-boq) con migración remota aprobada.
+
+**agent-db-rls (4B.2)** — ownership:
+- Migración `supabase/migrations/20260604120000_project_scopes_authorship.sql`
+  (`project_scopes.description` + `project_scopes.created_by`), reversible.
+- `apps/web/server/scopes/` (`ScopesWriteRepository`: `insertScope`,
+  `listScopesByProject`, `getScopeById`; tipos como fuente única) + impl fixture/db.
+- `apps/web/lib/scopes/scope-types.ts` (constantes client-safe).
+- RLS runtime extendido (`scripts/rls-runtime/run.ts`, +6 checks de `project_scopes`).
+**NO tocar**: UI, auth runtime (solo consume), Vercel. **No** service-role.
+
+**agent-frontend-boq (4B.2)** — ownership:
+- `apps/web/app/(dashboard)/projects/[id]/` sección Alcances + `scopes/new`,
+  `scopes/[scopeId]`, `scopes/actions.ts`, `new-scope-form.tsx`, `scope-labels.ts`.
+- Tests UI/route-config de scopes.
+**NO tocar**: DB/migraciones/RLS/repositorio (consume su interfaz), Vercel, remoto.
+**No** recibir `organization_id`/`created_by`/`status`/`code` del navegador.
+
 ### agent-qa (Oleada 4)
 - `docs/QA_REPORT.md` con resultado completo.
 - Sin FAIL bloqueante para release.

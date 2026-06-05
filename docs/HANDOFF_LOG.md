@@ -1,5 +1,45 @@
 # Handoff Log
 
+## 2026-06-04 — 4B.2 implementado: alcances reales (migración + repo + UI + tests)
+
+### Estado
+- Rama `integration/wave-4b2-real-scopes`. Aprobación de migración recibida.
+- **Migración aplicada al remoto** ⇒ **17/17 Local = Remote** (sin seeds, sin proyectos
+  remotos). Dry-run mostró exactamente 1 migración esperada antes del push.
+
+### Migración (autorizada)
+- `20260604120000_project_scopes_authorship.sql` (aditiva, reversible):
+  `project_scopes` += `description text`, `created_by uuid REFERENCES profiles(id)
+  ON DELETE SET NULL` + índice `project_scopes_created_by_idx`. Sin cambios de RLS.
+- Local: `db reset` aplicó 17 migraciones + 4 seeds; columnas verificadas. **RLS runtime
+  67/67** (incluye 6 checks nuevos de `project_scopes`: SELECT/INSERT/UPDATE cross-org,
+  WITH CHECK por proyecto padre, deny sin org).
+
+### Implementación
+- Contrato congelado `docs/SCOPES_CRUD_CONTRACT.md` (v1).
+- `apps/web/server/scopes/`: `insertScope`/`listScopesByProject`/`getScopeById`
+  (selector por `READ_MODEL_SOURCE` sin fallback; db RLS-bound sin service-role;
+  fixture solo lectura). `code` autogenerado + anti-colisión; `created_by`/`status`/
+  `project_id` server-side; proyecto validado por visibilidad RLS.
+- `apps/web/lib/scopes/scope-types.ts` (constantes client-safe — evita arrastrar
+  `postgres` al bundle del navegador).
+- UI: `/projects/[id]` sección **Alcances** (lista + CTA `Button asChild`+`Link` +
+  empty state honesto); `/projects/[id]/scopes/new` (form: nombre, tipo select 7
+  valores default `floor`, descripción; hidden `projectId` validado server-side);
+  `/projects/[id]/scopes/[scopeId]` (detalle + placeholder de presupuesto 4B.3).
+  Todas `ƒ` (layout force-dynamic + resolveViewer). `scope_type` como select; footer ya
+  mode-aware desde 4B.1.
+
+### Validación
+- typecheck/lint 0, **588 tests** (+42 de scopes), build fixture + build `db` LOCAL
+  (vacío y con proyecto+alcance) PASS, gm 22/22, gm:import, validador 214/0/0,
+  RLS runtime 67/67, `git diff --check` limpio.
+
+### Pendiente
+- Preview + merge `--no-ff` + Production (Vercel CLI). Acción manual final de la usuaria:
+  crear el alcance `PRIMER PISO` desde la UI (no se crea desde terminal). Rollback estable:
+  tag `wave-4b1-real-projects-production-v1`. 4B.3/4C NO iniciadas.
+
 ## 2026-06-04 — 4B.2 Fase 1: diagnóstico de scopes — STOP por migración requerida
 
 ### Estado

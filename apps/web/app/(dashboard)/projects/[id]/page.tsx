@@ -16,18 +16,28 @@ import {
   Calendar,
   FileText,
   Tag,
+  Layers,
+  Plus,
+  ChevronRight,
 } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
 import { ProjectStatusBadge } from '@/components/shared/status-badge';
+import { EmptyState } from '@/components/shared/empty-state';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { formatDateTime } from '@/lib/utils/format';
+import { formatDate, formatDateTime } from '@/lib/utils/format';
 import { getProjectsWriteRepository, ProjectNotFoundError } from '@/server/projects';
+import { getScopesWriteRepository } from '@/server/scopes';
+import type { ScopeListItem } from '@/server/scopes';
 import { resolveViewer } from '@/server/auth/resolve-viewer';
+import { isCreationModeEnabled } from '../mode-guard';
+import { SCOPE_TYPE_LABELS } from './scope-labels';
 
 interface ProjectDetailPageProps {
   params: Promise<{ id: string }>;
@@ -60,6 +70,18 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
     // Error inesperado de infraestructura: también 404 amable
     notFound();
   }
+
+  // Cargar alcances del proyecto (RLS-bound; cross-org ⇒ []).
+  let scopes: ScopeListItem[] = [];
+  let scopesError: string | null = null;
+  try {
+    scopes = await getScopesWriteRepository().listScopesByProject(viewer, id);
+  } catch (e) {
+    scopesError = e instanceof Error ? e.message : 'Error al cargar alcances';
+  }
+
+  const canCreateScope = isCreationModeEnabled();
+  const newScopeHref = `/projects/${id}/scopes/new`;
 
   return (
     <div>
@@ -139,12 +161,102 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
         </Card>
       </div>
 
-      {/* Nota: alcances y presupuesto en oleadas posteriores */}
+      {/* ------------------------------------------------------------------ */}
+      {/* Alcances del proyecto (4B.2)                                         */}
+      {/* ------------------------------------------------------------------ */}
+      <section aria-label="Alcances del proyecto" className="mt-8">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="flex items-center gap-2 text-base font-semibold text-gray-900">
+            <Layers className="h-4 w-4 text-gray-500" aria-hidden="true" />
+            Alcances
+          </h2>
+          {canCreateScope ? (
+            <Button asChild size="sm">
+              <Link href={newScopeHref}>
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                Nuevo alcance
+              </Link>
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              disabled
+              aria-disabled="true"
+              title="Disponible en modo supabase+db"
+            >
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              Nuevo alcance
+            </Button>
+          )}
+        </div>
+
+        {scopesError ? (
+          <div
+            className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+            role="alert"
+            aria-live="assertive"
+          >
+            Error al cargar alcances: {scopesError}
+          </div>
+        ) : scopes.length === 0 ? (
+          <EmptyState
+            icon={Layers}
+            title="Sin alcances"
+            description="Este proyecto todavía no tiene alcances registrados."
+            action={
+              canCreateScope ? (
+                <Button asChild size="sm">
+                  <Link href={newScopeHref}>Crear primer alcance</Link>
+                </Button>
+              ) : (
+                <Button size="sm" disabled>
+                  Crear primer alcance
+                </Button>
+              )
+            }
+          />
+        ) : (
+          <ul role="list" className="space-y-3">
+            {scopes.map((scope) => (
+              <li key={scope.id}>
+                <Link
+                  href={`/projects/${id}/scopes/${scope.id}`}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-mono text-xs rounded bg-gray-100 px-2 py-0.5 text-gray-600">
+                        {scope.code}
+                      </span>
+                      <Badge variant="secondary">
+                        {SCOPE_TYPE_LABELS[scope.scopeType]}
+                      </Badge>
+                      {scope.status === 'archived' && (
+                        <Badge variant="outline">Archivado</Badge>
+                      )}
+                    </div>
+                    <p className="mt-1 truncate font-medium text-gray-900">{scope.name}</p>
+                    <p className="text-xs text-gray-400">
+                      Creado: {formatDate(scope.createdAt)}
+                    </p>
+                  </div>
+                  <ChevronRight
+                    className="h-4 w-4 shrink-0 text-gray-400"
+                    aria-hidden="true"
+                  />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {/* Presupuesto: disponible en la siguiente fase (4B.3) */}
       <div
         className="mt-6 rounded-md border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700"
         role="status"
       >
-        Presupuestos y alcances disponibles en versiones futuras del sistema.
+        El presupuesto del proyecto estará disponible en la siguiente fase.
       </div>
     </div>
   );

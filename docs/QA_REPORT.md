@@ -9,6 +9,24 @@ cada ciclo de validación.
 
 ---
 
+## 4B.2 — alcances reales: validación local + migración remota (2026-06-04)
+
+> Rama `integration/wave-4b2-real-scopes`. Migración `20260604120000` ⇒ **17/17 Local = Remote**.
+
+- **Migración** aditiva/reversible (`description` + `created_by` en `project_scopes`);
+  dry-run = 1 migración esperada (sin seeds); push controlado. RLS sin cambios.
+- **RLS runtime 67/67** (+6 checks de `project_scopes`: A ve su alcance, B no; INSERT en su
+  proyecto OK; INSERT cross-org bloqueado por WITH CHECK; UPDATE cross-org 0 filas; sin org 0).
+- **Tests** 588 (+42 de scopes): validación pura, selector sin fallback, fixture, db-repo con
+  cliente simulado (created_by server-side, anti-colisión code, proyecto no visible ⇒ deny),
+  route-config de UI (CTAs ancla, hidden projectId, sin campos sensibles).
+- **Builds**: fixture PASS; **db LOCAL vacío** PASS; **db LOCAL con proyecto+alcance** PASS.
+  Rutas de scopes `ƒ` (request-time). typecheck/lint 0, gm 22/22, gm:import, validador 214/0/0.
+- **Sin escrituras remotas** salvo la migración aprobada; sin seeds remotos; sin alcance remoto
+  creado desde terminal. Sin secretos impresos/en disco.
+
+---
+
 ## CIERRE 4B.1 — smoke productivo real verificado (2026-06-04)
 
 > Verificación MANUAL de la usuaria en `https://construction-ops-psi.vercel.app`

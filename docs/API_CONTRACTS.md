@@ -651,3 +651,17 @@ navegador = `{ name, city, description?, initialStatus? }`. `organization_id`
 "Ciudad" persiste en `projects.location`. Creación exige `APP_AUTH_MODE=supabase` +
 `READ_MODEL_SOURCE=db`; en `demo`/`fixture` la creación está deshabilitada. Cliente
 RLS-bound (sin service-role); cross-org ⇒ 404 amable.
+
+## Escritura de alcances (Oleada 4B.2) — ver `docs/SCOPES_CRUD_CONTRACT.md`
+
+`ScopesWriteRepository` (`apps/web/server/scopes/`): `insertScope(viewer, projectId,
+input)`, `listScopesByProject(viewer, projectId)`, `getScopeById(viewer, scopeId)`.
+`CreateScopeInput` permitido desde el navegador = `{ name, scopeType, description? }`
+(`scopeType` ∈ floor/tower/stage/package/unit/modification/other). `created_by`
+(= `viewer.profileId`), `status` (`active`), `code` (autogenerado), `id` y timestamps
+se derivan **server-side**; `project_id` llega del path y se **valida** por visibilidad
+RLS (cross-org ⇒ `ProjectNotFoundError`). No hay `organization_id` en `project_scopes`:
+el aislamiento es transitivo vía `projects.organization_id` (policy `project_scopes_all`,
+sin cambios). Migración aditiva `20260604120000_project_scopes_authorship` añadió
+`description` + `created_by`. Creación exige `supabase`+`db`; cliente RLS-bound (sin
+service-role). Constantes client-safe en `@/lib/scopes/scope-types`.
