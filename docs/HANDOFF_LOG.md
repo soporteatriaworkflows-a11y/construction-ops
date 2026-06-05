@@ -1,5 +1,24 @@
 # Handoff Log
 
+## 2026-06-04 — 4B.2 CERRADA: smoke productivo real de alcances
+
+### Estado
+- **Oleada 4B.2 CERRADA.** Smoke manual verificado por la usuaria en producción
+  (`construction-ops-psi.vercel.app`, `supabase`+`db`). `main = origin/main = 0f470bf`.
+- Tag estable: **`wave-4b2-real-scopes-production-v1`**.
+
+### Smoke productivo verificado (usuaria)
+- Proyecto real `ENTRE PATIOS`. **Alcance remoto real creado desde la UI**: `PRIMER PISO`
+  (tipo floor/Piso — descripción "Alcance inicial para presupuesto de obra del primer piso").
+- Listado de alcances: funcional. Detalle de alcance: funcional. Placeholder visible
+  "El presupuesto de este alcance estará disponible en la siguiente fase.". Footer
+  "Datos reales". **Sin datos fixture (DB mode).** create/list/detail verificados.
+
+### Siguiente bloque
+- **Oleada 4B.3 — presupuesto inicial real por alcance** (estimate + versión V01).
+  Rama `integration/wave-4b3-real-estimates`. Reutilizar esquema de estimates si es
+  suficiente; no ejecutar migración remota; detenerse y pedir aprobación si se requiere.
+
 ## 2026-06-04 — 4B.2 desplegado: merge a `main` + Production READY
 
 ### Estado

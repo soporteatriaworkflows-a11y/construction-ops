@@ -9,6 +9,18 @@ cada ciclo de validación.
 
 ---
 
+## CIERRE 4B.2 — smoke productivo real de alcances (2026-06-04)
+
+> Verificación MANUAL de la usuaria en `https://construction-ops-psi.vercel.app`
+> (`supabase`+`db`). Tag `wave-4b2-real-scopes-production-v1`.
+
+- **Alcance remoto real creado desde la UI**: `PRIMER PISO` (floor) en `ENTRE PATIOS` ✅.
+- Listado de alcances ✅; detalle ✅; placeholder de presupuesto visible ✅; footer
+  "Datos reales" ✅; **sin fixture en DB mode** ✅. Flujo create → list → detail verificado.
+- **Oleada 4B.2 CERRADA.** Siguiente: 4B.3 (presupuesto inicial real por alcance).
+
+---
+
 ## 4B.2 — alcances reales: validación local + migración remota (2026-06-04)
 
 > Rama `integration/wave-4b2-real-scopes`. Migración `20260604120000` ⇒ **17/17 Local = Remote**.
