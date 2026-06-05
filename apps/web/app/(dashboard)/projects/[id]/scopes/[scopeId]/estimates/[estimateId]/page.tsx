@@ -20,27 +20,35 @@ import {
   FolderOpen,
   ListTree,
   Hash,
+  DollarSign,
+  Upload,
+  CheckCircle2,
 } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
 import { EstimateVersionBadge } from '@/components/shared/status-badge';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { formatDateTime } from '@/lib/utils/format';
+import { formatCOP, formatDateTime } from '@/lib/utils/format';
 import { resolveViewer } from '@/server/auth/resolve-viewer';
 import { getEstimatesWriteRepository, EstimateNotFoundError } from '@/server/estimates';
+import { isCreationModeEnabled } from '../../../../../mode-guard';
 import { formatVersionLabel } from '../../estimate-format';
 
 interface PageProps {
   params: Promise<{ id: string; scopeId: string; estimateId: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }
 
-export default async function EstimateDetailPage({ params }: PageProps) {
+export default async function EstimateDetailPage({ params, searchParams }: PageProps) {
   const { id, scopeId, estimateId } = await params;
+  const sp = searchParams ? await searchParams : {};
+  const justImported = sp['imported'] === '1';
   const scopeHref = `/projects/${id}/scopes/${scopeId}`;
 
   let viewer: Awaited<ReturnType<typeof resolveViewer>>;
@@ -66,6 +74,9 @@ export default async function EstimateDetailPage({ params }: PageProps) {
   }
 
   const active = estimate.activeVersion;
+  const hasContent = !!active && (active.chapterCount > 0 || active.itemCount > 0);
+  const canImport = isCreationModeEnabled();
+  const importHref = `${scopeHref}/estimates/${estimateId}/import`;
 
   return (
     <div>
@@ -81,6 +92,17 @@ export default async function EstimateDetailPage({ params }: PageProps) {
           </Link>
         }
       />
+
+      {justImported && (
+        <div
+          className="mb-4 flex items-center gap-2 rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800"
+          role="status"
+          aria-live="polite"
+        >
+          <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+          Importación completada.
+        </div>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2">
         {/* Información general */}
@@ -166,7 +188,7 @@ export default async function EstimateDetailPage({ params }: PageProps) {
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-600">
           Versión activa
         </h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
           <Card>
             <CardContent className="flex items-center justify-between py-4">
               <div>
@@ -200,16 +222,63 @@ export default async function EstimateDetailPage({ params }: PageProps) {
               <Hash className="h-5 w-5 text-gray-300" aria-hidden="true" />
             </CardContent>
           </Card>
+          <Card>
+            <CardContent className="flex items-center justify-between py-4">
+              <div>
+                <p className="text-xs text-gray-400">Total directo</p>
+                <p className="text-lg font-bold text-blue-700 tabular-nums">
+                  {formatCOP(active ? active.directTotal : '0')}
+                </p>
+              </div>
+              <DollarSign className="h-5 w-5 text-gray-300" aria-hidden="true" />
+            </CardContent>
+          </Card>
         </div>
       </section>
 
-      {/* Importación de Excel: siguiente fase (4C) */}
-      <div
-        className="mt-6 rounded-md border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700"
-        role="status"
-      >
-        La importación del Excel estará disponible en la siguiente fase.
-      </div>
+      {/* ------------------------------------------------------------------ */}
+      {/* Importar Excel (4C.1)                                               */}
+      {/* ------------------------------------------------------------------ */}
+      <section aria-label="Importar Excel" className="mt-8">
+        <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-600">
+          <Upload className="h-4 w-4 text-gray-400" aria-hidden="true" />
+          Importar Excel
+        </h2>
+        {hasContent ? (
+          <div
+            className="flex items-start gap-2 rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800"
+            role="status"
+          >
+            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            <span>
+              <strong>Importación completada.</strong> Esta versión ya contiene{' '}
+              {active!.chapterCount} capítulos y {active!.itemCount} ítems. La reimportación
+              estará disponible en una fase posterior.
+            </span>
+          </div>
+        ) : (
+          <div className="rounded-lg border border-gray-200 bg-white px-4 py-4">
+            <p className="text-sm text-gray-600">
+              V01 todavía no contiene capítulos ni ítems. Importa el Excel para cargar el BOQ.
+            </p>
+            <div className="mt-3">
+              {canImport ? (
+                <Button asChild size="sm">
+                  <Link href={importHref}>
+                    <Upload className="h-4 w-4" aria-hidden="true" />
+                    Importar Excel
+                  </Link>
+                </Button>
+              ) : (
+                <Button size="sm" disabled aria-disabled="true" title="Disponible en modo supabase+db">
+                  <Upload className="h-4 w-4" aria-hidden="true" />
+                  Importar Excel
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+      </section>
     </div>
   );
 }

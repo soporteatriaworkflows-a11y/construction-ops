@@ -63,8 +63,9 @@ describe('estimates/[estimateId] — detalle', () => {
     expect(source).toMatch(/Cap[ií]tulos/);
     expect(source).toMatch(/[ÍI]tems/);
   });
-  it('placeholder honesto de importación de Excel', () => {
-    expect(source).toMatch(/importaci[óo]n del Excel estar[áa] disponible en la siguiente fase/i);
+  it('integra la sección Importar Excel (4C.1): CTA + estado', () => {
+    expect(source).toMatch(/Importar Excel/);
+    expect(source).toMatch(/estimates\/\$\{estimateId\}\/import/);
   });
 });
 

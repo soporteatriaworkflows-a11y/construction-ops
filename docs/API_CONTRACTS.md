@@ -666,6 +666,19 @@ sin cambios). Migración aditiva `20260604120000_project_scopes_authorship` aña
 `description` + `created_by`. Creación exige `supabase`+`db`; cliente RLS-bound (sin
 service-role). Constantes client-safe en `@/lib/scopes/scope-types`.
 
+## Importación de Excel (Oleada 4C.1) — ver `docs/EXCEL_IMPORT_CONTRACT.md`
+
+`apps/web/server/estimates/import/`: `previewEstimateExcelImport(viewer, estimateId,
+file)` (parsea + valida, NO escribe; digest SHA-256), `confirmEstimateExcelImport(viewer,
+estimateId, file, digest)` (re-parse + compara digest + RPC atómica),
+`getEstimateImportStatus(viewer, estimateId)`. Formato `.xlsx`, hoja `COTIZACION 1 PISO`,
+columnas por encabezado. La importación usa la RPC **`public.import_boq_into_version(
+p_version_id, p_chapters jsonb, p_items jsonb)`** `SECURITY INVOKER` (versión vacía/
+editable, subtotal recalculado server-side, atómica). `subtotal = quantity × unit_price`
+(Decimal); nunca confiado del cliente/Excel. Tope archivo 3 MB
+(`serverActions.bodySizeLimit='4mb'`). Tipos client-safe en `@/lib/import/types`. Solo
+`db`; sin service-role; el archivo no se persiste.
+
 ## Escritura de presupuestos (Oleada 4B.3) — ver `docs/ESTIMATES_CRUD_CONTRACT.md`
 
 `EstimatesWriteRepository` (`apps/web/server/estimates/`):

@@ -1,5 +1,90 @@
 # Handoff Log
 
+## 2026-06-05 — 4C.1 implementado: importación de Excel atómica (migración aprobada)
+
+### Estado
+- Rama `integration/wave-4c1-excel-import`. Migración aprobada (RPC de import atómico).
+- **Migración aplicada al remoto** ⇒ **19/19 Local = Remote** (sin seeds, sin importaciones
+  remotas). Dry-run mostró exactamente 1 migración esperada.
+
+### Migración (autorizada + hardening)
+- `20260604140000_boq_import_atomic.sql`: RPC `public.import_boq_into_version(p_version_id,
+  p_chapters jsonb, p_items jsonb)` `SECURITY INVOKER` (RLS aplica). Deny sin sesión/membresía
+  (`app._auth_uid()`/`app.current_org()`); `FOR UPDATE` sobre la versión (serializa); valida
+  editable + **vacía** (anti doble-submit); inserta capítulos+ítems atómicamente con
+  **subtotal recalculado server-side**; devuelve `{chapterCount,itemCount,directTotal}`.
+  Grants: `REVOKE FROM PUBLIC+anon`, `GRANT TO authenticated` (ACL verificada sin `anon`).
+  NO crea tablas ni cambia RLS.
+- **RLS runtime 87/87** (+10 import: recálculo, atomicidad, doble-submit bloqueado, cross-org,
+  deny, anon sin EXECUTE).
+
+### Implementación
+- Contrato `docs/EXCEL_IMPORT_CONTRACT.md` (v1). Formato congelado: `.xlsx`, hoja
+  `COTIZACION 1 PISO`, columnas por encabezado (A–F), convención capítulo/ítem.
+- Parser server-side `apps/web/server/estimates/import/parse.ts` (SheetJS; **no evalúa
+  fórmulas ni macros**; recálculo Decimal; digest SHA-256). Tipos client-safe en
+  `@/lib/import/types`.
+- Servicio `preview/confirm/getStatus`: preview sin escritura; confirm re-parsea + **compara
+  digest** + RPC atómica; solo en `db`. UI request-time: sección Importar Excel en el detalle
+  (estado vacío con CTA / "Importación completada" + reimport bloqueada) + ruta `…/import`
+  (upload → preview → confirmar → redirect con banner). `next.config` `serverActions.bodySizeLimit='4mb'`.
+- **Límites** (EXCEL_IMPORT_CONTRACT §4): archivo **3 MB** (bodySizeLimit 4 MB < ~4.5 MB de
+  Vercel), 500 capítulos, 5000 ítems, negativos bloqueados.
+
+### Validación
+- typecheck/lint 0, **651 tests** (+28 de import), build fixture + build `db` LOCAL (vacío y
+  sembrado) PASS, gm 22/22, gm:import, validador 214/0/0, RLS 87/87, `git diff --check` limpio.
+- **Excel privado real NO usado**: tests construyen workbooks sintéticos en memoria.
+
+### Pendiente
+- Preview + merge `--no-ff` + Production. Acción manual final de la usuaria: subir su Excel real
+  desde la UI (Importar Excel → analizar → confirmar). Rollback estable: tag
+  `wave-4b3-real-estimates-production-v1`. **4C.2/4D NO iniciadas.**
+
+## 2026-06-04 — 4C.1 Fase 1: diagnóstico importación Excel — STOP por migración requerida
+
+### Estado
+- Rama `integration/wave-4c1-excel-import` desde `main`@`8ebad9e` (`main` intacta).
+- **DETENIDO tras el diagnóstico** (Fase 1): se requiere **migración nueva**; pendiente de
+  **aprobación explícita de la usuaria** antes de continuar (regla del prompt).
+
+### Diagnóstico del pipeline existente
+- `gm:import` ⇒ `scripts/excel-import/import.ts` (propiedad agent-excel-mapper): herramienta de
+  **build-time** que valida el fixture sanitizado + cadena de regresión; **NO escribe en DB**.
+  `sheet-map.ts` documenta las 10 hojas del golden master (COT.ENTRE PATIOS) con columnas
+  **tentativas** (`TODO_VERIFY`, sin coordenadas empíricas congeladas). Hoja BOQ de referencia:
+  `COTIZACION 1 PISO` (A=code, B=descripción, C=unidad, D=cantidad, E=v/unit, F=subtotal).
+- Dependencias: **`xlsx` 0.18.5 (SheetJS)** y `exceljs` 4.4.0 en `apps/web` (ambas server-side
+  en Vercel Node). No hay importador runtime, ni RPC, ni tablas de import/staging.
+- Tablas destino existen: `chapters` (estimate_version_id, code único por versión, name,
+  sort_order) y `boq_items` (estimate_version_id, chapter_id, code, *_snapshot, subtotal,
+  sort_order). **RLS suficiente**: `chapters_insert`/`boq_items_insert` exigen
+  `estimate_version_in_org` + `NOT estimate_version_locked`. **V01 (draft) NO está bloqueada**
+  ⇒ acepta inserts del mismo org. No requiere migración de RLS.
+
+### Conclusión
+- El esquema de datos es suficiente, PERO el flujo exige **transacción atómica** (capítulos +
+  ítems juntos, rollback total) y **bloqueo de doble importación**, imposibles de garantizar con
+  inserts multi-tabla de supabase-js sin service-role. ⇒ **Migración nueva ESTRICTAMENTE
+  NECESARIA**: una RPC `SECURITY INVOKER` que importe atómicamente y verifique versión vacía.
+- Propuesta (aditiva, reversible; sin tablas nuevas):
+  `public.import_boq_into_version(p_version_id uuid, p_chapters jsonb, p_items jsonb)`
+  `SECURITY INVOKER`: deny sin sesión; **versión debe estar VACÍA** (anti doble-submit);
+  inserta capítulos (code→id) y luego ítems con **subtotal recomputado server-side**
+  (`quantity × unit_price`, NUMERIC(20,10)); devuelve conteos + total directo. Hardening igual a
+  4B.3 (`search_path=public`, refs calificadas, `REVOKE FROM PUBLIC+anon`, `GRANT TO authenticated`).
+  RLS aplica a cada INSERT ⇒ cross-org/bloqueada rechazadas (rollback atómico). El índice
+  `chapters_version_code_uq` refuerza idempotencia.
+- Remoto actual 18/18 ⇒ sería la 19.ª (requiere `db push` tras dry-run).
+- Dev: se usará un **.xlsx sintético sanitizado** (sin el Excel privado real) para tests/preview.
+
+### Acción solicitada (UNA aprobación)
+- Autorizar: crear+validar la migración local (db reset + RLS runtime + tests),
+  `db push --dry-run` y, si OK (1 migración, sin seeds), `db push --linked`; luego implementar
+  contrato + repo (`previewEstimateExcelImport`/`confirmEstimateExcelImport`/
+  `getEstimateImportStatus`) + UI (upload/preview/confirm) + tests + deploy. **Nada remoto sin OK.**
+  Rollback estable: tag `wave-4b3-real-estimates-production-v1`.
+
 ## 2026-06-04 — 4B.3 CERRADA: smoke productivo real de presupuesto + V01
 
 ### Estado

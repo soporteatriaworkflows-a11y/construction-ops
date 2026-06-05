@@ -191,7 +191,7 @@ describe('DbEstimatesWriteRepository lecturas', () => {
   it('getEstimateActiveVersion mapea versión + conteos (0/0 en V01)', async () => {
     const repo = new DbEstimatesWriteRepository(makeClient({ versionRow: VERSION_ROW }));
     const v = await repo.getEstimateActiveVersion(READER, 'est-1');
-    expect(v).toEqual({ id: 'ver-1', versionNumber: 1, status: 'draft', chapterCount: 0, itemCount: 0 });
+    expect(v).toEqual({ id: 'ver-1', versionNumber: 1, status: 'draft', chapterCount: 0, itemCount: 0, directTotal: '0' });
   });
 
   it('getEstimateActiveVersion sin versiones ⇒ null', async () => {

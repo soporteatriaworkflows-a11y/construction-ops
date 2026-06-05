@@ -836,6 +836,133 @@ async function main(): Promise<void> {
   }
   check('estimates: rol anon NO puede ejecutar la RPC (grants)', anonDenied);
 
+  // ===========================================================================
+  // 15) IMPORT BOQ 4C.1 — RPC atómica import_boq_into_version.
+  //     Subtotal recalculado server-side; versión vacía/editable; doble-import
+  //     bloqueado; cross-org/anon denegados. Se crea un V01 draft fresco vía la
+  //     RPC de 4B.3 y se importa sobre él (todo en la tx del harness, revertido).
+  // ===========================================================================
+  console.log('\n--- IMPORT BOQ 4C.1: RPC atómica import_boq_into_version ---');
+
+  const impChapters = [{ code: 'CAP1', name: 'Preliminares', sortOrder: 0 }];
+  const impItems = [
+    { chapterCode: 'CAP1', code: 'IT1', description: 'Excavación', unit: 'm3', quantity: '2', unitPrice: '3', sortOrder: 0 },
+    { chapterCode: 'CAP1', code: 'IT2', description: 'Relleno', unit: 'm3', quantity: '4', unitPrice: '5', sortOrder: 1 },
+  ];
+
+  // 15a) Import exitoso: conteos + directTotal recalculado (2*3 + 4*5 = 26).
+  const imp = await asUser(realA, async (q) => {
+    const [{ id: estId }] = await q<{ id: string }[]>`
+      SELECT id FROM public.create_estimate_with_initial_version(${SCOPE_A}, 'IMP', 'Imp', NULL)`;
+    const [{ vid }] = await q<{ vid: string }[]>`
+      SELECT id AS vid FROM estimate_versions WHERE estimate_id = ${estId} ORDER BY version_number DESC LIMIT 1`;
+    const [{ res }] = await q<{ res: { chapterCount: number; itemCount: number; directTotal: string } }[]>`
+      SELECT public.import_boq_into_version(${vid}, ${sql.json(impChapters)}, ${sql.json(impItems)}) AS res`;
+    // Subtotal recalculado server-side (no se confía en columna F del Excel).
+    const sub = await q<{ subtotal: string; q: string; p: string }[]>`
+      SELECT subtotal, quantity_snapshot AS q, unit_price_snapshot AS p
+      FROM boq_items WHERE estimate_version_id = ${vid} AND code = 'IT1'`;
+    return { res, vid, sub: sub[0]! };
+  });
+  check('import: conteos correctos (1 cap / 2 ítems)', imp.res.chapterCount === 1 && imp.res.itemCount === 2, JSON.stringify(imp.res));
+  check('import: directTotal recalculado server-side = 26', Number(imp.res.directTotal) === 26, `dt=${imp.res.directTotal}`);
+  check('import: subtotal recalculado = quantity × unit_price (6)', Number(imp.sub.subtotal) === 6, `sub=${imp.sub.subtotal}`);
+
+  // 15b) Doble importación bloqueada (versión ya no vacía) ⇒ revierte (savepoint).
+  const dbl = await asUser(realA, async (q) => {
+    const [{ id: estId }] = await q<{ id: string }[]>`
+      SELECT id FROM public.create_estimate_with_initial_version(${SCOPE_A}, 'IMP2', 'Imp2', NULL)`;
+    const [{ vid }] = await q<{ vid: string }[]>`
+      SELECT id AS vid FROM estimate_versions WHERE estimate_id = ${estId} ORDER BY version_number DESC LIMIT 1`;
+    await q`SELECT public.import_boq_into_version(${vid}, ${sql.json(impChapters)}, ${sql.json(impItems)})`;
+    let blocked = false;
+    await q.unsafe('SAVEPOINT sp_imp');
+    try {
+      await q`SELECT public.import_boq_into_version(${vid}, ${sql.json(impChapters)}, ${sql.json(impItems)})`;
+    } catch {
+      blocked = true;
+      await q.unsafe('ROLLBACK TO SAVEPOINT sp_imp');
+    }
+    const [{ n }] = await q<{ n: number }[]>`SELECT count(*)::int AS n FROM boq_items WHERE estimate_version_id = ${vid}`;
+    return { blocked, items: n };
+  });
+  check('import: doble importación bloqueada (version_not_empty)', dbl.blocked);
+  check('import: tras el bloqueo siguen 2 ítems (sin duplicar)', dbl.items === 2, `n=${dbl.items}`);
+
+  // 15c) Atomicidad: ítem con chapterCode inexistente ⇒ revierte TODO (0 cap/0 ítems).
+  const atom = await asUser(realA, async (q) => {
+    const [{ id: estId }] = await q<{ id: string }[]>`
+      SELECT id FROM public.create_estimate_with_initial_version(${SCOPE_A}, 'IMP3', 'Imp3', NULL)`;
+    const [{ vid }] = await q<{ vid: string }[]>`
+      SELECT id AS vid FROM estimate_versions WHERE estimate_id = ${estId} ORDER BY version_number DESC LIMIT 1`;
+    const badItems = JSON.stringify([{ chapterCode: 'NOPE', code: 'X', description: 'x', unit: 'u', quantity: '1', unitPrice: '1' }]);
+    let blocked = false;
+    await q.unsafe('SAVEPOINT sp_atom');
+    try {
+      await q`SELECT public.import_boq_into_version(${vid}, ${sql.json(impChapters)}, ${badItems}::jsonb)`;
+    } catch {
+      blocked = true;
+      await q.unsafe('ROLLBACK TO SAVEPOINT sp_atom');
+    }
+    const [{ c }] = await q<{ c: number }[]>`SELECT count(*)::int AS c FROM chapters WHERE estimate_version_id = ${vid}`;
+    return { blocked, chapters: c };
+  });
+  check('import: ítem con capítulo inexistente revierte la transacción', atom.blocked);
+  check('import: atomicidad ⇒ 0 capítulos tras el fallo (sin huérfanos)', atom.chapters === 0, `c=${atom.chapters}`);
+
+  // 15d) Cross-org: A importa en una versión de B ⇒ version_not_found (RLS) ⇒ revierte.
+  let impCrossBlocked = false;
+  try {
+    await asUser(
+      realA,
+      async (q) => {
+        await q`SELECT public.import_boq_into_version(${'00000000-0000-0000-0000-0000000000e2'}, ${sql.json(impChapters)}, ${sql.json(impItems)})`;
+      },
+      async (q) => {
+        // Versión de B (superusuario): estimate + versión draft bajo PROJECT_B/SCOPE_B.
+        await q`INSERT INTO project_scopes (id, project_id, code, name, scope_type)
+                VALUES (${SCOPE_B}, ${PROJECT_B}, 'SB', 'Scope B', 'floor') ON CONFLICT (id) DO NOTHING`;
+        await q`INSERT INTO estimates (id, project_scope_id, code, name, status)
+                VALUES ('00000000-0000-0000-0000-0000000000e1', ${SCOPE_B}, 'EB', 'Est B', 'active') ON CONFLICT (id) DO NOTHING`;
+        await q`INSERT INTO estimate_versions (id, estimate_id, version_number, status)
+                VALUES ('00000000-0000-0000-0000-0000000000e2', '00000000-0000-0000-0000-0000000000e1', 1, 'draft') ON CONFLICT (id) DO NOTHING`;
+      },
+    );
+  } catch {
+    impCrossBlocked = true;
+  }
+  check('import: A no puede importar en versión de B (RLS ⇒ version_not_found)', impCrossBlocked);
+
+  // 15e) Sin sesión / sin membresía ⇒ RPC abortada.
+  let impNoSession = false;
+  try {
+    await asUser(noSession, async (q) => {
+      await q`SELECT public.import_boq_into_version(${imp.vid}, ${sql.json(impChapters)}, ${sql.json(impItems)})`;
+    });
+  } catch {
+    impNoSession = true;
+  }
+  check('import: sin sesión la RPC aborta (deny)', impNoSession);
+
+  // 15f) Grants: el rol `anon` NO puede ejecutar la RPC de import.
+  let impAnonDenied = false;
+  {
+    const r = await sql.reserve();
+    try {
+      await r.unsafe('BEGIN');
+      await r.unsafe('SET LOCAL ROLE anon');
+      try {
+        await r`SELECT public.import_boq_into_version(${imp.vid}, ${sql.json(impChapters)}, ${sql.json(impItems)})`;
+      } catch {
+        impAnonDenied = true;
+      }
+      await r.unsafe('ROLLBACK');
+    } finally {
+      r.release();
+    }
+  }
+  check('import: rol anon NO puede ejecutar la RPC de import (grants)', impAnonDenied);
+
   // --- Resumen ---
   console.log(`\nRESULTADO RLS RUNTIME: ${pass} PASS / ${fail} FAIL`);
   if (fail > 0) {

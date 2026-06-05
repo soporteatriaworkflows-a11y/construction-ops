@@ -14,6 +14,7 @@
  *  - Errores → tipos de dominio; nunca se propaga SQL/stack.
  */
 import { createClient } from '@/lib/supabase/server';
+import Decimal from 'decimal.js';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type {
   AuthenticatedViewer,
@@ -210,7 +211,7 @@ export class DbEstimatesWriteRepository implements EstimatesWriteRepository {
     if (!data) return null;
 
     const version = data as { id: string; version_number: number; status: string };
-    const [{ count: chapterCount }, { count: itemCount }] = await Promise.all([
+    const [{ count: chapterCount }, { count: itemCount }, subsRes] = await Promise.all([
       supabase
         .from('chapters')
         .select('id', { count: 'exact', head: true })
@@ -219,7 +220,16 @@ export class DbEstimatesWriteRepository implements EstimatesWriteRepository {
         .from('boq_items')
         .select('id', { count: 'exact', head: true })
         .eq('estimate_version_id', version.id),
+      supabase
+        .from('boq_items')
+        .select('subtotal')
+        .eq('estimate_version_id', version.id),
     ]);
+
+    const subs = (subsRes.data ?? []) as { subtotal: string }[];
+    const directTotal = subs
+      .reduce((acc, r) => acc.plus(new Decimal(r.subtotal)), new Decimal(0))
+      .toFixed();
 
     return {
       id: version.id,
@@ -227,6 +237,7 @@ export class DbEstimatesWriteRepository implements EstimatesWriteRepository {
       status: version.status as EstimateActiveVersionView['status'],
       chapterCount: chapterCount ?? 0,
       itemCount: itemCount ?? 0,
+      directTotal,
     };
   }
 }
