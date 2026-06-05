@@ -37,6 +37,7 @@ interface FixtureShape {
   estimateVersion: { id: Uuid; versionNumber: number; status: EstimateVersionStatus };
   chapters: unknown[];
   boqItems: unknown[];
+  estimateTotals: { costos_directos: string };
 }
 
 const fixture = fixtureJson as unknown as FixtureShape;
@@ -52,6 +53,7 @@ function activeVersion(): EstimateActiveVersionView {
     status: fixture.estimateVersion.status,
     chapterCount: fixture.chapters.length,
     itemCount: fixture.boqItems.length,
+    directTotal: fixture.estimateTotals.costos_directos,
   };
 }
 

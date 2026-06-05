@@ -1,0 +1,111 @@
+/**
+ * actions.ts — Server Actions de importación de Excel (4C.1).
+ *
+ * Propiedad: agent-frontend-boq. Contrato: `docs/EXCEL_IMPORT_CONTRACT.md §2,§3`.
+ *
+ * Dos pasos, sin persistir el archivo:
+ *  - `previewExcelImportAction`: parsea + valida, NO escribe; devuelve preview+digest.
+ *  - `confirmExcelImportAction`: re-parsea, compara digest e importa atómicamente.
+ *
+ * Seguridad: modo supabase+db, viewer autenticado server-side, errores sanitizados.
+ * El `estimateId` se valida por visibilidad RLS dentro del repositorio.
+ */
+'use server';
+
+import {
+  previewEstimateExcelImport,
+  confirmEstimateExcelImport,
+  ExcelParseError,
+  ImportFileError,
+  ImportVersionNotEmptyError,
+  ImportVersionLockedError,
+  ImportDigestMismatchError,
+  ImportNotSupportedError,
+} from '@/server/estimates/import';
+import { EstimateNotFoundError } from '@/server/estimates';
+import { resolveAuthenticatedViewer } from '@/server/auth/resolve-viewer';
+import { AuthError } from '@/server/auth/errors';
+import { isCreationModeEnabled } from '../../../../../../mode-guard';
+import type { ImportPreview, ImportResult } from '@/lib/import/types';
+
+export type PreviewActionResult =
+  | { ok: true; preview: ImportPreview }
+  | { ok: false; error: string; detectedSheets?: string[] };
+
+export type ConfirmActionResult =
+  | { ok: true; result: ImportResult }
+  | { ok: false; error: string };
+
+function authMessage(e: AuthError): string {
+  const messages: Record<string, string> = {
+    no_session: 'No hay sesión activa. Por favor inicia sesión.',
+    no_membership: 'No tienes membresía activa en ninguna organización.',
+    invalid_role: 'Tu rol no permite realizar esta acción.',
+    config: 'Error de configuración del servidor.',
+  };
+  return messages[e.reason] ?? 'Error de autenticación.';
+}
+
+function sanitizeError(e: unknown): string {
+  if (e instanceof ImportFileError) return e.message;
+  if (e instanceof ExcelParseError) return e.message;
+  if (e instanceof ImportVersionNotEmptyError) return e.message;
+  if (e instanceof ImportVersionLockedError) return e.message;
+  if (e instanceof ImportDigestMismatchError) return e.message;
+  if (e instanceof ImportNotSupportedError) return e.message;
+  if (e instanceof EstimateNotFoundError) return 'El presupuesto no existe o no es accesible.';
+  return 'No se pudo procesar el archivo. Verifica el formato e intenta de nuevo.';
+}
+
+export async function previewExcelImportAction(
+  formData: FormData,
+): Promise<PreviewActionResult> {
+  if (!isCreationModeEnabled()) {
+    return { ok: false, error: 'La importación requiere APP_AUTH_MODE=supabase y READ_MODEL_SOURCE=db.' };
+  }
+  const estimateId = (formData.get('estimateId') as string | null)?.trim() ?? '';
+  const file = formData.get('file');
+  if (!estimateId) return { ok: false, error: 'Presupuesto no especificado.' };
+
+  let viewer: Awaited<ReturnType<typeof resolveAuthenticatedViewer>>;
+  try {
+    viewer = await resolveAuthenticatedViewer();
+  } catch (e) {
+    return { ok: false, error: e instanceof AuthError ? authMessage(e) : 'Error al verificar la sesión.' };
+  }
+
+  try {
+    const preview = await previewEstimateExcelImport(viewer, estimateId, file);
+    return { ok: true, preview };
+  } catch (e) {
+    const detectedSheets = e instanceof ExcelParseError ? e.detectedSheets : undefined;
+    return { ok: false, error: sanitizeError(e), ...(detectedSheets ? { detectedSheets } : {}) };
+  }
+}
+
+export async function confirmExcelImportAction(
+  formData: FormData,
+): Promise<ConfirmActionResult> {
+  if (!isCreationModeEnabled()) {
+    return { ok: false, error: 'La importación requiere APP_AUTH_MODE=supabase y READ_MODEL_SOURCE=db.' };
+  }
+  const estimateId = (formData.get('estimateId') as string | null)?.trim() ?? '';
+  const digest = (formData.get('digest') as string | null)?.trim() ?? '';
+  const file = formData.get('file');
+  if (!estimateId) return { ok: false, error: 'Presupuesto no especificado.' };
+  if (!digest) return { ok: false, error: 'Falta la vista previa. Analiza el archivo antes de confirmar.' };
+
+  let viewer: Awaited<ReturnType<typeof resolveAuthenticatedViewer>>;
+  try {
+    viewer = await resolveAuthenticatedViewer();
+  } catch (e) {
+    return { ok: false, error: e instanceof AuthError ? authMessage(e) : 'Error al verificar la sesión.' };
+  }
+
+  try {
+    const result = await confirmEstimateExcelImport(viewer, estimateId, file, digest);
+    return { ok: true, result };
+  } catch (e) {
+    return { ok: false, error: sanitizeError(e) };
+  }
+}

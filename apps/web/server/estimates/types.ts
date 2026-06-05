@@ -54,6 +54,8 @@ export interface EstimateActiveVersionView {
   /** Conteos de la versión (0/0 en V01 recién creada). */
   chapterCount: number;
   itemCount: number;
+  /** Σ subtotales de los ítems (DecimalString). "0" si no hay ítems. */
+  directTotal: import('@/lib/utils/types').DecimalString;
 }
 
 /** Detalle básico de un presupuesto (4B.3; sin capítulos/BOQ). */

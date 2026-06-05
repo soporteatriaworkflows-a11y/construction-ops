@@ -432,6 +432,26 @@ Contrato: `docs/ESTIMATES_CRUD_CONTRACT.md` (v1). Migración remota aprobada.
 **No** recibir `organization_id`/`created_by`/`status`/`code`/`project_scope_id`
 sin validar del navegador.
 
+### Ownership congelado — Oleada 4C.1 (importación de Excel a V01)
+
+Contrato: `docs/EXCEL_IMPORT_CONTRACT.md` (v1). Migración remota aprobada.
+
+**agent-db-rls (4C.1)** — ownership:
+- Migración `20260604140000_boq_import_atomic.sql` (RPC `import_boq_into_version`
+  `SECURITY INVOKER`, grants endurecidos). Sin tablas nuevas ni cambios RLS.
+- RLS runtime extendido (`scripts/rls-runtime/run.ts`, +10 checks de import).
+
+**agent-excel-mapper (4C.1)** — ownership:
+- `apps/web/server/estimates/import/parse.ts` (parser SheetJS, recálculo Decimal, digest).
+- `apps/web/lib/import/types.ts` (tipos/limites client-safe).
+
+**agent-frontend-boq (4C.1)** — ownership:
+- `apps/web/app/(dashboard)/projects/[id]/scopes/[scopeId]/estimates/[estimateId]/import/`
+  (page + import-flow client + actions); sección Importar Excel + Total directo en el detalle.
+- `apps/web/next.config.mjs` (`serverActions.bodySizeLimit`). Tests de parser/UI.
+**NO tocar**: migración/RLS/RPC (consume), Vercel. **No** persistir el archivo; **no** usar el
+Excel privado real en dev.
+
 ### agent-qa (Oleada 4)
 - `docs/QA_REPORT.md` con resultado completo.
 - Sin FAIL bloqueante para release.

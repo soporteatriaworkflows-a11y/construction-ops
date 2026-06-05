@@ -9,6 +9,29 @@ cada ciclo de validación.
 
 ---
 
+## 4C.1 — importación de Excel: validación local + migración remota (2026-06-05)
+
+> Rama `integration/wave-4c1-excel-import`. Migración `20260604140000` ⇒ **19/19**.
+
+- **Migración** aditiva/reversible (RPC `import_boq_into_version`, sin tablas/RLS nuevas);
+  dry-run = 1 migración esperada (sin seeds); push controlado.
+- **Seguridad RPC**: `SECURITY INVOKER`, autor/identidad por `app._auth_uid()`, `FOR UPDATE`
+  + versión vacía (anti doble-submit), subtotal recalculado server-side, `GRANT` solo
+  `authenticated` (ACL sin `anon`).
+- **RLS runtime 87/87** (+10 import): recálculo server-side, atomicidad (ítem inválido ⇒ 0
+  capítulos), doble importación bloqueada (sin duplicar), cross-org `version_not_found`, deny
+  sin sesión, anon sin EXECUTE.
+- **Tests** 651 (+28): parser (hoja/encabezados/clasificación/recálculo/advertencias/errores/
+  digest estable; encabezados ES con acentos), route-config de UI (preview→confirm, digest,
+  doble-submit, estado importado/bloqueado).
+- **Builds**: fixture PASS; **db LOCAL vacío** PASS; **db LOCAL sembrado** PASS. Ruta `/import`
+  `ƒ`. typecheck/lint 0, gm 22/22, gm:import, validador 214/0/0.
+- **Privacidad**: Excel privado real NO usado (workbooks sintéticos en memoria); archivo no se
+  persiste; contenido no se registra en logs. Sin escrituras remotas salvo la migración; sin
+  importación remota desde terminal.
+
+---
+
 ## CIERRE 4B.3 — smoke productivo real de presupuesto + V01 (2026-06-04)
 
 > Verificación MANUAL de la usuaria en `https://construction-ops-psi.vercel.app`
