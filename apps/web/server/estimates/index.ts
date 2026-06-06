@@ -54,6 +54,7 @@ export { DbEstimatesWriteRepository } from './db-repository';
 export { FixtureEstimatesWriteRepository } from './fixture-repository';
 export {
   ScopeNotFoundError,
+  ChapterNotFoundError,
   EstimateNotFoundError,
   EstimateValidationError,
   EstimateWriteNotSupportedError,

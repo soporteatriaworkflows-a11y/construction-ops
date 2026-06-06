@@ -28,6 +28,16 @@ export class EstimateValidationError extends Error {
   }
 }
 
+/** Capítulo inexistente o no visible para la organización del viewer. */
+export class ChapterNotFoundError extends Error {
+  readonly code = 'chapter_not_found' as const;
+
+  constructor(chapterId: string, message?: string) {
+    super(message ?? `chapter_not_found: ${chapterId}`);
+    this.name = 'ChapterNotFoundError';
+  }
+}
+
 /** Presupuesto inexistente o no visible para la organización del viewer. */
 export class EstimateNotFoundError extends Error {
   readonly code = 'estimate_not_found' as const;

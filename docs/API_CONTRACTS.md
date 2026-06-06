@@ -679,6 +679,17 @@ editable, subtotal recalculado server-side, atómica). `subtotal = quantity × u
 (`serverActions.bodySizeLimit='4mb'`). Tipos client-safe en `@/lib/import/types`. Solo
 `db`; sin service-role; el archivo no se persiste.
 
+## Revisión operativa del presupuesto (Oleada 4D.1)
+
+`EstimatesWriteRepository` (lectura RLS-bound, db+fixture):
+`listChaptersByEstimateVersion(viewer, estimateId)` (capítulos de la versión activa con
+`itemCount` + subtotal), `getChapterById(viewer, chapterId)` (capítulo + contexto
+proyecto/alcance/presupuesto/versión; cross-org ⇒ `ChapterNotFoundError`),
+`listItemsByChapter(viewer, chapterId)` (ítems BOQ ordenados por `sort_order`). El resumen
+operativo reusa `getEstimateById`. Exponen `source_code`/`source_row` (trazabilidad 4C.3).
+Tipos client-safe en `@/lib/estimates/review-types`. **Sin migración**; solo lectura;
+sin service-role; sin fallback silencioso db→fixture.
+
 ## Escritura de presupuestos (Oleada 4B.3) — ver `docs/ESTIMATES_CRUD_CONTRACT.md`
 
 `EstimatesWriteRepository` (`apps/web/server/estimates/`):

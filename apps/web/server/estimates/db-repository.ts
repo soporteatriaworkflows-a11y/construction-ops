@@ -27,10 +27,16 @@ import type {
   ViewerContext,
 } from './types';
 import {
+  ChapterNotFoundError,
   EstimateCodeGenerationError,
   EstimateNotFoundError,
   ScopeNotFoundError,
 } from './errors';
+import type {
+  BoqItemReviewView,
+  ChapterDetailView,
+  ChapterReviewItem,
+} from '@/lib/estimates/review-types';
 import {
   buildEstimateCodeCandidate,
   CODE_MAX_ATTEMPTS,
@@ -239,5 +245,99 @@ export class DbEstimatesWriteRepository implements EstimatesWriteRepository {
       itemCount: itemCount ?? 0,
       directTotal,
     };
+  }
+
+  async listChaptersByEstimateVersion(
+    viewer: ViewerContext,
+    estimateId: Uuid,
+  ): Promise<ChapterReviewItem[]> {
+    const active = await this.getEstimateActiveVersion(viewer, estimateId);
+    if (!active) return [];
+    const supabase = await this.clientFactory();
+    const { data, error } = await supabase
+      .from('chapters')
+      .select('id, code, name, sort_order, source_code, source_row, boq_items(subtotal)')
+      .eq('estimate_version_id', active.id)
+      .order('sort_order', { ascending: true });
+    if (error) throw new Error(`chapter_list_failed: ${error.code ?? 'unknown'}`);
+
+    return (data ?? []).map((row) => {
+      const r = row as unknown as {
+        id: string; code: string; name: string; sort_order: number;
+        source_code: string | null; source_row: number | null;
+        boq_items: { subtotal: string }[] | null;
+      };
+      const items = r.boq_items ?? [];
+      const subtotal = items.reduce((acc, it) => acc.plus(new Decimal(it.subtotal)), new Decimal(0)).toFixed();
+      return {
+        id: r.id, code: r.code, name: r.name, sortOrder: r.sort_order,
+        itemCount: items.length, subtotal,
+        sourceCode: r.source_code ?? null, sourceRow: r.source_row ?? null,
+      };
+    });
+  }
+
+  async getChapterById(viewer: ViewerContext, chapterId: Uuid): Promise<ChapterDetailView> {
+    const supabase = await this.clientFactory();
+    const { data, error } = await supabase
+      .from('chapters')
+      .select(
+        'id, code, name, sort_order, source_code, source_row, boq_items(subtotal), ' +
+          'estimate_versions(version_number, estimates(id, name, project_scopes(id, name, projects(id, name))))',
+      )
+      .eq('id', chapterId)
+      .maybeSingle();
+    if (error) throw new Error(`chapter_read_failed: ${error.code ?? 'unknown'}`);
+    if (!data) throw new ChapterNotFoundError(chapterId);
+
+    const r = data as unknown as {
+      id: string; code: string; name: string; sort_order: number;
+      source_code: string | null; source_row: number | null;
+      boq_items: { subtotal: string }[] | null;
+      estimate_versions: {
+        version_number: number;
+        estimates: {
+          id: string; name: string;
+          project_scopes: { id: string; name: string | null; projects: { id: string; name: string | null } | null } | null;
+        } | null;
+      } | null;
+    };
+    const items = r.boq_items ?? [];
+    const subtotal = items.reduce((acc, it) => acc.plus(new Decimal(it.subtotal)), new Decimal(0)).toFixed();
+    const ev = r.estimate_versions;
+    const est = ev?.estimates;
+    const scope = est?.project_scopes;
+    const project = scope?.projects;
+    return {
+      id: r.id, code: r.code, name: r.name, sortOrder: r.sort_order,
+      subtotal, itemCount: items.length,
+      sourceCode: r.source_code ?? null, sourceRow: r.source_row ?? null,
+      estimateId: est?.id ?? '', estimateName: est?.name ?? '',
+      versionNumber: ev?.version_number ?? 0,
+      scopeId: scope?.id ?? '', scopeName: scope?.name ?? null,
+      projectId: project?.id ?? '', projectName: project?.name ?? null,
+    };
+  }
+
+  async listItemsByChapter(_viewer: ViewerContext, chapterId: Uuid): Promise<BoqItemReviewView[]> {
+    const supabase = await this.clientFactory();
+    const { data, error } = await supabase
+      .from('boq_items')
+      .select('id, code, description_snapshot, unit_snapshot, quantity_snapshot, unit_price_snapshot, subtotal, sort_order, source_code, source_row')
+      .eq('chapter_id', chapterId)
+      .order('sort_order', { ascending: true });
+    if (error) throw new Error(`item_list_failed: ${error.code ?? 'unknown'}`);
+    return (data ?? []).map((row) => {
+      const r = row as unknown as {
+        id: string; code: string; description_snapshot: string; unit_snapshot: string;
+        quantity_snapshot: string; unit_price_snapshot: string; subtotal: string; sort_order: number;
+        source_code: string | null; source_row: number | null;
+      };
+      return {
+        id: r.id, code: r.code, description: r.description_snapshot, unit: r.unit_snapshot,
+        quantity: r.quantity_snapshot, unitPrice: r.unit_price_snapshot, subtotal: r.subtotal,
+        sortOrder: r.sort_order, sourceCode: r.source_code ?? null, sourceRow: r.source_row ?? null,
+      };
+    });
   }
 }
