@@ -130,27 +130,42 @@ cambios en datos productivos). Rollback = revertir el merge de
 - `EXPORT_PROFILES_FOR_ESTIMATE` — perfiles de privacidad (cliente vs interno)
   para el export del presupuesto real, reusando la noción de perfiles de la
   Oleada 3 sobre este nuevo camino de datos.
-- `ICONIC_LOGO_ASSET` — incorporar el PNG oficial (base64 en `logo-asset.ts`).
-
-## 13. Branding visual (Oleada 4E.1B)
+## 13. Branding visual oficial GRUPO ICONIC (Oleadas 4E.1B/4E.1C)
 
 Identidad ICONIC **puramente visual** (no toca contenido, finanzas, importación,
 AIU, capítulos ni ítems). Fuente única: `apps/web/server/estimates/export/branding.ts`.
 
-- **Paleta corporativa** (HEX para @react-pdf, ARGB para ExcelJS): azul noche
-  `#0F2A43` (primario), azul intermedio `#1C4E80`, dorado premium `#C8A24B`
-  (acento/realce de total), tinta `#1A2330`, banda clara `#EEF2F7`, realce de
-  totales `#DCE6F1`.
-- **PDF**: banda de marca fija (logo o monograma `IC` + nombre + tagline +
-  `documentTitle`), línea de acento dorada, ficha del proyecto, secciones con
-  títulos corporativos, tabla con filas alternas, AIU jerarquizado, **TOTAL
-  GENERAL** resaltado (banda azul + borde dorado), footer limpio con paginación.
-- **Excel**: banda de marca en `RESUMEN` (logo o monograma), encabezados de tabla
-  y títulos con color de marca, filas alternas, subtotales/totales resaltados,
-  paneles congelados (`PRESUPUESTO`/`TRAZABILIDAD`), anchos de columna razonables,
-  `gridLines` ocultas.
-- **Logo**: mecanismo **serverless-safe** vía base64 embebido en
-  `logo-asset.ts` (`ICONIC_LOGO_BASE64`); sin asset ⇒ monograma textual (la
-  exportación nunca se rompe). Ruta documentada del PNG oficial y conversión en
-  `apps/web/public/branding/README.md`. **Sin `fs` en runtime** (evita el aviso
-  NFT de Turbopack y funciona en la función de Vercel).
+### Paleta oficial (`ICONIC_EXPORT_PALETTE`, única fuente de verdad)
+Azul ICONIC `#005DD6` (dominante), cian `#00B8FF` (**único acento**), azul noche
+`#020148` (premium/títulos/total), grafito `#1B1F3E` (texto técnico), gris azulado
+`#C7DCED` (bordes), gris claro `#F2F4F7` (filas alternas), blanco `#FFFFFF` (fondo).
+**Sin dorado** (el acento `#C8A24B` de 4E.1B fue eliminado; no reintroducir sin
+aprobación explícita).
+
+### Logos oficiales
+`grupo-iconic-logo-full.png` (encabezado PDF + hoja `RESUMEN`) y
+`grupo-iconic-logo-symbol.png` (footer PDF + zonas compactas), en
+`apps/web/public/branding/iconic/`. Se **embeben en base64** vía
+`scripts/branding/embed-iconic-assets.mjs` → módulo generado
+`apps/web/server/estimates/export/logo-asset.ts`
+(`ICONIC_LOGO_FULL_DATA_URI`/`ICONIC_LOGO_SYMBOL_DATA_URI`). **Sin `fs` en
+runtime** (serverless-safe; no usa `outputFileTracingIncludes`). Sin assets ⇒
+monograma `IC` (solo resiliencia de desarrollo).
+
+### PDF
+Encabezado fijo con **logo completo** sobre fondo blanco (el logo lleva texto azul
+noche), regla de acento cian, ficha de proyecto, títulos de sección en azul ICONIC,
+tabla con filas alternas, AIU jerarquizado, **TOTAL GENERAL** resaltado (banda azul
+noche + borde cian), footer con **símbolo** discreto + paginación. Logo con relación
+de aspecto preservada.
+
+### Excel
+`RESUMEN` con **logo completo** + título azul noche + regla cian; encabezados de
+tabla en azul ICONIC (texto blanco); subtotales/totales resaltados (TOTAL GENERAL en
+azul noche + borde cian); filas alternas gris claro; paneles congelados
+(`PRESUPUESTO`/`TRAZABILIDAD`); `gridLines` ocultas; anchos razonables. Estructura,
+fórmulas, hojas, conteos, códigos y trazabilidad intactos.
+
+### Guía interna
+`docs/branding/ICONIC_EXPORTS_VISUAL_GUIDE.pdf` (referencia de implementación; **no**
+se publica en la app ni por rutas públicas).

@@ -1,5 +1,38 @@
 # Handoff Log
 
+## 2026-06-06 — 4E.1C: activación de assets oficiales GRUPO ICONIC
+
+### Estado
+- Rama `integration/wave-4e1c-official-iconic-assets` (desde `main` `3bd3b01`).
+- **Sin migración, sin cambios estructurales/financieros.** Solo branding visual.
+- La usuaria añadió los assets oficiales; auditados y conectados.
+
+### Assets
+- `apps/web/public/branding/iconic/grupo-iconic-logo-full.png` (846×846 RGBA, 48 KB).
+- `apps/web/public/branding/iconic/grupo-iconic-logo-symbol.png` (1080×1080 RGBA, 56 KB).
+- Guía movida a `docs/branding/ICONIC_EXPORTS_VISUAL_GUIDE.pdf` (interna, no publicada).
+
+### Cambios
+- Paleta oficial `ICONIC_EXPORT_PALETTE` en `branding.ts` (azul `#005DD6`, cian
+  `#00B8FF`, navy `#020148`, grafito, gris azulado, gris claro, blanco).
+  **Dorado `#C8A24B` eliminado.**
+- Script reproducible `scripts/branding/embed-iconic-assets.mjs` → genera
+  `logo-asset.ts` con `ICONIC_LOGO_FULL_DATA_URI`/`ICONIC_LOGO_SYMBOL_DATA_URI`
+  (base64). **Sin `fs` en runtime.**
+- PDF: encabezado con logo completo sobre blanco (texto navy legible), regla cian,
+  títulos azul ICONIC, footer con símbolo + paginación, TOTAL GENERAL navy+cian.
+- Excel `RESUMEN`: logo completo + título navy + regla cian; encabezados azul,
+  totales navy+cian; estructura/fórmulas/paneles intactos.
+
+### Validación
+- typecheck 0, lint 0 (sin warnings), **712 tests** (+ assets/paleta/embed/no-dorado),
+  build fixture + db-local PASS sin warnings, gm 22/22, gm:import PASS, validador
+  214/0/0, `git diff --check` limpio. Remoto Supabase intacto (20/20).
+
+### Próximo paso
+- Preview → merge `--no-ff` → Production → smoke visual. **No iniciar 4E.2.**
+- Deuda `ICONIC_LOGO_ASSET` ⇒ **RESUELTA**.
+
 ## 2026-06-06 — 4E.1B: branding visual de exports (Excel + PDF)
 
 ### Estado

@@ -1,55 +1,59 @@
-# Branding de exports — ICONIC
+# Branding de exports — GRUPO ICONIC
 
-Esta carpeta provee los assets de marca que consumen los **exports** del
-presupuesto (Excel y PDF). Ver `docs/BUDGET_EXPORT_CONTRACT.md §13` y
-`apps/web/server/estimates/export/branding.ts` (fuente única de identidad).
+Assets de marca que consumen los **exports** del presupuesto (Excel y PDF). Ver
+`docs/BUDGET_EXPORT_CONTRACT.md §13`, la guía interna
+`docs/branding/ICONIC_EXPORTS_VISUAL_GUIDE.pdf` y la fuente única
+`apps/web/server/estimates/export/branding.ts`.
 
-## Logo oficial — dos mecanismos
-
-### 1) Recomendado para producción (serverless-safe): base64 embebido
-Pega el logo en base64 dentro de
-`apps/web/server/estimates/export/logo-asset.ts` (constante
-`ICONIC_LOGO_BASE64`). Así el asset viaja **bundled** con la función del export,
-sin depender del sistema de archivos ni de tracing. Conversión:
+## Assets oficiales
 
 ```
-# Linux/macOS
-base64 -w0 iconic-logo.png
-# PowerShell
-[Convert]::ToBase64String([IO.File]::ReadAllBytes('iconic-logo.png'))
+apps/web/public/branding/iconic/grupo-iconic-logo-full.png    # logo completo (mark + texto)
+apps/web/public/branding/iconic/grupo-iconic-logo-symbol.png  # marca compacta
 ```
 
-### 2) Conveniencia de desarrollo: archivo PNG
-Coloca el PNG en:
+- **Formato:** PNG RGBA (transparente). Actuales: full 846×846, symbol 1080×1080.
+- **Uso:** `full` → encabezado del PDF y hoja `RESUMEN` del Excel; `symbol` →
+  footer del PDF y zonas compactas.
+
+## Embebido reproducible (serverless-safe, SIN fs en runtime)
+
+Los logos se **embeben en base64** dentro de
+`apps/web/server/estimates/export/logo-asset.ts` (GENERADO, no editar a mano),
+de modo que viajan *bundled* con la función del export. Regenerar cuando cambien
+los logos:
 
 ```
-apps/web/public/branding/iconic-logo.png
+node scripts/branding/embed-iconic-assets.mjs
 ```
 
-`loadBrandLogo()` lo lee por `fs` cuando `ICONIC_LOGO_BASE64` está vacío. Útil en
-local; en producción Vercel/Turbopack prefiere el mecanismo (1).
+El script lee los dos PNG, valida la firma PNG y reescribe `logo-asset.ts` con
+`ICONIC_LOGO_FULL_DATA_URI` y `ICONIC_LOGO_SYMBOL_DATA_URI`. **No** registra
+cadenas base64 en logs. **No** se usa `fs` ni `outputFileTracingIncludes` en
+runtime.
 
-### Formato sugerido
-- **Formato:** PNG con fondo transparente.
-- **Resolución:** ~600×600 px (o ~1200×400 px horizontal); el generador lo escala.
-  Peso sugerido < 300 KB.
-- **Color:** versión que contraste sobre banda azul noche (`#0F2A43`) en el PDF y
-  sobre blanco en el Excel.
-
-## Comportamiento sin logo
-
-Mientras no haya base64 ni PNG, los generadores usan un **monograma textual**
-(`IC`) con la paleta corporativa: la exportación nunca se rompe por la ausencia
-del asset. Al proveer el logo (mecanismo 1 o 2), aparece automáticamente en el
-encabezado del PDF y en la hoja `RESUMEN` del Excel, sin más cambios de código.
-
-## Paleta corporativa (referencia)
+## Paleta oficial (única fuente: `branding.ts` → `ICONIC_EXPORT_PALETTE`)
 
 | Rol | HEX |
 |---|---|
-| Azul noche (primario) | `#0F2A43` |
-| Azul intermedio | `#1C4E80` |
-| Dorado premium (acento) | `#C8A24B` |
-| Tinta de texto | `#1A2330` |
-| Banda clara | `#EEF2F7` |
-| Realce de totales | `#DCE6F1` |
+| Azul ICONIC (dominante) | `#005DD6` |
+| Cian (ÚNICO acento) | `#00B8FF` |
+| Azul noche (premium/títulos) | `#020148` |
+| Grafito (texto técnico) | `#1B1F3E` |
+| Gris azulado (bordes) | `#C7DCED` |
+| Gris claro (filas alternas) | `#F2F4F7` |
+| Blanco (fondo principal) | `#FFFFFF` |
+
+**Sin dorado.** El acento es el cian ICONIC; no introducir dorado sin aprobación
+explícita de la usuaria.
+
+## Fallback (solo resiliencia de desarrollo)
+
+Si faltara el módulo generado, los generadores usan un **monograma textual**
+(`IC`): nunca esperado en producción. La exportación no se rompe.
+
+## Guía visual interna
+
+`docs/branding/ICONIC_EXPORTS_VISUAL_GUIDE.pdf` es referencia **interna** de
+implementación. **No** se publica dentro de la app ni se expone por rutas
+públicas (vive en `docs/`, no en `public/`).

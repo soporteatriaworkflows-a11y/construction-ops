@@ -92,6 +92,11 @@ Los archivos `.md` de cada agente viven en `.claude/agents/`.
   `apps/web/server/estimates/export/logo-asset.ts` (logo base64 embebido),
   `apps/web/public/branding/README.md` (ruta/forma del PNG oficial). Solo visual;
   no toca contenido ni finanzas.
+- (4E.1C, orquestación) assets oficiales GRUPO ICONIC:
+  `apps/web/public/branding/iconic/grupo-iconic-logo-{full,symbol}.png` (assets),
+  `scripts/branding/embed-iconic-assets.mjs` (genera `logo-asset.ts`),
+  `docs/branding/ICONIC_EXPORTS_VISUAL_GUIDE.pdf` (guía interna, no publicada).
+  Paleta `ICONIC_EXPORT_PALETTE` (sin dorado).
 
 ### agent-qa
 - `apps/web/tests/regression/`
