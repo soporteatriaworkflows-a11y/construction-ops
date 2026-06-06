@@ -2,6 +2,7 @@
 
 | Fecha | Decisión | Razón | Estado |
 |---|---|---|---|
+| 2026-06-05 | 4D.2 CERRADA: AIU editable por versión validado en producción (smoke usuaria, total ≈ $372.247.170). Tag `wave-4d2-editable-aiu-production-v1`. Inicia 4E.1 exportación protegida Excel+PDF en `integration/wave-4e1-budget-exports` | AIU persistente/editable confirmado; siguiente bloque entrega documentos del presupuesto real | ✅ Aprobado |
 | 2026-05-29 | ORM: Drizzle ORM | Mejor DX con TypeScript, migraciones SQL directas, sin magia | ✅ Aprobado |
 | 2026-05-29 | Stack: Next.js 16 + Supabase + Drizzle | Monolito modular, un solo lenguaje, menor complejidad inicial | ✅ Aprobado |
 | 2026-05-29 | Licencia: construcción clean-room | No copiar código AGPL. OpenConstructionERP solo como referencia funcional | ✅ Aprobado |

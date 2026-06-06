@@ -1,5 +1,24 @@
 # Handoff Log
 
+## 2026-06-05 — 4D.2 CERRADA: smoke real de AIU editable
+
+### Estado
+- **Oleada 4D.2 CERRADA.** Smoke manual verificado por la usuaria en producción
+  (`construction-ops-psi.vercel.app`). `main = origin/main = e5eede1`.
+- Tag estable: **`wave-4d2-editable-aiu-production-v1`**.
+
+### Smoke productivo verificado (usuaria)
+- PRESUPUESTO BASE → V01: AIU editable; guardó **Administración 3.5 / Imprevistos 2.5 /
+  Utilidad 4 / IVA 19**; **persistió tras recargar**; modificó Administración, guardó y el total
+  cambió; restauró a 3.5; **Total general ≈ $372.247.170**. Cálculo y persistencia correctos.
+- AIU **por versión**, persistente y editable. Cálculo financiero validado.
+- Deudas vigentes: `AIU_PRESETS_BY_ORGANIZATION`, `AIU_IMPORT_PREFILL_FROM_EXCEL`.
+
+### Siguiente bloque
+- **Oleada 4E.1 — exportación protegida de presupuesto real a Excel y PDF** (desde los datos
+  persistidos, no del Excel original). Rama `integration/wave-4e1-budget-exports`. Reutilizar
+  `/api/exports` + exceljs/@react-pdf si es suficiente; detenerse y pedir aprobación si migración.
+
 ## 2026-06-05 — 4D.2: AIU editable + costos indirectos + total general (sin migración)
 
 ### Estado

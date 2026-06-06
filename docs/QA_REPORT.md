@@ -9,6 +9,17 @@ cada ciclo de validación.
 
 ---
 
+## 4D.2 — SMOKE PRODUCTIVO CERRADO (2026-06-05)
+
+Smoke manual verificado por la usuaria en `construction-ops-psi.vercel.app`:
+PRESUPUESTO BASE → V01 abre; AIU editable visible; guardó Administración 3.5 /
+Imprevistos 2.5 / Utilidad 4 / IVA 19; **porcentajes persistieron tras recargar**;
+edición temporal de Administración cambió el total; restauración a 3.5; **Total
+general ≈ $372.247.170**; cálculo y persistencia correctos. **Oleada 4D.2 CERRADA.**
+Tag `wave-4d2-editable-aiu-production-v1`.
+
+---
+
 ## 4D.2 — AIU editable + total general por versión (2026-06-05)
 
 > Rama `integration/wave-4d2-editable-aiu`. **Sin migración** (remoto **20/20** intacto).
