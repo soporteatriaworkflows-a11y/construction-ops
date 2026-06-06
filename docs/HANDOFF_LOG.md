@@ -1,5 +1,35 @@
 # Handoff Log
 
+## 2026-06-06 — 4E.1B: branding visual de exports (Excel + PDF)
+
+### Estado
+- **4E.1 CERRADA a nivel funcional** (smoke real de la usuaria: Excel/PDF abren,
+  3 hojas, 14 capítulos/132 ítems, directo 336.084.480, total 372.247.170).
+  Observación: faltaba branding ICONIC ⇒ origen de 4E.1B.
+- Rama `integration/wave-4e1b-export-branding` (desde `main` `490a5dc`).
+- **Sin migración, sin cambios estructurales ni financieros.** Solo lenguaje
+  visual de los generadores Excel/PDF.
+
+### Cambios
+- Fuente única `apps/web/server/estimates/export/branding.ts` (paleta ICONIC
+  HEX/ARGB + metadatos + `loadBrandLogo`). Logo **serverless-safe** vía base64
+  embebido (`logo-asset.ts`, `ICONIC_LOGO_BASE64`); sin asset ⇒ monograma `IC`.
+- PDF rediseñado: banda de marca fija (logo/monograma), línea dorada, ficha de
+  proyecto, secciones corporativas, filas alternas, **TOTAL GENERAL** resaltado,
+  footer con paginación. Excel: banda en RESUMEN, encabezados/títulos de marca,
+  subtotales/totales resaltados, paneles congelados, anchos razonables.
+- Ruta del PNG oficial documentada en `apps/web/public/branding/README.md`.
+- **Sin `fs` en runtime** (evita el aviso NFT de Turbopack) ⇒ build limpio.
+
+### Validación
+- typecheck 0, lint 0, **710 tests** (+7 branding), build fixture + db-local
+  PASS **sin warnings**, gm 22/22, gm:import PASS, validador 214/0/0,
+  `git diff --check` limpio. Remoto Supabase intacto (20/20).
+
+### Próximo paso
+- Preview → merge `--no-ff` → Production → smoke visual. **No iniciar 4E.2.**
+- Deuda: `ICONIC_LOGO_ASSET` (incorporar el PNG oficial en base64).
+
 ## 2026-06-05 — 4E.1: exportación protegida Excel + PDF del presupuesto real
 
 ### Estado

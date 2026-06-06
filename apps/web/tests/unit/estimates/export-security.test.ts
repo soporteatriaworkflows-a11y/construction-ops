@@ -68,7 +68,7 @@ describe('Export — Excel trazabilidad secundaria (fuente)', () => {
 
   it('source_code/source_row sólo se usan en la hoja TRAZABILIDAD', () => {
     // La trazabilidad (sourceCode/sourceRow) aparece tras declarar la hoja TRAZABILIDAD.
-    const trazaIdx = xlsxSrc.indexOf("addWorksheet('TRAZABILIDAD')");
+    const trazaIdx = xlsxSrc.indexOf("addWorksheet('TRAZABILIDAD'");
     const firstSourceIdx = xlsxSrc.search(/sourceCode|sourceRow/);
     expect(trazaIdx).toBeGreaterThan(0);
     expect(firstSourceIdx).toBeGreaterThan(trazaIdx);

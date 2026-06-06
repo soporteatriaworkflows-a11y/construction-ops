@@ -1,47 +1,116 @@
 /**
- * pdf.ts — Generador PDF del presupuesto real (4E.1). @react-pdf/renderer.
+ * pdf.ts — Generador PDF del presupuesto real con branding ICONIC (4E.1/4E.1B).
  *
- * Contrato: `docs/BUDGET_EXPORT_CONTRACT.md §4`. En memoria (Uint8Array), sin
- * temporales. No recalcula finanzas (usa el payload server-derived). NUNCA
- * incluye identificadores internos, filas de origen del Excel, variables,
- * secretos, trazabilidad histórica ni texto demo (ver contrato §4).
+ * @react-pdf/renderer, en memoria (Uint8Array), sin temporales. No recalcula
+ * finanzas (usa el payload server-derived). NUNCA incluye identificadores
+ * internos, filas de origen del Excel, variables, secretos, trazabilidad
+ * histórica ni texto demo (contrato §4). El branding (paleta + logo opcional)
+ * es puramente visual; no altera el contenido estructural.
  */
 import {
   Document,
   Page,
   Text,
   View,
+  Image,
   StyleSheet,
   renderToBuffer,
 } from '@react-pdf/renderer';
 import React from 'react';
 import Decimal from 'decimal.js';
 import type { EstimateExportPayload } from '@/lib/estimates/export-types';
+import { BRAND, BRAND_HEX, loadBrandLogo } from './branding';
 
 const styles = StyleSheet.create({
-  page: { fontFamily: 'Helvetica', fontSize: 8, paddingTop: 36, paddingBottom: 40, paddingHorizontal: 32, color: '#222222' },
-  header: { marginBottom: 12, borderBottom: '1 solid #2E5FA3', paddingBottom: 6 },
-  title: { fontSize: 15, fontFamily: 'Helvetica-Bold', color: '#2E5FA3', marginBottom: 3 },
-  subtitle: { fontSize: 9, color: '#555555', marginBottom: 1 },
-  section: { marginTop: 10, marginBottom: 4 },
-  sectionTitle: { fontSize: 10, fontFamily: 'Helvetica-Bold', backgroundColor: '#E8EEF8', padding: '3 5', marginBottom: 4, color: '#2E5FA3' },
-  chapterRow: { backgroundColor: '#EEF4EA', paddingVertical: 3, paddingHorizontal: 3, marginTop: 4, flexDirection: 'row' },
-  chapterName: { fontFamily: 'Helvetica-Bold', fontSize: 8 },
-  thead: { flexDirection: 'row', backgroundColor: '#2E5FA3', color: '#FFFFFF', paddingVertical: 3 },
-  row: { flexDirection: 'row', borderBottom: '0.3 solid #E5E5E5', paddingVertical: 2 },
+  page: {
+    fontFamily: 'Helvetica',
+    fontSize: 8,
+    paddingTop: 96,
+    paddingBottom: 44,
+    paddingHorizontal: 34,
+    color: BRAND_HEX.ink,
+  },
+  // ---- Encabezado de marca (banda azul noche, fixed en cada página) ----
+  brandBar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 76,
+    backgroundColor: BRAND_HEX.primary,
+    paddingHorizontal: 34,
+    paddingTop: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  accentLine: { position: 'absolute', top: 76, left: 0, right: 0, height: 3, backgroundColor: BRAND_HEX.accent },
+  logoImg: { width: 44, height: 44, objectFit: 'contain', marginRight: 12 },
+  monogram: {
+    width: 44, height: 44, marginRight: 12, borderRadius: 6,
+    border: `1.4 solid ${BRAND_HEX.accent}`, color: BRAND_HEX.white,
+    fontSize: 18, fontFamily: 'Helvetica-Bold', textAlign: 'center', paddingTop: 11,
+  },
+  brandName: { color: BRAND_HEX.white, fontSize: 16, fontFamily: 'Helvetica-Bold', letterSpacing: 1 },
+  brandTagline: { color: '#C9D4E0', fontSize: 8, marginTop: 1 },
+  docTag: { color: BRAND_HEX.accent, fontSize: 9, fontFamily: 'Helvetica-Bold', textAlign: 'right', letterSpacing: 0.5 },
+  docMeta: { color: '#C9D4E0', fontSize: 7.5, textAlign: 'right', marginTop: 2 },
+
+  // ---- Ficha del proyecto ----
+  metaCard: {
+    borderLeft: `3 solid ${BRAND_HEX.accent}`,
+    backgroundColor: BRAND_HEX.bandLight,
+    paddingVertical: 8, paddingHorizontal: 10, marginBottom: 10,
+  },
+  metaTitle: { fontSize: 12, fontFamily: 'Helvetica-Bold', color: BRAND_HEX.primary, marginBottom: 3 },
+  metaLine: { fontSize: 8.5, color: BRAND_HEX.ink, marginBottom: 1 },
+  metaLabel: { fontFamily: 'Helvetica-Bold', color: BRAND_HEX.primarySoft },
+
+  // ---- Secciones ----
+  section: { marginTop: 8, marginBottom: 4 },
+  sectionTitle: {
+    fontSize: 10, fontFamily: 'Helvetica-Bold', color: BRAND_HEX.white,
+    backgroundColor: BRAND_HEX.primary, padding: '4 7', marginBottom: 5, letterSpacing: 0.4,
+  },
+
+  // ---- Tabla de presupuesto ----
+  chapterRow: {
+    backgroundColor: BRAND_HEX.bandLight, paddingVertical: 3.5, paddingHorizontal: 3,
+    marginTop: 5, flexDirection: 'row', borderLeft: `2 solid ${BRAND_HEX.primarySoft}`,
+  },
+  chapterName: { fontFamily: 'Helvetica-Bold', fontSize: 8, color: BRAND_HEX.primary },
+  thead: { flexDirection: 'row', backgroundColor: BRAND_HEX.primarySoft, color: BRAND_HEX.white, paddingVertical: 3 },
+  row: { flexDirection: 'row', borderBottom: `0.3 solid ${BRAND_HEX.border}`, paddingVertical: 2 },
+  rowAlt: { backgroundColor: '#FAFBFD' },
   cCode: { width: 44, paddingHorizontal: 3 },
   cDesc: { flex: 1, paddingHorizontal: 3 },
   cUnit: { width: 34, paddingHorizontal: 3 },
   cQty: { width: 54, paddingHorizontal: 3, textAlign: 'right' },
   cUnit2: { width: 64, paddingHorizontal: 3, textAlign: 'right' },
-  cSub: { width: 72, paddingHorizontal: 3, textAlign: 'right' },
+  cSub: { width: 74, paddingHorizontal: 3, textAlign: 'right' },
   th: { fontFamily: 'Helvetica-Bold', fontSize: 7.5 },
-  finRow: { flexDirection: 'row', borderBottom: '0.4 solid #DDDDDD', paddingVertical: 3 },
-  finLabel: { flex: 1, paddingHorizontal: 4 },
-  finVal: { width: 110, paddingHorizontal: 4, textAlign: 'right' },
-  totRow: { flexDirection: 'row', borderTop: '1 solid #2E5FA3', backgroundColor: '#D9E1F2', paddingVertical: 4 },
+
+  // ---- Resumen financiero ----
+  finRow: { flexDirection: 'row', borderBottom: `0.4 solid ${BRAND_HEX.border}`, paddingVertical: 3.5, paddingHorizontal: 4 },
+  finLabel: { flex: 1 },
+  finPct: { width: 60, textAlign: 'right', color: BRAND_HEX.muted },
+  finVal: { width: 110, textAlign: 'right' },
+  subtotalRow: {
+    flexDirection: 'row', paddingVertical: 4, paddingHorizontal: 4,
+    backgroundColor: BRAND_HEX.bandLight, borderTop: `0.6 solid ${BRAND_HEX.border}`,
+  },
+  totRow: {
+    flexDirection: 'row', paddingVertical: 6, paddingHorizontal: 8, marginTop: 4,
+    backgroundColor: BRAND_HEX.primary, borderLeft: `4 solid ${BRAND_HEX.accent}`,
+  },
+  totLabel: { flex: 1, color: BRAND_HEX.white, fontFamily: 'Helvetica-Bold', fontSize: 11, letterSpacing: 0.5 },
+  totVal: { width: 130, textAlign: 'right', color: BRAND_HEX.white, fontFamily: 'Helvetica-Bold', fontSize: 12 },
   bold: { fontFamily: 'Helvetica-Bold' },
-  footer: { position: 'absolute', bottom: 18, left: 32, right: 32, fontSize: 7, color: '#888888', textAlign: 'center', borderTop: '0.5 solid #CCCCCC', paddingTop: 4 },
+
+  // ---- Footer ----
+  footer: {
+    position: 'absolute', bottom: 16, left: 34, right: 34, fontSize: 7, color: BRAND_HEX.muted,
+    borderTop: `0.5 solid ${BRAND_HEX.border}`, paddingTop: 4, flexDirection: 'row', justifyContent: 'space-between',
+  },
 });
 
 function cop(value: string): string {
@@ -65,6 +134,40 @@ const h = React.createElement;
 export async function generateEstimatePdf(payload: EstimateExportPayload): Promise<Uint8Array> {
   const fecha = new Date(payload.generatedAt).toLocaleDateString('es-CO');
   const f = payload.financial;
+  const logo = loadBrandLogo();
+
+  // Banda de marca (fixed en todas las páginas).
+  const brandBar = h(
+    View,
+    { style: styles.brandBar, fixed: true },
+    logo
+      ? h(Image, { style: styles.logoImg, src: logo.dataUri })
+      : h(Text, { style: styles.monogram }, BRAND.monogram),
+    h(
+      View,
+      { style: { flex: 1 } },
+      h(Text, { style: styles.brandName }, BRAND.name),
+      h(Text, { style: styles.brandTagline }, BRAND.tagline),
+    ),
+    h(
+      View,
+      { style: { flex: 1 } },
+      h(Text, { style: styles.docTag }, BRAND.documentTitle),
+      h(Text, { style: styles.docMeta }, `${payload.version.label} · ${payload.version.status}`),
+      h(Text, { style: styles.docMeta }, fecha),
+    ),
+  );
+  const accentLine = h(View, { style: styles.accentLine, fixed: true });
+
+  const metaCard = h(
+    View,
+    { style: styles.metaCard },
+    h(Text, { style: styles.metaTitle }, payload.estimate.name),
+    h(Text, { style: styles.metaLine }, h(Text, { style: styles.metaLabel }, 'Organización: '), payload.organizationName),
+    h(Text, { style: styles.metaLine }, h(Text, { style: styles.metaLabel }, 'Proyecto: '), `${payload.project.name}${payload.project.city ? ' · ' + payload.project.city : ''}`),
+    h(Text, { style: styles.metaLine }, h(Text, { style: styles.metaLabel }, 'Alcance: '), payload.scope.name ?? '—'),
+    h(Text, { style: styles.metaLine }, h(Text, { style: styles.metaLabel }, 'Capítulos / Ítems: '), `${payload.counts.chapters} / ${payload.counts.items}`),
+  );
 
   const itemHeader = h(
     View,
@@ -91,7 +194,7 @@ export async function generateEstimatePdf(payload: EstimateExportPayload): Promi
       ...ch.items.map((it, ii) =>
         h(
           View,
-          { key: `it-${ci}-${ii}`, style: styles.row },
+          { key: `it-${ci}-${ii}`, style: ii % 2 === 1 ? [styles.row, styles.rowAlt] : styles.row },
           h(Text, { style: styles.cCode }, it.code),
           h(Text, { style: styles.cDesc }, it.description),
           h(Text, { style: styles.cUnit }, it.unit),
@@ -107,26 +210,29 @@ export async function generateEstimatePdf(payload: EstimateExportPayload): Promi
     h(
       View,
       { style: styles.finRow, key: label },
-      h(Text, { style: styles.finLabel }, pctHuman ? `${label} (${pct(pctHuman)})` : label),
+      h(Text, { style: styles.finLabel }, label),
+      h(Text, { style: styles.finPct }, pctHuman ? pct(pctHuman) : ''),
       h(Text, { style: styles.finVal }, cop(value)),
+    );
+
+  const subtotalLine = (label: string, value: string) =>
+    h(
+      View,
+      { style: styles.subtotalRow, key: label },
+      h(Text, { style: [styles.finLabel, styles.bold] }, label),
+      h(Text, { style: styles.finPct }, ''),
+      h(Text, { style: [styles.finVal, styles.bold] }, cop(value)),
     );
 
   const doc = h(
     Document,
-    { title: `Presupuesto ${payload.estimate.name}`, author: 'Construction Ops' },
+    { title: `Presupuesto ${payload.estimate.name}`, author: BRAND.name, creator: 'Construction Ops', producer: 'Construction Ops' },
     h(
       Page,
       { size: 'A4', style: styles.page },
-      // Encabezado
-      h(
-        View,
-        { style: styles.header },
-        h(Text, { style: styles.title }, 'PRESUPUESTO DE OBRA'),
-        h(Text, { style: styles.subtitle }, `${payload.organizationName}`),
-        h(Text, { style: styles.subtitle }, `${payload.project.name}${payload.project.city ? ' · ' + payload.project.city : ''}`),
-        h(Text, { style: styles.subtitle }, `Alcance: ${payload.scope.name ?? '—'} · ${payload.estimate.name}`),
-        h(Text, { style: styles.subtitle }, `Versión ${payload.version.label} · Estado: ${payload.version.status} · Fecha: ${fecha}`),
-      ),
+      brandBar,
+      accentLine,
+      metaCard,
       // Capítulos + actividades
       h(
         View,
@@ -140,26 +246,30 @@ export async function generateEstimatePdf(payload: EstimateExportPayload): Promi
         View,
         { style: styles.section, wrap: false },
         h(Text, { style: styles.sectionTitle }, 'RESUMEN FINANCIERO'),
-        finLine('Costos directos', f.directTotal),
+        subtotalLine('Costos directos', f.directTotal),
         finLine('Administración', f.administrationAmount, payload.aiu.administrationRate),
         finLine('Imprevistos', f.contingencyAmount, payload.aiu.contingencyRate),
         finLine('Utilidad', f.utilityAmount, payload.aiu.utilityRate),
         finLine('IVA sobre utilidad', f.utilityVatAmount, payload.aiu.utilityVatRate),
-        finLine('Costos indirectos', f.indirectTotal),
+        subtotalLine('Costos indirectos (AIU)', f.indirectTotal),
         h(
           View,
           { style: styles.totRow },
-          h(Text, { style: [styles.finLabel, styles.bold] }, 'TOTAL GENERAL'),
-          h(Text, { style: [styles.finVal, styles.bold] }, cop(f.grandTotal)),
+          h(Text, { style: styles.totLabel }, 'TOTAL GENERAL'),
+          h(Text, { style: styles.totVal }, cop(f.grandTotal)),
         ),
       ),
       // Footer con paginación
-      h(Text, {
-        style: styles.footer,
-        fixed: true,
-        render: ({ pageNumber, totalPages }: { pageNumber: number; totalPages: number }) =>
-          `Página ${pageNumber} de ${totalPages} · Generado: ${fecha} · Construction Ops`,
-      }),
+      h(
+        View,
+        { style: styles.footer, fixed: true },
+        h(Text, null, `${BRAND.name} · ${BRAND.tagline}`),
+        h(Text, {
+          render: ({ pageNumber, totalPages }: { pageNumber: number; totalPages: number }) =>
+            `Página ${pageNumber} de ${totalPages}`,
+        }),
+        h(Text, null, `Generado: ${fecha}`),
+      ),
     ),
   );
 

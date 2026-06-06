@@ -2,6 +2,7 @@
 
 | Fecha | Decisión | Razón | Estado |
 |---|---|---|---|
+| 2026-06-06 | 4E.1B: branding visual de exports con **fuente única `branding.ts`** (paleta ICONIC HEX/ARGB) y logo **embebido en base64** (`logo-asset.ts`), NO por `fs`/`outputFileTracingIncludes`. Sin asset ⇒ monograma `IC`. | El logo por `fs` desde `public/` dispara el aviso NFT de Turbopack y no es fiable en serverless; el base64 bundled es serverless-safe y mantiene el build limpio. Branding es solo visual: no toca contenido ni finanzas. | ✅ Aprobado |
 | 2026-06-05 | 4E.1: export protegido del presupuesto real se construye como **camino nuevo sobre `EstimatesWriteRepository`** (método `getEstimateExportPayload` + servicio `server/estimates/export`), **sin migración**, reutilizando `exceljs`/`@react-pdf/renderer` ya aprobadas. El módulo legacy `modules/exports` (Oleada 3, read-model demo) se deja intacto. | El export debe reflejar el presupuesto persistido (ENTRE PATIOS→V01) y reutilizar el resumen financiero 4D.2; el módulo legacy está atado al read-model demo y a `DEMO_ORGANIZATION_ID`. Sin duplicar lógica financiera. | ✅ Aprobado |
 | 2026-06-05 | 4D.2 CERRADA: AIU editable por versión validado en producción (smoke usuaria, total ≈ $372.247.170). Tag `wave-4d2-editable-aiu-production-v1`. Inicia 4E.1 exportación protegida Excel+PDF en `integration/wave-4e1-budget-exports` | AIU persistente/editable confirmado; siguiente bloque entrega documentos del presupuesto real | ✅ Aprobado |
 | 2026-05-29 | ORM: Drizzle ORM | Mejor DX con TypeScript, migraciones SQL directas, sin magia | ✅ Aprobado |
