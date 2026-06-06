@@ -40,6 +40,11 @@ import type {
 } from '@/lib/estimates/review-types';
 import type { AiuRatesInput, AiuRatesView, FinancialSummary } from '@/lib/estimates/aiu-types';
 import { AIU_KINDS } from '@/lib/estimates/aiu-types';
+import type {
+  EstimateExportChapter,
+  EstimateExportPayload,
+} from '@/lib/estimates/export-types';
+import { versionLabel } from './export/version-label';
 import {
   computeFinancialSummary,
   fractionToHuman,
@@ -436,5 +441,97 @@ export class DbEstimatesWriteRepository implements EstimatesWriteRepository {
     const supabase = await this.clientFactory();
     const { fractions } = await this.readAiuFractions(supabase, active.id);
     return computeFinancialSummary(active.directTotal, fractions);
+  }
+
+  async getEstimateExportPayload(
+    viewer: ViewerContext,
+    estimateId: Uuid,
+  ): Promise<EstimateExportPayload> {
+    const supabase = await this.clientFactory();
+
+    // Lectura extendida (RLS-bound) con organización + ciudad (location).
+    const { data, error } = await supabase
+      .from('estimates')
+      .select(
+        'id, code, name, status, project_scope_id, ' +
+          'project_scopes(id, name, projects(id, name, location, organizations(name)))',
+      )
+      .eq('id', estimateId)
+      .maybeSingle();
+    if (error) throw new Error(`estimate_export_read_failed: ${error.code ?? 'unknown'}`);
+    if (!data) throw new EstimateNotFoundError(estimateId);
+
+    const r = data as unknown as {
+      id: string; code: string; name: string; status: string; project_scope_id: string;
+      project_scopes: {
+        id: string; name: string | null;
+        projects: {
+          id: string; name: string | null; location: string | null;
+          organizations: { name: string | null } | null;
+        } | null;
+      } | null;
+    };
+
+    const active = await this.getEstimateActiveVersion(viewer, estimateId);
+    if (!active) throw new EstimateNotFoundError(estimateId);
+
+    // Capítulos + ítems (ordenados) + AIU + resumen financiero.
+    const reviewChapters = await this.listChaptersByEstimateVersion(viewer, estimateId);
+    const chapters: EstimateExportChapter[] = [];
+    let itemCount = 0;
+    for (const ch of reviewChapters) {
+      const items = await this.listItemsByChapter(viewer, ch.id);
+      itemCount += items.length;
+      chapters.push({
+        code: ch.code,
+        name: ch.name,
+        sortOrder: ch.sortOrder,
+        subtotal: ch.subtotal,
+        sourceCode: ch.sourceCode,
+        sourceRow: ch.sourceRow,
+        items: items.map((it) => ({
+          code: it.code,
+          description: it.description,
+          unit: it.unit,
+          quantity: it.quantity,
+          unitPrice: it.unitPrice,
+          subtotal: it.subtotal,
+          sourceCode: it.sourceCode,
+          sourceRow: it.sourceRow,
+        })),
+      });
+    }
+
+    const [aiu, financial] = await Promise.all([
+      this.getEstimateVersionAiu(viewer, estimateId),
+      this.calculateEstimateFinancialSummary(viewer, estimateId),
+    ]);
+
+    const scope = r.project_scopes;
+    const project = scope?.projects;
+    return {
+      organizationName: project?.organizations?.name ?? '—',
+      project: { id: project?.id ?? '', name: project?.name ?? '—', city: project?.location ?? null },
+      scope: { id: scope?.id ?? r.project_scope_id, name: scope?.name ?? null },
+      estimate: {
+        id: r.id, code: r.code, name: r.name,
+        status: r.status as EstimateExportPayload['estimate']['status'],
+      },
+      version: {
+        number: active.versionNumber,
+        label: versionLabel(active.versionNumber),
+        status: active.status as EstimateExportPayload['version']['status'],
+      },
+      generatedAt: new Date().toISOString(),
+      counts: { chapters: reviewChapters.length, items: itemCount },
+      chapters,
+      aiu: {
+        administrationRate: aiu.administrationRate,
+        contingencyRate: aiu.contingencyRate,
+        utilityRate: aiu.utilityRate,
+        utilityVatRate: aiu.utilityVatRate,
+      },
+      financial,
+    };
   }
 }

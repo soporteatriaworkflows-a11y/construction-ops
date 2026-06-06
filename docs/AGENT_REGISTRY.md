@@ -81,6 +81,12 @@ Los archivos `.md` de cada agente viven en `.claude/agents/`.
 - `apps/web/app/api/exports/`
 - `apps/web/tests/unit/exports/`
 - `scripts/export-fixtures/`
+- (4E.1, orquestación) export del presupuesto real:
+  `apps/web/server/estimates/export/`, `apps/web/app/api/estimates/export/`,
+  `apps/web/lib/estimates/export-types.ts`,
+  `apps/web/app/(dashboard)/projects/[id]/scopes/[scopeId]/estimates/[estimateId]/export-buttons.tsx`.
+  Camino independiente del módulo legacy (Oleada 3); consume `EstimatesWriteRepository`
+  (`getEstimateExportPayload`, agent-db-rls) y el resumen financiero 4D.2.
 
 ### agent-qa
 - `apps/web/tests/regression/`

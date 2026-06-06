@@ -134,6 +134,18 @@ export interface EstimatesWriteRepository {
     viewer: ViewerContext,
     estimateId: Uuid,
   ): Promise<import('@/lib/estimates/aiu-types').FinancialSummary>;
+
+  /* --- Exportación protegida (Oleada 4E.1) --- */
+  /**
+   * Payload completo, server-derived, para generar Excel/PDF del presupuesto
+   * real (versión activa): organización, proyecto/ciudad, alcance, presupuesto,
+   * capítulos+ítems ordenados, AIU persistido y resumen financiero. RLS ⇒
+   * cross-org/inexistente `EstimateNotFoundError`. No lee el Excel original.
+   */
+  getEstimateExportPayload(
+    viewer: ViewerContext,
+    estimateId: Uuid,
+  ): Promise<import('@/lib/estimates/export-types').EstimateExportPayload>;
 }
 
 export type { AuthenticatedViewer } from '@/server/auth/types';

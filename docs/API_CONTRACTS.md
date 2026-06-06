@@ -702,6 +702,25 @@ utilidad, `grandTotal = directTotal + indirectTotal`. AIU **por versión**, NO g
 **Sin migración** (reutiliza `indirect_cost_rules`). Tipos client-safe en
 `@/lib/estimates/aiu-types`.
 
+## Exportación protegida del presupuesto (Oleada 4E.1) — ver `docs/BUDGET_EXPORT_CONTRACT.md`
+
+`EstimatesWriteRepository.getEstimateExportPayload(viewer, estimateId)` ⇒
+`EstimateExportPayload` (organización, proyecto/ciudad, alcance, presupuesto, versión
+activa, capítulos+ítems ordenados, AIU humano y resumen financiero de 4D.2). RLS ⇒
+cross-org/inexistente `EstimateNotFoundError`. **No lee el Excel original.**
+
+Servicio `@/server/estimates/export`: `generateEstimateExcelExport(viewer, estimateId)`
+(Excel `RESUMEN`/`PRESUPUESTO`/`TRAZABILIDAD`, ExcelJS) y `generateEstimatePdfExport(viewer,
+estimateId)` (PDF sobrio sin UUID/source_row, @react-pdf/renderer) ⇒ `EstimateExportResult`
+`{ buffer, fileName, contentType, sizeBytes, generatedAt }`, en memoria, filename sanitizado.
+
+Endpoint: `GET /api/estimates/export?format=xlsx|pdf&estimateId&projectId&scopeId`
+(`runtime=nodejs`, `force-dynamic`). Viewer requerido (sin sesión ⇒ 401); cadena
+proyecto/alcance/presupuesto validada; cross-org ⇒ 404; 413 si excede tamaño; 500 interno.
+**Sin migración**, **sin service-role**, **sin fallback** db→fixture. No recalcula finanzas
+(reutiliza `calculateEstimateFinancialSummary`). Tipos client-safe en
+`@/lib/estimates/export-types`.
+
 ## Escritura de presupuestos (Oleada 4B.3) — ver `docs/ESTIMATES_CRUD_CONTRACT.md`
 
 `EstimatesWriteRepository` (`apps/web/server/estimates/`):

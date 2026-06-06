@@ -9,6 +9,20 @@ cada ciclo de validación.
 
 ---
 
+## 4E.1 — Exportación protegida Excel + PDF (2026-06-05, pre-merge)
+
+Validación de integración del orquestador en `integration/wave-4e1-budget-exports`:
+typecheck 0, lint 0, **703 tests** (+16 de export: payload fixture + cross-org
+NotFound, Excel parseado con 3 hojas RESUMEN/PRESUPUESTO/TRAZABILIDAD + total general
++ códigos canónicos, PDF `%PDF` en memoria, filename sanitizado/anti path-traversal,
+guards de ruta force-dynamic/nodejs/401/404, privacidad estructural del PDF sin
+UUID/source_row/secretos, trazabilidad sólo en hoja secundaria del Excel). Build
+fixture + build db-local PASS (`/api/estimates/export` presente). gm:regression 22/22,
+gm:import PASS, validador 214/0/0, `git diff --check` limpio. **Sin migración**;
+remoto Supabase intacto (20/20). No se generaron exports remotos desde terminal.
+
+---
+
 ## 4D.2 — SMOKE PRODUCTIVO CERRADO (2026-06-05)
 
 Smoke manual verificado por la usuaria en `construction-ops-psi.vercel.app`:
