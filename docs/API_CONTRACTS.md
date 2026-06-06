@@ -690,6 +690,18 @@ operativo reusa `getEstimateById`. Exponen `source_code`/`source_row` (trazabili
 Tipos client-safe en `@/lib/estimates/review-types`. **Sin migración**; solo lectura;
 sin service-role; sin fallback silencioso db→fixture.
 
+## AIU editable + total general (Oleada 4D.2) — ver `docs/AIU_CRUD_CONTRACT.md`
+
+`EstimatesWriteRepository`: `getEstimateVersionAiu(viewer, estimateId)` (porcentajes
+humanos de la versión activa + `isEmpty`/`editable`), `updateEstimateVersionAiu(viewer,
+estimateId, input)` (solo 4 % del navegador; **upsert atómico** de `indirect_cost_rules`
+`A/I/U/IVA` por versión; solo `db`; fixture ⇒ `AiuWriteNotSupportedError`),
+`calculateEstimateFinancialSummary(viewer, estimateId)`. `directTotal` = Σ subtotales BOQ
+server-side; montos por `aiu-calc.ts` (Decimal): A/I/U sobre directTotal, IVA sobre
+utilidad, `grandTotal = directTotal + indirectTotal`. AIU **por versión**, NO global.
+**Sin migración** (reutiliza `indirect_cost_rules`). Tipos client-safe en
+`@/lib/estimates/aiu-types`.
+
 ## Escritura de presupuestos (Oleada 4B.3) — ver `docs/ESTIMATES_CRUD_CONTRACT.md`
 
 `EstimatesWriteRepository` (`apps/web/server/estimates/`):

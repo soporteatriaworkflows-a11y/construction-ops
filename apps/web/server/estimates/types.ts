@@ -114,6 +114,26 @@ export interface EstimatesWriteRepository {
     viewer: ViewerContext,
     chapterId: Uuid,
   ): Promise<import('@/lib/estimates/review-types').BoqItemReviewView[]>;
+
+  /* --- AIU editable (Oleada 4D.2) --- */
+  /** Porcentajes AIU (formato humano) de la versión activa + flags. */
+  getEstimateVersionAiu(
+    viewer: ViewerContext,
+    estimateId: Uuid,
+  ): Promise<import('@/lib/estimates/aiu-types').AiuRatesView>;
+
+  /** Guarda (upsert atómico) los 4 porcentajes AIU de la versión activa. */
+  updateEstimateVersionAiu(
+    viewer: AuthenticatedViewer,
+    estimateId: Uuid,
+    input: import('@/lib/estimates/aiu-types').AiuRatesInput,
+  ): Promise<import('@/lib/estimates/aiu-types').FinancialSummary>;
+
+  /** Resumen financiero (directo + AIU + total general) recalculado server-side. */
+  calculateEstimateFinancialSummary(
+    viewer: ViewerContext,
+    estimateId: Uuid,
+  ): Promise<import('@/lib/estimates/aiu-types').FinancialSummary>;
 }
 
 export type { AuthenticatedViewer } from '@/server/auth/types';

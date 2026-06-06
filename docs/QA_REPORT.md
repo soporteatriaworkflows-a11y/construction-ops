@@ -9,6 +9,24 @@ cada ciclo de validación.
 
 ---
 
+## 4D.2 — AIU editable + total general por versión (2026-06-05)
+
+> Rama `integration/wave-4d2-editable-aiu`. **Sin migración** (remoto **20/20** intacto).
+
+- **Modelo reutilizado**: `indirect_cost_rules` (porcentajes por versión, RLS completa).
+- **Cálculo** (Decimal, sin float): humano 3.5→fracción 0.035; A/I/U sobre directTotal, IVA sobre
+  utilidad; verificado contra el golden master (admin 11.762.956,79… / total 372.247.169,97… ±0.01).
+- **RLS runtime 93/93** (+4 AIU): A inserta/actualiza en su versión draft; cross-org bloqueado
+  (WITH CHECK); **versión emitida (approved) ⇒ AIU read-only**.
+- **Tests** 687 (+21): aiu-calc (conversión, rangos, fórmulas golden master, IVA sobre utilidad,
+  sin AIU ⇒ total=directo) + repo fixture (vacío/no editable, write no soportada) + route-config
+  (solo 4 % del navegador; "AIU ajustable por versión"; Guardar; read-only).
+- **Seguridad**: navegador solo envía 4 %; viewer/directTotal/montos server-side; upsert atómico;
+  sin service-role; sin fallback fixture. **Sin cambios remotos**.
+- **Builds**: fixture + db local PASS. typecheck/lint 0, gm 22/22, gm:import, validador 214/0/0.
+
+---
+
 ## CIERRE 4D.1 — smoke real de revisión operativa (2026-06-05)
 
 > Verificación MANUAL de la usuaria en `https://construction-ops-psi.vercel.app`.

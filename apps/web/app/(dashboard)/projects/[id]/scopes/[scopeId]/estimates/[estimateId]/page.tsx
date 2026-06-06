@@ -39,8 +39,10 @@ import { formatCOP, formatDateTime } from '@/lib/utils/format';
 import { resolveViewer } from '@/server/auth/resolve-viewer';
 import { getEstimatesWriteRepository, EstimateNotFoundError } from '@/server/estimates';
 import type { ChapterReviewItem } from '@/lib/estimates/review-types';
+import type { AiuRatesView, FinancialSummary } from '@/lib/estimates/aiu-types';
 import { isCreationModeEnabled } from '../../../../../mode-guard';
 import { formatVersionLabel } from '../../estimate-format';
+import { AiuForm } from './aiu-form';
 
 interface PageProps {
   params: Promise<{ id: string; scopeId: string; estimateId: string }>;
@@ -92,6 +94,22 @@ export default async function EstimateDetailPage({ params, searchParams }: PageP
   }
   const chapterHref = (chapterId: string) =>
     `${scopeHref}/estimates/${estimateId}/chapters/${chapterId}`;
+
+  // AIU + resumen financiero (4D.2). Solo si hay una versión activa.
+  let aiu: AiuRatesView | null = null;
+  let financialSummary: FinancialSummary | null = null;
+  if (active) {
+    try {
+      const repo = getEstimatesWriteRepository();
+      [aiu, financialSummary] = await Promise.all([
+        repo.getEstimateVersionAiu(viewer, estimateId),
+        repo.calculateEstimateFinancialSummary(viewer, estimateId),
+      ]);
+    } catch {
+      aiu = null;
+      financialSummary = null;
+    }
+  }
 
   return (
     <div>
@@ -305,6 +323,24 @@ export default async function EstimateDetailPage({ params, searchParams }: PageP
               </table>
             </div>
           )}
+        </section>
+      )}
+
+      {/* ------------------------------------------------------------------ */}
+      {/* AIU y costos indirectos (4D.2)                                      */}
+      {/* ------------------------------------------------------------------ */}
+      {hasContent && aiu && financialSummary && (
+        <section aria-label="AIU y costos indirectos" className="mt-8">
+          <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-600">
+            <DollarSign className="h-4 w-4 text-gray-400" aria-hidden="true" />
+            AIU y costos indirectos
+          </h2>
+          <AiuForm
+            estimateId={estimateId}
+            aiu={aiu}
+            directTotal={financialSummary.directTotal}
+            serverSummary={financialSummary}
+          />
         </section>
       )}
 

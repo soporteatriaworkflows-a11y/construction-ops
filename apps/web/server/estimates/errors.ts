@@ -28,6 +28,44 @@ export class EstimateValidationError extends Error {
   }
 }
 
+/** Campo y motivo de una violación de validación de porcentajes AIU. */
+export interface AiuValidationIssue {
+  field: 'administrationRate' | 'contingencyRate' | 'utilityRate' | 'utilityVatRate';
+  message: string;
+}
+
+/** Porcentajes AIU inválidos (rango/negativo/no numérico). */
+export class AiuValidationError extends Error {
+  readonly code = 'aiu_validation' as const;
+  readonly issues: AiuValidationIssue[];
+  constructor(issues: AiuValidationIssue[], message?: string) {
+    super(message ?? `aiu_validation: ${issues.map((i) => i.field).join(', ')}`);
+    this.name = 'AiuValidationError';
+    this.issues = issues;
+  }
+}
+
+/** La edición de AIU no aplica en el modo actual (fixture, solo lectura). */
+export class AiuWriteNotSupportedError extends Error {
+  readonly code = 'aiu_write_not_supported' as const;
+  constructor(message?: string) {
+    super(
+      message ??
+        'aiu_write_not_supported: la edición de AIU requiere READ_MODEL_SOURCE=db (el modo demostración es de solo lectura).',
+    );
+    this.name = 'AiuWriteNotSupportedError';
+  }
+}
+
+/** La versión del presupuesto no admite edición de AIU (emitida/bloqueada). */
+export class AiuVersionLockedError extends Error {
+  readonly code = 'aiu_version_locked' as const;
+  constructor(message?: string) {
+    super(message ?? 'La versión del presupuesto no admite cambios de AIU.');
+    this.name = 'AiuVersionLockedError';
+  }
+}
+
 /** Capítulo inexistente o no visible para la organización del viewer. */
 export class ChapterNotFoundError extends Error {
   readonly code = 'chapter_not_found' as const;

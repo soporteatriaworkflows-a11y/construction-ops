@@ -1,5 +1,45 @@
 # Handoff Log
 
+## 2026-06-05 — 4D.2: AIU editable + costos indirectos + total general (sin migración)
+
+### Estado
+- Rama `integration/wave-4d2-editable-aiu` desde `main`@`99a5a8e`. **Sin migración** (reutiliza
+  `indirect_cost_rules`). Remoto intacto **20/20**.
+
+### Diagnóstico de esquema
+- `indirect_cost_rules` (mig. `20260530090700`) ya soporta porcentajes **por versión**:
+  `estimate_version_id`, `code` (único por versión), `name`, `percentage` numeric(20,10) (≥0),
+  `base_type` (CHECK direct_cost/utility/custom), `sort_order`, `visible_to_client`. RLS completa
+  (select/insert/update/delete; write requiere `NOT estimate_version_locked`). El seed demo usa
+  códigos `A/I/U/IVA`. **Esquema suficiente** ⇒ NO migración.
+
+### Implementación (decisión: AIU por versión, NO global/hardcodeado)
+- Cálculo puro `aiu-calc.ts` (Decimal): `validateAiuRates` (humano `3.5`→fracción `0.035`, rango
+  [0,100], no negativos/excesivos), `computeFinancialSummary` (fórmulas: A/I/U sobre directTotal,
+  IVA sobre utilidad, indirectTotal, grandTotal).
+- Repo (db RLS-bound + fixture): `getEstimateVersionAiu` (rates humanos + isEmpty/editable),
+  `updateEstimateVersionAiu` (**upsert atómico** de las 4 filas `A/I/U/IVA` vía PostgREST onConflict;
+  solo `db`; fixture ⇒ `AiuWriteNotSupportedError`), `calculateEstimateFinancialSummary`. `directTotal`
+  = Σ subtotales BOQ (server-side). Tipos client-safe en `@/lib/estimates/aiu-types`.
+- UI: sección **"AIU y costos indirectos"** en el detalle (cuando V01 tiene datos) con indicador
+  "AIU ajustable por versión": formulario (4 % humanos), **preview client-side** + cálculo
+  **definitivo server-side** al Guardar, resumen (directo/A/I/U/IVA/indirectos/**total general**),
+  banner de éxito, errores sanitizados. **No** precarga `3.5/2.5/4/19`; versión emitida ⇒ read-only.
+
+### Validación
+- typecheck/lint 0, **687 tests** (+21: aiu-calc con valores del golden master, repo fixture,
+  route-config), build fixture + db local PASS, gm 22/22, gm:import, validador 214/0/0,
+  **RLS runtime 93/93** (+4 AIU: insert/update draft, cross-org bloqueado, versión emitida read-only).
+
+### Deudas registradas
+- `AIU_PRESETS_BY_ORGANIZATION` (plantillas sugeridas por empresa/tipo de obra; nunca defaults
+  globales automáticos). `AIU_IMPORT_PREFILL_FROM_EXCEL` (Preview Excel podrá sugerir AIU detectado;
+  la usuaria confirma; nunca defaults globales).
+
+### Pendiente
+- Preview + merge `--no-ff` + Production. Acción manual final: en PRESUPUESTO BASE → V01 escribir
+  Administración 3.5 / Imprevistos 2.5 / Utilidad 4 / IVA 19, **Guardar** y verificar el total general.
+
 ## 2026-06-05 — 4D.1 CERRADA: smoke real de revisión operativa
 
 ### Estado

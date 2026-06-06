@@ -464,6 +464,20 @@ por `rowType:sourceRow`; `lib/import/types.ts` (NumberingMapping/MappingOverride
 **NO** confiar en capítulos/ítems/totales del navegador (solo intención de mapping); reconstrucción
 server-side; nada se renumera en silencio.
 
+### Ownership congelado — Oleada 4D.1/4D.2 (revisión operativa + AIU editable)
+
+Contratos: `EXCEL_IMPORT_CONTRACT` (4D.1 sin contrato propio) + `docs/AIU_CRUD_CONTRACT.md`
+(4D.2). **Sin migración** (reutilizan esquema existente).
+
+**agent-db-rls (4D.1/4D.2)** — métodos de lectura/escritura RLS-bound en
+`apps/web/server/estimates/` (`listChaptersByEstimateVersion`/`getChapterById`/
+`listItemsByChapter`; `getEstimateVersionAiu`/`updateEstimateVersionAiu`/
+`calculateEstimateFinancialSummary`) + `aiu-calc.ts`. RLS runtime +6 (review 0 / AIU 4 /
+trazabilidad 2). NO migración (reutiliza `indirect_cost_rules`).
+**agent-frontend-boq (4D.1/4D.2)** — UI tabla de capítulos + ruta `chapters/[chapterId]`;
+sección AIU (`aiu-form.tsx`, `aiu-actions.ts`). Tipos client-safe en `@/lib/estimates/`.
+**No** confiar en montos/totales del navegador (solo 4 % en AIU); cálculo server-side.
+
 ### agent-qa (Oleada 4)
 - `docs/QA_REPORT.md` con resultado completo.
 - Sin FAIL bloqueante para release.

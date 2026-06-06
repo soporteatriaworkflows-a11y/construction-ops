@@ -59,7 +59,16 @@ export {
   EstimateValidationError,
   EstimateWriteNotSupportedError,
   EstimateCodeGenerationError,
+  AiuValidationError,
+  AiuWriteNotSupportedError,
+  AiuVersionLockedError,
 } from './errors';
+export {
+  validateAiuRates,
+  computeFinancialSummary,
+  humanToFraction,
+  fractionToHuman,
+} from './aiu-calc';
 export type { EstimateValidationIssue } from './errors';
 export {
   validateCreateEstimateInput,
