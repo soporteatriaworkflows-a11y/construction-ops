@@ -971,6 +971,83 @@ async function main(): Promise<void> {
   }
   check('import: rol anon NO puede ejecutar la RPC de import (grants)', impAnonDenied);
 
+  // ===========================================================================
+  // 16) AIU 4D.2 — indirect_cost_rules editable por versión (RLS).
+  // ===========================================================================
+  console.log('\n--- AIU 4D.2: indirect_cost_rules por versión (RLS) ---');
+  const aiuObjs = (vid: string) => [
+    { estimate_version_id: vid, code: 'A', name: 'Administración', percentage: '0.035', base_type: 'direct_cost', sort_order: 0, visible_to_client: true },
+    { estimate_version_id: vid, code: 'I', name: 'Imprevistos', percentage: '0.025', base_type: 'direct_cost', sort_order: 1, visible_to_client: true },
+  ];
+
+  // 16a) A inserta/actualiza AIU en SU versión draft (editable).
+  const aiuOk = await asUser(realA, async (q) => {
+    const [{ id: estId }] = await q<{ id: string }[]>`
+      SELECT id FROM public.create_estimate_with_initial_version(${SCOPE_A}, 'AIU', 'Aiu', NULL)`;
+    const [{ vid }] = await q<{ vid: string }[]>`
+      SELECT id AS vid FROM estimate_versions WHERE estimate_id = ${estId} ORDER BY version_number DESC LIMIT 1`;
+    await q`INSERT INTO indirect_cost_rules ${q(aiuObjs(vid))}`;
+    const [{ n }] = await q<{ n: number }[]>`SELECT count(*)::int AS n FROM indirect_cost_rules WHERE estimate_version_id = ${vid}`;
+    // UPDATE del porcentaje (versión draft permite UPDATE).
+    const upd = await q`UPDATE indirect_cost_rules SET percentage = '0.04' WHERE estimate_version_id = ${vid} AND code = 'A'`;
+    return { n, upd: upd.count };
+  });
+  check('aiu: A puede insertar AIU en su versión draft', aiuOk.n === 2, `n=${aiuOk.n}`);
+  check('aiu: A puede actualizar el porcentaje (draft editable)', aiuOk.upd === 1, `upd=${aiuOk.upd}`);
+
+  // 16b) Cross-org: A NO puede insertar AIU en una versión de B (WITH CHECK).
+  let aiuCrossBlocked = false;
+  try {
+    await asUser(
+      realA,
+      async (q) => {
+        await q`INSERT INTO indirect_cost_rules ${q(aiuObjs('00000000-0000-0000-0000-0000000000e2'))}`;
+      },
+      async (q) => {
+        await q`INSERT INTO project_scopes (id, project_id, code, name, scope_type)
+                VALUES (${SCOPE_B}, ${PROJECT_B}, 'SB', 'Scope B', 'floor') ON CONFLICT (id) DO NOTHING`;
+        await q`INSERT INTO estimates (id, project_scope_id, code, name, status)
+                VALUES ('00000000-0000-0000-0000-0000000000e1', ${SCOPE_B}, 'EB', 'Est B', 'active') ON CONFLICT (id) DO NOTHING`;
+        await q`INSERT INTO estimate_versions (id, estimate_id, version_number, status)
+                VALUES ('00000000-0000-0000-0000-0000000000e2', '00000000-0000-0000-0000-0000000000e1', 1, 'draft') ON CONFLICT (id) DO NOTHING`;
+      },
+    );
+  } catch {
+    aiuCrossBlocked = true;
+  }
+  check('aiu: A no puede insertar AIU en versión de B (WITH CHECK)', aiuCrossBlocked);
+
+  // 16c) Versión EMITIDA (approved) ⇒ AIU read-only (INSERT/UPDATE bloqueados).
+  let aiuLockedBlocked = false;
+  await asUser(
+    realA,
+    async (q) => {
+      let blocked = false;
+      await q.unsafe('SAVEPOINT sp_aiu');
+      try {
+        await q`INSERT INTO indirect_cost_rules
+                  (estimate_version_id, code, name, percentage, base_type, sort_order, visible_to_client)
+                VALUES ('00000000-0000-0000-0000-0000000000e3', 'A', 'Admin', '0.03', 'direct_cost', 0, true)`;
+      } catch {
+        blocked = true;
+        await q.unsafe('ROLLBACK TO SAVEPOINT sp_aiu');
+      }
+      aiuLockedBlocked = blocked;
+    },
+    async (q) => {
+      // Versión de A en estado approved (emitida).
+      const [{ id: estId }] = await q<{ id: string }[]>`
+        INSERT INTO estimates (id, project_scope_id, code, name, status)
+        VALUES ('00000000-0000-0000-0000-0000000000e4', ${SCOPE_A}, 'EMIT', 'Emit', 'active')
+        ON CONFLICT (id) DO NOTHING RETURNING id`;
+      void estId;
+      await q`INSERT INTO estimate_versions (id, estimate_id, version_number, status)
+              VALUES ('00000000-0000-0000-0000-0000000000e3', '00000000-0000-0000-0000-0000000000e4', 1, 'approved')
+              ON CONFLICT (id) DO NOTHING`;
+    },
+  );
+  check('aiu: versión emitida (approved) ⇒ INSERT de AIU bloqueado (read-only)', aiuLockedBlocked);
+
   // --- Resumen ---
   console.log(`\nRESULTADO RLS RUNTIME: ${pass} PASS / ${fail} FAIL`);
   if (fail > 0) {

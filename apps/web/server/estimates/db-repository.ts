@@ -27,6 +27,7 @@ import type {
   ViewerContext,
 } from './types';
 import {
+  AiuVersionLockedError,
   ChapterNotFoundError,
   EstimateCodeGenerationError,
   EstimateNotFoundError,
@@ -37,6 +38,24 @@ import type {
   ChapterDetailView,
   ChapterReviewItem,
 } from '@/lib/estimates/review-types';
+import type { AiuRatesInput, AiuRatesView, FinancialSummary } from '@/lib/estimates/aiu-types';
+import { AIU_KINDS } from '@/lib/estimates/aiu-types';
+import {
+  computeFinancialSummary,
+  fractionToHuman,
+  validateAiuRates,
+  type AiuFractions,
+} from './aiu-calc';
+
+/** Mapa code (indirect_cost_rules) → llave de fracción AIU. */
+const CODE_TO_FRACTION: Record<string, keyof AiuFractions> = {
+  A: 'administration',
+  I: 'contingency',
+  U: 'utility',
+  IVA: 'utilityVat',
+};
+
+const LOCKED_STATUSES = ['approved', 'issued', 'archived'];
 import {
   buildEstimateCodeCandidate,
   CODE_MAX_ATTEMPTS,
@@ -339,5 +358,83 @@ export class DbEstimatesWriteRepository implements EstimatesWriteRepository {
         sortOrder: r.sort_order, sourceCode: r.source_code ?? null, sourceRow: r.source_row ?? null,
       };
     });
+  }
+
+  /** Lee las fracciones AIU (por code) de una versión; ceros si no hay reglas. */
+  private async readAiuFractions(supabase: SupabaseClient, versionId: string): Promise<{ fractions: AiuFractions; isEmpty: boolean }> {
+    const { data, error } = await supabase
+      .from('indirect_cost_rules')
+      .select('code, percentage')
+      .eq('estimate_version_id', versionId);
+    if (error) throw new Error(`aiu_read_failed: ${error.code ?? 'unknown'}`);
+    const byCode = new Map((data ?? []).map((r) => [(r as { code: string }).code, String((r as { percentage: string }).percentage)]));
+    const get = (code: string) => byCode.get(code) ?? null;
+    const isEmpty = AIU_KINDS.every((k) => byCode.get(k.code) === undefined);
+    return {
+      isEmpty,
+      fractions: {
+        administration: get('A') ?? '0',
+        contingency: get('I') ?? '0',
+        utility: get('U') ?? '0',
+        utilityVat: get('IVA') ?? '0',
+      },
+    };
+  }
+
+  async getEstimateVersionAiu(viewer: ViewerContext, estimateId: Uuid): Promise<AiuRatesView> {
+    const active = await this.getEstimateActiveVersion(viewer, estimateId);
+    if (!active) throw new EstimateNotFoundError(estimateId);
+    const supabase = await this.clientFactory();
+    const { fractions, isEmpty } = await this.readAiuFractions(supabase, active.id);
+    return {
+      administrationRate: fractionToHuman(fractions.administration),
+      contingencyRate: fractionToHuman(fractions.contingency),
+      utilityRate: fractionToHuman(fractions.utility),
+      utilityVatRate: fractionToHuman(fractions.utilityVat),
+      isEmpty,
+      editable: !LOCKED_STATUSES.includes(active.status),
+      updatedAt: null,
+    };
+  }
+
+  async updateEstimateVersionAiu(
+    viewer: AuthenticatedViewer,
+    estimateId: Uuid,
+    input: AiuRatesInput,
+  ): Promise<FinancialSummary> {
+    const active = await this.getEstimateActiveVersion(viewer, estimateId);
+    if (!active) throw new EstimateNotFoundError(estimateId);
+    if (LOCKED_STATUSES.includes(active.status)) throw new AiuVersionLockedError();
+
+    const fractions = validateAiuRates(input); // valida rango + convierte a fracción
+    const supabase = await this.clientFactory();
+
+    // Upsert ATÓMICO de las 4 filas (un statement PostgREST). RLS WITH CHECK aplica.
+    const rows = AIU_KINDS.map((k) => ({
+      estimate_version_id: active.id,
+      code: k.code,
+      name: k.name,
+      base_type: k.baseType,
+      percentage: fractions[CODE_TO_FRACTION[k.code]!],
+      sort_order: k.sortOrder,
+      visible_to_client: true,
+    }));
+    const { error } = await supabase
+      .from('indirect_cost_rules')
+      .upsert(rows, { onConflict: 'estimate_version_id,code' });
+    if (error) throw new Error(`aiu_save_failed: ${error.code ?? 'unknown'}`);
+
+    return computeFinancialSummary(active.directTotal, fractions);
+  }
+
+  async calculateEstimateFinancialSummary(
+    viewer: ViewerContext,
+    estimateId: Uuid,
+  ): Promise<FinancialSummary> {
+    const active = await this.getEstimateActiveVersion(viewer, estimateId);
+    if (!active) throw new EstimateNotFoundError(estimateId);
+    const supabase = await this.clientFactory();
+    const { fractions } = await this.readAiuFractions(supabase, active.id);
+    return computeFinancialSummary(active.directTotal, fractions);
   }
 }

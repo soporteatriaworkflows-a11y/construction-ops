@@ -21,12 +21,19 @@ import type {
   Uuid,
   ViewerContext,
 } from './types';
-import { ChapterNotFoundError, EstimateNotFoundError, EstimateWriteNotSupportedError } from './errors';
+import {
+  AiuWriteNotSupportedError,
+  ChapterNotFoundError,
+  EstimateNotFoundError,
+  EstimateWriteNotSupportedError,
+} from './errors';
 import type {
   BoqItemReviewView,
   ChapterDetailView,
   ChapterReviewItem,
 } from '@/lib/estimates/review-types';
+import type { AiuRatesInput, AiuRatesView, FinancialSummary } from '@/lib/estimates/aiu-types';
+import { computeFinancialSummary, ZERO_FRACTIONS } from './aiu-calc';
 
 interface FixtureChapter { id: Uuid; estimateVersionId: Uuid; code: string; name: string; sortOrder: number }
 interface FixtureBoqItem {
@@ -175,5 +182,32 @@ export class FixtureEstimatesWriteRepository implements EstimatesWriteRepository
         quantity: it.quantitySnapshot, unitPrice: it.unitPriceSnapshot, subtotal: it.subtotal,
         sortOrder: it.sortOrder, sourceCode: null, sourceRow: null,
       }));
+  }
+
+  async getEstimateVersionAiu(viewer: ViewerContext, estimateId: Uuid): Promise<AiuRatesView> {
+    if (!sameOrg(viewer) || estimateId !== fixture.estimate.id) {
+      throw new EstimateNotFoundError(estimateId);
+    }
+    // Demo: el fixture no precarga AIU (vacío). Lectura solo demostrativa.
+    return {
+      administrationRate: '0', contingencyRate: '0', utilityRate: '0', utilityVatRate: '0',
+      isEmpty: true, editable: false, updatedAt: null,
+    };
+  }
+
+  async updateEstimateVersionAiu(): Promise<FinancialSummary> {
+    // El fixture es de solo lectura.
+    throw new AiuWriteNotSupportedError();
+  }
+
+  async calculateEstimateFinancialSummary(
+    viewer: ViewerContext,
+    estimateId: Uuid,
+  ): Promise<FinancialSummary> {
+    if (!sameOrg(viewer) || estimateId !== fixture.estimate.id) {
+      throw new EstimateNotFoundError(estimateId);
+    }
+    // Sin AIU en el fixture ⇒ total general = costo directo.
+    return computeFinancialSummary(fixture.estimateTotals.costos_directos, ZERO_FRACTIONS);
   }
 }
