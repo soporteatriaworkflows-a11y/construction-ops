@@ -23,6 +23,7 @@ import {
   DollarSign,
   Upload,
   CheckCircle2,
+  ChevronRight,
 } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
 import { EstimateVersionBadge } from '@/components/shared/status-badge';
@@ -37,6 +38,7 @@ import {
 import { formatCOP, formatDateTime } from '@/lib/utils/format';
 import { resolveViewer } from '@/server/auth/resolve-viewer';
 import { getEstimatesWriteRepository, EstimateNotFoundError } from '@/server/estimates';
+import type { ChapterReviewItem } from '@/lib/estimates/review-types';
 import { isCreationModeEnabled } from '../../../../../mode-guard';
 import { formatVersionLabel } from '../../estimate-format';
 
@@ -77,6 +79,19 @@ export default async function EstimateDetailPage({ params, searchParams }: PageP
   const hasContent = !!active && (active.chapterCount > 0 || active.itemCount > 0);
   const canImport = isCreationModeEnabled();
   const importHref = `${scopeHref}/estimates/${estimateId}/import`;
+
+  // Capítulos del presupuesto importado (revisión operativa, 4D.1).
+  let chapters: ChapterReviewItem[] = [];
+  let chaptersError: string | null = null;
+  if (hasContent) {
+    try {
+      chapters = await getEstimatesWriteRepository().listChaptersByEstimateVersion(viewer, estimateId);
+    } catch (e) {
+      chaptersError = e instanceof Error ? e.message : 'Error al cargar capítulos';
+    }
+  }
+  const chapterHref = (chapterId: string) =>
+    `${scopeHref}/estimates/${estimateId}/chapters/${chapterId}`;
 
   return (
     <div>
@@ -235,6 +250,63 @@ export default async function EstimateDetailPage({ params, searchParams }: PageP
           </Card>
         </div>
       </section>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Capítulos del presupuesto (revisión operativa, 4D.1)                */}
+      {/* ------------------------------------------------------------------ */}
+      {hasContent && (
+        <section aria-label="Capítulos del presupuesto" className="mt-8">
+          <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-600">
+            <ListTree className="h-4 w-4 text-gray-400" aria-hidden="true" />
+            Capítulos
+          </h2>
+          {chaptersError ? (
+            <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+              Error al cargar capítulos: {chaptersError}
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border border-gray-200">
+              <table className="w-full text-sm" aria-label="Tabla de capítulos">
+                <thead className="bg-gray-50 text-left text-xs text-gray-500">
+                  <tr>
+                    <th className="px-3 py-2 font-medium">Código</th>
+                    <th className="px-3 py-2 font-medium">Nombre</th>
+                    <th className="px-3 py-2 text-right font-medium">Ítems</th>
+                    <th className="px-3 py-2 text-right font-medium">Subtotal</th>
+                    <th className="px-3 py-2" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {chapters.map((ch) => (
+                    <tr key={ch.id} className="hover:bg-gray-50">
+                      <td className="px-3 py-2">
+                        <span className="font-mono text-xs text-gray-600">{ch.code}</span>
+                        {ch.sourceCode && ch.sourceCode !== ch.code && (
+                          <span
+                            className="ml-1.5 rounded bg-amber-50 px-1 py-0.5 text-[10px] font-medium text-amber-700"
+                            title={`Código original: ${ch.sourceCode}${ch.sourceRow ? ` (fila ${ch.sourceRow})` : ''}`}
+                          >
+                            normalizado
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-gray-900">{ch.name}</td>
+                      <td className="px-3 py-2 text-right tabular-nums text-gray-600">{ch.itemCount}</td>
+                      <td className="px-3 py-2 text-right tabular-nums font-medium">{formatCOP(ch.subtotal)}</td>
+                      <td className="px-3 py-2 text-right">
+                        <Link href={chapterHref(ch.id)} className="inline-flex items-center gap-0.5 text-xs font-medium text-blue-700 hover:underline">
+                          Ver detalle
+                          <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
 
       {/* ------------------------------------------------------------------ */}
       {/* Importar Excel (4C.1)                                               */}

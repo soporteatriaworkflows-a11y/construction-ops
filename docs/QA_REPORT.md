@@ -9,6 +9,23 @@ cada ciclo de validación.
 
 ---
 
+## 4D.1 — revisión operativa del presupuesto importado (2026-06-05)
+
+> Rama `integration/wave-4d1-budget-review`. **Sin migración** (remoto **20/20** intacto).
+
+- **Repositorio** (db RLS-bound + fixture): `listChaptersByEstimateVersion`/`getChapterById`/
+  `listItemsByChapter`; cross-org ⇒ `[]`/`ChapterNotFoundError`; subtotales recalculados/derivados.
+- **Tests** 666 (+16): review fixture (14 capítulos ordenados; Σ subtotales ≈ total directo del
+  golden master ±1 COP; cross-org/not-found; ítems ordenados) + route-config (tabla de capítulos,
+  detalle de capítulo, trazabilidad discreta, pertenencia validada).
+- **UI**: resumen + tabla de capítulos en el detalle del presupuesto; ruta capítulo con ítems BOQ;
+  indicador "normalizado" solo cuando `source_code≠code`; reimport bloqueada.
+- **Builds**: fixture + db local PASS (ruta capítulo `ƒ`). typecheck/lint 0, gm 22/22, gm:import,
+  validador 214/0/0.
+- **Sin cambios remotos**; sin importación; valores monetarios derivados de datos persistidos.
+
+---
+
 ## CIERRE 4C.3 — smoke real de importación con normalización (2026-06-05)
 
 > Verificación MANUAL de la usuaria en `https://construction-ops-psi.vercel.app` (`supabase`+`db`).

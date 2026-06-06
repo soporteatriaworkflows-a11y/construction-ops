@@ -8,6 +8,7 @@
  * - Lecturas: resuelven sobre el golden master (un presupuesto, su V01 y conteos
  *   reales). Cross-org / id desconocido ⇒ vacío / `EstimateNotFoundError`.
  */
+import Decimal from 'decimal.js';
 import fixtureJson from '../../../../scripts/fixtures/entre-patios-first-floor.fixture.json';
 import type {
   AuthenticatedViewer,
@@ -20,7 +21,18 @@ import type {
   Uuid,
   ViewerContext,
 } from './types';
-import { EstimateNotFoundError, EstimateWriteNotSupportedError } from './errors';
+import { ChapterNotFoundError, EstimateNotFoundError, EstimateWriteNotSupportedError } from './errors';
+import type {
+  BoqItemReviewView,
+  ChapterDetailView,
+  ChapterReviewItem,
+} from '@/lib/estimates/review-types';
+
+interface FixtureChapter { id: Uuid; estimateVersionId: Uuid; code: string; name: string; sortOrder: number }
+interface FixtureBoqItem {
+  id: Uuid; chapterId: Uuid; code: string; descriptionSnapshot: string; unitSnapshot: string;
+  quantitySnapshot: string; unitPriceSnapshot: string; subtotal: string; sortOrder: number;
+}
 
 interface FixtureShape {
   organization: { id: Uuid };
@@ -35,8 +47,8 @@ interface FixtureShape {
     createdAt: string;
   };
   estimateVersion: { id: Uuid; versionNumber: number; status: EstimateVersionStatus };
-  chapters: unknown[];
-  boqItems: unknown[];
+  chapters: FixtureChapter[];
+  boqItems: FixtureBoqItem[];
   estimateTotals: { costos_directos: string };
 }
 
@@ -112,5 +124,56 @@ export class FixtureEstimatesWriteRepository implements EstimatesWriteRepository
   ): Promise<EstimateActiveVersionView | null> {
     if (!sameOrg(viewer) || estimateId !== fixture.estimate.id) return null;
     return activeVersion();
+  }
+
+  async listChaptersByEstimateVersion(
+    viewer: ViewerContext,
+    estimateId: Uuid,
+  ): Promise<ChapterReviewItem[]> {
+    if (!sameOrg(viewer) || estimateId !== fixture.estimate.id) return [];
+    return fixture.chapters
+      .slice()
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((ch) => {
+        const items = fixture.boqItems.filter((it) => it.chapterId === ch.id);
+        const subtotal = items
+          .reduce((acc, it) => acc.plus(new Decimal(it.subtotal)), new Decimal(0))
+          .toFixed();
+        return {
+          id: ch.id, code: ch.code, name: ch.name, sortOrder: ch.sortOrder,
+          itemCount: items.length, subtotal, sourceCode: null, sourceRow: null,
+        };
+      });
+  }
+
+  async getChapterById(viewer: ViewerContext, chapterId: Uuid): Promise<ChapterDetailView> {
+    const ch = fixture.chapters.find((c) => c.id === chapterId);
+    if (!sameOrg(viewer) || !ch) throw new ChapterNotFoundError(chapterId);
+    const items = fixture.boqItems.filter((it) => it.chapterId === ch.id);
+    const subtotal = items
+      .reduce((acc, it) => acc.plus(new Decimal(it.subtotal)), new Decimal(0))
+      .toFixed();
+    const scope = fixture.projectScopes.find((s) => s.id === fixture.estimate.projectScopeId);
+    return {
+      id: ch.id, code: ch.code, name: ch.name, sortOrder: ch.sortOrder,
+      subtotal, itemCount: items.length, sourceCode: null, sourceRow: null,
+      estimateId: fixture.estimate.id, estimateName: fixture.estimate.name,
+      versionNumber: fixture.estimateVersion.versionNumber,
+      scopeId: scope?.id ?? '', scopeName: scope?.name ?? null,
+      projectId: fixture.project.id, projectName: fixture.project.name,
+    };
+  }
+
+  async listItemsByChapter(viewer: ViewerContext, chapterId: Uuid): Promise<BoqItemReviewView[]> {
+    const ch = fixture.chapters.find((c) => c.id === chapterId);
+    if (!sameOrg(viewer) || !ch) return [];
+    return fixture.boqItems
+      .filter((it) => it.chapterId === chapterId)
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((it) => ({
+        id: it.id, code: it.code, description: it.descriptionSnapshot, unit: it.unitSnapshot,
+        quantity: it.quantitySnapshot, unitPrice: it.unitPriceSnapshot, subtotal: it.subtotal,
+        sortOrder: it.sortOrder, sourceCode: null, sourceRow: null,
+      }));
   }
 }

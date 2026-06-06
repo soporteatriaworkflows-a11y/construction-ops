@@ -1,5 +1,37 @@
 # Handoff Log
 
+## 2026-06-05 — 4D.1: revisión operativa del presupuesto importado (sin migración)
+
+### Estado
+- Rama `integration/wave-4d1-budget-review` desde `main`@`0a3cd69`. **Sin migración** (el esquema
+  + `source_code`/`source_row` de 4C.3 bastan). Remoto intacto **20/20**.
+
+### Diagnóstico read-model
+- Existe el read-model 3A (`getEstimateDetail` por versionId), pero el slice usa el repositorio
+  RLS-bound. Se añadieron métodos de lectura al `EstimatesWriteRepository` (db + fixture):
+  `listChaptersByEstimateVersion`, `getChapterById`, `listItemsByChapter`. El "resumen operativo"
+  reutiliza `getEstimateById` (estado + V01 + conteos + total directo). Esquema **suficiente**.
+
+### Implementación
+- Repo (db RLS-bound + fixture): capítulos con `itemCount`+subtotal (Σ recalculada), detalle de
+  capítulo con contexto (proyecto/alcance/presupuesto/versión) por embedding PostgREST, ítems por
+  `chapter_id` ordenados. Cross-org ⇒ `[]`/`ChapterNotFoundError`. `source_code`/`source_row`
+  expuestos como trazabilidad. Tipos client-safe en `@/lib/estimates/review-types`.
+- UI: detalle del presupuesto muestra (cuando V01 tiene datos) **resumen** (V01/capítulos/ítems/
+  **total directo**) + **tabla de Capítulos** (código, indicador discreto "normalizado" si
+  `source_code≠code`, nombre, ítems, subtotal, "Ver detalle"). Nueva ruta
+  `…/estimates/[estimateId]/chapters/[chapterId]`: capítulo + contexto + **tabla de Ítems BOQ**
+  (código, descripción, unidad, cantidad, V/unitario, subtotal) + trazabilidad secundaria
+  (tooltip/etiqueta). Reimportación bloqueada (mensaje honesto). `/estimates` lista real (4B.3).
+
+### Validación
+- typecheck/lint 0, **666 tests** (+16: review fixture + route-config), build fixture + db local
+  PASS (ruta capítulo `ƒ`), gm 22/22, gm:import, validador 214/0/0, `git diff --check` limpio.
+
+### Pendiente
+- Preview + merge `--no-ff` + Production. Acción manual final: abrir PRESUPUESTO BASE, revisar el
+  resumen y entrar a 2-3 capítulos para validar visualmente los ítems importados.
+
 ## 2026-06-05 — 4C.3 CERRADA: smoke real de importación con normalización
 
 ### Estado

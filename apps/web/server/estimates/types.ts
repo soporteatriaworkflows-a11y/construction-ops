@@ -95,6 +95,25 @@ export interface EstimatesWriteRepository {
     viewer: ViewerContext,
     estimateId: Uuid,
   ): Promise<EstimateActiveVersionView | null>;
+
+  /* --- Revisión operativa (Oleada 4D.1) --- */
+  /** Capítulos de la versión activa del presupuesto (con conteo + subtotal). */
+  listChaptersByEstimateVersion(
+    viewer: ViewerContext,
+    estimateId: Uuid,
+  ): Promise<import('@/lib/estimates/review-types').ChapterReviewItem[]>;
+
+  /** Detalle de un capítulo visible (con contexto proyecto/alcance/presupuesto). */
+  getChapterById(
+    viewer: ViewerContext,
+    chapterId: Uuid,
+  ): Promise<import('@/lib/estimates/review-types').ChapterDetailView>;
+
+  /** Ítems BOQ de un capítulo visible (ordenados por `sort_order`). */
+  listItemsByChapter(
+    viewer: ViewerContext,
+    chapterId: Uuid,
+  ): Promise<import('@/lib/estimates/review-types').BoqItemReviewView[]>;
 }
 
 export type { AuthenticatedViewer } from '@/server/auth/types';
