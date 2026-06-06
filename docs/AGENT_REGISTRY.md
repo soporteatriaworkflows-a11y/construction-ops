@@ -87,6 +87,11 @@ Los archivos `.md` de cada agente viven en `.claude/agents/`.
   `apps/web/app/(dashboard)/projects/[id]/scopes/[scopeId]/estimates/[estimateId]/export-buttons.tsx`.
   Camino independiente del módulo legacy (Oleada 3); consume `EstimatesWriteRepository`
   (`getEstimateExportPayload`, agent-db-rls) y el resumen financiero 4D.2.
+- (4E.1B, orquestación) branding visual de exports:
+  `apps/web/server/estimates/export/branding.ts` (paleta ICONIC + `loadBrandLogo`),
+  `apps/web/server/estimates/export/logo-asset.ts` (logo base64 embebido),
+  `apps/web/public/branding/README.md` (ruta/forma del PNG oficial). Solo visual;
+  no toca contenido ni finanzas.
 
 ### agent-qa
 - `apps/web/tests/regression/`

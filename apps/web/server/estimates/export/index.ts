@@ -98,3 +98,11 @@ export { generateEstimateExcel } from './xlsx';
 export { generateEstimatePdf } from './pdf';
 export { buildEstimateExportFileName, sanitizeSegment } from './filename';
 export { versionLabel } from './version-label';
+export {
+  BRAND,
+  BRAND_HEX,
+  BRAND_ARGB,
+  loadBrandLogo,
+  __resetBrandLogoCache,
+  type BrandLogo,
+} from './branding';

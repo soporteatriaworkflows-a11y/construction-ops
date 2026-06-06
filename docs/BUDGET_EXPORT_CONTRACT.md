@@ -130,3 +130,27 @@ cambios en datos productivos). Rollback = revertir el merge de
 - `EXPORT_PROFILES_FOR_ESTIMATE` — perfiles de privacidad (cliente vs interno)
   para el export del presupuesto real, reusando la noción de perfiles de la
   Oleada 3 sobre este nuevo camino de datos.
+- `ICONIC_LOGO_ASSET` — incorporar el PNG oficial (base64 en `logo-asset.ts`).
+
+## 13. Branding visual (Oleada 4E.1B)
+
+Identidad ICONIC **puramente visual** (no toca contenido, finanzas, importación,
+AIU, capítulos ni ítems). Fuente única: `apps/web/server/estimates/export/branding.ts`.
+
+- **Paleta corporativa** (HEX para @react-pdf, ARGB para ExcelJS): azul noche
+  `#0F2A43` (primario), azul intermedio `#1C4E80`, dorado premium `#C8A24B`
+  (acento/realce de total), tinta `#1A2330`, banda clara `#EEF2F7`, realce de
+  totales `#DCE6F1`.
+- **PDF**: banda de marca fija (logo o monograma `IC` + nombre + tagline +
+  `documentTitle`), línea de acento dorada, ficha del proyecto, secciones con
+  títulos corporativos, tabla con filas alternas, AIU jerarquizado, **TOTAL
+  GENERAL** resaltado (banda azul + borde dorado), footer limpio con paginación.
+- **Excel**: banda de marca en `RESUMEN` (logo o monograma), encabezados de tabla
+  y títulos con color de marca, filas alternas, subtotales/totales resaltados,
+  paneles congelados (`PRESUPUESTO`/`TRAZABILIDAD`), anchos de columna razonables,
+  `gridLines` ocultas.
+- **Logo**: mecanismo **serverless-safe** vía base64 embebido en
+  `logo-asset.ts` (`ICONIC_LOGO_BASE64`); sin asset ⇒ monograma textual (la
+  exportación nunca se rompe). Ruta documentada del PNG oficial y conversión en
+  `apps/web/public/branding/README.md`. **Sin `fs` en runtime** (evita el aviso
+  NFT de Turbopack y funciona en la función de Vercel).

@@ -9,6 +9,20 @@ cada ciclo de validación.
 
 ---
 
+## 4E.1B — Branding visual de exports (2026-06-06, pre-merge)
+
+Validación de integración en `integration/wave-4e1b-export-branding`: typecheck 0,
+lint 0, **710 tests** (+7 branding: consistencia de paleta HEX↔ARGB, `loadBrandLogo`
+null sin asset + sin throw, Excel mantiene 3 hojas/total general/creator de marca,
+PDF sigue `%PDF`, fuentes con logo+fallback monograma y mecanismo base64). Build
+fixture + db-local PASS **sin warnings** (`/api/estimates/export` presente como `ƒ`;
+sin `fs` runtime ⇒ sin aviso NFT de Turbopack). gm:regression 22/22, gm:import PASS,
+validador 214/0/0, `git diff --check` limpio. **Sin migración**; contenido/finanzas
+sin cambios; remoto Supabase **20/20** intacto. **4E.1 cerrada funcionalmente**
+(smoke real de la usuaria) antes de iniciar 4E.1B.
+
+---
+
 ## 4E.1 — Exportación protegida Excel + PDF (2026-06-05, pre-merge)
 
 Validación de integración del orquestador en `integration/wave-4e1-budget-exports`:
