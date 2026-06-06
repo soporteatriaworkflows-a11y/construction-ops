@@ -9,6 +9,18 @@ cada ciclo de validación.
 
 ---
 
+## CIERRE 4D.1 — smoke real de revisión operativa (2026-06-05)
+
+> Verificación MANUAL de la usuaria en `https://construction-ops-psi.vercel.app`.
+> Tag `wave-4d1-operational-budget-review-production-v1`.
+
+- PRESUPUESTO BASE → V01: resumen (14 capítulos, ~132 ítems, total directo) ✅; capítulos
+  navegables ✅; ítems BOQ visibles ✅; códigos canónicos + trazabilidad correctos ✅; etiquetas
+  "normalizado" donde corresponde ✅.
+- **Oleada 4D.1 CERRADA.** Siguiente: 4D.2 (AIU editable + total general por versión).
+
+---
+
 ## 4D.1 — revisión operativa del presupuesto importado (2026-06-05)
 
 > Rama `integration/wave-4d1-budget-review`. **Sin migración** (remoto **20/20** intacto).

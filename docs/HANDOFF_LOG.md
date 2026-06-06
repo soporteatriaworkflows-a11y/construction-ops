@@ -1,5 +1,23 @@
 # Handoff Log
 
+## 2026-06-05 — 4D.1 CERRADA: smoke real de revisión operativa
+
+### Estado
+- **Oleada 4D.1 CERRADA.** Smoke manual verificado por la usuaria en producción
+  (`construction-ops-psi.vercel.app`). `main = origin/main = e3ad4af`.
+- Tag estable: **`wave-4d1-operational-budget-review-production-v1`**.
+
+### Smoke productivo verificado (usuaria)
+- PRESUPUESTO BASE → V01 abre; resumen con **14 capítulos**, ~**132 ítems**, **total directo**
+  visible. Capítulos navegables; ítems BOQ visibles; códigos canónicos + trazabilidad histórica
+  correctos; etiquetas "normalizado" donde corresponde. Revisión operativa satisfactoria.
+
+### Siguiente bloque
+- **Oleada 4D.2 — AIU editable, costos indirectos y total general por versión** (porcentajes por
+  `estimate_version`, NO hardcodeados/globales; cálculo server-side con Decimal). Rama
+  `integration/wave-4d2-editable-aiu`. Reutilizar `indirect_cost_rules` si es suficiente; detenerse
+  y pedir aprobación si se requiere migración.
+
 ## 2026-06-05 — 4D.1: revisión operativa del presupuesto importado (sin migración)
 
 ### Estado
