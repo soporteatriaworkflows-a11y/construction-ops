@@ -1,11 +1,11 @@
 /**
- * pdf.ts — Generador PDF del presupuesto real con branding ICONIC (4E.1/4E.1B).
+ * pdf.ts — Generador PDF del presupuesto real con branding GRUPO ICONIC (4E.1C).
  *
  * @react-pdf/renderer, en memoria (Uint8Array), sin temporales. No recalcula
  * finanzas (usa el payload server-derived). NUNCA incluye identificadores
  * internos, filas de origen del Excel, variables, secretos, trazabilidad
- * histórica ni texto demo (contrato §4). El branding (paleta + logo opcional)
- * es puramente visual; no altera el contenido estructural.
+ * histórica ni texto demo (contrato §4). Branding puramente visual; paleta
+ * oficial ICONIC (sin dorado), logo completo en encabezado y símbolo en footer.
  */
 import {
   Document,
@@ -19,51 +19,44 @@ import {
 import React from 'react';
 import Decimal from 'decimal.js';
 import type { EstimateExportPayload } from '@/lib/estimates/export-types';
-import { BRAND, BRAND_HEX, loadBrandLogo } from './branding';
+import { BRAND, BRAND_HEX, getLogoDataUri } from './branding';
 
 const styles = StyleSheet.create({
   page: {
     fontFamily: 'Helvetica',
     fontSize: 8,
-    paddingTop: 96,
-    paddingBottom: 44,
+    paddingTop: 104,
+    paddingBottom: 46,
     paddingHorizontal: 34,
-    color: BRAND_HEX.ink,
+    color: BRAND_HEX.graphite,
   },
-  // ---- Encabezado de marca (banda azul noche, fixed en cada página) ----
-  brandBar: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 76,
-    backgroundColor: BRAND_HEX.primary,
-    paddingHorizontal: 34,
-    paddingTop: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
+  // ---- Encabezado de marca: fondo blanco (el logo lleva texto azul noche) ----
+  header: {
+    position: 'absolute', top: 0, left: 0, right: 0, height: 84,
+    backgroundColor: BRAND_HEX.white, paddingHorizontal: 34, paddingTop: 16,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
-  accentLine: { position: 'absolute', top: 76, left: 0, right: 0, height: 3, backgroundColor: BRAND_HEX.accent },
-  logoImg: { width: 44, height: 44, objectFit: 'contain', marginRight: 12 },
+  logoImg: { height: 56, width: 130, objectFit: 'contain' },
   monogram: {
-    width: 44, height: 44, marginRight: 12, borderRadius: 6,
-    border: `1.4 solid ${BRAND_HEX.accent}`, color: BRAND_HEX.white,
-    fontSize: 18, fontFamily: 'Helvetica-Bold', textAlign: 'center', paddingTop: 11,
+    width: 50, height: 50, borderRadius: 6, border: `1.4 solid ${BRAND_HEX.primary}`,
+    color: BRAND_HEX.primary, fontSize: 20, fontFamily: 'Helvetica-Bold', textAlign: 'center', paddingTop: 13,
   },
-  brandName: { color: BRAND_HEX.white, fontSize: 16, fontFamily: 'Helvetica-Bold', letterSpacing: 1 },
-  brandTagline: { color: '#C9D4E0', fontSize: 8, marginTop: 1 },
-  docTag: { color: BRAND_HEX.accent, fontSize: 9, fontFamily: 'Helvetica-Bold', textAlign: 'right', letterSpacing: 0.5 },
-  docMeta: { color: '#C9D4E0', fontSize: 7.5, textAlign: 'right', marginTop: 2 },
+  headRight: { alignItems: 'flex-end' },
+  docTag: { color: BRAND_HEX.deepNavy, fontSize: 12, fontFamily: 'Helvetica-Bold', letterSpacing: 0.6 },
+  docMeta: { color: BRAND_HEX.primary, fontSize: 8, marginTop: 2 },
+  docMetaSoft: { color: BRAND_HEX.graphite, fontSize: 7.5, marginTop: 1 },
+  // Regla de acento cian bajo el encabezado.
+  accentRule: { position: 'absolute', top: 84, left: 0, right: 0, height: 2.4, backgroundColor: BRAND_HEX.accent },
+  navyRule: { position: 'absolute', top: 86.4, left: 0, right: 0, height: 0.8, backgroundColor: BRAND_HEX.deepNavy },
 
   // ---- Ficha del proyecto ----
   metaCard: {
-    borderLeft: `3 solid ${BRAND_HEX.accent}`,
-    backgroundColor: BRAND_HEX.bandLight,
-    paddingVertical: 8, paddingHorizontal: 10, marginBottom: 10,
+    backgroundColor: BRAND_HEX.bandLight, borderLeft: `3 solid ${BRAND_HEX.primary}`,
+    paddingVertical: 8, paddingHorizontal: 11, marginBottom: 10,
   },
-  metaTitle: { fontSize: 12, fontFamily: 'Helvetica-Bold', color: BRAND_HEX.primary, marginBottom: 3 },
-  metaLine: { fontSize: 8.5, color: BRAND_HEX.ink, marginBottom: 1 },
-  metaLabel: { fontFamily: 'Helvetica-Bold', color: BRAND_HEX.primarySoft },
+  metaTitle: { fontSize: 12, fontFamily: 'Helvetica-Bold', color: BRAND_HEX.deepNavy, marginBottom: 3 },
+  metaLine: { fontSize: 8.5, color: BRAND_HEX.graphite, marginBottom: 1 },
+  metaLabel: { fontFamily: 'Helvetica-Bold', color: BRAND_HEX.primary },
 
   // ---- Secciones ----
   section: { marginTop: 8, marginBottom: 4 },
@@ -75,12 +68,12 @@ const styles = StyleSheet.create({
   // ---- Tabla de presupuesto ----
   chapterRow: {
     backgroundColor: BRAND_HEX.bandLight, paddingVertical: 3.5, paddingHorizontal: 3,
-    marginTop: 5, flexDirection: 'row', borderLeft: `2 solid ${BRAND_HEX.primarySoft}`,
+    marginTop: 5, flexDirection: 'row', borderLeft: `2 solid ${BRAND_HEX.primary}`,
   },
-  chapterName: { fontFamily: 'Helvetica-Bold', fontSize: 8, color: BRAND_HEX.primary },
-  thead: { flexDirection: 'row', backgroundColor: BRAND_HEX.primarySoft, color: BRAND_HEX.white, paddingVertical: 3 },
+  chapterName: { fontFamily: 'Helvetica-Bold', fontSize: 8, color: BRAND_HEX.deepNavy },
+  thead: { flexDirection: 'row', backgroundColor: BRAND_HEX.primary, color: BRAND_HEX.white, paddingVertical: 3 },
   row: { flexDirection: 'row', borderBottom: `0.3 solid ${BRAND_HEX.border}`, paddingVertical: 2 },
-  rowAlt: { backgroundColor: '#FAFBFD' },
+  rowAlt: { backgroundColor: BRAND_HEX.bandLight },
   cCode: { width: 44, paddingHorizontal: 3 },
   cDesc: { flex: 1, paddingHorizontal: 3 },
   cUnit: { width: 34, paddingHorizontal: 3 },
@@ -100,17 +93,21 @@ const styles = StyleSheet.create({
   },
   totRow: {
     flexDirection: 'row', paddingVertical: 6, paddingHorizontal: 8, marginTop: 4,
-    backgroundColor: BRAND_HEX.primary, borderLeft: `4 solid ${BRAND_HEX.accent}`,
+    backgroundColor: BRAND_HEX.deepNavy, borderLeft: `4 solid ${BRAND_HEX.accent}`,
   },
   totLabel: { flex: 1, color: BRAND_HEX.white, fontFamily: 'Helvetica-Bold', fontSize: 11, letterSpacing: 0.5 },
   totVal: { width: 130, textAlign: 'right', color: BRAND_HEX.white, fontFamily: 'Helvetica-Bold', fontSize: 12 },
   bold: { fontFamily: 'Helvetica-Bold' },
 
-  // ---- Footer ----
+  // ---- Footer con símbolo ----
   footer: {
-    position: 'absolute', bottom: 16, left: 34, right: 34, fontSize: 7, color: BRAND_HEX.muted,
-    borderTop: `0.5 solid ${BRAND_HEX.border}`, paddingTop: 4, flexDirection: 'row', justifyContent: 'space-between',
+    position: 'absolute', bottom: 16, left: 34, right: 34, height: 22,
+    borderTop: `0.5 solid ${BRAND_HEX.border}`, paddingTop: 4,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
+  footerLeft: { flexDirection: 'row', alignItems: 'center' },
+  footerSymbol: { width: 12, height: 12, objectFit: 'contain', marginRight: 5 },
+  footerText: { fontSize: 7, color: BRAND_HEX.muted },
 });
 
 function cop(value: string): string {
@@ -134,30 +131,24 @@ const h = React.createElement;
 export async function generateEstimatePdf(payload: EstimateExportPayload): Promise<Uint8Array> {
   const fecha = new Date(payload.generatedAt).toLocaleDateString('es-CO');
   const f = payload.financial;
-  const logo = loadBrandLogo();
+  const logoFull = getLogoDataUri('full');
+  const logoSymbol = getLogoDataUri('symbol');
 
-  // Banda de marca (fixed en todas las páginas).
-  const brandBar = h(
+  // Encabezado (fijo en cada página): logo oficial a la izquierda, doc a la derecha.
+  const header = h(
     View,
-    { style: styles.brandBar, fixed: true },
-    logo
-      ? h(Image, { style: styles.logoImg, src: logo.dataUri })
+    { style: styles.header, fixed: true },
+    logoFull
+      ? h(Image, { style: styles.logoImg, src: logoFull })
       : h(Text, { style: styles.monogram }, BRAND.monogram),
     h(
       View,
-      { style: { flex: 1 } },
-      h(Text, { style: styles.brandName }, BRAND.name),
-      h(Text, { style: styles.brandTagline }, BRAND.tagline),
-    ),
-    h(
-      View,
-      { style: { flex: 1 } },
+      { style: styles.headRight },
       h(Text, { style: styles.docTag }, BRAND.documentTitle),
       h(Text, { style: styles.docMeta }, `${payload.version.label} · ${payload.version.status}`),
-      h(Text, { style: styles.docMeta }, fecha),
+      h(Text, { style: styles.docMetaSoft }, fecha),
     ),
   );
-  const accentLine = h(View, { style: styles.accentLine, fixed: true });
 
   const metaCard = h(
     View,
@@ -224,16 +215,33 @@ export async function generateEstimatePdf(payload: EstimateExportPayload): Promi
       h(Text, { style: [styles.finVal, styles.bold] }, cop(value)),
     );
 
+  const footer = h(
+    View,
+    { style: styles.footer, fixed: true },
+    h(
+      View,
+      { style: styles.footerLeft },
+      logoSymbol ? h(Image, { style: styles.footerSymbol, src: logoSymbol }) : null,
+      h(Text, { style: styles.footerText }, `${BRAND.name} · ${BRAND.tagline}`),
+    ),
+    h(Text, {
+      style: styles.footerText,
+      render: ({ pageNumber, totalPages }: { pageNumber: number; totalPages: number }) =>
+        `Página ${pageNumber} de ${totalPages}`,
+    }),
+    h(Text, { style: styles.footerText }, `Generado: ${fecha}`),
+  );
+
   const doc = h(
     Document,
     { title: `Presupuesto ${payload.estimate.name}`, author: BRAND.name, creator: 'Construction Ops', producer: 'Construction Ops' },
     h(
       Page,
       { size: 'A4', style: styles.page },
-      brandBar,
-      accentLine,
+      header,
+      h(View, { style: styles.accentRule, fixed: true }),
+      h(View, { style: styles.navyRule, fixed: true }),
       metaCard,
-      // Capítulos + actividades
       h(
         View,
         { style: styles.section },
@@ -241,7 +249,6 @@ export async function generateEstimatePdf(payload: EstimateExportPayload): Promi
         itemHeader,
         ...chapterBlocks,
       ),
-      // Resumen financiero
       h(
         View,
         { style: styles.section, wrap: false },
@@ -259,17 +266,7 @@ export async function generateEstimatePdf(payload: EstimateExportPayload): Promi
           h(Text, { style: styles.totVal }, cop(f.grandTotal)),
         ),
       ),
-      // Footer con paginación
-      h(
-        View,
-        { style: styles.footer, fixed: true },
-        h(Text, null, `${BRAND.name} · ${BRAND.tagline}`),
-        h(Text, {
-          render: ({ pageNumber, totalPages }: { pageNumber: number; totalPages: number }) =>
-            `Página ${pageNumber} de ${totalPages}`,
-        }),
-        h(Text, null, `Generado: ${fecha}`),
-      ),
+      footer,
     ),
   );
 

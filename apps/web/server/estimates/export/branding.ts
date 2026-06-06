@@ -1,103 +1,91 @@
 /**
- * branding.ts — Identidad visual ICONIC para los exports (4E.1B). FUENTE ÚNICA.
+ * branding.ts — Identidad visual GRUPO ICONIC para los exports (4E.1C). ÚNICA FUENTE.
  *
- * Paleta corporativa + metadatos + cargador de logo OPCIONAL. No cambia el
- * contenido estructural ni la lógica financiera del presupuesto; sólo el
- * lenguaje visual de Excel/PDF. Contrato: `docs/BUDGET_EXPORT_CONTRACT.md §13`.
+ * Paleta oficial + metadatos + logos oficiales embebidos. Branding puramente
+ * visual: no cambia contenido estructural, finanzas, importación, AIU, capítulos
+ * ni ítems. Contrato: `docs/BUDGET_EXPORT_CONTRACT.md §13`.
  *
- * Logo: se consume EMBEBIDO en base64 desde `logo-asset.ts` (serverless-safe,
- * sin fs ni tracing). Ruta documentada para el PNG oficial:
- * `apps/web/public/branding/iconic-logo.png` (convertir a base64 y pegar en
- * `ICONIC_LOGO_BASE64`; ver `public/branding/README.md`). Sin asset, los
- * generadores usan un monograma textual; la exportación NUNCA se rompe.
+ * Logos: se consumen EMBEBIDOS en base64 desde `logo-asset.ts` (generado por
+ * `scripts/branding/embed-iconic-assets.mjs`), SIN `fs` en runtime (serverless-safe).
+ * Fuentes: `apps/web/public/branding/iconic/grupo-iconic-logo-{full,symbol}.png`.
+ * Sin asset (solo desarrollo) ⇒ monograma textual; nunca esperado en producción.
+ *
+ * SIN DORADO: el acento es el cian ICONIC. No introducir dorado sin aprobación.
  */
-import { ICONIC_LOGO_BASE64 } from './logo-asset';
+import { ICONIC_LOGO_FULL_DATA_URI, ICONIC_LOGO_SYMBOL_DATA_URI } from './logo-asset';
 
-/** Colores de marca en HEX (`#RRGGBB`) — para @react-pdf. */
-export const BRAND_HEX = {
-  /** Azul noche corporativo (títulos, bandas, encabezados de tabla). */
-  primary: '#0F2A43',
-  /** Variante intermedia para subtítulos/acentos sobrios. */
-  primarySoft: '#1C4E80',
-  /** Dorado premium (línea de marca, realce de TOTAL GENERAL). */
-  accent: '#C8A24B',
-  /** Tinta de texto principal. */
-  ink: '#1A2330',
-  /** Texto secundario/muted. */
-  muted: '#6B7280',
-  /** Banda/again clara para secciones y filas alternas. */
-  bandLight: '#EEF2F7',
-  /** Realce de totales (azul muy claro). */
-  totalFill: '#DCE6F1',
-  /** Borde sutil. */
-  border: '#D9DEE6',
+/**
+ * Paleta oficial de exports ICONIC (guía `docs/branding/ICONIC_EXPORTS_VISUAL_GUIDE.pdf`).
+ * FUENTE ÚNICA DE VERDAD. No usar colores genéricos ni dorado.
+ */
+export const ICONIC_EXPORT_PALETTE = {
+  primaryBlue: '#005DD6',
+  cyanAccent: '#00B8FF',
+  deepNavy: '#020148',
+  graphite: '#1B1F3E',
+  softBlueGray: '#C7DCED',
+  lightGray: '#F2F4F7',
   white: '#FFFFFF',
 } as const;
 
-/** Mismos colores en ARGB (`FFRRGGBB`) — para ExcelJS. */
-export const BRAND_ARGB = {
-  primary: 'FF0F2A43',
-  primarySoft: 'FF1C4E80',
-  accent: 'FFC8A24B',
-  ink: 'FF1A2330',
-  muted: 'FF6B7280',
-  bandLight: 'FFEEF2F7',
-  totalFill: 'FFDCE6F1',
-  border: 'FFD9DEE6',
-  white: 'FFFFFFFF',
+/** Roles semánticos en HEX (`#RRGGBB`) — para @react-pdf. Derivados de la paleta. */
+export const BRAND_HEX = {
+  /** Azul ICONIC dominante (encabezados de tabla, títulos de sección). */
+  primary: ICONIC_EXPORT_PALETTE.primaryBlue,
+  /** Azul noche premium (texto destacado, banda de TOTAL GENERAL). */
+  deepNavy: ICONIC_EXPORT_PALETTE.deepNavy,
+  /** Cian ICONIC — ÚNICO acento (líneas/bordes; nunca relleno con texto). */
+  accent: ICONIC_EXPORT_PALETTE.cyanAccent,
+  /** Grafito para texto técnico/cuerpo. */
+  graphite: ICONIC_EXPORT_PALETTE.graphite,
+  /** Texto secundario/muted (grafito atenuado por uso). */
+  muted: ICONIC_EXPORT_PALETTE.graphite,
+  /** Gris azulado para bordes sutiles. */
+  border: ICONIC_EXPORT_PALETTE.softBlueGray,
+  /** Gris muy claro para alternancia de filas y bandas. */
+  bandLight: ICONIC_EXPORT_PALETTE.lightGray,
+  white: ICONIC_EXPORT_PALETTE.white,
 } as const;
 
-/** Metadatos de marca (configurables sin tocar generadores). */
+/** Convierte `#RRGGBB` a ARGB (`FFRRGGBB`) para ExcelJS. */
+function toArgb(hex: string): string {
+  return `FF${hex.replace('#', '').toUpperCase()}`;
+}
+
+/** Mismos roles en ARGB (`FFRRGGBB`) — para ExcelJS. */
+export const BRAND_ARGB = {
+  primary: toArgb(BRAND_HEX.primary),
+  deepNavy: toArgb(BRAND_HEX.deepNavy),
+  accent: toArgb(BRAND_HEX.accent),
+  graphite: toArgb(BRAND_HEX.graphite),
+  muted: toArgb(BRAND_HEX.muted),
+  border: toArgb(BRAND_HEX.border),
+  bandLight: toArgb(BRAND_HEX.bandLight),
+  white: toArgb(BRAND_HEX.white),
+} as const;
+
+/** Metadatos de marca. */
 export const BRAND = {
-  name: 'ICONIC',
-  tagline: 'Construcción & Presupuestos',
+  name: 'GRUPO ICONIC',
+  tagline: 'Studio + Construcción + Bienes Raíces',
   documentTitle: 'PRESUPUESTO DE OBRA',
-  /** Monograma textual usado cuando no hay logo (fallback premium). */
+  /** Monograma textual de RESILIENCIA (solo si faltan assets en desarrollo). */
   monogram: 'IC',
 } as const;
 
-export interface BrandLogo {
-  /** Data URI listo para `<Image src>` de @react-pdf. */
-  dataUri: string;
-  /** Buffer del PNG decodificado (uso interno/pruebas). */
-  buffer: Buffer;
-  extension: 'png';
-}
-
-let cached: { logo: BrandLogo | null } | null = null;
+export type BrandLogoVariant = 'full' | 'symbol';
 
 /**
- * Resuelve el logo oficial desde el base64 EMBEBIDO (`logo-asset.ts`,
- * serverless-safe, sin fs ni tracing). Cachea el resultado (incluida la
- * ausencia). NUNCA lanza: ante base64 inválido/vacío devuelve `null` y el
- * generador usa el monograma. No registra el contenido del asset.
+ * Devuelve el data URI del logo oficial embebido (`full` o `symbol`) o `null`
+ * si el asset no está disponible (solo en desarrollo sin generar). NUNCA lanza
+ * ni registra el contenido. Sin `fs`.
  */
-export function loadBrandLogo(): BrandLogo | null {
-  if (cached) return cached.logo;
-
-  const embedded = ICONIC_LOGO_BASE64.trim();
-  if (embedded.length > 0) {
-    try {
-      const buffer = Buffer.from(embedded, 'base64');
-      if (buffer.byteLength > 0) {
-        const logo: BrandLogo = {
-          buffer,
-          dataUri: `data:image/png;base64,${embedded}`,
-          extension: 'png',
-        };
-        cached = { logo };
-        return logo;
-      }
-    } catch {
-      /* base64 inválido: usar monograma */
-    }
-  }
-
-  cached = { logo: null };
-  return null;
+export function getLogoDataUri(variant: BrandLogoVariant = 'full'): string | null {
+  const uri = variant === 'symbol' ? ICONIC_LOGO_SYMBOL_DATA_URI : ICONIC_LOGO_FULL_DATA_URI;
+  return typeof uri === 'string' && uri.startsWith('data:image/') ? uri : null;
 }
 
-/** Reinicia la caché del logo (sólo para pruebas). */
-export function __resetBrandLogoCache(): void {
-  cached = null;
+/** `true` si ambos logos oficiales están embebidos (producción esperada). */
+export function hasOfficialLogos(): boolean {
+  return getLogoDataUri('full') !== null && getLogoDataUri('symbol') !== null;
 }

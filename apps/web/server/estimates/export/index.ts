@@ -102,7 +102,8 @@ export {
   BRAND,
   BRAND_HEX,
   BRAND_ARGB,
-  loadBrandLogo,
-  __resetBrandLogoCache,
-  type BrandLogo,
+  ICONIC_EXPORT_PALETTE,
+  getLogoDataUri,
+  hasOfficialLogos,
+  type BrandLogoVariant,
 } from './branding';

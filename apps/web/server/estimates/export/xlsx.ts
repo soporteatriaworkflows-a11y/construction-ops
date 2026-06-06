@@ -1,14 +1,15 @@
 /**
- * xlsx.ts — Generador Excel del presupuesto real con branding ICONIC (4E.1/4E.1B).
+ * xlsx.ts — Generador Excel del presupuesto real con branding GRUPO ICONIC (4E.1C).
  *
  * ExcelJS, en memoria. Hojas: RESUMEN, PRESUPUESTO, TRAZABILIDAD (contrato §3).
- * No recalcula finanzas (usa el payload server-derived). El branding (logo +
- * paleta corporativa) es puramente visual; no altera el contenido estructural.
+ * No recalcula finanzas (usa el payload server-derived). Branding puramente
+ * visual: paleta oficial ICONIC (sin dorado), logo completo en RESUMEN. No
+ * altera fórmulas, valores, hojas, conteos, códigos, trazabilidad ni paneles.
  */
 import ExcelJS from 'exceljs';
 import Decimal from 'decimal.js';
 import type { EstimateExportPayload } from '@/lib/estimates/export-types';
-import { BRAND, BRAND_ARGB, loadBrandLogo } from './branding';
+import { BRAND, BRAND_ARGB, getLogoDataUri } from './branding';
 
 const MONEY_FMT = '"$"#,##0';
 const QTY_FMT = '#,##0.00';
@@ -31,48 +32,46 @@ function thinBorder(argb: string): Partial<ExcelJS.Borders> {
   return { top: side, left: side, bottom: side, right: side };
 }
 
-/** Encabezado de tabla con estilo corporativo. */
+/** Encabezado de tabla con estilo corporativo (azul ICONIC, texto blanco). */
 function styleTableHeader(row: ExcelJS.Row): void {
   row.eachCell((cell) => {
     cell.font = { bold: true, color: { argb: BRAND_ARGB.white }, size: 10 };
-    cell.fill = fill(BRAND_ARGB.primarySoft);
+    cell.fill = fill(BRAND_ARGB.primary);
     cell.alignment = { horizontal: 'center', vertical: 'middle' };
     cell.border = thinBorder(BRAND_ARGB.border);
   });
   row.height = 18;
 }
 
-/** Inserta la banda de marca (logo o monograma) en las filas 1–4. */
-function brandHeader(wb: ExcelJS.Workbook, ws: ExcelJS.Worksheet, lastCol: string): void {
-  ws.mergeCells(`A1:${lastCol}3`);
-  const band = ws.getCell('A1');
-  band.value = {
-    richText: [
-      { text: `${BRAND.name}\n`, font: { bold: true, size: 20, color: { argb: BRAND_ARGB.white } } },
-      { text: `${BRAND.tagline}   ·   ${BRAND.documentTitle}`, font: { size: 10, color: { argb: 'FFC9D4E0' } } },
-    ],
-  };
-  band.alignment = { vertical: 'middle', horizontal: 'left', indent: 1, wrapText: true };
-  for (let r = 1; r <= 3; r++) {
-    ws.getRow(r).height = 22;
-    ws.getRow(r).eachCell?.({ includeEmpty: true }, (c) => { c.fill = fill(BRAND_ARGB.primary); });
-  }
-  ws.getCell('A1').fill = fill(BRAND_ARGB.primary);
-  // Línea de acento dorada (fila 4).
-  ws.mergeCells(`A4:${lastCol}4`);
-  ws.getRow(4).height = 4;
-  ws.getCell('A4').fill = fill(BRAND_ARGB.accent);
-
-  // Logo opcional, flotando a la derecha de la banda.
-  const logo = loadBrandLogo();
+/** Banda de marca ICONIC en RESUMEN (logo completo sobre fondo blanco). */
+function brandHeader(wb: ExcelJS.Workbook, ws: ExcelJS.Worksheet): void {
+  for (let r = 1; r <= 3; r++) ws.getRow(r).height = 20;
+  // Logo oficial completo, flotando a la izquierda (texto azul noche legible en blanco).
+  const logo = getLogoDataUri('full');
   if (logo) {
-    const imageId = wb.addImage({ base64: logo.dataUri, extension: logo.extension });
-    ws.addImage(imageId, {
-      tl: { col: lastCol === 'C' ? 2.55 : 4.55, row: 0.25 },
-      ext: { width: 58, height: 58 },
-      editAs: 'oneCell',
-    });
+    const imageId = wb.addImage({ base64: logo, extension: 'png' });
+    ws.addImage(imageId, { tl: { col: 0.1, row: 0.2 }, ext: { width: 150, height: 64 }, editAs: 'oneCell' });
+  } else {
+    const m = ws.getCell('A1');
+    m.value = BRAND.monogram;
+    m.font = { bold: true, size: 22, color: { argb: BRAND_ARGB.primary } };
+    m.alignment = { vertical: 'middle' };
   }
+  // Título del documento a la derecha (azul noche), versión en azul ICONIC.
+  ws.mergeCells('B1:C2');
+  const t = ws.getCell('B1');
+  t.value = BRAND.documentTitle;
+  t.font = { bold: true, size: 15, color: { argb: BRAND_ARGB.deepNavy } };
+  t.alignment = { vertical: 'middle', horizontal: 'right' };
+  ws.mergeCells('B3:C3');
+  const s = ws.getCell('B3');
+  s.value = `${BRAND.name}  ·  ${BRAND.tagline}`;
+  s.font = { size: 9, color: { argb: BRAND_ARGB.primary } };
+  s.alignment = { horizontal: 'right' };
+  // Regla de acento cian (fila 4).
+  ws.mergeCells('A4:C4');
+  ws.getRow(4).height = 3;
+  ws.getCell('A4').fill = fill(BRAND_ARGB.accent);
 }
 
 export async function generateEstimateExcel(payload: EstimateExportPayload): Promise<Uint8Array> {
@@ -85,25 +84,26 @@ export async function generateEstimateExcel(payload: EstimateExportPayload): Pro
   resumen.getColumn('A').width = 34;
   resumen.getColumn('B').width = 24;
   resumen.getColumn('C').width = 18;
-  brandHeader(wb, resumen, 'C');
+  brandHeader(wb, resumen);
 
   const f = payload.financial;
   let ri = 6;
   const fechaExport = new Date(payload.generatedAt).toLocaleDateString('es-CO');
 
-  // Sub-encabezado: nombre del presupuesto.
   resumen.mergeCells(`A${ri}:C${ri}`);
   const nameCell = resumen.getCell(`A${ri}`);
   nameCell.value = payload.estimate.name;
-  nameCell.font = { bold: true, size: 13, color: { argb: BRAND_ARGB.primary } };
+  nameCell.font = { bold: true, size: 13, color: { argb: BRAND_ARGB.deepNavy } };
   ri += 2;
 
   const put = (label: string, value: string | number): void => {
     const l = resumen.getCell(`A${ri}`);
     l.value = label;
-    l.font = { bold: true, color: { argb: BRAND_ARGB.primarySoft } };
+    l.font = { bold: true, color: { argb: BRAND_ARGB.primary } };
     resumen.mergeCells(`B${ri}:C${ri}`);
-    resumen.getCell(`B${ri}`).value = value;
+    const v = resumen.getCell(`B${ri}`);
+    v.value = value;
+    v.font = { color: { argb: BRAND_ARGB.graphite } };
     if (ri % 2 === 0) {
       (['A', 'B', 'C'] as const).forEach((col) => { resumen.getCell(`${col}${ri}`).fill = fill(BRAND_ARGB.bandLight); });
     }
@@ -124,12 +124,11 @@ export async function generateEstimateExcel(payload: EstimateExportPayload): Pro
   const finTitle = resumen.getCell(`A${ri}`);
   finTitle.value = 'RESUMEN FINANCIERO';
   finTitle.font = { bold: true, size: 11, color: { argb: BRAND_ARGB.white } };
-  finTitle.fill = fill(BRAND_ARGB.primary);
+  finTitle.fill = fill(BRAND_ARGB.deepNavy);
   finTitle.alignment = { vertical: 'middle', indent: 1 };
   resumen.getRow(ri).height = 18;
   ri++;
 
-  // Cabecera de la tabla financiera.
   resumen.getCell(`A${ri}`).value = 'Concepto';
   resumen.getCell(`B${ri}`).value = '%';
   resumen.getCell(`C${ri}`).value = 'Valor';
@@ -145,15 +144,17 @@ export async function generateEstimateExcel(payload: EstimateExportPayload): Pro
     c.value = n(amount); c.numFmt = MONEY_FMT;
     (['A', 'B', 'C'] as const).forEach((col) => { resumen.getCell(`${col}${ri}`).border = thinBorder(BRAND_ARGB.border); });
     if (kind === 'subtotal') {
-      a.font = { bold: true, color: { argb: BRAND_ARGB.primary } };
+      a.font = { bold: true, color: { argb: BRAND_ARGB.deepNavy } };
       c.font = { bold: true };
       (['A', 'B', 'C'] as const).forEach((col) => { resumen.getCell(`${col}${ri}`).fill = fill(BRAND_ARGB.bandLight); });
     } else if (kind === 'total') {
       resumen.getRow(ri).height = 20;
       a.font = { bold: true, size: 12, color: { argb: BRAND_ARGB.white } };
       c.font = { bold: true, size: 12, color: { argb: BRAND_ARGB.white } };
-      (['A', 'B', 'C'] as const).forEach((col) => { resumen.getCell(`${col}${ri}`).fill = fill(BRAND_ARGB.primary); });
-      a.border = { ...thinBorder(BRAND_ARGB.accent), left: { style: 'medium', color: { argb: BRAND_ARGB.accent } } };
+      (['A', 'B', 'C'] as const).forEach((col) => { resumen.getCell(`${col}${ri}`).fill = fill(BRAND_ARGB.deepNavy); });
+      a.border = { ...thinBorder(BRAND_ARGB.border), left: { style: 'medium', color: { argb: BRAND_ARGB.accent } } };
+    } else {
+      a.font = { color: { argb: BRAND_ARGB.graphite } };
     }
     ri++;
   };
@@ -176,7 +177,7 @@ export async function generateEstimateExcel(payload: EstimateExportPayload): Pro
   for (const ch of payload.chapters) {
     ws.addRow([ch.code, ch.name.toUpperCase(), '', '', '', '', '', '']);
     const chRow = ws.getRow(rowIdx);
-    chRow.font = { bold: true, color: { argb: BRAND_ARGB.primary } };
+    chRow.font = { bold: true, color: { argb: BRAND_ARGB.deepNavy } };
     chRow.eachCell({ includeEmpty: true }, (c) => { c.fill = fill(BRAND_ARGB.bandLight); });
     rowIdx++;
 
@@ -187,19 +188,18 @@ export async function generateEstimateExcel(payload: EstimateExportPayload): Pro
       r.getCell(6).numFmt = QTY_FMT;
       r.getCell(7).numFmt = MONEY_FMT;
       r.getCell(8).numFmt = MONEY_FMT;
-      if (alt) r.eachCell((c) => { c.fill = fill('FFFAFBFD'); });
+      if (alt) r.eachCell((c) => { c.fill = fill(BRAND_ARGB.bandLight); });
       alt = !alt;
       rowIdx++;
     }
 
     ws.addRow(['', `Subtotal ${ch.name}`, '', '', '', '', '', n(ch.subtotal)]);
     const stRow = ws.getRow(rowIdx);
-    stRow.font = { bold: true, italic: true, color: { argb: BRAND_ARGB.primarySoft } };
+    stRow.font = { bold: true, italic: true, color: { argb: BRAND_ARGB.primary } };
     stRow.getCell(8).numFmt = MONEY_FMT;
     rowIdx++;
   }
 
-  // Pie: directos, indirectos, total general.
   rowIdx++;
   const footRow = (label: string, value: string, total = false): void => {
     ws.addRow(['', label, '', '', '', '', '', n(value)]);
@@ -208,10 +208,10 @@ export async function generateEstimateExcel(payload: EstimateExportPayload): Pro
     if (total) {
       r.height = 20;
       r.font = { bold: true, size: 12, color: { argb: BRAND_ARGB.white } };
-      for (let cI = 1; cI <= 8; cI++) r.getCell(cI).fill = fill(BRAND_ARGB.primary);
+      for (let cI = 1; cI <= 8; cI++) r.getCell(cI).fill = fill(BRAND_ARGB.deepNavy);
       r.getCell(2).border = { left: { style: 'medium', color: { argb: BRAND_ARGB.accent } } };
     } else {
-      r.font = { bold: true, color: { argb: BRAND_ARGB.primary } };
+      r.font = { bold: true, color: { argb: BRAND_ARGB.deepNavy } };
       for (let cI = 1; cI <= 8; cI++) r.getCell(cI).fill = fill(BRAND_ARGB.bandLight);
     }
     rowIdx++;
@@ -231,11 +231,12 @@ export async function generateEstimateExcel(payload: EstimateExportPayload): Pro
   let tAlt = false;
   for (const ch of payload.chapters) {
     traza.addRow(['Capítulo', ch.code, ch.sourceCode ?? '', ch.sourceRow ?? '', ch.sourceCode && ch.sourceCode !== ch.code ? 'Sí' : 'No']);
-    traza.getRow(tIdx).font = { bold: true, color: { argb: BRAND_ARGB.primarySoft } };
+    traza.getRow(tIdx).font = { bold: true, color: { argb: BRAND_ARGB.deepNavy } };
     tIdx++;
     for (const it of ch.items) {
       traza.addRow(['Ítem', it.code, it.sourceCode ?? '', it.sourceRow ?? '', it.sourceCode && it.sourceCode !== it.code ? 'Sí' : 'No']);
-      if (tAlt) traza.getRow(tIdx).eachCell((c) => { c.fill = fill('FFFAFBFD'); });
+      traza.getRow(tIdx).font = { color: { argb: BRAND_ARGB.graphite } };
+      if (tAlt) traza.getRow(tIdx).eachCell((c) => { c.fill = fill(BRAND_ARGB.bandLight); });
       tAlt = !tAlt;
       tIdx++;
     }

@@ -9,6 +9,21 @@ cada ciclo de validación.
 
 ---
 
+## 4E.1C — Assets oficiales GRUPO ICONIC (2026-06-06, pre-merge)
+
+Validación en `integration/wave-4e1c-official-iconic-assets`: typecheck 0, lint 0
+(sin warnings), **712 tests** (assets oficiales existen + firma PNG, guía solo en
+`docs/branding` y no en `public`, data URI full/symbol `data:image/png;base64,`,
+`hasOfficialLogos()` true, paleta `ICONIC_EXPORT_PALETTE` exacta, **sin dorado
+`#C8A24B`**, branding sin `fs`/`path`, Excel embebe imagen + 3 hojas + total general,
+PDF `%PDF` con logos full+symbol y sin UUID/source_row, script reproducible + módulo
+generado). Build fixture + db-local PASS **sin warnings** (`/api/estimates/export`
+`ƒ`). gm:regression 22/22, gm:import PASS, validador 214/0/0, `git diff --check`
+limpio. **Sin migración**; contenido/finanzas/seguridad sin cambios; remoto Supabase
+**20/20** intacto. Deuda `ICONIC_LOGO_ASSET` resuelta.
+
+---
+
 ## 4E.1B — Branding visual de exports (2026-06-06, pre-merge)
 
 Validación de integración en `integration/wave-4e1b-export-branding`: typecheck 0,
