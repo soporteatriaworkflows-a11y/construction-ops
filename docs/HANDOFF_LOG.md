@@ -1,5 +1,32 @@
 # Handoff Log
 
+## 2026-06-05 — 4E.1: exportación protegida Excel + PDF del presupuesto real
+
+### Estado
+- Rama `integration/wave-4e1-budget-exports` (desde `main` post-4D.2 cierre `d330430`).
+- **Sin migración.** Camino de export nuevo sobre `EstimatesWriteRepository`
+  (`getEstimateExportPayload`) + servicio `apps/web/server/estimates/export/`
+  (`generateEstimateExcelExport`/`generateEstimatePdfExport`, ExcelJS + @react-pdf).
+- Endpoint `GET /api/estimates/export` (`runtime=nodejs`, `force-dynamic`): viewer
+  requerido, cadena proyecto/alcance/presupuesto validada, cross-org ⇒ 404, sin
+  service-role, en memoria, filename sanitizado.
+- UI: sección "Exportar presupuesto" con botones Excel/PDF (loading, anti doble-click,
+  error sanitizado, descarga directa) en el detalle del presupuesto.
+- Excel: hojas `RESUMEN`/`PRESUPUESTO`/`TRAZABILIDAD`. PDF: sobrio, paginado, sin
+  UUID/source_row/secretos. Reutiliza el resumen financiero 4D.2 (no recalcula).
+
+### Validación
+- typecheck 0, lint 0, **703 tests** (+16), build fixture + build db-local PASS
+  (`/api/estimates/export` presente), gm:regression 22/22, gm:import PASS, validador
+  214/0/0, `git diff --check` limpio. Remoto Supabase intacto (20/20, sin tocar).
+
+### Deudas registradas
+- `EXPORT_TRACEABILITY_BY_ROLE`, `EXPORT_PROFILES_FOR_ESTIMATE` (INTEGRATION_REQUESTS).
+- Nota cross-ownership: `EstimatesWriteRepository` extendido (avalar con agent-db-rls).
+
+### Próximo paso
+- Preview Vercel → merge `--no-ff` → Production → smoke. **No iniciar 4E.2.**
+
 ## 2026-06-05 — 4D.2 CERRADA: smoke real de AIU editable
 
 ### Estado

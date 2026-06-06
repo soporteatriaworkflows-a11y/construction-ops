@@ -24,6 +24,7 @@ import {
   Upload,
   CheckCircle2,
   ChevronRight,
+  Download,
 } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
 import { EstimateVersionBadge } from '@/components/shared/status-badge';
@@ -43,6 +44,7 @@ import type { AiuRatesView, FinancialSummary } from '@/lib/estimates/aiu-types';
 import { isCreationModeEnabled } from '../../../../../mode-guard';
 import { formatVersionLabel } from '../../estimate-format';
 import { AiuForm } from './aiu-form';
+import { ExportButtons } from './export-buttons';
 
 interface PageProps {
   params: Promise<{ id: string; scopeId: string; estimateId: string }>;
@@ -341,6 +343,24 @@ export default async function EstimateDetailPage({ params, searchParams }: PageP
             directTotal={financialSummary.directTotal}
             serverSummary={financialSummary}
           />
+        </section>
+      )}
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Exportar presupuesto (4E.1)                                         */}
+      {/* ------------------------------------------------------------------ */}
+      {hasContent && active && (
+        <section aria-label="Exportar presupuesto" className="mt-8">
+          <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-600">
+            <Download className="h-4 w-4 text-gray-400" aria-hidden="true" />
+            Exportar presupuesto
+          </h2>
+          <p className="mb-2 text-xs text-gray-500">
+            Versión exportada:{' '}
+            <span className="font-medium text-gray-700">{formatVersionLabel(active.versionNumber)}</span>
+            {' · '}Datos al {formatDateTime(new Date().toISOString())}
+          </p>
+          <ExportButtons projectId={id} scopeId={scopeId} estimateId={estimateId} />
         </section>
       )}
 

@@ -33,7 +33,12 @@ import type {
   ChapterReviewItem,
 } from '@/lib/estimates/review-types';
 import type { AiuRatesInput, AiuRatesView, FinancialSummary } from '@/lib/estimates/aiu-types';
+import type {
+  EstimateExportChapter,
+  EstimateExportPayload,
+} from '@/lib/estimates/export-types';
 import { computeFinancialSummary, ZERO_FRACTIONS } from './aiu-calc';
+import { versionLabel } from './export/version-label';
 
 interface FixtureChapter { id: Uuid; estimateVersionId: Uuid; code: string; name: string; sortOrder: number }
 interface FixtureBoqItem {
@@ -42,8 +47,8 @@ interface FixtureBoqItem {
 }
 
 interface FixtureShape {
-  organization: { id: Uuid };
-  project: { id: Uuid; name: string };
+  organization: { id: Uuid; name?: string };
+  project: { id: Uuid; name: string; location?: string | null };
   projectScopes: { id: Uuid; name: string }[];
   estimate: {
     id: Uuid;
@@ -209,5 +214,56 @@ export class FixtureEstimatesWriteRepository implements EstimatesWriteRepository
     }
     // Sin AIU en el fixture ⇒ total general = costo directo.
     return computeFinancialSummary(fixture.estimateTotals.costos_directos, ZERO_FRACTIONS);
+  }
+
+  async getEstimateExportPayload(
+    viewer: ViewerContext,
+    estimateId: Uuid,
+  ): Promise<EstimateExportPayload> {
+    if (!sameOrg(viewer) || estimateId !== fixture.estimate.id) {
+      throw new EstimateNotFoundError(estimateId);
+    }
+    const reviewChapters = await this.listChaptersByEstimateVersion(viewer, estimateId);
+    const chapters: EstimateExportChapter[] = [];
+    let itemCount = 0;
+    for (const ch of reviewChapters) {
+      const items = await this.listItemsByChapter(viewer, ch.id);
+      itemCount += items.length;
+      chapters.push({
+        code: ch.code, name: ch.name, sortOrder: ch.sortOrder, subtotal: ch.subtotal,
+        sourceCode: ch.sourceCode, sourceRow: ch.sourceRow,
+        items: items.map((it) => ({
+          code: it.code, description: it.description, unit: it.unit,
+          quantity: it.quantity, unitPrice: it.unitPrice, subtotal: it.subtotal,
+          sourceCode: it.sourceCode, sourceRow: it.sourceRow,
+        })),
+      });
+    }
+    const [aiu, financial] = await Promise.all([
+      this.getEstimateVersionAiu(viewer, estimateId),
+      this.calculateEstimateFinancialSummary(viewer, estimateId),
+    ]);
+    const scope = fixture.projectScopes.find((s) => s.id === fixture.estimate.projectScopeId);
+    const v = fixture.estimateVersion;
+    return {
+      organizationName: fixture.organization.name ?? '—',
+      project: { id: fixture.project.id, name: fixture.project.name, city: fixture.project.location ?? null },
+      scope: { id: scope?.id ?? fixture.estimate.projectScopeId, name: scope?.name ?? null },
+      estimate: {
+        id: fixture.estimate.id, code: fixture.estimate.code, name: fixture.estimate.name,
+        status: fixture.estimate.status,
+      },
+      version: { number: v.versionNumber, label: versionLabel(v.versionNumber), status: v.status },
+      generatedAt: new Date().toISOString(),
+      counts: { chapters: reviewChapters.length, items: itemCount },
+      chapters,
+      aiu: {
+        administrationRate: aiu.administrationRate,
+        contingencyRate: aiu.contingencyRate,
+        utilityRate: aiu.utilityRate,
+        utilityVatRate: aiu.utilityVatRate,
+      },
+      financial,
+    };
   }
 }
