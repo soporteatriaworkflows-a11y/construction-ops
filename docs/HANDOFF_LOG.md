@@ -1,5 +1,40 @@
 # Handoff Log
 
+## 2026-06-07 — 4E.1C CERRADA (smoke productivo aprobado) + diagnóstico 4E.2A (migración requerida)
+
+### A. Cierre 4E.1C
+- **Smoke productivo APROBADO por la usuaria**: Excel y PDF exportados OK; logo completo
+  oficial + símbolo visibles; paleta ICONIC correcta (azul dominante, cian acento,
+  **sin dorado**); jerarquía visual aprobada; **total general intacto ($372.247.170)**;
+  presentación general aprobada sin observaciones.
+- `main = origin/main = 7af91ea` (merge `8121731`). Sin migración (solo branding visual)
+  ⇒ remoto Supabase **20/20** intacto.
+- Tag estable: **`wave-4e1c-official-iconic-branding-production-v1`**.
+- Deuda `ICONIC_LOGO_ASSET` ⇒ RESUELTA (assets oficiales versionados; guía interna en
+  `docs/branding/`, no publicada).
+
+### B. Diagnóstico 4E.2A — Creación/edición manual segura de BOQ (FASE 1)
+- **RLS suficiente, sin migración de seguridad**: `chapters`/`boq_items` ENABLE+FORCE RLS;
+  policies select/insert/update/delete por organización (`app.estimate_version_in_org`) y
+  con bloqueo de versión emitida (`NOT app.estimate_version_locked`). Insert/update por la
+  misma organización en versión `draft`/`review` ya permitidos; cross-org y locked bloqueados.
+- **Repositorio de escritura inexistente** para edición manual (db-repository solo lectura
+  de capítulos/ítems hoy).
+- **GAP CRÍTICO (bloqueante)**: NO existe invariant DB-level para `subtotal`. `boq_items.subtotal`
+  solo tiene CHECK `>= 0`; el recálculo `round(qty×price,10)` vive únicamente en la RPC
+  `import_boq_into_version` (carga inicial). Un `authenticated` podría persistir subtotal
+  arbitrario vía PostgREST directo en una versión editable.
+- **Decisión por regla STOP**: se propone UNA migración mínima (función + trigger
+  `BEFORE INSERT OR UPDATE` en `boq_items`) y **se detiene la implementación**. NO UI,
+  NO contrato, NO repositorio, NO deploy, NO dry-run, NO tocar remoto hasta aprobación.
+
+### C. Estado / próximo paso
+- Rama `integration/wave-4e2a-manual-boq-editing` **NO creada todavía** (se creará al aprobar
+  la migración, según el flujo del prompt).
+- **Bloqueo**: requiere **aprobación explícita de la migración** para continuar 4E.2A.
+- Deudas registradas: `BOQ_SAFE_DELETE_OR_ARCHIVE`, `BOQ_REORDER`, `BOQ_AUDIT_TRAIL`,
+  `ESTIMATE_VERSIONING`.
+
 ## 2026-06-06 — 4E.1C: activación de assets oficiales GRUPO ICONIC
 
 ### Estado
