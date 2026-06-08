@@ -1,5 +1,29 @@
 # Handoff Log
 
+## 2026-06-07 — 4E.2A: verificación productiva (deploy READY) por Vercel CLI
+
+### Auditoría read-only del estado real
+- Rama `main`; HEAD `19f3c5d`; **main = origin/main = 19f3c5d**; working tree limpio;
+  sin WIP de 4E.2A pendiente. Sin inconsistencias con el reporte anterior.
+- **P1-A intacto (no tocado)**: rama `fix/security-p1a-read-model-rls-export-legacy`
+  (`a78839c`) + 2 `git stash` (export-test / exports organizationId) sin cambios.
+
+### Verificación Vercel (CLI vía `corepack pnpm dlx vercel`, sin instalar global)
+- `vercel whoami` = `soporteatriaworkflows-8854`. Carpeta vinculada a `construction-ops`
+  (`prj_fVLILBxQnttsj8rMYls7WikAGGPE`), NO `construction-ops-1rqh`.
+- Deployment producción `dpl_DenhpBNL8ga7kKfeQ8vyYk3Jdq8E` (`construction-oxzs4xcb2-…`):
+  **● Ready**, target production, aliases `construction-ops-psi.vercel.app` +
+  `construction-ops-git-main-…`, creado tras el push de `19f3c5d` (auto-deploy GitHub).
+- **Smoke HTTP**: `/login` 200; `/dashboard` 307→`/login`; rutas 4E.2A `chapters/new`,
+  `items/new`, `items/[id]/edit` 307→`/login?next=…`; control inexistente 404
+  (confirma que las rutas 4E.2A están en el build desplegado). Sin 500; sin fixture
+  público; sin secretos; sin cambios de datos productivos.
+
+### Pendiente
+- **Smoke visual de la usuaria** (editar cantidad de un ítem real → ver subtotal/directo/
+  AIU/total → restaurar ≈ $372.247.170). Tras su OK: tag
+  `wave-4e2a-manual-boq-editing-production-v1`. **4E.2B/4E.3 NO iniciadas.**
+
 ## 2026-06-07 — 4E.2A: edición manual segura de BOQ IMPLEMENTADA (migración aplicada)
 
 ### Estado
