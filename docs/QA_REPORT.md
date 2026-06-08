@@ -9,6 +9,27 @@ cada ciclo de validación.
 
 ---
 
+## 4E.2A — Edición manual segura de BOQ (2026-06-07, pre-merge)
+
+Validación en `integration/wave-4e2a-manual-boq-editing`:
+- **typecheck 0, lint 0, 736 tests** (+24 de 4E.2A: validación de capítulo/ítem,
+  subtotal derivado, fixture solo lectura + cross-org, fuente de actions/UI sin
+  subtotal/totales del navegador).
+- **build fixture + build db-local PASS** (4 rutas nuevas `ƒ` dynamic).
+- **gm:regression 22/22, gm:import PASS, validador agentes 214/0/0.**
+- **RLS runtime 106/106** (+17 checks 4E.2A): función/trigger presentes, INSERT
+  recalcula (999→6), UPDATE cantidad/precio recalcula, **PATCH subtotal-only
+  ignorado** (777→20), import RPC compatible, ítem importado recalcula y
+  **preserva `source_code`/`source_row`**, mover ítem conserva origen, cantidad
+  negativa bloqueada (CHECK), versión emitida ⇒ INSERT bloqueado (RLS).
+- Migración `20260606120000` aplicada al remoto ⇒ **21/21 Local = Remote** (0 seeds).
+- `git diff --check` limpio; sin secretos ni archivos privados; WIP de seguridad
+  ajeno aislado en `git stash` (no commiteado).
+- Privacidad/seguridad: cliente RLS-bound sin service-role; cross-org Not-Found;
+  fixture write bloqueada; el navegador no puede persistir subtotal arbitrario.
+
+Pendiente de QA integral (Oleada 4) y smoke productivo de la usuaria.
+
 ## 4E.1C — Assets oficiales GRUPO ICONIC (2026-06-06, pre-merge)
 
 Validación en `integration/wave-4e1c-official-iconic-assets`: typecheck 0, lint 0

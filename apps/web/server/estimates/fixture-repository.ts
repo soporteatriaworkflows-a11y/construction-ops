@@ -23,10 +23,18 @@ import type {
 } from './types';
 import {
   AiuWriteNotSupportedError,
+  BoqItemNotFoundError,
+  BoqWriteNotSupportedError,
   ChapterNotFoundError,
   EstimateNotFoundError,
   EstimateWriteNotSupportedError,
 } from './errors';
+import type {
+  BoqItemMutationResult,
+  ChapterMutationResult,
+  EditableBoqItemView,
+  EditableChapterView,
+} from '@/lib/estimates/boq-edit-types';
 import type {
   BoqItemReviewView,
   ChapterDetailView,
@@ -264,6 +272,80 @@ export class FixtureEstimatesWriteRepository implements EstimatesWriteRepository
         utilityVatRate: aiu.utilityVatRate,
       },
       financial,
+    };
+  }
+
+  /* --- Edición manual de BOQ (4E.2A): escritura bloqueada (solo lectura). --- */
+
+  async createEstimateChapter(): Promise<ChapterMutationResult> {
+    throw new BoqWriteNotSupportedError();
+  }
+
+  async updateEstimateChapter(): Promise<ChapterMutationResult> {
+    throw new BoqWriteNotSupportedError();
+  }
+
+  async getEditableEstimateChapter(
+    viewer: ViewerContext,
+    estimateId: Uuid,
+    chapterId: Uuid,
+  ): Promise<EditableChapterView> {
+    const ch = fixture.chapters.find((c) => c.id === chapterId);
+    if (!sameOrg(viewer) || estimateId !== fixture.estimate.id || !ch) {
+      throw new ChapterNotFoundError(chapterId);
+    }
+    return {
+      id: ch.id,
+      code: ch.code,
+      name: ch.name,
+      sourceCode: null,
+      sourceRow: null,
+      isManual: true,
+      editable: false, // demo/fixture: solo lectura.
+      estimateId,
+      versionNumber: fixture.estimateVersion.versionNumber,
+    };
+  }
+
+  async createBoqItem(): Promise<BoqItemMutationResult> {
+    throw new BoqWriteNotSupportedError();
+  }
+
+  async updateBoqItem(): Promise<BoqItemMutationResult> {
+    throw new BoqWriteNotSupportedError();
+  }
+
+  async getEditableBoqItem(
+    viewer: ViewerContext,
+    estimateId: Uuid,
+    chapterId: Uuid,
+    itemId: Uuid,
+  ): Promise<EditableBoqItemView> {
+    const it = fixture.boqItems.find((i) => i.id === itemId);
+    if (!sameOrg(viewer) || estimateId !== fixture.estimate.id || !it || it.chapterId !== chapterId) {
+      throw new BoqItemNotFoundError(itemId);
+    }
+    const ch = fixture.chapters.find((c) => c.id === chapterId);
+    const availableChapters = fixture.chapters
+      .slice()
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((c) => ({ id: c.id, code: c.code, name: c.name }));
+    return {
+      id: it.id,
+      chapterId: it.chapterId,
+      chapterCode: ch?.code ?? '',
+      code: it.code,
+      description: it.descriptionSnapshot,
+      unit: it.unitSnapshot,
+      quantity: it.quantitySnapshot,
+      unitPrice: it.unitPriceSnapshot,
+      subtotal: it.subtotal,
+      sourceCode: null,
+      sourceRow: null,
+      isManual: true,
+      editable: false, // demo/fixture: solo lectura.
+      versionNumber: fixture.estimateVersion.versionNumber,
+      availableChapters,
     };
   }
 }

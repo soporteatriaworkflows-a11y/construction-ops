@@ -1048,6 +1048,132 @@ async function main(): Promise<void> {
   );
   check('aiu: versión emitida (approved) ⇒ INSERT de AIU bloqueado (read-only)', aiuLockedBlocked);
 
+  // ===========================================================================
+  // 17) BOQ MANUAL EDITING 4E.2A — invariant DB-level del subtotal + edición.
+  //     Trigger boq_items_recompute_subtotal fuerza subtotal=round(q×p,10) en
+  //     TODO INSERT/UPDATE; trazabilidad; mover ítem; versión bloqueada.
+  // ===========================================================================
+  console.log('\n--- BOQ MANUAL 4E.2A: invariant subtotal + edición segura ---');
+
+  // 17a) Catálogo: función + trigger presentes (BEFORE INSERT OR UPDATE).
+  const trig = await sql<{ fn: number; tg: number; ev: string | null }[]>`
+    SELECT
+      (SELECT count(*)::int FROM pg_proc WHERE proname = 'set_boq_item_subtotal') AS fn,
+      (SELECT count(*)::int FROM pg_trigger WHERE tgname = 'boq_items_recompute_subtotal' AND NOT tgisinternal) AS tg,
+      (SELECT CASE WHEN bool_or(action_timing='BEFORE') AND
+                        bool_and(event_manipulation IN ('INSERT','UPDATE'))
+                   THEN string_agg(DISTINCT event_manipulation, ',' ORDER BY event_manipulation) END
+       FROM information_schema.triggers
+       WHERE trigger_name = 'boq_items_recompute_subtotal') AS ev`;
+  check('boq-subtotal: función set_boq_item_subtotal presente', trig[0]!.fn === 1, `fn=${trig[0]!.fn}`);
+  check('boq-subtotal: trigger boq_items_recompute_subtotal presente', trig[0]!.tg === 1, `tg=${trig[0]!.tg}`);
+  check('boq-subtotal: trigger BEFORE INSERT+UPDATE', trig[0]!.ev === 'INSERT,UPDATE', `ev=${trig[0]!.ev}`);
+
+  // Capítulos de prueba: 2 para el escenario de mover ítem.
+  const meChapters = [
+    { code: '11', name: 'Preliminares', sortOrder: 0, sourceCode: '7', sourceRow: 97 },
+    { code: '12', name: 'Cimentación', sortOrder: 1, sourceCode: '8', sourceRow: 110 },
+  ];
+  const meItems = [
+    { chapterCode: '11', code: '11.01', description: 'Excavación', unit: 'm3', quantity: '2', unitPrice: '3', sortOrder: 0, sourceCode: '7.01', sourceRow: 98 },
+  ];
+
+  const me = await asUser(realA, async (q) => {
+    const [{ id: estId }] = await q<{ id: string }[]>`
+      SELECT id FROM public.create_estimate_with_initial_version(${SCOPE_A}, 'MANUAL', 'Manual', NULL)`;
+    const [{ vid }] = await q<{ vid: string }[]>`
+      SELECT id AS vid FROM estimate_versions WHERE estimate_id = ${estId} ORDER BY version_number DESC LIMIT 1`;
+    await q`SELECT public.import_boq_into_version(${vid}, ${sql.json(meChapters)}, ${sql.json(meItems)})`;
+    const [{ id: ch11 }] = await q<{ id: string }[]>`SELECT id FROM chapters WHERE estimate_version_id = ${vid} AND code = '11'`;
+    const [{ id: ch12 }] = await q<{ id: string }[]>`SELECT id FROM chapters WHERE estimate_version_id = ${vid} AND code = '12'`;
+
+    // 17b) INSERT manual con subtotal MENTIROSO (999) ⇒ recalculado a 6 (=3×2).
+    const [ins] = await q<{ subtotal: string; source_code: string | null; source_row: number | null }[]>`
+      INSERT INTO boq_items (estimate_version_id, chapter_id, code, description_snapshot, unit_snapshot,
+        quantity_snapshot, unit_price_snapshot, subtotal, sort_order)
+      VALUES (${vid}, ${ch11}, '11.99', 'Manual', 'un', 3, 2, 999, 1)
+      RETURNING subtotal, source_code, source_row`;
+
+    // 17c) UPDATE cantidad ⇒ subtotal recalculado (q=5,p=2 ⇒ 10).
+    const [updQ] = await q<{ subtotal: string }[]>`
+      UPDATE boq_items SET quantity_snapshot = 5 WHERE estimate_version_id = ${vid} AND code = '11.99' RETURNING subtotal`;
+    // 17d) UPDATE precio ⇒ subtotal recalculado (q=5,p=4 ⇒ 20).
+    const [updP] = await q<{ subtotal: string }[]>`
+      UPDATE boq_items SET unit_price_snapshot = 4 WHERE estimate_version_id = ${vid} AND code = '11.99' RETURNING subtotal`;
+    // 17e) PATCH subtotal-only (777) ⇒ ignorado, recalculado a 20 (q=5,p=4).
+    const [patch] = await q<{ subtotal: string }[]>`
+      UPDATE boq_items SET subtotal = 777 WHERE estimate_version_id = ${vid} AND code = '11.99' RETURNING subtotal`;
+
+    // 17f) UPDATE de ítem IMPORTADO: cambia cantidad, subtotal recalculado,
+    //      source_code/source_row PRESERVADOS.
+    const [updImp] = await q<{ subtotal: string; source_code: string | null; source_row: number | null }[]>`
+      UPDATE boq_items SET quantity_snapshot = 10 WHERE estimate_version_id = ${vid} AND code = '11.01'
+      RETURNING subtotal, source_code, source_row`;
+
+    // 17g) Mover ítem importado de cap 11 → cap 12 (misma versión); origen intacto.
+    const [moved] = await q<{ chapter_id: string; source_code: string | null; subtotal: string }[]>`
+      UPDATE boq_items SET chapter_id = ${ch12}, sort_order = 5 WHERE estimate_version_id = ${vid} AND code = '11.01'
+      RETURNING chapter_id, source_code, subtotal`;
+
+    return { vid, ch11, ch12, ins, updQ, updP, patch, updImp, moved };
+  });
+  check('boq-subtotal: INSERT recalcula subtotal (999→6)', Number(me.ins.subtotal) === 6, `sub=${me.ins.subtotal}`);
+  check('boq-subtotal: INSERT manual ⇒ source_code/source_row NULL', me.ins.source_code === null && me.ins.source_row === null);
+  check('boq-subtotal: UPDATE cantidad recalcula subtotal (→10)', Number(me.updQ.subtotal) === 10, `sub=${me.updQ.subtotal}`);
+  check('boq-subtotal: UPDATE precio recalcula subtotal (→20)', Number(me.updP.subtotal) === 20, `sub=${me.updP.subtotal}`);
+  check('boq-subtotal: PATCH subtotal-only ignorado (777→20)', Number(me.patch.subtotal) === 20, `sub=${me.patch.subtotal}`);
+  check('boq-subtotal: UPDATE importado recalcula subtotal (10×3=30)', Number(me.updImp.subtotal) === 30, `sub=${me.updImp.subtotal}`);
+  check('boq-subtotal: UPDATE importado preserva origen (7.01/98)', me.updImp.source_code === '7.01' && me.updImp.source_row === 98, JSON.stringify(me.updImp));
+  check('boq-subtotal: mover ítem cambia chapter_id y conserva origen', me.moved.chapter_id === me.ch12 && me.moved.source_code === '7.01');
+
+  // 17h) Valor negativo bloqueado por CHECK (boq_items_nonneg).
+  let negBlocked = false;
+  await asUser(realA, async (q) => {
+    const [{ id: estId }] = await q<{ id: string }[]>`
+      SELECT id FROM public.create_estimate_with_initial_version(${SCOPE_A}, 'NEG', 'Neg', NULL)`;
+    const [{ vid }] = await q<{ vid: string }[]>`
+      SELECT id AS vid FROM estimate_versions WHERE estimate_id = ${estId} ORDER BY version_number DESC LIMIT 1`;
+    await q`SELECT public.import_boq_into_version(${vid}, ${sql.json([meChapters[0]])}, ${sql.json([])})`;
+    const [{ id: chid }] = await q<{ id: string }[]>`SELECT id FROM chapters WHERE estimate_version_id = ${vid} AND code = '11'`;
+    await q.unsafe('SAVEPOINT sp_neg');
+    try {
+      await q`INSERT INTO boq_items (estimate_version_id, chapter_id, code, description_snapshot, unit_snapshot,
+        quantity_snapshot, unit_price_snapshot, subtotal, sort_order)
+        VALUES (${vid}, ${chid}, 'NEG', 'x', 'u', -1, 2, 0, 0)`;
+    } catch {
+      negBlocked = true;
+      await q.unsafe('ROLLBACK TO SAVEPOINT sp_neg');
+    }
+  });
+  check('boq-subtotal: cantidad negativa bloqueada (CHECK)', negBlocked);
+
+  // 17i) Versión EMITIDA (approved) ⇒ INSERT manual de ítem bloqueado (RLS).
+  let boqLockedBlocked = false;
+  await asUser(
+    realA,
+    async (q) => {
+      let blocked = false;
+      await q.unsafe('SAVEPOINT sp_boq_lock');
+      try {
+        await q`INSERT INTO chapters (estimate_version_id, code, name, sort_order)
+                VALUES ('00000000-0000-0000-0000-0000000000e3', 'LK', 'Locked', 0)`;
+      } catch {
+        blocked = true;
+        await q.unsafe('ROLLBACK TO SAVEPOINT sp_boq_lock');
+      }
+      boqLockedBlocked = blocked;
+    },
+    async (q) => {
+      await q`INSERT INTO estimates (id, project_scope_id, code, name, status)
+              VALUES ('00000000-0000-0000-0000-0000000000e4', ${SCOPE_A}, 'EMIT', 'Emit', 'active')
+              ON CONFLICT (id) DO NOTHING`;
+      await q`INSERT INTO estimate_versions (id, estimate_id, version_number, status)
+              VALUES ('00000000-0000-0000-0000-0000000000e3', '00000000-0000-0000-0000-0000000000e4', 1, 'approved')
+              ON CONFLICT (id) DO NOTHING`;
+    },
+  );
+  check('boq-manual: versión emitida ⇒ INSERT de capítulo bloqueado (read-only)', boqLockedBlocked);
+
   // --- Resumen ---
   console.log(`\nRESULTADO RLS RUNTIME: ${pass} PASS / ${fail} FAIL`);
   if (fail > 0) {

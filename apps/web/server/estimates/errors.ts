@@ -103,6 +103,76 @@ export class EstimateWriteNotSupportedError extends Error {
   }
 }
 
+/* --------------------------------------------------------------------------
+ * Edición manual de BOQ (Oleada 4E.2A) — `docs/BOQ_MANUAL_EDITING_CONTRACT.md`.
+ * ----------------------------------------------------------------------- */
+
+/** Campo y motivo de una violación de validación de capítulo/ítem BOQ. */
+export interface BoqValidationIssue {
+  field: 'code' | 'name' | 'description' | 'unit' | 'quantity' | 'unitPrice' | 'targetChapterId';
+  message: string;
+}
+
+/** Entrada inválida de capítulo o ítem (obligatorios, longitudes, numérico). */
+export class BoqValidationError extends Error {
+  readonly code = 'boq_validation' as const;
+  readonly issues: BoqValidationIssue[];
+  constructor(issues: BoqValidationIssue[], message?: string) {
+    super(message ?? `boq_validation: ${issues.map((i) => i.field).join(', ')}`);
+    this.name = 'BoqValidationError';
+    this.issues = issues;
+  }
+}
+
+/** La edición manual de BOQ no aplica en el modo actual (fixture, solo lectura). */
+export class BoqWriteNotSupportedError extends Error {
+  readonly code = 'boq_write_not_supported' as const;
+  constructor(message?: string) {
+    super(
+      message ??
+        'boq_write_not_supported: la edición manual del presupuesto requiere ' +
+          'READ_MODEL_SOURCE=db (el modo demostración es de solo lectura).',
+    );
+    this.name = 'BoqWriteNotSupportedError';
+  }
+}
+
+/** La versión del presupuesto no admite edición (emitida/bloqueada). */
+export class BoqVersionLockedError extends Error {
+  readonly code = 'boq_version_locked' as const;
+  constructor(message?: string) {
+    super(message ?? 'La versión del presupuesto no admite cambios (versión emitida).');
+    this.name = 'BoqVersionLockedError';
+  }
+}
+
+/** Código de capítulo duplicado dentro de la versión (unique violation). */
+export class ChapterCodeDuplicateError extends Error {
+  readonly code = 'chapter_code_duplicate' as const;
+  constructor(message?: string) {
+    super(message ?? 'Ya existe un capítulo con ese código en esta versión.');
+    this.name = 'ChapterCodeDuplicateError';
+  }
+}
+
+/** Ítem BOQ inexistente o no visible para la organización del viewer. */
+export class BoqItemNotFoundError extends Error {
+  readonly code = 'boq_item_not_found' as const;
+  constructor(itemId: string, message?: string) {
+    super(message ?? `boq_item_not_found: ${itemId}`);
+    this.name = 'BoqItemNotFoundError';
+  }
+}
+
+/** Capítulo destino (para mover) inexistente o de otra versión/organización. */
+export class TargetChapterNotFoundError extends Error {
+  readonly code = 'target_chapter_not_found' as const;
+  constructor(message?: string) {
+    super(message ?? 'El capítulo de destino no existe o no pertenece a este presupuesto.');
+    this.name = 'TargetChapterNotFoundError';
+  }
+}
+
 /** No se pudo generar un `code` libre tras agotar los reintentos anti-colisión. */
 export class EstimateCodeGenerationError extends Error {
   readonly code = 'estimate_code_generation' as const;

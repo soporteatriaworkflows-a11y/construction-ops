@@ -1,5 +1,52 @@
 # Handoff Log
 
+## 2026-06-07 — 4E.2A: edición manual segura de BOQ IMPLEMENTADA (migración aplicada)
+
+### Estado
+- Rama `integration/wave-4e2a-manual-boq-editing` (desde `main` `1aaf203`).
+- **Migración aprobada y aplicada** `20260606120000_boq_items_subtotal_invariant.sql`:
+  función `set_boq_item_subtotal()` + trigger `boq_items_recompute_subtotal`
+  `BEFORE INSERT OR UPDATE` (subtotal = `round(q×p,10)` forzado en toda escritura).
+  `db push --dry-run` = 1 migración esperada (0 seeds) ⇒ `db push --linked` ⇒
+  **21/21 Local = Remote**. Remoto: solo esquema, sin datos/seeds.
+
+### Implementación
+- Repo (`server/estimates/`): 6 métodos nuevos (create/update/getEditable de
+  capítulo e ítem) en db + fixture; validación pura `boq-validation.ts`; errores
+  de dominio; barrel actualizado. Subtotal derivado server-side + trigger DB;
+  AIU/total general reutilizan `aiu-calc` (una sola fuente). Trazabilidad
+  preservada (importado) / NULL (manual); `sort_order` append; mover ítem entre
+  capítulos de la misma versión (código no renumerado, advertencia de prefijo).
+- UI: server actions `chapter-actions.ts`/`item-actions.ts` (guard supabase+db,
+  viewer server-side, nunca subtotal/totales del navegador); formularios
+  `chapter-form.tsx`/`item-form.tsx` (preview de subtotal + leyenda, loading,
+  anti doble-submit, banner de éxito, read-only si bloqueada/fixture); 4 rutas
+  nuevas (chapters/new, chapters/[id]/edit, items/new, items/[id]/edit); CTAs
+  "Nuevo capítulo"/"Editar" en detalle de presupuesto y capítulo.
+
+### Validación (local, todo verde)
+- typecheck 0, lint 0, **736 tests** (+24), build fixture + build db-local PASS
+  (rutas `ƒ`), gm:regression 22/22, gm:import PASS, validador 214/0/0,
+  **RLS runtime 106/106** (+17 checks 4E.2A: trigger presente, INSERT/UPDATE
+  recalcula, PATCH-subtotal ignorado, import compatible, origen preservado,
+  mover, negativo/emitida bloqueados). `git diff --check` limpio; sin secretos/
+  privados.
+
+### Nota de proceso — WIP de seguridad en paralelo (export-legacy)
+- Aparecieron cambios NO commiteados ajenos a 4E.2A en `apps/web/{app/api/exports/
+  route.ts, modules/exports/types.ts, server/exports/export-service.ts,
+  tests/unit/exports/export-service.test.ts}` (remediación P1-A/M-02 incompleta,
+  rompía typecheck/test del módulo legacy). Preservados en **2 `git stash`**
+  (recuperables vía `git stash list`/`pop`), NO commiteados aquí. Los completa la
+  rama `fix/security-p1a-...`.
+
+### Próximo paso
+- Merge `--no-ff` a `main` + push. **Deploy a producción vía Vercel CLI NO
+  ejecutable en este entorno (CLI no instalada)** ⇒ acción manual de la usuaria
+  (o auto-deploy por integración GitHub). Smoke final manual de la usuaria
+  (cambiar cantidad de un ítem real → ver total → restaurar ≈ $372.247.170).
+- **4E.2B / 4E.3 / 4F NO iniciadas.**
+
 ## 2026-06-07 — 4E.1C CERRADA (smoke productivo aprobado) + diagnóstico 4E.2A (migración requerida)
 
 ### A. Cierre 4E.1C

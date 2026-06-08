@@ -8,23 +8,33 @@
  */
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, ListTree, Hash, DollarSign, FolderOpen, Layers, ClipboardList } from 'lucide-react';
+import { ArrowLeft, ListTree, Hash, DollarSign, FolderOpen, Layers, ClipboardList, Plus, Pencil, CheckCircle2 } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Card, CardContent } from '@/components/ui/card';
 import { formatCOP, formatNumber } from '@/lib/utils/format';
 import { resolveViewer } from '@/server/auth/resolve-viewer';
 import { getEstimatesWriteRepository, ChapterNotFoundError } from '@/server/estimates';
 import type { BoqItemReviewView } from '@/lib/estimates/review-types';
+import { isCreationModeEnabled } from '../../../../../../../mode-guard';
 
 interface PageProps {
   params: Promise<{ id: string; scopeId: string; estimateId: string; chapterId: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }
 
-export default async function ChapterDetailPage({ params }: PageProps) {
+export default async function ChapterDetailPage({ params, searchParams }: PageProps) {
   const { id, scopeId, estimateId, chapterId } = await params;
+  const sp = searchParams ? await searchParams : {};
+  const justSaved = sp['saved'] === '1';
   const estimateHref = `/projects/${id}/scopes/${scopeId}/estimates/${estimateId}`;
+  const chapterBase = `${estimateHref}/chapters/${chapterId}`;
+  const itemNewHref = `${chapterBase}/items/new`;
+  const itemEditHref = (itemId: string) => `${chapterBase}/items/${itemId}/edit`;
+  const chapterEditHref = `${chapterBase}/edit`;
+  const canEdit = isCreationModeEnabled();
 
   let viewer: Awaited<ReturnType<typeof resolveViewer>>;
   try {
@@ -71,6 +81,24 @@ export default async function ChapterDetailPage({ params }: PageProps) {
           </Link>
         }
       />
+
+      {justSaved && (
+        <div className="mb-4 flex items-center gap-2 rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800" role="status" aria-live="polite">
+          <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+          Cambios guardados. Los subtotales y el total general reflejan los datos actuales.
+        </div>
+      )}
+
+      {canEdit && (
+        <div className="mb-4">
+          <Button asChild size="sm" variant="outline">
+            <Link href={chapterEditHref}>
+              <Pencil className="h-4 w-4" aria-hidden="true" />
+              Editar capítulo
+            </Link>
+          </Button>
+        </div>
+      )}
 
       {/* Resumen del capítulo + contexto */}
       <div className="grid gap-4 sm:grid-cols-2">
@@ -126,10 +154,25 @@ export default async function ChapterDetailPage({ params }: PageProps) {
 
       {/* Ítems BOQ */}
       <section aria-label="Ítems BOQ" className="mt-6">
-        <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-600">
-          <ListTree className="h-4 w-4 text-gray-400" aria-hidden="true" />
-          Ítems BOQ
-        </h2>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-600">
+            <ListTree className="h-4 w-4 text-gray-400" aria-hidden="true" />
+            Ítems BOQ
+          </h2>
+          {canEdit ? (
+            <Button asChild size="sm" variant="outline">
+              <Link href={itemNewHref}>
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                Nuevo ítem
+              </Link>
+            </Button>
+          ) : (
+            <Button size="sm" variant="outline" disabled aria-disabled="true" title="Disponible en modo supabase+db">
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              Nuevo ítem
+            </Button>
+          )}
+        </div>
         {itemsError ? (
           <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
             Error al cargar ítems: {itemsError}
@@ -147,6 +190,7 @@ export default async function ChapterDetailPage({ params }: PageProps) {
                   <th className="px-3 py-2 text-right font-medium">Cantidad</th>
                   <th className="px-3 py-2 text-right font-medium">V/Unitario</th>
                   <th className="px-3 py-2 text-right font-medium">Subtotal</th>
+                  {canEdit && <th className="px-3 py-2" />}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -168,6 +212,14 @@ export default async function ChapterDetailPage({ params }: PageProps) {
                     <td className="px-3 py-2 text-right tabular-nums text-gray-600">{formatNumber(it.quantity)}</td>
                     <td className="px-3 py-2 text-right tabular-nums text-gray-600">{formatCOP(it.unitPrice)}</td>
                     <td className="px-3 py-2 text-right tabular-nums font-medium">{formatCOP(it.subtotal)}</td>
+                    {canEdit && (
+                      <td className="px-3 py-2 text-right">
+                        <Link href={itemEditHref(it.id)} className="inline-flex items-center gap-0.5 text-xs font-medium text-gray-600 hover:underline">
+                          <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                          Editar
+                        </Link>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
