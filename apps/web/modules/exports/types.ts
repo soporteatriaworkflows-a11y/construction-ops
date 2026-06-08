@@ -62,6 +62,12 @@ export const FORMAT_PROFILE_COMPAT: Record<ExportFormat, ExportProfile[]> = {
 export interface ExportRequest {
   /** Perfil de exportación (proyección de datos a aplicar). */
   profile: ExportProfile;
+  /**
+   * Organización del visor, DERIVADA SERVER-SIDE de la sesión autenticada
+   * (P1-A / M-02). NUNCA se acepta desde el navegador. El servicio la usa como
+   * `ViewerContext.organizationId`; jamás una organización demo hardcodeada.
+   */
+  organizationId: Uuid;
   /** ID del proyecto a exportar. */
   projectId: Uuid;
   /** Versión del presupuesto (opcional; usa la vigente si se omite). */
