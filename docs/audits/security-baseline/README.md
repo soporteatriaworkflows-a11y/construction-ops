@@ -4,6 +4,14 @@
 > desplegó, **no** se tocó Supabase remoto, **no** se expusieron secretos.
 > Generado en la rama aislada `audit/security-baseline-construction-ops`.
 
+> **Actualización P1-A (2026-06-08):** remediación parcial en worktree aislado
+> `construction-ops-security-p1a` (rama `fix/security-p1a-read-model-rls-export-legacy`).
+> **M-02 ASEGURADO** (export legacy deriva la organización server-side). **H-01:**
+> `DATABASE_URL_RLS_STATUS = BYPASSRLS_ROLE` confirmado; utilidad `withTenantRls`
+> (Alternativa B) implementada y **probada (aislamiento 8/8)**; cableado en el
+> read-model = rollout escalonado pendiente. Sin migración, sin deploy, sin merge.
+> Ver docs **17–20**. typecheck/lint/build OK · 714 tests · harness 93/93.
+
 - **Repo:** `D:/ICONIC/SOFTWARE PRESUPUESTOS/construction-ops`
 - **Rama base auditada:** `main` · **commit** `7af91ea`
 - **Rama de trabajo de auditoría:** `audit/security-baseline-construction-ops`
@@ -83,6 +91,10 @@ Detalle en [`12_FINDINGS_REGISTER.md`](12_FINDINGS_REGISTER.md).
 | 14 | [Manual Validation Checklist](14_MANUAL_VALIDATION_CHECKLIST.md) |
 | 15 | [Commands Executed](15_COMMANDS_EXECUTED.md) |
 | 16 | [Open Questions](16_OPEN_QUESTIONS.md) |
+| 17 | [P1-A — Decisión RLS read-model](17_P1A_READ_MODEL_RLS_DECISION.md) |
+| 18 | [P1-A — Reporte de implementación](18_P1A_IMPLEMENTATION_REPORT.md) |
+| 19 | [P1-A — Evidencia de pruebas](19_P1A_TEST_EVIDENCE.md) |
+| 20 | [P1-A — Checklist de despliegue](20_P1A_DEPLOYMENT_CHECKLIST.md) |
 
 ## Recomendación de siguiente paso
 

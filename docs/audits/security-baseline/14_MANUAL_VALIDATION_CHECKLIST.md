@@ -3,6 +3,12 @@
 > Requiere acceso a paneles externos (no disponible en esta fase). **No** solicitar
 > ni exponer valores de secretos. Marcar al validar.
 
+> **P1-A (2026-06-08):** **MV-04 EJECUTADO** — harness RLS local **93/93** +
+> aislamiento read-model **8/8**. **MV-01 con evidencia local:** la conexión
+> por defecto del read-model usa rol `postgres` con `rolbypassrls=true`
+> (`DATABASE_URL_RLS_STATUS = BYPASSRLS_ROLE`); **falta confirmar el rol en
+> PRODUCCIÓN (Vercel)**, que sigue pendiente abajo.
+
 ## Supabase (panel del proyecto productivo)
 - [ ] **MV-01 (crítico, H-01):** ¿Con qué rol se conecta `DATABASE_URL` de Vercel?
       (¿`postgres`/owner/service = bypassa RLS, o un rol no privilegiado?) Sin

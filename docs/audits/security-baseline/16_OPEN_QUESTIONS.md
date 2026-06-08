@@ -1,5 +1,10 @@
 # 16 — Preguntas Abiertas
 
+> **P1-A (2026-06-08):** (1) parcialmente respondida — rol local/por-defecto del
+> read-model = `postgres` con `rolbypassrls=true`; **falta confirmar el rol en
+> producción (Vercel)**. (2) RESUELTA — `/api/exports` sin consumidores; se
+> **aseguró** (org server-side) en vez de retirarse.
+
 1. **`DATABASE_URL` (H-01):** ¿con qué rol de PostgreSQL se conecta el read-model en
    producción? Si es `postgres`/owner/`service_role`, RLS no protege las lecturas.
    ¿Se desea migrar el read-model a una conexión `authenticated` con el JWT del

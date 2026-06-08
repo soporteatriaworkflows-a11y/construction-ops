@@ -1,5 +1,9 @@
 # 06 — Backend / API Routes / Server Actions / RPCs
 
+> **P1-A (2026-06-08):** M-02 **ASEGURADO** — `/api/exports` deriva la organización
+> del visor server-side (`request.organizationId`); eliminado `DEMO_ORGANIZATION_ID`
+> hardcodeado; tests cross-org añadidos. Ver docs 18–19.
+
 ## Superficies
 
 | Endpoint / acción | Método | Auth | Autorización | Validación | Hallazgos |

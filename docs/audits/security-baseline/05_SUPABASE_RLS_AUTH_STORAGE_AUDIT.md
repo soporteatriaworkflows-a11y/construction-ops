@@ -1,5 +1,10 @@
 # 05 — Supabase / PostgreSQL / RLS / Auth / Storage
 
+> **P1-A (2026-06-08):** MV-04 ejecutado (harness **93/93**). H-01 confirmado:
+> conexión del read-model = `postgres`/`rolbypassrls=true`
+> (`DATABASE_URL_RLS_STATUS = BYPASSRLS_ROLE`). Fix `withTenantRls` (Alt B) probado
+> 8/8 sin migración; ver docs 17–20.
+
 ## 5.1 Inventario
 
 - **Migraciones:** 20 (`20260530090000` … `20260605120000`).

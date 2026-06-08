@@ -1,7 +1,14 @@
 # 13 — Plan de Remediación (NO implementar todavía)
 
-> Dividido en oleadas P0–P3. Ninguna acción se ejecuta en esta fase. Cada acción
-> requiere rama aislada, validación y rollback definido.
+> Dividido en oleadas P0–P3. Cada acción requiere rama aislada, validación y
+> rollback definido.
+
+> **Progreso P1-A (2026-06-08, rama `fix/security-p1a-...`, sin merge):**
+> - **M-02 (export legacy):** ✅ ASEGURADO (org server-side + tests cross-org).
+> - **H-01 (read-model RLS):** 🟡 EN PROGRESO — `withTenantRls` (Alt B) implementada
+>   y probada 8/8; cableado escalonado en el read-model + confirmación del rol de
+>   `DATABASE_URL` en prod = pendiente (docs 17–20).
+> - Resto de P1/P2/P3: sin iniciar.
 
 ## OLEADA P0 — Contención inmediata
 

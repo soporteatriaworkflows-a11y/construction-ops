@@ -15,6 +15,20 @@ lectura; explotabilidad real condicionada al rol de `DATABASE_URL` (validación
 manual) y a defectos de filtrado (existe uno concreto: M-02). El camino de
 escritura sí es RLS-bound, por eso no es CRITICAL.
 
+> **Actualización P1-A (2026-06-08) — H-01:** `DATABASE_URL_RLS_STATUS =
+> BYPASSRLS_ROLE` **confirmado** (`current_user=postgres`, `rolbypassrls=true`).
+> Utilidad `withTenantRls` (Alt B) implementada (`apps/web/lib/db/rls.ts`) y
+> **probada 8/8** (`scripts/rls-runtime/read-model-isolation.ts`): reproduce la
+> fuga cruda y demuestra el fix (RLS aplica, sin cross-org, sin contaminación de
+> pool, deny-by-default). **Sin migración.** Pendiente: cableado escalonado en el
+> read-model + confirmar/migrar rol de `DATABASE_URL` (docs 17–20). **EN PROGRESO.**
+>
+> **Actualización P1-A — M-02:** **ASEGURADO** (en rama P1-A, sin merge).
+> `/api/exports` deriva la organización server-side (`request.organizationId`);
+> eliminado `DEMO_ORGANIZATION_ID` hardcodeado; tests cross-org añadidos. Endpoint
+> conservado (sin consumidores hallados; no se retira por integraciones externas
+> desconocidas).
+
 ## MEDIUM
 
 | ID | Capa | Severidad | Hallazgo | Evidencia | Impacto | Recomendación | Estado |
