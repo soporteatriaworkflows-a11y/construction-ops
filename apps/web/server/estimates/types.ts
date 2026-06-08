@@ -146,6 +146,54 @@ export interface EstimatesWriteRepository {
     viewer: ViewerContext,
     estimateId: Uuid,
   ): Promise<import('@/lib/estimates/export-types').EstimateExportPayload>;
+
+  /* --- Edición manual de BOQ (Oleada 4E.2A) --- */
+  /** Crea un capítulo manual en la versión activa (sort_order append). */
+  createEstimateChapter(
+    viewer: AuthenticatedViewer,
+    estimateId: Uuid,
+    input: import('@/lib/estimates/boq-edit-types').ChapterInput,
+  ): Promise<import('@/lib/estimates/boq-edit-types').ChapterMutationResult>;
+
+  /** Edita código/nombre de un capítulo; preserva metadata de origen. */
+  updateEstimateChapter(
+    viewer: AuthenticatedViewer,
+    estimateId: Uuid,
+    chapterId: Uuid,
+    input: import('@/lib/estimates/boq-edit-types').ChapterInput,
+  ): Promise<import('@/lib/estimates/boq-edit-types').ChapterMutationResult>;
+
+  /** Capítulo editable + contexto (para precargar el formulario). */
+  getEditableEstimateChapter(
+    viewer: ViewerContext,
+    estimateId: Uuid,
+    chapterId: Uuid,
+  ): Promise<import('@/lib/estimates/boq-edit-types').EditableChapterView>;
+
+  /** Crea un ítem BOQ manual en un capítulo (subtotal derivado; sort_order append). */
+  createBoqItem(
+    viewer: AuthenticatedViewer,
+    estimateId: Uuid,
+    chapterId: Uuid,
+    input: import('@/lib/estimates/boq-edit-types').BoqItemInput,
+  ): Promise<import('@/lib/estimates/boq-edit-types').BoqItemMutationResult>;
+
+  /** Edita un ítem BOQ; subtotal recalculado; preserva origen; mover opcional. */
+  updateBoqItem(
+    viewer: AuthenticatedViewer,
+    estimateId: Uuid,
+    chapterId: Uuid,
+    itemId: Uuid,
+    input: import('@/lib/estimates/boq-edit-types').BoqItemUpdateInput,
+  ): Promise<import('@/lib/estimates/boq-edit-types').BoqItemMutationResult>;
+
+  /** Ítem editable + capítulos disponibles para mover (para precargar el formulario). */
+  getEditableBoqItem(
+    viewer: ViewerContext,
+    estimateId: Uuid,
+    chapterId: Uuid,
+    itemId: Uuid,
+  ): Promise<import('@/lib/estimates/boq-edit-types').EditableBoqItemView>;
 }
 
 export type { AuthenticatedViewer } from '@/server/auth/types';

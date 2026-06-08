@@ -721,6 +721,33 @@ proyecto/alcance/presupuesto validada; cross-org ⇒ 404; 413 si excede tamaño;
 (reutiliza `calculateEstimateFinancialSummary`). Tipos client-safe en
 `@/lib/estimates/export-types`.
 
+## Edición manual de BOQ (Oleada 4E.2A) — ver `docs/BOQ_MANUAL_EDITING_CONTRACT.md`
+
+`EstimatesWriteRepository` (escritura RLS-bound, db+fixture):
+- `createEstimateChapter(viewer, estimateId, {code,name})` ⇒ `ChapterMutationResult`
+  `{chapterId, financial}`. `sort_order` append (`max+1`); origen NULL (manual).
+- `updateEstimateChapter(viewer, estimateId, chapterId, {code,name})` ⇒ `ChapterMutationResult`.
+  Preserva `source_code`/`source_row`. Código duplicado ⇒ `ChapterCodeDuplicateError`.
+- `getEditableEstimateChapter(viewer, estimateId, chapterId)` ⇒ `EditableChapterView`
+  (`isManual`, `editable`, origen).
+- `createBoqItem(viewer, estimateId, chapterId, {code,description,unit,quantity,unitPrice})` ⇒
+  `BoqItemMutationResult` `{itemId, chapterId, subtotal, financial}`. Subtotal derivado
+  server-side + **forzado por trigger DB**; `sort_order` append; origen NULL.
+- `updateBoqItem(viewer, estimateId, chapterId, itemId, {...,targetChapterId?})` ⇒
+  `BoqItemMutationResult`. `targetChapterId` (opcional) mueve el ítem a otro capítulo de la
+  misma versión (`max(sort_order)+1`, código NO renumerado); preserva origen. Destino inválido
+  ⇒ `TargetChapterNotFoundError`.
+- `getEditableBoqItem(viewer, estimateId, chapterId, itemId)` ⇒ `EditableBoqItemView`
+  (+ `availableChapters` para mover).
+
+Reglas: viewer/organización/versión activa derivados server-side; **el navegador NUNCA envía
+`subtotal`/`directTotal`/AIU/`grandTotal`**; versión emitida ⇒ `BoqVersionLockedError`;
+cross-org ⇒ Not-Found; valores negativos ⇒ `BoqValidationError`; `Decimal` (sin float); cliente
+RLS-bound **sin service-role**; `fixture` ⇒ `BoqWriteNotSupportedError` (solo lectura). Cada
+mutación devuelve el `FinancialSummary` recalculado (fuente única `aiu-calc`). Server actions
+`chapter-actions.ts`/`item-actions.ts` (guard `isCreationModeEnabled` supabase+db). Tipos
+client-safe en `@/lib/estimates/boq-edit-types`.
+
 ## Escritura de presupuestos (Oleada 4B.3) — ver `docs/ESTIMATES_CRUD_CONTRACT.md`
 
 `EstimatesWriteRepository` (`apps/web/server/estimates/`):

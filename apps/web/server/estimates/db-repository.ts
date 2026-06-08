@@ -28,11 +28,30 @@ import type {
 } from './types';
 import {
   AiuVersionLockedError,
+  BoqItemNotFoundError,
+  BoqVersionLockedError,
+  ChapterCodeDuplicateError,
   ChapterNotFoundError,
   EstimateCodeGenerationError,
   EstimateNotFoundError,
   ScopeNotFoundError,
+  TargetChapterNotFoundError,
 } from './errors';
+import {
+  validateChapterInput,
+  validateBoqItemInput,
+  validateBoqItemUpdate,
+  deriveSubtotal,
+} from './boq-validation';
+import type {
+  BoqItemMutationResult,
+  ChapterInput,
+  ChapterMutationResult,
+  EditableBoqItemView,
+  EditableChapterView,
+  BoqItemInput,
+  BoqItemUpdateInput,
+} from '@/lib/estimates/boq-edit-types';
 import type {
   BoqItemReviewView,
   ChapterDetailView,
@@ -532,6 +551,298 @@ export class DbEstimatesWriteRepository implements EstimatesWriteRepository {
         utilityVatRate: aiu.utilityVatRate,
       },
       financial,
+    };
+  }
+
+  /* ----------------------------------------------------------------------
+   * Edición manual de BOQ (Oleada 4E.2A).
+   * Versión activa + editabilidad derivadas server-side; subtotal forzado por
+   * el trigger DB-level + recálculo en cliente (defensa en profundidad).
+   * -------------------------------------------------------------------- */
+
+  /** Versión activa editable (lanza si no existe o está bloqueada). */
+  private async assertEditableActiveVersion(
+    viewer: ViewerContext,
+    estimateId: Uuid,
+  ): Promise<EstimateActiveVersionView> {
+    const active = await this.getEstimateActiveVersion(viewer, estimateId);
+    if (!active) throw new EstimateNotFoundError(estimateId);
+    if (LOCKED_STATUSES.includes(active.status)) throw new BoqVersionLockedError();
+    return active;
+  }
+
+  /** Siguiente sort_order (append) para capítulos de una versión. */
+  private async nextChapterSortOrder(supabase: SupabaseClient, versionId: string): Promise<number> {
+    const { data, error } = await supabase
+      .from('chapters')
+      .select('sort_order')
+      .eq('estimate_version_id', versionId)
+      .order('sort_order', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw new Error(`chapter_sort_failed: ${error.code ?? 'unknown'}`);
+    return (data ? (data as { sort_order: number }).sort_order : -1) + 1;
+  }
+
+  /** Siguiente sort_order (append) para ítems de un capítulo. */
+  private async nextItemSortOrder(supabase: SupabaseClient, chapterId: string): Promise<number> {
+    const { data, error } = await supabase
+      .from('boq_items')
+      .select('sort_order')
+      .eq('chapter_id', chapterId)
+      .order('sort_order', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw new Error(`item_sort_failed: ${error.code ?? 'unknown'}`);
+    return (data ? (data as { sort_order: number }).sort_order : -1) + 1;
+  }
+
+  /** Verifica que el capítulo pertenezca a la versión (RLS ⇒ org). */
+  private async assertChapterInVersion(
+    supabase: SupabaseClient,
+    chapterId: Uuid,
+    versionId: string,
+  ): Promise<void> {
+    const { data, error } = await supabase
+      .from('chapters')
+      .select('id, estimate_version_id')
+      .eq('id', chapterId)
+      .maybeSingle();
+    if (error) throw new Error(`chapter_read_failed: ${error.code ?? 'unknown'}`);
+    if (!data || (data as { estimate_version_id: string }).estimate_version_id !== versionId) {
+      throw new ChapterNotFoundError(chapterId);
+    }
+  }
+
+  async createEstimateChapter(
+    viewer: AuthenticatedViewer,
+    estimateId: Uuid,
+    input: ChapterInput,
+  ): Promise<ChapterMutationResult> {
+    const normalized = validateChapterInput(input);
+    const active = await this.assertEditableActiveVersion(viewer, estimateId);
+    const supabase = await this.clientFactory();
+    const sortOrder = await this.nextChapterSortOrder(supabase, active.id);
+    const { data, error } = await supabase
+      .from('chapters')
+      .insert({
+        estimate_version_id: active.id,
+        code: normalized.code,
+        name: normalized.name,
+        sort_order: sortOrder,
+      })
+      .select('id')
+      .single();
+    if (error) {
+      if (error.code === UNIQUE_VIOLATION) throw new ChapterCodeDuplicateError();
+      throw new Error(`chapter_create_failed: ${error.code ?? 'unknown'}`);
+    }
+    const financial = await this.calculateEstimateFinancialSummary(viewer, estimateId);
+    return { chapterId: (data as { id: string }).id, financial };
+  }
+
+  async updateEstimateChapter(
+    viewer: AuthenticatedViewer,
+    estimateId: Uuid,
+    chapterId: Uuid,
+    input: ChapterInput,
+  ): Promise<ChapterMutationResult> {
+    const normalized = validateChapterInput(input);
+    const active = await this.assertEditableActiveVersion(viewer, estimateId);
+    const supabase = await this.clientFactory();
+    await this.assertChapterInVersion(supabase, chapterId, active.id);
+    // NO se tocan source_code/source_row (trazabilidad de origen intacta).
+    const { error } = await supabase
+      .from('chapters')
+      .update({ code: normalized.code, name: normalized.name })
+      .eq('id', chapterId);
+    if (error) {
+      if (error.code === UNIQUE_VIOLATION) throw new ChapterCodeDuplicateError();
+      throw new Error(`chapter_update_failed: ${error.code ?? 'unknown'}`);
+    }
+    const financial = await this.calculateEstimateFinancialSummary(viewer, estimateId);
+    return { chapterId, financial };
+  }
+
+  async getEditableEstimateChapter(
+    viewer: ViewerContext,
+    estimateId: Uuid,
+    chapterId: Uuid,
+  ): Promise<EditableChapterView> {
+    const active = await this.getEstimateActiveVersion(viewer, estimateId);
+    if (!active) throw new EstimateNotFoundError(estimateId);
+    const supabase = await this.clientFactory();
+    const { data, error } = await supabase
+      .from('chapters')
+      .select('id, code, name, source_code, source_row, estimate_version_id')
+      .eq('id', chapterId)
+      .maybeSingle();
+    if (error) throw new Error(`chapter_read_failed: ${error.code ?? 'unknown'}`);
+    const r = data as
+      | { id: string; code: string; name: string; source_code: string | null; source_row: number | null; estimate_version_id: string }
+      | null;
+    if (!r || r.estimate_version_id !== active.id) throw new ChapterNotFoundError(chapterId);
+    return {
+      id: r.id,
+      code: r.code,
+      name: r.name,
+      sourceCode: r.source_code ?? null,
+      sourceRow: r.source_row ?? null,
+      isManual: r.source_code === null && r.source_row === null,
+      editable: !LOCKED_STATUSES.includes(active.status),
+      estimateId,
+      versionNumber: active.versionNumber,
+    };
+  }
+
+  async createBoqItem(
+    viewer: AuthenticatedViewer,
+    estimateId: Uuid,
+    chapterId: Uuid,
+    input: BoqItemInput,
+  ): Promise<BoqItemMutationResult> {
+    const normalized = validateBoqItemInput(input);
+    const active = await this.assertEditableActiveVersion(viewer, estimateId);
+    const supabase = await this.clientFactory();
+    await this.assertChapterInVersion(supabase, chapterId, active.id);
+    const sortOrder = await this.nextItemSortOrder(supabase, chapterId);
+    const subtotal = deriveSubtotal(normalized.quantity, normalized.unitPrice);
+    const { data, error } = await supabase
+      .from('boq_items')
+      .insert({
+        estimate_version_id: active.id,
+        chapter_id: chapterId,
+        code: normalized.code,
+        description_snapshot: normalized.description,
+        unit_snapshot: normalized.unit,
+        quantity_snapshot: normalized.quantity,
+        unit_price_snapshot: normalized.unitPrice,
+        subtotal, // el trigger DB lo re-fuerza; aquí va el valor derivado.
+        sort_order: sortOrder,
+      })
+      .select('id, subtotal')
+      .single();
+    if (error) throw new Error(`item_create_failed: ${error.code ?? 'unknown'}`);
+    const financial = await this.calculateEstimateFinancialSummary(viewer, estimateId);
+    const row = data as { id: string; subtotal: string };
+    return { itemId: row.id, chapterId, subtotal: row.subtotal, financial };
+  }
+
+  async updateBoqItem(
+    viewer: AuthenticatedViewer,
+    estimateId: Uuid,
+    chapterId: Uuid,
+    itemId: Uuid,
+    input: BoqItemUpdateInput,
+  ): Promise<BoqItemMutationResult> {
+    const normalized = validateBoqItemUpdate(input);
+    const active = await this.assertEditableActiveVersion(viewer, estimateId);
+    const supabase = await this.clientFactory();
+
+    const { data: itemRow, error: itemErr } = await supabase
+      .from('boq_items')
+      .select('id, chapter_id, estimate_version_id')
+      .eq('id', itemId)
+      .maybeSingle();
+    if (itemErr) throw new Error(`item_read_failed: ${itemErr.code ?? 'unknown'}`);
+    const it = itemRow as { id: string; chapter_id: string; estimate_version_id: string } | null;
+    if (!it || it.estimate_version_id !== active.id || it.chapter_id !== chapterId) {
+      throw new BoqItemNotFoundError(itemId);
+    }
+
+    const update: Record<string, unknown> = {
+      code: normalized.code,
+      description_snapshot: normalized.description,
+      unit_snapshot: normalized.unit,
+      quantity_snapshot: normalized.quantity,
+      unit_price_snapshot: normalized.unitPrice,
+      subtotal: deriveSubtotal(normalized.quantity, normalized.unitPrice),
+    };
+
+    let finalChapterId: Uuid = chapterId;
+    if (normalized.targetChapterId && normalized.targetChapterId !== chapterId) {
+      const { data: tgt, error: tgtErr } = await supabase
+        .from('chapters')
+        .select('id, estimate_version_id')
+        .eq('id', normalized.targetChapterId)
+        .maybeSingle();
+      if (tgtErr) throw new Error(`chapter_read_failed: ${tgtErr.code ?? 'unknown'}`);
+      if (!tgt || (tgt as { estimate_version_id: string }).estimate_version_id !== active.id) {
+        throw new TargetChapterNotFoundError();
+      }
+      update.chapter_id = normalized.targetChapterId;
+      update.sort_order = await this.nextItemSortOrder(supabase, normalized.targetChapterId);
+      finalChapterId = normalized.targetChapterId;
+    }
+
+    const { data, error } = await supabase
+      .from('boq_items')
+      .update(update)
+      .eq('id', itemId)
+      .select('subtotal')
+      .single();
+    if (error) throw new Error(`item_update_failed: ${error.code ?? 'unknown'}`);
+    const financial = await this.calculateEstimateFinancialSummary(viewer, estimateId);
+    return { itemId, chapterId: finalChapterId, subtotal: (data as { subtotal: string }).subtotal, financial };
+  }
+
+  async getEditableBoqItem(
+    viewer: ViewerContext,
+    estimateId: Uuid,
+    chapterId: Uuid,
+    itemId: Uuid,
+  ): Promise<EditableBoqItemView> {
+    const active = await this.getEstimateActiveVersion(viewer, estimateId);
+    if (!active) throw new EstimateNotFoundError(estimateId);
+    const supabase = await this.clientFactory();
+    const { data, error } = await supabase
+      .from('boq_items')
+      .select(
+        'id, chapter_id, code, description_snapshot, unit_snapshot, quantity_snapshot, ' +
+          'unit_price_snapshot, subtotal, source_code, source_row, estimate_version_id, chapters(code)',
+      )
+      .eq('id', itemId)
+      .maybeSingle();
+    if (error) throw new Error(`item_read_failed: ${error.code ?? 'unknown'}`);
+    const r = data as
+      | {
+          id: string; chapter_id: string; code: string; description_snapshot: string;
+          unit_snapshot: string; quantity_snapshot: string; unit_price_snapshot: string;
+          subtotal: string; source_code: string | null; source_row: number | null;
+          estimate_version_id: string; chapters: { code: string } | null;
+        }
+      | null;
+    if (!r || r.estimate_version_id !== active.id || r.chapter_id !== chapterId) {
+      throw new BoqItemNotFoundError(itemId);
+    }
+
+    const { data: chs, error: chErr } = await supabase
+      .from('chapters')
+      .select('id, code, name')
+      .eq('estimate_version_id', active.id)
+      .order('sort_order', { ascending: true });
+    if (chErr) throw new Error(`chapter_list_failed: ${chErr.code ?? 'unknown'}`);
+    const availableChapters = (chs ?? []).map((c) => {
+      const cc = c as { id: string; code: string; name: string };
+      return { id: cc.id, code: cc.code, name: cc.name };
+    });
+
+    return {
+      id: r.id,
+      chapterId: r.chapter_id,
+      chapterCode: r.chapters?.code ?? '',
+      code: r.code,
+      description: r.description_snapshot,
+      unit: r.unit_snapshot,
+      quantity: r.quantity_snapshot,
+      unitPrice: r.unit_price_snapshot,
+      subtotal: r.subtotal,
+      sourceCode: r.source_code ?? null,
+      sourceRow: r.source_row ?? null,
+      isManual: r.source_code === null && r.source_row === null,
+      editable: !LOCKED_STATUSES.includes(active.status),
+      versionNumber: active.versionNumber,
+      availableChapters,
     };
   }
 }

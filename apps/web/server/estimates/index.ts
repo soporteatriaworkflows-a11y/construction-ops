@@ -62,7 +62,21 @@ export {
   AiuValidationError,
   AiuWriteNotSupportedError,
   AiuVersionLockedError,
+  BoqValidationError,
+  BoqWriteNotSupportedError,
+  BoqVersionLockedError,
+  BoqItemNotFoundError,
+  ChapterCodeDuplicateError,
+  TargetChapterNotFoundError,
 } from './errors';
+export type { BoqValidationIssue } from './errors';
+export {
+  validateChapterInput,
+  validateBoqItemInput,
+  validateBoqItemUpdate,
+  deriveSubtotal,
+  parseNonNegativeDecimal,
+} from './boq-validation';
 export {
   validateAiuRates,
   computeFinancialSummary,
