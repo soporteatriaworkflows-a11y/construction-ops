@@ -1,5 +1,50 @@
 # Handoff Log
 
+## 2026-06-07 — 4E.2A CERRADA (automated-ready): smoke automatizado no destructivo
+
+### Decisión de la usuaria
+- **Omitió voluntariamente** el smoke manual de escritura sobre el presupuesto
+  productivo ENTRE PATIOS. Cierre por **verificación automatizada no destructiva**.
+
+### Auditoría read-only inicial
+- `main = origin/main = 02f475e` (contiene merge 4E.2A `19f3c5d`); working tree limpio.
+- **P1-A intacto (NO tocado)**: rama `fix/security-p1a-read-model-rls-export-legacy`
+  (`a78839c`) + 2 `git stash` (export-test / exports organizationId). Sin stash pop/apply/drop.
+
+### Smoke automatizado local (repo REAL + RLS) — `apps/web/tests/integration/boq-edit-smoke.test.ts`
+- Postgres 17 / Supabase local; `DbEstimatesWriteRepository` vía PostgREST con JWT de
+  usuario sembrado (RLS aplicada); datos **sintéticos** locales (estimate+V01+import+AIU).
+  Gated por `BOQ_SMOKE_DB=1` (el `pnpm run test` normal lo salta). **11/11 PASS**:
+  - A editar cantidad → recalcula subtotal/capítulo/directo/A·I·U·IVA/indirecto/total; origen preservado.
+  - B restaurar cantidad → **vuelve EXACTO al baseline** (todas las cifras).
+  - C editar precio → recalcula → restaurar → baseline.
+  - D PATCH subtotal-only por PostgREST → **trigger ignora** el valor; persiste `round(q×p,10)`.
+  - E crear capítulo manual → origen NULL, sort_order append, código único.
+  - F crear ítem manual → origen NULL, subtotal derivado, total sube.
+  - G editar ítem importado → code editable, `source_code`/`source_row` preservados.
+  - H mover ítem entre capítulos (misma versión) → origen intacto, sort append.
+  - I seguridad → cross-org Not-Found, fixture write bloqueada, versión emitida bloqueada.
+  - N (FASE 3) export payload refleja la edición y restaura su pre-estado.
+
+### Validación completa
+- typecheck 0, lint 0, **736 tests** (+11 integración gated, saltados en run normal),
+  build fixture + db-local PASS, gm:regression 22/22, gm:import PASS, validador 214/0/0,
+  **RLS runtime 106/106**, Supabase remoto **21/21 Local = Remote** (solo lectura),
+  `git diff --check` limpio; sin secretos/privados.
+
+### Producción (read-only)
+- Vercel `whoami` `soporteatriaworkflows-8854`; proyecto `construction-ops` (NO `-1rqh`).
+  Deployment producción **● Ready** (`construction-b8klgx2bm-…`, alias
+  `construction-ops-psi.vercel.app`). Smoke HTTP: `/login` 200; protegidas 307→`/login`;
+  rutas 4E.2A (`chapters/new`, `items/[id]/edit`) 307→`/login`; control inexistente 404.
+  **Sin escrituras productivas; ENTRE PATIOS intacto.**
+
+### Cierre
+- Tag `wave-4e2a-manual-boq-editing-automated-ready-v1`. Smoke de **escritura real en
+  producción = OPCIONAL** para sesión futura. **4E.2B/4E.3 NO iniciadas.**
+- Siguiente acción recomendada: retomar **P1-A** exclusivamente desde un **worktree de
+  seguridad aislado** (ver memoria/INTEGRATION_REQUESTS).
+
 ## 2026-06-07 — 4E.2A: verificación productiva (deploy READY) por Vercel CLI
 
 ### Auditoría read-only del estado real

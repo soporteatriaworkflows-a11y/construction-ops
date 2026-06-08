@@ -9,6 +9,30 @@ cada ciclo de validación.
 
 ---
 
+## 4E.2A — Cierre automated-ready (2026-06-07, post-merge)
+
+La usuaria **omitió voluntariamente** el smoke manual de escritura sobre el
+presupuesto productivo ENTRE PATIOS. 4E.2A se cierra por **verificación
+automatizada NO destructiva**:
+
+- **Smoke automatizado local** (`apps/web/tests/integration/boq-edit-smoke.test.ts`,
+  gated `BOQ_SMOKE_DB=1`): **11/11 PASS** usando el repositorio REAL
+  (`DbEstimatesWriteRepository`) vía PostgREST con RLS (JWT de usuario sembrado),
+  sobre datos sintéticos locales. Cubre editar cantidad/precio + **restauración
+  EXACTA al baseline** de subtotal/capítulo/directo/A·I·U·IVA/indirecto/total;
+  PATCH-subtotal-only ignorado por el trigger; crear capítulo/ítem manual
+  (origen NULL, sort append, código único); editar importado preservando origen;
+  mover ítem entre capítulos; cross-org/fixture/versión-emitida bloqueados; export
+  payload refleja la edición.
+- Validación completa: typecheck/lint 0, **736 tests** (+11 integración gated),
+  build fixture + db-local, gm 22/22 + import, validador 214/0/0, **RLS runtime
+  106/106**, remoto **21/21 Local=Remote** (read-only), `git diff --check` limpio.
+- Producción **read-only**: Vercel READY; `/login` 200; rutas protegidas 307→`/login`;
+  rutas 4E.2A presentes; control 404; **sin escrituras productivas; ENTRE PATIOS
+  intacto**.
+- Pendiente OPCIONAL: smoke de escritura real en producción (sesión futura).
+  Tag `wave-4e2a-manual-boq-editing-automated-ready-v1`.
+
 ## 4E.2A — Edición manual segura de BOQ (2026-06-07, pre-merge)
 
 Validación en `integration/wave-4e2a-manual-boq-editing`:
