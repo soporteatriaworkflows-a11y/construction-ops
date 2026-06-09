@@ -13,7 +13,7 @@
  * Drizzle, de modo que nunca se conecta silenciosamente.
  */
 
-import { and, eq, inArray, asc } from 'drizzle-orm';
+import { and, eq, inArray, asc, isNull } from 'drizzle-orm';
 
 import { db as defaultDb, schema } from '@/lib/db';
 import type { Uuid } from '@/lib/contracts/read-model';
@@ -121,20 +121,30 @@ export class DrizzleReadRepository {
     return rows[0] ?? null;
   }
 
-  /** Capítulos de una versión. */
+  /** Capítulos ACTIVOS de una versión (4E.2B: excluye archivados). */
   async chaptersByVersion(versionId: Uuid) {
     return this.db
       .select()
       .from(schema.chapters)
-      .where(eq(schema.chapters.estimateVersionId, versionId));
+      .where(
+        and(
+          eq(schema.chapters.estimateVersionId, versionId),
+          isNull(schema.chapters.archivedAt),
+        ),
+      );
   }
 
-  /** Ítems BOQ de una versión. */
+  /** Ítems BOQ ACTIVOS de una versión (4E.2B: excluye archivados). */
   async boqItemsByVersion(versionId: Uuid) {
     return this.db
       .select()
       .from(schema.boqItems)
-      .where(eq(schema.boqItems.estimateVersionId, versionId));
+      .where(
+        and(
+          eq(schema.boqItems.estimateVersionId, versionId),
+          isNull(schema.boqItems.archivedAt),
+        ),
+      );
   }
 
   /** Reglas de costo indirecto de una versión. */

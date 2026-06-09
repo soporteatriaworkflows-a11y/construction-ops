@@ -145,17 +145,23 @@ export class DrizzleReadModelRepository implements ReadModelPort {
       name: c.name,
       sortOrder: c.sortOrder,
     }));
-    const rawItems: RawBoqItem[] = items.map((it) => ({
-      id: it.id,
-      chapterId: it.chapterId,
-      code: it.code,
-      descriptionSnapshot: it.descriptionSnapshot,
-      unitSnapshot: it.unitSnapshot,
-      quantitySnapshot: it.quantitySnapshot,
-      unitPriceSnapshot: it.unitPriceSnapshot,
-      subtotal: it.subtotal,
-      sortOrder: it.sortOrder,
-    }));
+    // 4E.2B: `chaptersByVersion`/`boqItemsByVersion` ya excluyen nodos archivados,
+    // pero un ítem ACTIVO cuyo capítulo está ARCHIVADO debe excluirse también de
+    // los totales (su capítulo ya no está en `rawChapters`).
+    const activeChapterIds = new Set(rawChapters.map((c) => c.id));
+    const rawItems: RawBoqItem[] = items
+      .filter((it) => activeChapterIds.has(it.chapterId))
+      .map((it) => ({
+        id: it.id,
+        chapterId: it.chapterId,
+        code: it.code,
+        descriptionSnapshot: it.descriptionSnapshot,
+        unitSnapshot: it.unitSnapshot,
+        quantitySnapshot: it.quantitySnapshot,
+        unitPriceSnapshot: it.unitPriceSnapshot,
+        subtotal: it.subtotal,
+        sortOrder: it.sortOrder,
+      }));
     const rawRules: RawIndirectRule[] = rules.map((r) => ({
       code: r.code,
       name: r.name,
@@ -341,7 +347,10 @@ export class DrizzleReadModelRepository implements ReadModelPort {
     );
     const computation: EstimateComputation = computeEstimate(input);
 
+    // 4E.2B: solo ítems activos de capítulos activos (consistente con totales).
+    const activeChapterIds = new Set(computation.chapters.map((c) => c.id));
     const items: BoqItemView[] = (await this.repo.boqItemsByVersion(version.id))
+      .filter((it) => activeChapterIds.has(it.chapterId))
       .sort((a, b) => a.sortOrder - b.sortOrder)
       .map((it) => ({
         id: it.id,
