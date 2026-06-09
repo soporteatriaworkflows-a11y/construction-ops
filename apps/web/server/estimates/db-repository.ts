@@ -38,7 +38,10 @@ import {
   EstimateNotFoundError,
   ScopeNotFoundError,
   TargetChapterNotFoundError,
+  VersionNotDraftError,
+  VersionNotIssuedError,
 } from './errors';
+import type { EstimateVersionSummary } from '@/lib/estimates/version-types';
 import {
   validateChapterInput,
   validateBoqItemInput,
@@ -264,16 +267,30 @@ export class DbEstimatesWriteRepository implements EstimatesWriteRepository {
     if (!data) return null;
 
     const version = data as { id: string; version_number: number; status: string };
+    const rollup = await this.versionRollup(supabase, version.id);
+    return {
+      id: version.id,
+      versionNumber: version.version_number,
+      status: version.status as EstimateActiveVersionView['status'],
+      chapterCount: rollup.chapterCount,
+      itemCount: rollup.itemCount,
+      directTotal: rollup.directTotal,
+    };
+  }
 
-    // 4E.2B: conteos + directTotal ACTIVOS. Un capítulo archivado excluye él y
-    // TODOS sus ítems; un ítem archivado se excluye aunque su capítulo esté activo.
-    const { data: chRows, error: rollupErr } = await supabase
+  /**
+   * Rollup ACTIVO de una versión (4E.2B): conteos + directTotal excluyendo
+   * capítulos archivados (y TODOS sus ítems) e ítems archivados individualmente.
+   */
+  private async versionRollup(
+    supabase: SupabaseClient,
+    versionId: string,
+  ): Promise<{ chapterCount: number; itemCount: number; directTotal: string }> {
+    const { data: chRows, error } = await supabase
       .from('chapters')
       .select('id, archived_at, boq_items(subtotal, archived_at)')
-      .eq('estimate_version_id', version.id);
-    if (rollupErr) {
-      throw new Error(`estimate_version_rollup_failed: ${rollupErr.code ?? 'unknown'}`);
-    }
+      .eq('estimate_version_id', versionId);
+    if (error) throw new Error(`estimate_version_rollup_failed: ${error.code ?? 'unknown'}`);
 
     let chapterCount = 0;
     let itemCount = 0;
@@ -283,23 +300,15 @@ export class DbEstimatesWriteRepository implements EstimatesWriteRepository {
         archived_at: string | null;
         boq_items: { subtotal: string; archived_at: string | null }[] | null;
       };
-      if (r.archived_at) continue; // capítulo archivado ⇒ excluye él y sus ítems
+      if (r.archived_at) continue;
       chapterCount += 1;
       for (const it of r.boq_items ?? []) {
-        if (it.archived_at) continue; // ítem archivado individualmente
+        if (it.archived_at) continue;
         itemCount += 1;
         directTotal = directTotal.plus(new Decimal(it.subtotal));
       }
     }
-
-    return {
-      id: version.id,
-      versionNumber: version.version_number,
-      status: version.status as EstimateActiveVersionView['status'],
-      chapterCount,
-      itemCount,
-      directTotal: directTotal.toFixed(),
-    };
+    return { chapterCount, itemCount, directTotal: directTotal.toFixed() };
   }
 
   async listChaptersByEstimateVersion(
@@ -309,12 +318,20 @@ export class DbEstimatesWriteRepository implements EstimatesWriteRepository {
   ): Promise<ChapterReviewItem[]> {
     const active = await this.getEstimateActiveVersion(viewer, estimateId);
     if (!active) return [];
-    const includeArchived = options?.includeArchived ?? false;
     const supabase = await this.clientFactory();
+    return this.listChaptersForVersion(supabase, active.id, options?.includeArchived ?? false);
+  }
+
+  /** Lista capítulos de una versión concreta (activos por defecto). */
+  private async listChaptersForVersion(
+    supabase: SupabaseClient,
+    versionId: string,
+    includeArchived: boolean,
+  ): Promise<ChapterReviewItem[]> {
     const { data, error } = await supabase
       .from('chapters')
       .select('id, code, name, sort_order, source_code, source_row, archived_at, boq_items(subtotal, archived_at)')
-      .eq('estimate_version_id', active.id)
+      .eq('estimate_version_id', versionId)
       .order('sort_order', { ascending: true });
     if (error) throw new Error(`chapter_list_failed: ${error.code ?? 'unknown'}`);
 
@@ -493,6 +510,7 @@ export class DbEstimatesWriteRepository implements EstimatesWriteRepository {
   async getEstimateExportPayload(
     viewer: ViewerContext,
     estimateId: Uuid,
+    versionId?: Uuid,
   ): Promise<EstimateExportPayload> {
     const supabase = await this.clientFactory();
 
@@ -519,11 +537,28 @@ export class DbEstimatesWriteRepository implements EstimatesWriteRepository {
       } | null;
     };
 
-    const active = await this.getEstimateActiveVersion(viewer, estimateId);
-    if (!active) throw new EstimateNotFoundError(estimateId);
+    // Versión objetivo: explícita (snapshot histórico) o la activa.
+    let targetId: string;
+    let targetNumber: number;
+    let targetStatus: string;
+    if (versionId) {
+      const { data: vRow, error: vErr } = await supabase
+        .from('estimate_versions')
+        .select('id, version_number, status, estimate_id')
+        .eq('id', versionId)
+        .maybeSingle();
+      if (vErr) throw new Error(`estimate_version_read_failed: ${vErr.code ?? 'unknown'}`);
+      const v = vRow as { id: string; version_number: number; status: string; estimate_id: string } | null;
+      if (!v || v.estimate_id !== estimateId) throw new EstimateNotFoundError(estimateId);
+      targetId = v.id; targetNumber = v.version_number; targetStatus = v.status;
+    } else {
+      const active = await this.getEstimateActiveVersion(viewer, estimateId);
+      if (!active) throw new EstimateNotFoundError(estimateId);
+      targetId = active.id; targetNumber = active.versionNumber; targetStatus = active.status;
+    }
 
-    // Capítulos + ítems (ordenados) + AIU + resumen financiero.
-    const reviewChapters = await this.listChaptersByEstimateVersion(viewer, estimateId);
+    // Capítulos + ítems (ordenados, activos) + AIU + resumen de la versión objetivo.
+    const reviewChapters = await this.listChaptersForVersion(supabase, targetId, false);
     const chapters: EstimateExportChapter[] = [];
     let itemCount = 0;
     for (const ch of reviewChapters) {
@@ -549,10 +584,16 @@ export class DbEstimatesWriteRepository implements EstimatesWriteRepository {
       });
     }
 
-    const [aiu, financial] = await Promise.all([
-      this.getEstimateVersionAiu(viewer, estimateId),
-      this.calculateEstimateFinancialSummary(viewer, estimateId),
-    ]);
+    // AIU + resumen financiero de la versión objetivo (snapshot por versión).
+    const { fractions } = await this.readAiuFractions(supabase, targetId);
+    const rollup = await this.versionRollup(supabase, targetId);
+    const financial = computeFinancialSummary(rollup.directTotal, fractions);
+    const aiu = {
+      administrationRate: fractionToHuman(fractions.administration),
+      contingencyRate: fractionToHuman(fractions.contingency),
+      utilityRate: fractionToHuman(fractions.utility),
+      utilityVatRate: fractionToHuman(fractions.utilityVat),
+    };
 
     const scope = r.project_scopes;
     const project = scope?.projects;
@@ -565,9 +606,9 @@ export class DbEstimatesWriteRepository implements EstimatesWriteRepository {
         status: r.status as EstimateExportPayload['estimate']['status'],
       },
       version: {
-        number: active.versionNumber,
-        label: versionLabel(active.versionNumber),
-        status: active.status as EstimateExportPayload['version']['status'],
+        number: targetNumber,
+        label: versionLabel(targetNumber),
+        status: targetStatus as EstimateExportPayload['version']['status'],
       },
       generatedAt: new Date().toISOString(),
       counts: { chapters: reviewChapters.length, items: itemCount },
@@ -979,5 +1020,106 @@ export class DbEstimatesWriteRepository implements EstimatesWriteRepository {
     if (upErr) throw new Error(`item_restore_failed: ${upErr.code ?? 'unknown'}`);
     const financial = await this.calculateEstimateFinancialSummary(viewer, estimateId);
     return { itemId, financial };
+  }
+
+  /* ----------------------------------------------------------------------
+   * Emisión / clonación de versiones (Oleada 4E.3A).
+   * -------------------------------------------------------------------- */
+
+  /** Resumen financiero (directo + total) de una versión concreta. */
+  private async versionSummaryRow(
+    supabase: SupabaseClient,
+    row: {
+      id: string; version_number: number; status: string; issued_at: string | null;
+      issued_by: string | null; created_at: string | null; source_version_id: string | null;
+    },
+    isActive: boolean,
+  ): Promise<EstimateVersionSummary> {
+    const rollup = await this.versionRollup(supabase, row.id);
+    const { fractions } = await this.readAiuFractions(supabase, row.id);
+    const financial = computeFinancialSummary(rollup.directTotal, fractions);
+    return {
+      id: row.id,
+      versionNumber: row.version_number,
+      status: row.status as EstimateVersionSummary['status'],
+      isActive,
+      editable: !LOCKED_STATUSES.includes(row.status),
+      issuedAt: row.issued_at,
+      issuedBy: row.issued_by,
+      createdAt: row.created_at,
+      sourceVersionId: row.source_version_id,
+      directTotal: rollup.directTotal,
+      grandTotal: financial.grandTotal,
+    };
+  }
+
+  async listEstimateVersions(
+    viewer: ViewerContext,
+    estimateId: Uuid,
+  ): Promise<EstimateVersionSummary[]> {
+    void viewer;
+    const supabase = await this.clientFactory();
+    const { data, error } = await supabase
+      .from('estimate_versions')
+      .select('id, version_number, status, issued_at, issued_by, created_at, source_version_id')
+      .eq('estimate_id', estimateId)
+      .order('version_number', { ascending: true });
+    if (error) throw new Error(`estimate_versions_list_failed: ${error.code ?? 'unknown'}`);
+    const rows = (data ?? []) as {
+      id: string; version_number: number; status: string; issued_at: string | null;
+      issued_by: string | null; created_at: string | null; source_version_id: string | null;
+    }[];
+    const maxNum = rows.reduce((m, r) => Math.max(m, r.version_number), 0);
+    return Promise.all(rows.map((r) => this.versionSummaryRow(supabase, r, r.version_number === maxNum)));
+  }
+
+  async issueEstimateVersion(
+    viewer: AuthenticatedViewer,
+    estimateId: Uuid,
+  ): Promise<EstimateVersionSummary> {
+    const active = await this.getEstimateActiveVersion(viewer, estimateId);
+    if (!active) throw new EstimateNotFoundError(estimateId);
+    if (active.status !== 'draft') throw new VersionNotDraftError();
+    const supabase = await this.clientFactory();
+    const { error } = await supabase
+      .from('estimate_versions')
+      .update({ status: 'issued', issued_at: new Date().toISOString(), issued_by: viewer.userId })
+      .eq('id', active.id);
+    if (error) throw new Error(`estimate_version_issue_failed: ${error.code ?? 'unknown'}`);
+    const { data, error: readErr } = await supabase
+      .from('estimate_versions')
+      .select('id, version_number, status, issued_at, issued_by, created_at, source_version_id')
+      .eq('id', active.id)
+      .single();
+    if (readErr) throw new Error(`estimate_version_read_failed: ${readErr.code ?? 'unknown'}`);
+    return this.versionSummaryRow(supabase, data as Parameters<typeof this.versionSummaryRow>[1], true);
+  }
+
+  async cloneIssuedEstimateVersion(
+    viewer: AuthenticatedViewer,
+    estimateId: Uuid,
+  ): Promise<EstimateVersionSummary> {
+    void viewer;
+    const active = await this.getEstimateActiveVersion(viewer, estimateId);
+    if (!active) throw new EstimateNotFoundError(estimateId);
+    if (active.status !== 'issued') throw new VersionNotIssuedError();
+    const supabase = await this.clientFactory();
+    const { data, error } = await supabase.rpc('clone_issued_estimate_version', {
+      p_version_id: active.id,
+    });
+    if (error) {
+      if (typeof error.message === 'string' && error.message.includes('version_not_issued')) {
+        throw new VersionNotIssuedError();
+      }
+      throw new Error(`estimate_version_clone_failed: ${error.code ?? 'unknown'}`);
+    }
+    const newId = (Array.isArray(data) ? data[0] : data) as string;
+    const { data: row, error: readErr } = await supabase
+      .from('estimate_versions')
+      .select('id, version_number, status, issued_at, issued_by, created_at, source_version_id')
+      .eq('id', newId)
+      .single();
+    if (readErr) throw new Error(`estimate_version_read_failed: ${readErr.code ?? 'unknown'}`);
+    return this.versionSummaryRow(supabase, row as Parameters<typeof this.versionSummaryRow>[1], true);
   }
 }

@@ -70,6 +70,8 @@ export {
   BoqNotArchivedError,
   ChapterCodeDuplicateError,
   TargetChapterNotFoundError,
+  VersionNotDraftError,
+  VersionNotIssuedError,
 } from './errors';
 export type { BoqValidationIssue } from './errors';
 export {

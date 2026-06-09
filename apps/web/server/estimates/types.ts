@@ -147,6 +147,7 @@ export interface EstimatesWriteRepository {
   getEstimateExportPayload(
     viewer: ViewerContext,
     estimateId: Uuid,
+    versionId?: Uuid,
   ): Promise<import('@/lib/estimates/export-types').EstimateExportPayload>;
 
   /* --- Edición manual de BOQ (Oleada 4E.2A) --- */
@@ -225,6 +226,25 @@ export interface EstimatesWriteRepository {
     estimateId: Uuid,
     itemId: Uuid,
   ): Promise<import('@/lib/estimates/boq-edit-types').BoqItemArchiveResult>;
+
+  /* --- Emisión / clonación de versiones (Oleada 4E.3A) --- */
+  /** Emite la versión activa (draft → issued); registra issued_at/issued_by. */
+  issueEstimateVersion(
+    viewer: AuthenticatedViewer,
+    estimateId: Uuid,
+  ): Promise<import('@/lib/estimates/version-types').EstimateVersionSummary>;
+
+  /** Clona la versión activa issued a una nueva draft (activa); atómico. */
+  cloneIssuedEstimateVersion(
+    viewer: AuthenticatedViewer,
+    estimateId: Uuid,
+  ): Promise<import('@/lib/estimates/version-types').EstimateVersionSummary>;
+
+  /** Lista las versiones del presupuesto (tenant-scoped) con resumen financiero. */
+  listEstimateVersions(
+    viewer: ViewerContext,
+    estimateId: Uuid,
+  ): Promise<import('@/lib/estimates/version-types').EstimateVersionSummary[]>;
 }
 
 export type { AuthenticatedViewer } from '@/server/auth/types';

@@ -37,6 +37,7 @@ import type {
   EditableChapterView,
   ReviewReadOptions,
 } from '@/lib/estimates/boq-edit-types';
+import type { EstimateVersionSummary } from '@/lib/estimates/version-types';
 import type {
   BoqItemReviewView,
   ChapterDetailView,
@@ -237,6 +238,7 @@ export class FixtureEstimatesWriteRepository implements EstimatesWriteRepository
   async getEstimateExportPayload(
     viewer: ViewerContext,
     estimateId: Uuid,
+    _versionId?: Uuid,
   ): Promise<EstimateExportPayload> {
     if (!sameOrg(viewer) || estimateId !== fixture.estimate.id) {
       throw new EstimateNotFoundError(estimateId);
@@ -371,5 +373,35 @@ export class FixtureEstimatesWriteRepository implements EstimatesWriteRepository
   }
   async restoreBoqItem(): Promise<BoqItemArchiveResult> {
     throw new BoqWriteNotSupportedError();
+  }
+
+  /* --- Emisión / clonación (4E.3A): escritura bloqueada en demo. --- */
+  async issueEstimateVersion(): Promise<EstimateVersionSummary> {
+    throw new BoqWriteNotSupportedError();
+  }
+  async cloneIssuedEstimateVersion(): Promise<EstimateVersionSummary> {
+    throw new BoqWriteNotSupportedError();
+  }
+  async listEstimateVersions(
+    viewer: ViewerContext,
+    estimateId: Uuid,
+  ): Promise<EstimateVersionSummary[]> {
+    if (!sameOrg(viewer) || estimateId !== fixture.estimate.id) return [];
+    const v = fixture.estimateVersion;
+    return [
+      {
+        id: v.id,
+        versionNumber: v.versionNumber,
+        status: v.status,
+        isActive: true,
+        editable: !['approved', 'issued', 'archived'].includes(v.status),
+        issuedAt: null,
+        issuedBy: null,
+        createdAt: fixture.estimate.createdAt,
+        sourceVersionId: null,
+        directTotal: fixture.estimateTotals.costos_directos,
+        grandTotal: fixture.estimateTotals.costos_directos,
+      },
+    ];
   }
 }
