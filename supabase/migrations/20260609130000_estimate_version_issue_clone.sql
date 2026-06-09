@@ -41,11 +41,17 @@ BEGIN
   IF v_uid IS NULL THEN RAISE EXCEPTION 'no_session' USING errcode = '42501'; END IF;
   IF v_org IS NULL THEN RAISE EXCEPTION 'no_membership' USING errcode = '42501'; END IF;
 
-  -- RLS oculta versiones cross-org ⇒ NOT FOUND. Lock para serializar.
+  -- RLS oculta versiones cross-org ⇒ NOT FOUND. NO se usa FOR UPDATE sobre la
+  -- versión: una fila ISSUED es inmutable y la policy de UPDATE la filtraría en un
+  -- SELECT ... FOR UPDATE (⇒ falso NOT FOUND). Se lee sin lock y se serializan los
+  -- clones concurrentes bloqueando la fila padre `estimates`. El índice único
+  -- (estimate_id, version_number) es la defensa final anti-colisión.
   SELECT estimate_id, status INTO v_estimate, v_status
-  FROM public.estimate_versions WHERE id = p_version_id FOR UPDATE;
+  FROM public.estimate_versions WHERE id = p_version_id;
   IF NOT FOUND THEN RAISE EXCEPTION 'version_not_found' USING errcode = 'P0002'; END IF;
   IF v_status <> 'issued' THEN RAISE EXCEPTION 'version_not_issued' USING errcode = 'P0001'; END IF;
+
+  PERFORM 1 FROM public.estimates WHERE id = v_estimate FOR UPDATE;
 
   SELECT COALESCE(max(version_number), 0) + 1 INTO v_new_num
   FROM public.estimate_versions WHERE estimate_id = v_estimate;
