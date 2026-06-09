@@ -20,6 +20,7 @@ import type { ResourcePriceObservationView } from '@/server/pricing';
 import { formatCOP } from '@/lib/utils/format';
 import { ObservationForm } from './_components/observation-form';
 import { ApproveButton, RejectButton } from './_components/observation-review-buttons';
+import { UrlValidationPanel } from './_components/url-validation-panel';
 
 export const dynamic = 'force-dynamic';
 
@@ -137,12 +138,22 @@ export default async function PriceIntelligencePage({ params }: PageProps) {
         }
       />
 
-      {/* Formulario nueva observación */}
+      {/* Formulario nueva observación + validación desde URL */}
       {canCreate && (
-        <section aria-label="Nueva observación de precio" className="mb-8">
-          <h2 className="mb-3 text-sm font-semibold text-gray-700">Registrar nueva observación</h2>
-          <div className="max-w-2xl">
-            <ObservationForm resourceId={resourceId} resourceUnit={resourceUnit} providers={providers} />
+        <section aria-label="Nueva observación de precio" className="mb-8 space-y-8">
+          <div>
+            <h2 className="mb-3 text-sm font-semibold text-gray-700">Registrar nueva observación</h2>
+            <div className="max-w-2xl">
+              <ObservationForm resourceId={resourceId} resourceUnit={resourceUnit} providers={providers} />
+            </div>
+          </div>
+
+          {/* Phase 3B — Validación supervisada desde URL pública */}
+          <div>
+            <h2 className="mb-3 text-sm font-semibold text-gray-700">Validar precio desde URL pública</h2>
+            <div className="max-w-2xl">
+              <UrlValidationPanel resourceId={resourceId} resourceUnit={resourceUnit} />
+            </div>
           </div>
         </section>
       )}
