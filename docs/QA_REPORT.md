@@ -9,6 +9,23 @@ cada ciclo de validación.
 
 ---
 
+## 4E.3B — Comparación de versiones IMPLEMENTADA (2026-06-09, Opción B)
+
+Rama `feature/wave-4e3b-estimate-version-compare`. **Todo PASS, sin migración nueva**:
+- typecheck/lint 0, **757 tests** + **32 integración gated** (`BOQ_SMOKE_DB=1`): diff
+  PURO (deltas financieros, % seguro base=0/≠0, capítulos added/removed/changed/
+  unchanged, ítems por qty/price/desc/unit/archived, **matching por
+  chapterCode+itemCode+occurrenceIndex** con desempate `sort_order,id` y
+  `duplicateCodeWarning`); repo: compara mismo estimate, **VersionMismatchError**
+  para estimates distintos, **cross-org bloqueado**, **no muta datos** (V1 issued
+  intacta).
+- build (`/compare` `ƒ`), **RLS 106/106**, **isolation 12/12**, **gm:regression 22/22**,
+  gm:import PASS, validador 214/0/0, `git diff --check` limpio.
+- Decisión: **Opción B** (matching por ocurrencia, sin migración). Deuda futura
+  `lineage_id` antes de `BOQ_REORDER`.
+- **Sin deploy; sin merge a main/integration.** `main = origin/main = 2918622`
+  intacta; producción intacta; stashes P1-A intactos.
+
 ## 4E.3A integración + 4E.3B blocker (2026-06-09)
 
 - **4E.3A integrada** en `integration/p1a-functional-resume` (merge `cd18f2d`).

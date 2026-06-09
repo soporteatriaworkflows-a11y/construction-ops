@@ -1,5 +1,47 @@
 # Handoff Log
 
+## 2026-06-09 — 4E.3B comparación de versiones IMPLEMENTADA (Opción B, sin migración)
+
+> **4E.3A integrada** en `integration/p1a-functional-resume` (merge `cd18f2d`).
+> **4E.3B** implementada en `feature/wave-4e3b-estimate-version-compare`.
+> **NO merge a integration/main; sin deploy; SIN migración nueva.**
+
+### Decisión
+- **Opción B aprobada**: matching de ítems por `chapterCode + itemCode +
+  occurrenceIndex` (orden `sort_order ASC, id ASC`), `duplicateCodeWarning` + aviso
+  UI. **Sin migración de unicidad.** Capítulos por `code` (único garantizado).
+
+### Implementación (read-only)
+- Módulo PURO `server/estimates/compare.ts` (`computeVersionComparison`): resumen
+  financiero con deltas (% seguro si base≠0, `null` si base=0), diff de capítulos
+  por `code`, diff de ítems por clave de ocurrencia; archivados incluidos en el
+  análisis (no sumados a totals activos).
+- Repo `compareEstimateVersions(viewer, estimateId, baseVersionId, targetVersionId)`
+  (db + fixture): valida mismo estimate (`VersionMismatchError`), RLS/cross-org
+  (`EstimateNotFoundError`), **no muta datos**, sin migración. Tipos client-safe
+  `lib/estimates/compare-types.ts`.
+- UI: página `…/estimates/[estimateId]/compare` (server, GET selectores base/target,
+  `<details>` por capítulo, estados, aviso de código repetido) + enlace "Comparar
+  versiones" en el panel de versiones.
+
+### Deuda futura
+- `lineage_id` (identidad de linaje estable de ítems clonados) **antes** de
+  `BOQ_REORDER` avanzado. **No implementado ahora.**
+
+### Validación (todo PASS)
+- typecheck/lint 0, **757 tests** + **32 integración gated** (incl. 4E.3B: diff
+  puro, ocurrencia/duplicado, seguridad repo, no-mutación), build (`/compare` `ƒ`),
+  **RLS 106/106**, **isolation 12/12**, **gm 22/22**, gm:import PASS, validador
+  214/0/0, diff limpio. **Sin migración nueva.**
+
+### Estado / pendientes
+- Integración de 4E.3B a `integration` **pendiente** (a tu orden). `main =
+  origin/main = 2918622` intacta; producción intacta; stashes P1-A intactos.
+- Migraciones locales `20260606120000`/`20260609120000`/`20260609130000`
+  **pendientes de `db push`**; en pre-release: `db push --dry-run --linked` (read-only)
+  y reconciliar (no asumir cuáles faltan). Preview/MV-01 diferidos.
+- **`BOQ_REORDER` NO iniciado.**
+
 ## 2026-06-09 — 4E.3A integrada + 4E.3B DETENIDA por blocker de unicidad de ítems
 
 > **4E.3A integrada** en `integration/p1a-functional-resume` (merge `cd18f2d`,
