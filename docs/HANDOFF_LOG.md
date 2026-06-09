@@ -1,5 +1,80 @@
 # Handoff Log
 
+## 2026-06-10 — FASE 3A — CIERRE FORMAL (DB RESET + VALIDACIÓN REAL + PRECISION FIX)
+
+**Rama:** `feature/phase3a-price-intelligence-foundation`.  
+**Continuación de la sesión anterior.** Se ejecutó el `supabase db reset --local` pendiente,
+se validaron las 27 migraciones + 5 seeds contra PostgreSQL local, y se detectó + corrigió
+un bug de precisión en `discount_percent`.
+
+### Fix detectado durante validación DB real
+
+**Bug:** `discount_percent NUMERIC(6,4)` solo permite valores hasta `99.9999`. Insertar `100`
+(descuento del 100%, válido por el CHECK) disparaba `numeric_field_overflow` en lugar del
+`check_violation` esperado. El constraint `rpo_discount_range (discount_percent <= 100)` era
+inalcanzable para su límite superior.
+
+**Fix aplicado:** Migración `20260610090200_fix_discount_percent_precision.sql` — cambia
+ambas columnas a `NUMERIC(7,4)` (permite 100.0000). Se requirió DROP + RECREATE de la
+política RLS `rpo_update_review_only` (que referencia `discount_percent`) alrededor del
+`ALTER COLUMN TYPE`.
+
+**Otros hallazgos:** El seed `0005_demo_price_intelligence.sql` no estaba listado en
+`supabase/config.toml [db.seed]`. Corregido.
+
+### Resultados de validación DB (27 tests)
+
+| Test | Resultado |
+|---|---|
+| T1 — tabla `resource_price_observations` existe | ✅ PASS |
+| T2 — 3 columnas nuevas en `suppliers` | ✅ PASS |
+| T3 — función trigger `app.set_rpo_suggested_net_price` existe | ✅ PASS |
+| T4 — trigger `rpo_set_suggested_net_price` vinculado a la tabla (BEFORE INSERT+UPDATE) | ✅ PASS |
+| T5 — 7 constraints presentes | ✅ PASS |
+| T6 — 4 índices presentes | ✅ PASS |
+| T7 — RLS habilitado | ✅ true |
+| T8 — FORCE RLS habilitado | ✅ true |
+| T9 — 3 policies RLS | ✅ PASS |
+| T10 — nombres: `rpo_select_own_org`, `rpo_insert_authorized`, `rpo_update_review_only` | ✅ PASS |
+| T11 — 2 proveedores demo en seeds | ✅ PASS |
+| T12 — 3 observaciones para MAT-001 en seeds | ✅ PASS |
+| T13 — fórmula trigger: 28000×(1−0.08)=25760, 29500×(1−0.05)=28025, 35000×(1−0)=35000 | ✅ PASS |
+| T14 — observación approved tiene approved_by + approved_at | ✅ PASS |
+| T15 — observación pending: approved_by=NULL, approved_at=NULL | ✅ PASS |
+| T16 — observación rejected tiene rejection_reason no vacío | ✅ PASS |
+| T17 — constraint rechaza observed_price negativo (check_violation) | ✅ PASS |
+| T18 — constraint rechaza discount_percent > 100 (check_violation post-fix) | ✅ PASS |
+| T19 — constraint rechaza currency inválido | ✅ PASS |
+| T20 — constraint rechaza source_type inválido | ✅ PASS |
+| T21 — constraint rechaza status inválido | ✅ PASS |
+| T22 — constraint rechaza `rejected` sin rejection_reason | ✅ PASS |
+| T23 — constraint rechaza `approved` sin approved_by | ✅ PASS |
+| T24 — sin policy DELETE (FORCE RLS deniega) | ✅ PASS |
+| T25 — 20 columnas en `resource_price_observations` | ✅ PASS |
+| T26 — tipo final `discount_percent`: `numeric(7,4)` | ✅ PASS |
+| T27 — tipo final `default_discount_percent` suppliers: `numeric(7,4)` | ✅ PASS |
+
+### Suite completa (Phase 3A closure)
+
+| Check | Resultado |
+|---|---|
+| `supabase db reset --local` (27 migraciones + 5 seeds) | ✅ Aplicado |
+| `typecheck` | ✅ 0 errores |
+| `lint` | ✅ 0 warnings |
+| Tests: 63 archivos, **809 tests** | ✅ PASS |
+| Tests pricing: 10 archivos, **99 tests** | ✅ PASS |
+| `build` (Next.js 16 Turbopack) | ✅ 0 errores, 0 warnings |
+| `git diff --check` | ✅ Limpio |
+
+### Archivos nuevos en este cierre
+
+- `supabase/migrations/20260610090200_fix_discount_percent_precision.sql`
+- `supabase/config.toml` (seed 0005 agregado a `sql_paths`)
+- `supabase/scripts/phase3a_db_validation.sql` (script de validación reutilizable)
+- `docs/HANDOFF_LOG.md`, `docs/DECISIONS.md`, `docs/QA_REPORT.md` (actualizados)
+
+---
+
 ## 2026-06-10 — FASE 3A — PRICE INTELLIGENCE FOUNDATION IMPLEMENTADA
 
 **Rama:** `feature/phase3a-price-intelligence-foundation` (worktree aislado).  

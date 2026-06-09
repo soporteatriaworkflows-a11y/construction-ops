@@ -9,6 +9,31 @@ cada ciclo de validación.
 
 ---
 
+## Fase 3A — Price Intelligence Foundation — Cierre Formal DB (2026-06-10 closure)
+
+**Rama:** `feature/phase3a-price-intelligence-foundation`. **Sin merge a main.**  
+**`supabase db reset --local` ejecutado.** 27 migraciones + 5 seeds aplicados. Bug de precisión corregido.
+
+| Check | Resultado |
+|---|---|
+| `supabase db reset --local` (27 migraciones + 5 seeds) | ✅ Aplicado limpiamente |
+| `typecheck` | ✅ 0 errores |
+| `lint` | ✅ 0 warnings |
+| Tests: 63 archivos, **809 tests** (42 skipped esperados) | ✅ PASS |
+| Tests pricing: 10 archivos, **99 tests** | ✅ PASS |
+| `build` (Next.js 16 Turbopack) | ✅ 0 errores, 0 warnings |
+| `git diff --check` | ✅ Limpio |
+| DB T1–T27 (tabla, trigger, constraints, indexes, RLS, seed, precisión) | ✅ 27/27 PASS |
+
+**Bug corregido:** `discount_percent NUMERIC(6,4)` → `NUMERIC(7,4)`.  
+`NUMERIC(6,4)` desbordaba para 100 antes del CHECK → `NUMERIC(7,4)` hace al CHECK el árbitro correcto.
+
+**Pendientes para Oleada QA formal:**
+- RLS runtime harness para `resource_price_observations` (extend `rls-runtime/`).
+- Validación cross-org a nivel de PostgREST con JWT real.
+
+---
+
 ## Fase 3A — Price Intelligence Foundation (2026-06-10)
 
 **Rama:** `feature/phase3a-price-intelligence-foundation`. **Sin merge a main.**
