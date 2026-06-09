@@ -1,6 +1,6 @@
 # Estimate Version Comparison Contract — v1 (Oleada 4E.3B)
 
-Estado: **congelado v1 (con BLOCKER de unicidad de ítems — ver §A)** · 2026-06-09.
+Estado: **congelado v1 · blocker RESUELTO con Opción B (matching por ocurrencia) — ver §A** · 2026-06-09.
 Microfase: comparación **read-only** entre dos versiones del mismo presupuesto.
 Propiedad: `agent-orchestrator`.
 
@@ -29,7 +29,22 @@ financiero (anterior vs nuevo + deltas) y diff de capítulos e ítems
    como activos en totals.
 10. `Decimal` (sin float). No modificar export payload salvo reutilizar lectura.
 
-## A. BLOCKER de unicidad de ítems (decisión de producto pendiente)
+## A.0 RESOLUCIÓN (2026-06-09) — Opción B aprobada (sin migración)
+La usuaria aprobó **Opción B**: matching determinístico por **ocurrencia**, sin
+migración de unicidad. Algoritmo de ítems:
+1. Agrupar por `chapterCode + itemCode`.
+2. Si hay un único ítem por versión en el grupo ⇒ emparejar directo.
+3. Si hay códigos repetidos ⇒ ordenar determinísticamente dentro de cada versión
+   por `sort_order ASC`, desempate `id ASC`, y asignar `occurrenceIndex` (1,2,3…).
+4. Clave de comparación = `chapterCode + itemCode + occurrenceIndex`.
+5. **No** usar descripción como clave; **no** exigir unicidad en DB.
+6. El resultado incluye `duplicateCodeWarning: boolean`; la UI muestra una
+   advertencia discreta ("Código repetido: comparación emparejada por orden.").
+- **Deuda futura** (NO ahora): antes de `BOQ_REORDER` avanzado, evaluar una
+  identidad de linaje estable para ítems clonados (p. ej. `lineage_id`). No se
+  implementa `lineage_id` ni reorder en esta fase.
+
+## A. Contexto del blocker (histórico — resuelto por A.0)
 - **Hallazgo (FASE 5, verificado en DB local):** índices `UNIQUE` existentes =
   `chapters.chapters_version_code_uq (estimate_version_id, code)` y los PK. **No
   existe** índice único sobre `boq_items` por `code`. ⇒ La clave de comparación de
