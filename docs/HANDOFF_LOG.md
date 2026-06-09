@@ -1,5 +1,25 @@
 # Handoff Log
 
+## 2026-06-09 — Integración funcional segura `integration/p1a-functional-resume` (P1-A staged)
+
+> Nota: registrada **solo en la rama de integración** (no en `main`).
+
+- **P1-A code-complete y validada localmente**: H-01 cableado en lecturas tenant-scoped;
+  M-02 export legacy corregido (`organizationId` server-side); filtros explícitos por
+  `organizationId` conservados.
+- **Rama de integración** `integration/p1a-functional-resume` creada **desde `origin/main`
+  (`2918622`)** + `git merge --no-ff origin/fix/security-p1a-read-model-rls-export-legacy`
+  (`a78b74b`), **sin conflictos**. `main` y `origin/main` **intactos en `2918622`**.
+- **Validación local única post-integración (todo PASS)**: typecheck 0, lint 0, build OK,
+  **738 tests** (+11 integración gated, saltados), **RLS harness 106/106**,
+  **read-model isolation 12/12**.
+- **Diferido a pre-release (NO bloquea el MVP interno)**: Preview runtime real de P1-A y
+  validación Vercel/pooler/**MV-01** (deuda de validación pre-release). El sandbox CLI no
+  completa uploads/builds (deployments UNKNOWN); **no se investiga Vercel en esta etapa**.
+- **Producción NO modificada; `main` NO modificada.** Base funcional segura para continuar
+  el MVP: **`integration/p1a-functional-resume`**. Stashes P1-A (`stash@{0}`/`stash@{1}`) y
+  worktree de seguridad intactos (no tocados).
+
 ## 2026-06-07 — 4E.2A CERRADA (automated-ready): smoke automatizado no destructivo
 
 ### Decisión de la usuaria
