@@ -122,10 +122,18 @@ export default async function DashboardPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Dashboard gerencial"
-        description="Resumen financiero del proyecto activo"
-      />
+      {/* Hero de marca */}
+      <section
+        className="mb-6 overflow-hidden rounded-2xl px-6 py-7 text-white shadow-sm"
+        style={{ background: 'linear-gradient(120deg, #020148 0%, #013E97 55%, #005DD6 100%)' }}
+      >
+        <p className="text-xs font-medium uppercase tracking-wide text-iconic-soft">Dashboard gerencial</p>
+        <h1 className="mt-1 text-2xl font-bold tracking-tight">Resumen financiero del proyecto activo</h1>
+        <p className="mt-1 text-sm text-white/80">
+          Estado del presupuesto: <span className="font-semibold text-white">{statusLabel}</span>
+          {' · '}Actualizado {formatDateTime(summary.lastUpdatedAt)}
+        </p>
+      </section>
 
       {/* ------------------------------------------------------------------ */}
       {/* KPIs financieros principales                                         */}
