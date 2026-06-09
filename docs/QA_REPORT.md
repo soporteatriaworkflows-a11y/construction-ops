@@ -3,6 +3,34 @@
 Este documento es propiedad de **agent-qa**. Se actualiza al final de
 cada ciclo de validación.
 
+---
+
+## Integración ICONIC UI + Price Intelligence 3A (2026-06-09, rama `integration/iconic-ui-price-intelligence-v1`)
+
+**Base:** `main` = `22a408c`. **Sin merge a main; sin deploy; sin db push remoto.**
+
+| Check | Resultado | Detalle |
+|---|---|---|
+| typecheck | ✅ PASS | 0 errores |
+| lint | ✅ PASS | 0 errores |
+| tests unitarios | ✅ **809/809 PASS** | 42 skipped (gated) |
+| pricing tests | ✅ **99/99 PASS** | tests/unit/pricing/ |
+| build | ✅ PASS | `/catalog/.../price-intelligence` ruta dinámica presente |
+| RLS runtime | ✅ **106/106 PASS** | 25 tablas FORCE RLS (actualizado +1 por `resource_price_observations`) |
+| read-model isolation | ✅ **12/12 PASS** | cross-org, deny-by-default, pool |
+| gm:regression | ✅ **22/22 PASS** | golden master intacto |
+| gm:import | ✅ PASS | total_costo=$372.247.170 diff=0 |
+| git diff --check | ✅ limpio | sin trailing whitespace ni marcadores |
+| validate-claude-agents | ✅ **214/0/0** | PASS/WARN/FAIL |
+| DB reset local | ✅ **26/26 migraciones** + 5 seeds | supabase db reset --local |
+| DB pricing validation | ✅ PASS | trigger T13/T24/T25, 3 policies RLS, seeds cargados |
+| coherencia visual pricing + ICONIC | ✅ PASS | inspección de código: shell ICONIC heredado, naming correcto |
+
+**Riesgos residuales:**
+- Revisión visual interactiva por la usuaria pendiente (servidor local corriendo).
+- `text-blue-600` en website URL de proveedores — deuda diferida, no es token ICONIC.
+- 26 migraciones (QA_REPORT de Fase 3A mencionaba "27" por error de conteo).
+
 > Validación de **integración de Oleada 1** realizada por el orquestador en
 > `integration/wave-1` (pre-merge). La validación QA integral formal es de
 > Oleada 4 (`agent-qa`).

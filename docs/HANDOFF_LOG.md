@@ -1,5 +1,49 @@
 # Handoff Log
 
+## 2026-06-09 — INTEGRACIÓN ICONIC UI + PRICE INTELLIGENCE (rama `integration/iconic-ui-price-intelligence-v1`)
+
+> **Integración controlada de 2 oleadas** sobre base `main` = `22a408c`. Sin merge a main; sin deploy; sin db push remoto.
+
+- **FASE 0 — Precheck:** invariants confirmados (rama, working tree limpio, origin/main=22a408c, ui-branding=d4c9dbd, phase3a=03bc334, stashes intactos).
+- **FASE 1 — Merge Branding ICONIC V1:** `git merge --no-ff origin/feature/ui-branding-iconic-v1` → merge `c647989`, **sin conflictos** (20 archivos: tokens, shell, login, sidebar, empty-state, workspace-brand, página-header, button/badge/card, dashboard hero).
+- **FASE 2 — Merge Price Intelligence 3A:** `git merge --no-ff origin/feature/phase3a-price-intelligence-foundation` → conflictos esperados en docs/ resueltos preservando ambas secciones → merge `a9ac86d` (30 archivos: server/pricing/, 4 páginas pricing, 3 migraciones pricing, seeds, validación DB).
+- **Fix harness RLS:** contador tablas FORCE RLS 24→25 (`resource_price_observations` añadida en Fase 3A) → commit `533ee67`.
+- **FASE 3 — DB reset local:** `supabase db reset --local` → **26/26 migraciones** + 5 seeds aplicados. Trigger `rpo_set_suggested_net_price` PASS, 3 policies RLS, seeds pricing OK.
+  - Nota: el QA_REPORT de Fase 3A menciona "27 migraciones" (error de conteo anterior; el actual es 26).
+- **FASE 4 — Validación completa:**
+  - typecheck: **0 errores**
+  - lint: **0 errores**
+  - tests: **809/809 PASS** (42 skipped gated) — golden master $372.247.170 intacto
+  - pricing tests: **99/99 PASS**
+  - build: **PASS** (`/catalog/resources/[resourceId]/price-intelligence` ruta dinámica presente)
+  - RLS runtime: **106/106 PASS** (25 tablas FORCE)
+  - read-model isolation: **12/12 PASS**
+  - gm:regression: **22/22 PASS**
+  - gm:import: **9/9 PASS** (diff=0 en total_costo)
+  - git diff --check: **limpio**
+  - validate-claude-agents: **214/0/0 PASS**
+- **FASE 5 — Coherencia visual pricing + ICONIC:** páginas pricing heredan shell ICONIC; `PageHeader`/`EmptyState`/`Badge`/`Button` ICONIC; sidebar "Presupuestos" + "Grupo ICONIC"; sin "Construction Ops" visible; sin pantalla en blanco; auth intacta. Deuda conocida `text-blue-600` en website URL (diferida).
+- **FASE 6 — Documentación:** esta entrada.
+- **FASE 7 — Rama publicada:** `integration/iconic-ui-price-intelligence-v1` → `origin`.
+- **FASE 8 — Entorno local:** servidor en `http://localhost:3010` (ver rutas prioritarias abajo).
+
+**Estado HEAD:** `533ee67` · **main intacta** = `22a408c` · **producción intacta** · **stashes P1-A intactos**
+
+**Rutas prioritarias para revisión visual:**
+- `/login` — identidad ICONIC (navy + curva + cian)
+- `/dashboard` — hero ICONIC + KPIs
+- `/catalog` — catálogo con tokens ICONIC
+- `/catalog/providers` — lista de proveedores (Price Intelligence)
+- `/catalog/resources/<resourceId>/price-intelligence` — historial + formulario de observaciones
+- `/projects` — proyectos con shell ICONIC
+- Una vista de presupuesto → `/projects/<id>/scopes/<scopeId>/estimates/<estimateId>`
+- Comparación de versiones → `.../compare`
+
+**Pendientes:**
+- Revisión visual de la usuaria (local).
+- `main` intacta hasta aprobación.
+- Phase 3B NOT iniciada.
+
 ## 2026-06-09 — OLEADA UI / BRANDING ICONIC V1 (rama `feature/ui-branding-iconic-v1`)
 
 > Refresh **visual** desde `main` (`22a408c`). **Sin lógica/cálculos/RLS/migraciones/
