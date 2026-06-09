@@ -3,6 +3,8 @@ import { cn } from '@/lib/utils/cn';
 interface PageHeaderProps {
   title: string;
   description?: string;
+  /** Texto pequeño (eyebrow) sobre el título; acento de marca. */
+  eyebrow?: string;
   actions?: React.ReactNode;
   breadcrumb?: React.ReactNode;
   className?: string;
@@ -11,6 +13,7 @@ interface PageHeaderProps {
 export function PageHeader({
   title,
   description,
+  eyebrow,
   actions,
   breadcrumb,
   className,
@@ -23,12 +26,18 @@ export function PageHeader({
         </nav>
       )}
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900">
+        <div className="min-w-0">
+          {eyebrow && (
+            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-iconic-primary">
+              {eyebrow}
+            </p>
+          )}
+          <h1 className="flex items-center gap-2.5 text-2xl font-bold tracking-tight text-iconic-ink">
+            <span className="hidden h-6 w-1 rounded-full bg-iconic-primary sm:inline-block" aria-hidden="true" />
             {title}
           </h1>
           {description && (
-            <p className="mt-1 text-sm text-gray-500">{description}</p>
+            <p className="mt-1 text-sm text-iconic-graphite/60">{description}</p>
           )}
         </div>
         {actions && (

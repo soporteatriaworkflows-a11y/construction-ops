@@ -9,6 +9,20 @@ cada ciclo de validación.
 
 ---
 
+## Oleada UI / Branding ICONIC V1 (2026-06-09, rama `feature/ui-branding-iconic-v1`)
+
+Refresh visual (sin lógica). **Todo PASS:**
+- typecheck 0, lint 0, **757 tests** (sin regresión — ningún test asserta texto de
+  marca de la UI), build OK, `git diff --check` limpio.
+- Alcance: tokens ICONIC (CSS vars + Tailwind), naming Presupuestos/Grupo ICONIC,
+  login branded (panel navy + curva + cian), shell ink + topbar + nav activa,
+  dashboard hero, reutilizables (button/badge/card/empty-state/page-header), branding
+  multi-tenant ready. Logos oficiales reutilizados; guía PDF ya en repo.
+- **Verificación de no-regresión funcional (inspección):** sin cambios de negocio/
+  cálculos/Decimal/Supabase/RLS/migraciones/Vercel/deploy. No se re-ejecutó la suite
+  funcional remota (no se tocó lógica). `main = 2918622` intacta; producción intacta;
+  stashes P1-A intactos. Doc `docs/UI_BRANDING_ICONIC_V1.md`.
+
 ## MVP interno LOCAL-READY (2026-06-09, checkpoint `mvp-internal-local-ready-v1`)
 
 - **4E.3B integrada** en `integration/p1a-functional-resume` (merge `9695322`).

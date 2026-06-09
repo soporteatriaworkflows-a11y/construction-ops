@@ -1,5 +1,30 @@
 # Handoff Log
 
+## 2026-06-09 — OLEADA UI / BRANDING ICONIC V1 (rama `feature/ui-branding-iconic-v1`)
+
+> Refresh **visual** desde `main` (`22a408c`). **Sin lógica/cálculos/RLS/migraciones/
+> Vercel/deploy. `main` intacta; producción intacta.** (Reemplaza la rama previa
+> `feature/ui-branding-wave-v1` con el set ICONIC completo.)
+
+- **Naming visible:** "Construction Ops" → **"Presupuestos"** (producto) + **"Grupo
+  ICONIC"** (workspace) + descriptor "Gestión de presupuestos de obra". Migrado en
+  sidebar, título del navegador y login. Internos técnicos sin tocar.
+- **Tokens oficiales:** CSS vars `--iconic-*` en `globals.css` + Tailwind `iconic.*`/
+  `brand.*` (paleta ICONIC). body `bg-iconic-gray`, focus ring ICONIC.
+- **Branding config multi-tenant ready:** `lib/branding/workspace.ts`.
+- **Assets oficiales reutilizados** (no redibujados): `grupo-iconic-logo-full.png`
+  (login) + `grupo-iconic-logo-symbol.png` (avatar). Guía
+  `docs/branding/ICONIC_EXPORTS_VISUAL_GUIDE.pdf` **ya existe** en el repo.
+- **Superficies:** login (panel navy + curva + cian), shell (sidebar ink + topbar +
+  nav activa), dashboard (hero + KPI ink), reutilizables (button/badge primario
+  ICONIC, card hover, empty-state branded, page-header navy + acento). Propaga a
+  proyectos/presupuestos/catálogo/cantidades/planeación/comparación vía componentes.
+- **Validación:** typecheck/lint 0, **757 tests** (sin regresión), build OK,
+  `git diff --check` limpio. Doc `docs/UI_BRANDING_ICONIC_V1.md`.
+- **Deuda visual:** branding por tenant aún estático; headers de tabla navy
+  (diferido, tablas inline); `text-blue-700` inline → ICONIC; metadata de exports
+  interna. **No merge a main; no deploy; sin nuevas features.**
+
 ## 2026-06-09 — RELEASE INTERNO V1 EN PRODUCCIÓN (tag `mvp-internal-release-v1`)
 
 - **Fecha release:** 2026-06-09.

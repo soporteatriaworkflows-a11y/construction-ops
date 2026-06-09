@@ -1,120 +1,58 @@
 /**
  * Layout autenticado del dashboard.
  * Server Component — sin estado de cliente.
- * Propiedad: agent-frontend-boq.
+ * Propiedad: agent-frontend-boq. Refresh visual: UI/Branding ICONIC V1.
  */
 import type { ReactNode } from 'react';
-import Link from 'next/link';
-import {
-  Building2,
-  FolderOpen,
-  BookOpen,
-  Calculator,
-  ClipboardList,
-  LayoutDashboard,
-  Hash,
-  CalendarRange,
-} from 'lucide-react';
 import { readModelModeLabel } from '@/lib/utils/mode-label';
+import { getActiveWorkspace } from '@/lib/branding/workspace';
+import { WorkspaceBrand } from '@/components/shared/workspace-brand';
+import { SidebarNav } from '@/components/shared/sidebar-nav';
 
 /**
  * Render REQUEST-TIME de todo el segmento autenticado. La app va detrás de auth
  * (proxy) y su contenido depende del viewer y del modo (`READ_MODEL_SOURCE`)
- * resueltos en runtime; no debe prerenderizarse estáticamente ni hornear datos
- * de demostración. Esto cubre `/apu`, `/catalog`, `/quantities`, `/planning`,
- * además del footer mode-aware de abajo.
+ * resueltos en runtime; no debe prerenderizarse estáticamente.
  */
 export const dynamic = 'force-dynamic';
 
-const NAV_ITEMS = [
-  {
-    href: '/dashboard',
-    label: 'Dashboard',
-    icon: LayoutDashboard,
-  },
-  {
-    href: '/projects',
-    label: 'Proyectos',
-    icon: FolderOpen,
-  },
-  {
-    href: '/estimates',
-    label: 'Presupuestos',
-    icon: ClipboardList,
-  },
-  {
-    href: '/apu',
-    label: 'APU',
-    icon: Calculator,
-  },
-  {
-    href: '/catalog',
-    label: 'Catálogo',
-    icon: BookOpen,
-  },
-  {
-    href: '/quantities',
-    label: 'Cantidades',
-    icon: Hash,
-  },
-  {
-    href: '/planning',
-    label: 'Cronograma',
-    icon: CalendarRange,
-  },
-] as const;
-
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const mode = readModelModeLabel();
+  const ws = getActiveWorkspace();
   return (
-    <div className="flex min-h-screen bg-gray-50">
-      {/* Sidebar */}
-      <aside
-        className="flex w-60 shrink-0 flex-col border-r border-gray-200 bg-white"
-        aria-label="Navegación principal"
-      >
-        {/* Logotipo */}
-        <div className="flex h-14 items-center gap-2 border-b border-gray-200 px-4">
-          <div
-            className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-700 text-white"
-            aria-hidden="true"
-          >
-            <Building2 className="h-4 w-4" />
-          </div>
-          <span className="text-sm font-semibold text-gray-900">
-            Construction Ops
-          </span>
+    <div className="flex min-h-screen bg-iconic-gray">
+      {/* Sidebar — estructura azul noche ICONIC */}
+      <aside className="flex w-60 shrink-0 flex-col bg-iconic-ink" aria-label="Navegación principal">
+        {/* Identidad del workspace */}
+        <div className="flex h-16 items-center border-b border-white/10 px-4">
+          <WorkspaceBrand variant="sidebar" />
         </div>
 
-        {/* Navegación */}
-        <nav className="flex-1 overflow-y-auto py-4">
-          <ul role="list" className="space-y-0.5 px-2">
-            {NAV_ITEMS.map(({ href, label, icon: Icon }) => (
-              <li key={href}>
-                <Link
-                  href={href}
-                  className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
-                >
-                  <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-                  {label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
+        {/* Navegación con estado activo */}
+        <SidebarNav />
 
-        {/* Footer del sidebar — etiqueta de modo resuelta en request-time */}
-        <div className="border-t border-gray-200 px-4 py-3">
-          <p className="text-xs text-gray-400">{mode.label}</p>
+        {/* Footer — workspace + etiqueta de modo (request-time) */}
+        <div className="space-y-0.5 border-t border-white/10 px-4 py-3">
+          <p className="text-[11px] font-medium text-white/80">{ws.workspaceName}</p>
+          <p className="text-[11px] text-iconic-soft-blue/60">{mode.label}</p>
         </div>
       </aside>
 
       {/* Contenido principal */}
-      <main className="flex-1 overflow-x-hidden" id="main-content" tabIndex={-1}>
-        <div className="mx-auto max-w-screen-2xl px-6 py-6">
-          {children}
-        </div>
-      </main>
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* Topbar */}
+        <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-iconic-soft-blue/60 bg-white/85 px-6 backdrop-blur">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="truncate text-sm font-semibold text-iconic-ink">{ws.productName}</span>
+            <span className="hidden truncate text-xs text-iconic-graphite/50 sm:inline">· {ws.descriptor}</span>
+          </div>
+          <WorkspaceBrand variant="chip" />
+        </header>
+
+        <main className="flex-1 overflow-x-hidden" id="main-content" tabIndex={-1}>
+          <div className="mx-auto max-w-screen-2xl px-6 py-6">{children}</div>
+        </main>
+      </div>
     </div>
   );
 }
