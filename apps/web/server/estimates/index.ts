@@ -66,6 +66,8 @@ export {
   BoqWriteNotSupportedError,
   BoqVersionLockedError,
   BoqItemNotFoundError,
+  BoqAlreadyArchivedError,
+  BoqNotArchivedError,
   ChapterCodeDuplicateError,
   TargetChapterNotFoundError,
 } from './errors';

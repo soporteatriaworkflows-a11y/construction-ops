@@ -83,3 +83,15 @@ export interface BoqItemMutationResult {
   subtotal: DecimalString;
   financial: FinancialSummary;
 }
+
+/** Opciones de lectura de revisión (4E.2B). Por defecto solo activos. */
+export interface ReviewReadOptions {
+  /** Incluir nodos archivados (para la UI "Mostrar archivados"). */
+  includeArchived?: boolean;
+}
+
+/** Resultado de archive/restore de un ítem (resumen recalculado). */
+export interface BoqItemArchiveResult {
+  itemId: Uuid;
+  financial: FinancialSummary;
+}
