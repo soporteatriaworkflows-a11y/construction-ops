@@ -30,10 +30,12 @@ import {
   EstimateWriteNotSupportedError,
 } from './errors';
 import type {
+  BoqItemArchiveResult,
   BoqItemMutationResult,
   ChapterMutationResult,
   EditableBoqItemView,
   EditableChapterView,
+  ReviewReadOptions,
 } from '@/lib/estimates/boq-edit-types';
 import type {
   BoqItemReviewView,
@@ -149,8 +151,10 @@ export class FixtureEstimatesWriteRepository implements EstimatesWriteRepository
   async listChaptersByEstimateVersion(
     viewer: ViewerContext,
     estimateId: Uuid,
+    _options?: ReviewReadOptions,
   ): Promise<ChapterReviewItem[]> {
     if (!sameOrg(viewer) || estimateId !== fixture.estimate.id) return [];
+    // El fixture (demo) no tiene nodos archivados: todo es activo.
     return fixture.chapters
       .slice()
       .sort((a, b) => a.sortOrder - b.sortOrder)
@@ -162,6 +166,7 @@ export class FixtureEstimatesWriteRepository implements EstimatesWriteRepository
         return {
           id: ch.id, code: ch.code, name: ch.name, sortOrder: ch.sortOrder,
           itemCount: items.length, subtotal, sourceCode: null, sourceRow: null,
+          archived: false,
         };
       });
   }
@@ -177,6 +182,7 @@ export class FixtureEstimatesWriteRepository implements EstimatesWriteRepository
     return {
       id: ch.id, code: ch.code, name: ch.name, sortOrder: ch.sortOrder,
       subtotal, itemCount: items.length, sourceCode: null, sourceRow: null,
+      archived: false,
       estimateId: fixture.estimate.id, estimateName: fixture.estimate.name,
       versionNumber: fixture.estimateVersion.versionNumber,
       scopeId: scope?.id ?? '', scopeName: scope?.name ?? null,
@@ -184,7 +190,11 @@ export class FixtureEstimatesWriteRepository implements EstimatesWriteRepository
     };
   }
 
-  async listItemsByChapter(viewer: ViewerContext, chapterId: Uuid): Promise<BoqItemReviewView[]> {
+  async listItemsByChapter(
+    viewer: ViewerContext,
+    chapterId: Uuid,
+    _options?: ReviewReadOptions,
+  ): Promise<BoqItemReviewView[]> {
     const ch = fixture.chapters.find((c) => c.id === chapterId);
     if (!sameOrg(viewer) || !ch) return [];
     return fixture.boqItems
@@ -193,7 +203,7 @@ export class FixtureEstimatesWriteRepository implements EstimatesWriteRepository
       .map((it) => ({
         id: it.id, code: it.code, description: it.descriptionSnapshot, unit: it.unitSnapshot,
         quantity: it.quantitySnapshot, unitPrice: it.unitPriceSnapshot, subtotal: it.subtotal,
-        sortOrder: it.sortOrder, sourceCode: null, sourceRow: null,
+        sortOrder: it.sortOrder, sourceCode: null, sourceRow: null, archived: false,
       }));
   }
 
@@ -347,5 +357,19 @@ export class FixtureEstimatesWriteRepository implements EstimatesWriteRepository
       versionNumber: fixture.estimateVersion.versionNumber,
       availableChapters,
     };
+  }
+
+  /* --- Archive/restore (4E.2B): escritura bloqueada (solo lectura). --- */
+  async archiveEstimateChapter(): Promise<ChapterMutationResult> {
+    throw new BoqWriteNotSupportedError();
+  }
+  async restoreEstimateChapter(): Promise<ChapterMutationResult> {
+    throw new BoqWriteNotSupportedError();
+  }
+  async archiveBoqItem(): Promise<BoqItemArchiveResult> {
+    throw new BoqWriteNotSupportedError();
+  }
+  async restoreBoqItem(): Promise<BoqItemArchiveResult> {
+    throw new BoqWriteNotSupportedError();
   }
 }

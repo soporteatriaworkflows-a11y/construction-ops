@@ -164,6 +164,24 @@ export class BoqItemNotFoundError extends Error {
   }
 }
 
+/** Se intentó archivar un nodo BOQ que ya está archivado (rechazo seguro). */
+export class BoqAlreadyArchivedError extends Error {
+  readonly code = 'boq_already_archived' as const;
+  constructor(message?: string) {
+    super(message ?? 'El elemento ya está archivado.');
+    this.name = 'BoqAlreadyArchivedError';
+  }
+}
+
+/** Se intentó restaurar un nodo BOQ que no está archivado (rechazo seguro). */
+export class BoqNotArchivedError extends Error {
+  readonly code = 'boq_not_archived' as const;
+  constructor(message?: string) {
+    super(message ?? 'El elemento no está archivado.');
+    this.name = 'BoqNotArchivedError';
+  }
+}
+
 /** Capítulo destino (para mover) inexistente o de otra versión/organización. */
 export class TargetChapterNotFoundError extends Error {
   readonly code = 'target_chapter_not_found' as const;

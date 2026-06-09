@@ -16,11 +16,13 @@ export interface ChapterReviewItem {
   name: string;
   sortOrder: number;
   itemCount: number;
-  /** Σ subtotales de sus ítems (DecimalString). */
+  /** Σ subtotales de sus ítems ACTIVOS (DecimalString). */
   subtotal: DecimalString;
   /** Trazabilidad: código/fila originales del Excel (null si no normalizado). */
   sourceCode: string | null;
   sourceRow: number | null;
+  /** 4E.2B: capítulo archivado (solo aparece con includeArchived). */
+  archived: boolean;
 }
 
 /** Fila de la tabla de ítems BOQ de un capítulo. */
@@ -35,6 +37,8 @@ export interface BoqItemReviewView {
   sortOrder: number;
   sourceCode: string | null;
   sourceRow: number | null;
+  /** 4E.2B: ítem archivado (solo aparece con includeArchived). */
+  archived: boolean;
 }
 
 /** Detalle de un capítulo + contexto (proyecto/alcance/presupuesto/versión). */
@@ -47,6 +51,8 @@ export interface ChapterDetailView {
   itemCount: number;
   sourceCode: string | null;
   sourceRow: number | null;
+  /** 4E.2B: el capítulo está archivado. */
+  archived: boolean;
   estimateId: Uuid;
   estimateName: string;
   versionNumber: number;

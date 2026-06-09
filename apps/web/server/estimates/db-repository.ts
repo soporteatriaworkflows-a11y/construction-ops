@@ -28,7 +28,9 @@ import type {
 } from './types';
 import {
   AiuVersionLockedError,
+  BoqAlreadyArchivedError,
   BoqItemNotFoundError,
+  BoqNotArchivedError,
   BoqVersionLockedError,
   ChapterCodeDuplicateError,
   ChapterNotFoundError,
@@ -44,6 +46,7 @@ import {
   deriveSubtotal,
 } from './boq-validation';
 import type {
+  BoqItemArchiveResult,
   BoqItemMutationResult,
   ChapterInput,
   ChapterMutationResult,
@@ -51,6 +54,7 @@ import type {
   EditableChapterView,
   BoqItemInput,
   BoqItemUpdateInput,
+  ReviewReadOptions,
 } from '@/lib/estimates/boq-edit-types';
 import type {
   BoqItemReviewView,
@@ -260,64 +264,80 @@ export class DbEstimatesWriteRepository implements EstimatesWriteRepository {
     if (!data) return null;
 
     const version = data as { id: string; version_number: number; status: string };
-    const [{ count: chapterCount }, { count: itemCount }, subsRes] = await Promise.all([
-      supabase
-        .from('chapters')
-        .select('id', { count: 'exact', head: true })
-        .eq('estimate_version_id', version.id),
-      supabase
-        .from('boq_items')
-        .select('id', { count: 'exact', head: true })
-        .eq('estimate_version_id', version.id),
-      supabase
-        .from('boq_items')
-        .select('subtotal')
-        .eq('estimate_version_id', version.id),
-    ]);
 
-    const subs = (subsRes.data ?? []) as { subtotal: string }[];
-    const directTotal = subs
-      .reduce((acc, r) => acc.plus(new Decimal(r.subtotal)), new Decimal(0))
-      .toFixed();
+    // 4E.2B: conteos + directTotal ACTIVOS. Un capítulo archivado excluye él y
+    // TODOS sus ítems; un ítem archivado se excluye aunque su capítulo esté activo.
+    const { data: chRows, error: rollupErr } = await supabase
+      .from('chapters')
+      .select('id, archived_at, boq_items(subtotal, archived_at)')
+      .eq('estimate_version_id', version.id);
+    if (rollupErr) {
+      throw new Error(`estimate_version_rollup_failed: ${rollupErr.code ?? 'unknown'}`);
+    }
+
+    let chapterCount = 0;
+    let itemCount = 0;
+    let directTotal = new Decimal(0);
+    for (const row of chRows ?? []) {
+      const r = row as {
+        archived_at: string | null;
+        boq_items: { subtotal: string; archived_at: string | null }[] | null;
+      };
+      if (r.archived_at) continue; // capítulo archivado ⇒ excluye él y sus ítems
+      chapterCount += 1;
+      for (const it of r.boq_items ?? []) {
+        if (it.archived_at) continue; // ítem archivado individualmente
+        itemCount += 1;
+        directTotal = directTotal.plus(new Decimal(it.subtotal));
+      }
+    }
 
     return {
       id: version.id,
       versionNumber: version.version_number,
       status: version.status as EstimateActiveVersionView['status'],
-      chapterCount: chapterCount ?? 0,
-      itemCount: itemCount ?? 0,
-      directTotal,
+      chapterCount,
+      itemCount,
+      directTotal: directTotal.toFixed(),
     };
   }
 
   async listChaptersByEstimateVersion(
     viewer: ViewerContext,
     estimateId: Uuid,
+    options?: ReviewReadOptions,
   ): Promise<ChapterReviewItem[]> {
     const active = await this.getEstimateActiveVersion(viewer, estimateId);
     if (!active) return [];
+    const includeArchived = options?.includeArchived ?? false;
     const supabase = await this.clientFactory();
     const { data, error } = await supabase
       .from('chapters')
-      .select('id, code, name, sort_order, source_code, source_row, boq_items(subtotal)')
+      .select('id, code, name, sort_order, source_code, source_row, archived_at, boq_items(subtotal, archived_at)')
       .eq('estimate_version_id', active.id)
       .order('sort_order', { ascending: true });
     if (error) throw new Error(`chapter_list_failed: ${error.code ?? 'unknown'}`);
 
-    return (data ?? []).map((row) => {
-      const r = row as unknown as {
-        id: string; code: string; name: string; sort_order: number;
-        source_code: string | null; source_row: number | null;
-        boq_items: { subtotal: string }[] | null;
-      };
-      const items = r.boq_items ?? [];
-      const subtotal = items.reduce((acc, it) => acc.plus(new Decimal(it.subtotal)), new Decimal(0)).toFixed();
-      return {
-        id: r.id, code: r.code, name: r.name, sortOrder: r.sort_order,
-        itemCount: items.length, subtotal,
-        sourceCode: r.source_code ?? null, sourceRow: r.source_row ?? null,
-      };
-    });
+    return (data ?? [])
+      .map((row) => {
+        const r = row as unknown as {
+          id: string; code: string; name: string; sort_order: number;
+          source_code: string | null; source_row: number | null; archived_at: string | null;
+          boq_items: { subtotal: string; archived_at: string | null }[] | null;
+        };
+        // Subtotal/conteo solo de ítems ACTIVOS (archivados no participan).
+        const activeItems = (r.boq_items ?? []).filter((it) => !it.archived_at);
+        const subtotal = activeItems
+          .reduce((acc, it) => acc.plus(new Decimal(it.subtotal)), new Decimal(0))
+          .toFixed();
+        return {
+          id: r.id, code: r.code, name: r.name, sortOrder: r.sort_order,
+          itemCount: activeItems.length, subtotal,
+          sourceCode: r.source_code ?? null, sourceRow: r.source_row ?? null,
+          archived: !!r.archived_at,
+        };
+      })
+      .filter((ch) => includeArchived || !ch.archived);
   }
 
   async getChapterById(viewer: ViewerContext, chapterId: Uuid): Promise<ChapterDetailView> {
@@ -325,7 +345,7 @@ export class DbEstimatesWriteRepository implements EstimatesWriteRepository {
     const { data, error } = await supabase
       .from('chapters')
       .select(
-        'id, code, name, sort_order, source_code, source_row, boq_items(subtotal), ' +
+        'id, code, name, sort_order, source_code, source_row, archived_at, boq_items(subtotal, archived_at), ' +
           'estimate_versions(version_number, estimates(id, name, project_scopes(id, name, projects(id, name))))',
       )
       .eq('id', chapterId)
@@ -335,8 +355,8 @@ export class DbEstimatesWriteRepository implements EstimatesWriteRepository {
 
     const r = data as unknown as {
       id: string; code: string; name: string; sort_order: number;
-      source_code: string | null; source_row: number | null;
-      boq_items: { subtotal: string }[] | null;
+      source_code: string | null; source_row: number | null; archived_at: string | null;
+      boq_items: { subtotal: string; archived_at: string | null }[] | null;
       estimate_versions: {
         version_number: number;
         estimates: {
@@ -345,16 +365,17 @@ export class DbEstimatesWriteRepository implements EstimatesWriteRepository {
         } | null;
       } | null;
     };
-    const items = r.boq_items ?? [];
-    const subtotal = items.reduce((acc, it) => acc.plus(new Decimal(it.subtotal)), new Decimal(0)).toFixed();
+    const activeItems = (r.boq_items ?? []).filter((it) => !it.archived_at);
+    const subtotal = activeItems.reduce((acc, it) => acc.plus(new Decimal(it.subtotal)), new Decimal(0)).toFixed();
     const ev = r.estimate_versions;
     const est = ev?.estimates;
     const scope = est?.project_scopes;
     const project = scope?.projects;
     return {
       id: r.id, code: r.code, name: r.name, sortOrder: r.sort_order,
-      subtotal, itemCount: items.length,
+      subtotal, itemCount: activeItems.length,
       sourceCode: r.source_code ?? null, sourceRow: r.source_row ?? null,
+      archived: !!r.archived_at,
       estimateId: est?.id ?? '', estimateName: est?.name ?? '',
       versionNumber: ev?.version_number ?? 0,
       scopeId: scope?.id ?? '', scopeName: scope?.name ?? null,
@@ -362,24 +383,31 @@ export class DbEstimatesWriteRepository implements EstimatesWriteRepository {
     };
   }
 
-  async listItemsByChapter(_viewer: ViewerContext, chapterId: Uuid): Promise<BoqItemReviewView[]> {
+  async listItemsByChapter(
+    _viewer: ViewerContext,
+    chapterId: Uuid,
+    options?: ReviewReadOptions,
+  ): Promise<BoqItemReviewView[]> {
+    const includeArchived = options?.includeArchived ?? false;
     const supabase = await this.clientFactory();
-    const { data, error } = await supabase
+    let query = supabase
       .from('boq_items')
-      .select('id, code, description_snapshot, unit_snapshot, quantity_snapshot, unit_price_snapshot, subtotal, sort_order, source_code, source_row')
-      .eq('chapter_id', chapterId)
-      .order('sort_order', { ascending: true });
+      .select('id, code, description_snapshot, unit_snapshot, quantity_snapshot, unit_price_snapshot, subtotal, sort_order, source_code, source_row, archived_at')
+      .eq('chapter_id', chapterId);
+    if (!includeArchived) query = query.is('archived_at', null);
+    const { data, error } = await query.order('sort_order', { ascending: true });
     if (error) throw new Error(`item_list_failed: ${error.code ?? 'unknown'}`);
     return (data ?? []).map((row) => {
       const r = row as unknown as {
         id: string; code: string; description_snapshot: string; unit_snapshot: string;
         quantity_snapshot: string; unit_price_snapshot: string; subtotal: string; sort_order: number;
-        source_code: string | null; source_row: number | null;
+        source_code: string | null; source_row: number | null; archived_at: string | null;
       };
       return {
         id: r.id, code: r.code, description: r.description_snapshot, unit: r.unit_snapshot,
         quantity: r.quantity_snapshot, unitPrice: r.unit_price_snapshot, subtotal: r.subtotal,
         sortOrder: r.sort_order, sourceCode: r.source_code ?? null, sourceRow: r.source_row ?? null,
+        archived: !!r.archived_at,
       };
     });
   }
@@ -844,5 +872,112 @@ export class DbEstimatesWriteRepository implements EstimatesWriteRepository {
       versionNumber: active.versionNumber,
       availableChapters,
     };
+  }
+
+  /* ----------------------------------------------------------------------
+   * Archive / restore no destructivo (Oleada 4E.2B).
+   * `archived_by` = identidad autenticada (server-side). Versión emitida ⇒
+   * `assertEditableActiveVersion` lanza `BoqVersionLockedError`. RLS bloquea
+   * cross-org y versiones emitidas también a nivel DB.
+   * -------------------------------------------------------------------- */
+
+  async archiveEstimateChapter(
+    viewer: AuthenticatedViewer,
+    estimateId: Uuid,
+    chapterId: Uuid,
+  ): Promise<ChapterMutationResult> {
+    const active = await this.assertEditableActiveVersion(viewer, estimateId);
+    const supabase = await this.clientFactory();
+    const { data, error } = await supabase
+      .from('chapters')
+      .select('id, estimate_version_id, archived_at')
+      .eq('id', chapterId)
+      .maybeSingle();
+    if (error) throw new Error(`chapter_read_failed: ${error.code ?? 'unknown'}`);
+    const r = data as { id: string; estimate_version_id: string; archived_at: string | null } | null;
+    if (!r || r.estimate_version_id !== active.id) throw new ChapterNotFoundError(chapterId);
+    if (r.archived_at) throw new BoqAlreadyArchivedError();
+    const { error: upErr } = await supabase
+      .from('chapters')
+      .update({ archived_at: new Date().toISOString(), archived_by: viewer.userId })
+      .eq('id', chapterId);
+    if (upErr) throw new Error(`chapter_archive_failed: ${upErr.code ?? 'unknown'}`);
+    const financial = await this.calculateEstimateFinancialSummary(viewer, estimateId);
+    return { chapterId, financial };
+  }
+
+  async restoreEstimateChapter(
+    viewer: AuthenticatedViewer,
+    estimateId: Uuid,
+    chapterId: Uuid,
+  ): Promise<ChapterMutationResult> {
+    const active = await this.assertEditableActiveVersion(viewer, estimateId);
+    const supabase = await this.clientFactory();
+    const { data, error } = await supabase
+      .from('chapters')
+      .select('id, estimate_version_id, archived_at')
+      .eq('id', chapterId)
+      .maybeSingle();
+    if (error) throw new Error(`chapter_read_failed: ${error.code ?? 'unknown'}`);
+    const r = data as { id: string; estimate_version_id: string; archived_at: string | null } | null;
+    if (!r || r.estimate_version_id !== active.id) throw new ChapterNotFoundError(chapterId);
+    if (!r.archived_at) throw new BoqNotArchivedError();
+    const { error: upErr } = await supabase
+      .from('chapters')
+      .update({ archived_at: null, archived_by: null })
+      .eq('id', chapterId);
+    if (upErr) throw new Error(`chapter_restore_failed: ${upErr.code ?? 'unknown'}`);
+    const financial = await this.calculateEstimateFinancialSummary(viewer, estimateId);
+    return { chapterId, financial };
+  }
+
+  async archiveBoqItem(
+    viewer: AuthenticatedViewer,
+    estimateId: Uuid,
+    itemId: Uuid,
+  ): Promise<BoqItemArchiveResult> {
+    const active = await this.assertEditableActiveVersion(viewer, estimateId);
+    const supabase = await this.clientFactory();
+    const { data, error } = await supabase
+      .from('boq_items')
+      .select('id, estimate_version_id, archived_at')
+      .eq('id', itemId)
+      .maybeSingle();
+    if (error) throw new Error(`item_read_failed: ${error.code ?? 'unknown'}`);
+    const r = data as { id: string; estimate_version_id: string; archived_at: string | null } | null;
+    if (!r || r.estimate_version_id !== active.id) throw new BoqItemNotFoundError(itemId);
+    if (r.archived_at) throw new BoqAlreadyArchivedError();
+    const { error: upErr } = await supabase
+      .from('boq_items')
+      .update({ archived_at: new Date().toISOString(), archived_by: viewer.userId })
+      .eq('id', itemId);
+    if (upErr) throw new Error(`item_archive_failed: ${upErr.code ?? 'unknown'}`);
+    const financial = await this.calculateEstimateFinancialSummary(viewer, estimateId);
+    return { itemId, financial };
+  }
+
+  async restoreBoqItem(
+    viewer: AuthenticatedViewer,
+    estimateId: Uuid,
+    itemId: Uuid,
+  ): Promise<BoqItemArchiveResult> {
+    const active = await this.assertEditableActiveVersion(viewer, estimateId);
+    const supabase = await this.clientFactory();
+    const { data, error } = await supabase
+      .from('boq_items')
+      .select('id, estimate_version_id, archived_at')
+      .eq('id', itemId)
+      .maybeSingle();
+    if (error) throw new Error(`item_read_failed: ${error.code ?? 'unknown'}`);
+    const r = data as { id: string; estimate_version_id: string; archived_at: string | null } | null;
+    if (!r || r.estimate_version_id !== active.id) throw new BoqItemNotFoundError(itemId);
+    if (!r.archived_at) throw new BoqNotArchivedError();
+    const { error: upErr } = await supabase
+      .from('boq_items')
+      .update({ archived_at: null, archived_by: null })
+      .eq('id', itemId);
+    if (upErr) throw new Error(`item_restore_failed: ${upErr.code ?? 'unknown'}`);
+    const financial = await this.calculateEstimateFinancialSummary(viewer, estimateId);
+    return { itemId, financial };
   }
 }

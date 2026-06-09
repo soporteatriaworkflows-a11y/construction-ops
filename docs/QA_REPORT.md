@@ -9,6 +9,25 @@ cada ciclo de validación.
 
 ---
 
+## 4E.2B — BOQ safe delete/archive (2026-06-09, rama funcional)
+
+Rama `feature/wave-4e2b-boq-safe-archive`. **Todo PASS**:
+- typecheck 0, lint 0, **743 tests** + **19 integración gated** (`BOQ_SMOKE_DB=1`,
+  repo real + RLS local) que cubren los 28 casos del plan: archivar/restaurar ítem
+  y capítulo con recálculo financiero exacto y restauración al baseline; capítulo
+  archivado excluye sus ítems sin reescribirlos; ítem archivado individualmente
+  sigue archivado tras restaurar el capítulo; duplicate-archive / restore-of-active
+  rechazados; **no DELETE físico** (fila persiste con `archived_at`/`archived_by`);
+  `archived_by` server-side; read-model activo vs `includeArchived`; export excluye
+  archivados; cross-org y versión emitida bloqueados; fixture solo lectura; fuente
+  de actions/controls/UI.
+- build fixture + db-local OK; **RLS harness 106/106**; **read-model isolation 12/12**
+  (P1-A intacto); **gm:regression 22/22** (sin degradar registros activos);
+  gm:import PASS; validador 214/0/0; `git diff --check` limpio.
+- Migración local `20260609120000` verificada con `db reset`; **sin `db push`**.
+- **Sin deploy; sin merge a main/integration.** `main = origin/main = 2918622`
+  intacta; producción intacta; stashes P1-A intactos. Preview/MV-01 diferidos.
+
 ## 4E.2A — Cierre automated-ready (2026-06-07, post-merge)
 
 La usuaria **omitió voluntariamente** el smoke manual de escritura sobre el

@@ -171,3 +171,41 @@ describe('BOQ manual — actions/UI (fuente)', () => {
     expect(src).toMatch(/chapterEditHref/);
   });
 });
+
+describe('BOQ archive (4E.2B) — fixture solo lectura + fuente actions/UI', () => {
+  it('fixture: archive/restore de capítulo e ítem ⇒ BoqWriteNotSupportedError', async () => {
+    await expect(repo().archiveEstimateChapter(writer, DEMO_ESTIMATE_ID, DEMO_CHAPTER_ID)).rejects.toBeInstanceOf(BoqWriteNotSupportedError);
+    await expect(repo().restoreEstimateChapter(writer, DEMO_ESTIMATE_ID, DEMO_CHAPTER_ID)).rejects.toBeInstanceOf(BoqWriteNotSupportedError);
+    await expect(repo().archiveBoqItem(writer, DEMO_ESTIMATE_ID, DEMO_ITEM_ID)).rejects.toBeInstanceOf(BoqWriteNotSupportedError);
+    await expect(repo().restoreBoqItem(writer, DEMO_ESTIMATE_ID, DEMO_ITEM_ID)).rejects.toBeInstanceOf(BoqWriteNotSupportedError);
+  });
+  it('fixture: lecturas marcan archived=false (demo sin archivados)', async () => {
+    const chs = await repo().listChaptersByEstimateVersion(reader, DEMO_ESTIMATE_ID, { includeArchived: true });
+    expect(chs.every((c) => c.archived === false)).toBe(true);
+    const its = await repo().listItemsByChapter(reader, DEMO_CHAPTER_ID, { includeArchived: true });
+    expect(its.every((i) => i.archived === false)).toBe(true);
+  });
+  it('archive-actions: server, guard de modo + viewer; sin archived_by del navegador', () => {
+    const src = read('archive-actions.ts');
+    expect(src).toMatch(/^'use server';/m);
+    expect(src).toMatch(/isCreationModeEnabled\(\)/);
+    expect(src).toMatch(/resolveAuthenticatedViewer\(\)/);
+    expect(src).toMatch(/archiveEstimateChapter\(|restoreEstimateChapter\(/);
+    expect(src).toMatch(/archiveBoqItem\(|restoreBoqItem\(/);
+    expect(src).not.toMatch(/formData\.get\('archived_by'\)/);
+    expect(src).not.toMatch(/formData\.get\('organizationId'\)/);
+  });
+  it('archive-controls: client, confirm al archivar + Restaurar/Archivar', () => {
+    const src = read('archive-controls.tsx');
+    expect(src).toMatch(/^'use client';/m);
+    expect(src).toMatch(/window\.confirm/);
+    expect(src).toMatch(/Restaurar/);
+    expect(src).toMatch(/Archivar/);
+  });
+  it('detalle: toggle Mostrar archivados + ArchiveControls', () => {
+    const src = read('page.tsx');
+    expect(src).toMatch(/Mostrar archivados/);
+    expect(src).toMatch(/ArchiveControls/);
+    expect(src).toMatch(/includeArchived/);
+  });
+});
