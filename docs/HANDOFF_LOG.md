@@ -1,5 +1,32 @@
 # Handoff Log
 
+## 2026-06-09 — RELEASE INTERNO V1 EN PRODUCCIÓN (tag `mvp-internal-release-v1`)
+
+- **Fecha release:** 2026-06-09.
+- **Hash main:** **`12d53d5`** (merge `merge(release): construction ops MVP internal v1`);
+  `main = origin/main = 12d53d5`. Rollback de app = commit anterior **`2918622`**.
+- **Migraciones realmente aplicadas al remoto:** `20260609120000` (4E.2B archive) +
+  `20260609130000` (4E.3A issue/clone). `20260606120000` (4E.2A) ya estaba aplicada
+  de antes ⇒ **remoto 23/23, dry-run "up to date", `db lint` sin errores**. Aditivas/
+  reversibles; sin seeds, sin reset/pull/repair, sin datos remotos.
+- **Vercel Git autorizado por la usuaria** (GitHub App + Production Branch=main +
+  Preview por ramas). Deployments **automáticos por Git** (sin `vercel deploy`).
+- **Preview automático** (release branch, commit `ceaf6d5`): `construction-ats9scfxw…`
+  **● Ready**, build limpio (sin errores DB/RLS/pooler). Smoke GET del Preview = 401
+  por **Vercel Deployment Protection** (no es defecto de la app).
+- **Production automático** (main `12d53d5`): `construction-o1rfipxzc…` **● Ready**,
+  alias `construction-ops-psi.vercel.app`. **Smoke productivo:** `/`→307→/login;
+  `/login` **200**; `/dashboard`,`/planning`,`/projects`,`/catalog`,`/quantities`
+  →307→/login; **sin HTTP 500**, sin escrituras/exports.
+- **Validación local post-merge (una vez, todo PASS):** typecheck/lint 0, **757 tests**,
+  **MVP e2e smoke 10/10**, build, **RLS 106/106**, **isolation 12/12**, **gm 22/22**,
+  gm:import, validador 214/0/0, diff limpio.
+- **Pendientes no bloqueantes:** smoke autenticado tenant (no ejecutado: sin sesión
+  aprobada); **MV-01**; `BOQ_REORDER`; `lineage_id` antes de reorder avanzado;
+  `BOQ_AUDIT_TRAIL`; hardening posterior.
+- **Rollback:** app → revertir a `2918622`; DB → migraciones aditivas (no rollback
+  destructivo automático). Stashes P1-A intactos. **`BOQ_REORDER` fuera del release.**
+
 ## 2026-06-09 — MVP INTERNO LOCAL-READY (4E.3B integrada + smoke end-to-end + checkpoint)
 
 > **4E.3B integrada** en `integration/p1a-functional-resume` (merge `9695322`).

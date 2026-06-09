@@ -1,7 +1,17 @@
 # MVP Interno — Local-Ready (Construction Ops)
 
-Estado: **local-ready** · 2026-06-09 · Rama candidata
-`integration/p1a-functional-resume`. **`main` y producción intactas; sin deploy.**
+> **ACTUALIZACIÓN 2026-06-09 — RELEASE INTERNO V1 EN PRODUCCIÓN.** Mergeado a `main`
+> (**`12d53d5`**, tag **`mvp-internal-release-v1`**). Migraciones `20260609120000` +
+> `20260609130000` aplicadas al remoto (remoto **23/23**, `db lint` sin errores;
+> `20260606120000` ya estaba aplicada). Deploy **automático por Git** (Vercel GitHub
+> App autorizada): Preview Ready (`ats9scfxw`), **Production Ready** (`o1rfipxzc`,
+> alias `construction-ops-psi.vercel.app`). Smoke productivo: `/login` 200, rutas
+> protegidas 307→/login, sin 500. **Rollback app = `2918622`.** Pendiente no
+> bloqueante: smoke autenticado tenant, MV-01, BOQ_REORDER, lineage_id, audit trail,
+> hardening. Las secciones siguientes documentan el alcance local-ready original.
+
+Estado: **local-ready → released v1** · 2026-06-09 · Rama candidata
+`integration/p1a-functional-resume` (mergeada a `main`).
 
 ## 1. Flujo funcional cubierto (end-to-end, validado local)
 Crear presupuesto → V01 draft → importar BOQ → editar (cantidad/precio, crear
