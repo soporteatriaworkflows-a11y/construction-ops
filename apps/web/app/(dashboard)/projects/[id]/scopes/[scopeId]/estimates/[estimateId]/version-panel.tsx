@@ -9,7 +9,8 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, FileCheck2, GitBranchPlus } from 'lucide-react';
+import Link from 'next/link';
+import { Loader2, FileCheck2, GitBranchPlus, GitCompare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { FormError } from '@/components/auth/form-error';
@@ -32,10 +33,12 @@ export function VersionPanel({
   estimateId,
   versions,
   canManage,
+  compareHref,
 }: {
   estimateId: string;
   versions: EstimateVersionSummary[];
   canManage: boolean;
+  compareHref: string;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -62,8 +65,17 @@ export function VersionPanel({
     <div className="rounded-lg border border-gray-200 bg-white">
       <div className="flex items-center justify-between gap-2 border-b border-gray-100 px-4 py-3">
         <span className="text-sm font-semibold text-gray-900">Versiones</span>
-        {canManage && (
-          <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2">
+          {versions.length >= 2 && (
+            <Button asChild size="sm" variant="outline">
+              <Link href={compareHref}>
+                <GitCompare className="h-4 w-4" aria-hidden="true" />
+                Comparar versiones
+              </Link>
+            </Button>
+          )}
+          {canManage && (
+            <>
             {activeDraft && (
               <Button type="button" size="sm" onClick={() => act('issue')} disabled={pending}>
                 {pending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <FileCheck2 className="h-4 w-4" aria-hidden="true" />}
@@ -76,8 +88,9 @@ export function VersionPanel({
                 Crear nueva versión
               </Button>
             )}
-          </div>
-        )}
+            </>
+          )}
+        </div>
       </div>
       {error && <div className="px-4 pt-3"><FormError id="version-error" message={error} /></div>}
       <table className="w-full text-sm" aria-label="Versiones del presupuesto">

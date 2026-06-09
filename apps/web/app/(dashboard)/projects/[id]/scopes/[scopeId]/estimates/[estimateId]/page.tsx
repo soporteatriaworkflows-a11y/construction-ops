@@ -322,7 +322,7 @@ export default async function EstimateDetailPage({ params, searchParams }: PageP
             <ClipboardList className="h-4 w-4 text-gray-400" aria-hidden="true" />
             Versiones
           </h2>
-          <VersionPanel estimateId={estimateId} versions={versions} canManage={canEdit} />
+          <VersionPanel estimateId={estimateId} versions={versions} canManage={canEdit} compareHref={`${scopeHref}/estimates/${estimateId}/compare`} />
         </section>
       )}
 
