@@ -24,6 +24,147 @@
 - **Deuda visual:** branding por tenant aún estático; headers de tabla navy
   (diferido, tablas inline); `text-blue-700` inline → ICONIC; metadata de exports
   interna. **No merge a main; no deploy; sin nuevas features.**
+## 2026-06-10 — FASE 3A — CIERRE FORMAL (DB RESET + VALIDACIÓN REAL + PRECISION FIX)
+
+**Rama:** `feature/phase3a-price-intelligence-foundation`.  
+**Continuación de la sesión anterior.** Se ejecutó el `supabase db reset --local` pendiente,
+se validaron las 27 migraciones + 5 seeds contra PostgreSQL local, y se detectó + corrigió
+un bug de precisión en `discount_percent`.
+
+### Fix detectado durante validación DB real
+
+**Bug:** `discount_percent NUMERIC(6,4)` solo permite valores hasta `99.9999`. Insertar `100`
+(descuento del 100%, válido por el CHECK) disparaba `numeric_field_overflow` en lugar del
+`check_violation` esperado. El constraint `rpo_discount_range (discount_percent <= 100)` era
+inalcanzable para su límite superior.
+
+**Fix aplicado:** Migración `20260610090200_fix_discount_percent_precision.sql` — cambia
+ambas columnas a `NUMERIC(7,4)` (permite 100.0000). Se requirió DROP + RECREATE de la
+política RLS `rpo_update_review_only` (que referencia `discount_percent`) alrededor del
+`ALTER COLUMN TYPE`.
+
+**Otros hallazgos:** El seed `0005_demo_price_intelligence.sql` no estaba listado en
+`supabase/config.toml [db.seed]`. Corregido.
+
+### Resultados de validación DB (27 tests)
+
+| Test | Resultado |
+|---|---|
+| T1 — tabla `resource_price_observations` existe | ✅ PASS |
+| T2 — 3 columnas nuevas en `suppliers` | ✅ PASS |
+| T3 — función trigger `app.set_rpo_suggested_net_price` existe | ✅ PASS |
+| T4 — trigger `rpo_set_suggested_net_price` vinculado a la tabla (BEFORE INSERT+UPDATE) | ✅ PASS |
+| T5 — 7 constraints presentes | ✅ PASS |
+| T6 — 4 índices presentes | ✅ PASS |
+| T7 — RLS habilitado | ✅ true |
+| T8 — FORCE RLS habilitado | ✅ true |
+| T9 — 3 policies RLS | ✅ PASS |
+| T10 — nombres: `rpo_select_own_org`, `rpo_insert_authorized`, `rpo_update_review_only` | ✅ PASS |
+| T11 — 2 proveedores demo en seeds | ✅ PASS |
+| T12 — 3 observaciones para MAT-001 en seeds | ✅ PASS |
+| T13 — fórmula trigger: 28000×(1−0.08)=25760, 29500×(1−0.05)=28025, 35000×(1−0)=35000 | ✅ PASS |
+| T14 — observación approved tiene approved_by + approved_at | ✅ PASS |
+| T15 — observación pending: approved_by=NULL, approved_at=NULL | ✅ PASS |
+| T16 — observación rejected tiene rejection_reason no vacío | ✅ PASS |
+| T17 — constraint rechaza observed_price negativo (check_violation) | ✅ PASS |
+| T18 — constraint rechaza discount_percent > 100 (check_violation post-fix) | ✅ PASS |
+| T19 — constraint rechaza currency inválido | ✅ PASS |
+| T20 — constraint rechaza source_type inválido | ✅ PASS |
+| T21 — constraint rechaza status inválido | ✅ PASS |
+| T22 — constraint rechaza `rejected` sin rejection_reason | ✅ PASS |
+| T23 — constraint rechaza `approved` sin approved_by | ✅ PASS |
+| T24 — sin policy DELETE (FORCE RLS deniega) | ✅ PASS |
+| T25 — 20 columnas en `resource_price_observations` | ✅ PASS |
+| T26 — tipo final `discount_percent`: `numeric(7,4)` | ✅ PASS |
+| T27 — tipo final `default_discount_percent` suppliers: `numeric(7,4)` | ✅ PASS |
+
+### Suite completa (Phase 3A closure)
+
+| Check | Resultado |
+|---|---|
+| `supabase db reset --local` (27 migraciones + 5 seeds) | ✅ Aplicado |
+| `typecheck` | ✅ 0 errores |
+| `lint` | ✅ 0 warnings |
+| Tests: 63 archivos, **809 tests** | ✅ PASS |
+| Tests pricing: 10 archivos, **99 tests** | ✅ PASS |
+| `build` (Next.js 16 Turbopack) | ✅ 0 errores, 0 warnings |
+| `git diff --check` | ✅ Limpio |
+
+### Archivos nuevos en este cierre
+
+- `supabase/migrations/20260610090200_fix_discount_percent_precision.sql`
+- `supabase/config.toml` (seed 0005 agregado a `sql_paths`)
+- `supabase/scripts/phase3a_db_validation.sql` (script de validación reutilizable)
+- `docs/HANDOFF_LOG.md`, `docs/DECISIONS.md`, `docs/QA_REPORT.md` (actualizados)
+
+---
+
+## 2026-06-10 — FASE 3A — PRICE INTELLIGENCE FOUNDATION IMPLEMENTADA
+
+**Rama:** `feature/phase3a-price-intelligence-foundation` (worktree aislado).  
+**Hash base:** `22a408c` (MVP internal v1 release). **Sin merge a main. Sin deploy.**
+
+### Entregables
+
+**Contrato congelado:**
+- `docs/PRICE_INTELLIGENCE_FOUNDATION_CONTRACT.md` (v1 congelado).
+
+**Migraciones (locales, no aplicadas a remoto):**
+- `20260610090000_resource_price_intelligence.sql` — tabla `resource_price_observations`,
+  extensión `suppliers` (website_url, default_discount_percent, notes, created_by),
+  trigger `app.set_rpo_suggested_net_price()` (invariante DB: `suggested_net_price = round(observed_price × (1 - discount_percent/100), 10)`).
+- `20260610090100_rls_resource_price_intelligence.sql` — FORCE RLS + 3 policies
+  (SELECT todos; INSERT management/internal; UPDATE management/internal solo cols revisión).
+
+**Seed demo:**
+- `supabase/seeds/0005_demo_price_intelligence.sql` — 2 proveedores + 3 observaciones
+  (approved, pending, rejected) para MAT-001.
+
+**Backend (`apps/web/server/pricing/`):**
+- `types.ts` — ProviderView, CreateObservationInput, ResourcePriceObservationView,
+  ObservationStatus, ResourcePriceIntelligenceSummary, ProviderRepository, PriceObservationRepository.
+- `errors.ts` — 6 clases de error de dominio.
+- `validation.ts` — validateCreateObservationInput, validateProviderCreateInput, computeIsStale (runtime, 30d staleAfterDays).
+- `db-provider-repository.ts` — DbProviderRepository (listProviders, createProvider, updateProvider, getProviderById).
+- `db-observation-repository.ts` — DbObservationRepository (list, create, approve, reject, summary).
+- `fixture-repository.ts` — FixtureProviderRepository + FixtureObservationRepository.
+- `index.ts` — getProviderRepository() + getObservationRepository() (fixture/db per READ_MODEL_SOURCE).
+
+**UI (`apps/web/app/(dashboard)/catalog/`):**
+- `providers/page.tsx` — lista de proveedores (campos 🔒 según ViewerRole).
+- `providers/new/page.tsx` — creación de proveedor (mode-guard).
+- `providers/actions.ts` — Server Actions createProviderAction + updateProviderAction.
+- `providers/_components/provider-form.tsx` — Client Component (useActionState React 19).
+- `resources/[resourceId]/price-intelligence/page.tsx` — historial de observaciones + formulario.
+- `resources/[resourceId]/price-intelligence/actions.ts` — Server Actions create/approve/reject.
+- `resources/[resourceId]/price-intelligence/_components/observation-form.tsx` — Client Component.
+- `resources/[resourceId]/price-intelligence/_components/observation-review-buttons.tsx` — Approve/Reject buttons.
+
+**Tests:**
+- `tests/unit/pricing/resource-price-observation.test.ts` — fórmula suggested_net_price + stale state + validaciones.
+- `tests/unit/pricing/observation-approval.test.ts` — fixture repos + workflow errores.
+- `tests/unit/pricing/observation-security.test.ts` — aislamiento org + privacidad + error classes.
+
+### Validación (todo PASS)
+- `typecheck` → ✅ 0 errores
+- `lint` → ✅ 0 warnings
+- `test` → ✅ **63 archivos, 809 tests** (de 757 → +52)
+- `build` → ✅ "Compiled successfully in 6.8s" + nuevas rutas dinámicas
+- `git diff --check` → ✅ limpio
+- `validate-claude-agents` → ✅ **214 PASS / 0 WARN / 0 FAIL**
+- Golden master regression `regression-first-floor.test.ts` → ✅ intacto (COP 372.247.170)
+
+### Seguridad
+- `organization_id`, `created_by`, `approved_by` SIEMPRE server-side.
+- FORCE RLS en `resource_price_observations`.
+- Campos 🔒 nunca serializados a rol cliente.
+- Observaciones append-only (solo UPDATE de status/approved_by/approved_at/rejection_reason).
+- Ninguna observación modifica presupuestos emitidos.
+
+### Pendientes
+- `supabase db reset` local (requiere Docker activo con `supabase start -x realtime,...`).
+- Smoke de escritura real en DB local (gated `PRICE_INTEL_SMOKE_DB=1`, no implementado).
+- Phase 3B (fuera del alcance de esta sesión).
 
 ## 2026-06-09 — RELEASE INTERNO V1 EN PRODUCCIÓN (tag `mvp-internal-release-v1`)
 

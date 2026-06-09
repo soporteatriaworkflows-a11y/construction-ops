@@ -22,6 +22,69 @@ Refresh visual (sin lógica). **Todo PASS:**
   cálculos/Decimal/Supabase/RLS/migraciones/Vercel/deploy. No se re-ejecutó la suite
   funcional remota (no se tocó lógica). `main = 2918622` intacta; producción intacta;
   stashes P1-A intactos. Doc `docs/UI_BRANDING_ICONIC_V1.md`.
+## Fase 3A — Price Intelligence Foundation — Cierre Formal DB (2026-06-10 closure)
+
+**Rama:** `feature/phase3a-price-intelligence-foundation`. **Sin merge a main.**  
+**`supabase db reset --local` ejecutado.** 27 migraciones + 5 seeds aplicados. Bug de precisión corregido.
+
+| Check | Resultado |
+|---|---|
+| `supabase db reset --local` (27 migraciones + 5 seeds) | ✅ Aplicado limpiamente |
+| `typecheck` | ✅ 0 errores |
+| `lint` | ✅ 0 warnings |
+| Tests: 63 archivos, **809 tests** (42 skipped esperados) | ✅ PASS |
+| Tests pricing: 10 archivos, **99 tests** | ✅ PASS |
+| `build` (Next.js 16 Turbopack) | ✅ 0 errores, 0 warnings |
+| `git diff --check` | ✅ Limpio |
+| DB T1–T27 (tabla, trigger, constraints, indexes, RLS, seed, precisión) | ✅ 27/27 PASS |
+
+**Bug corregido:** `discount_percent NUMERIC(6,4)` → `NUMERIC(7,4)`.  
+`NUMERIC(6,4)` desbordaba para 100 antes del CHECK → `NUMERIC(7,4)` hace al CHECK el árbitro correcto.
+
+**Pendientes para Oleada QA formal:**
+- RLS runtime harness para `resource_price_observations` (extend `rls-runtime/`).
+- Validación cross-org a nivel de PostgREST con JWT real.
+
+---
+
+## Fase 3A — Price Intelligence Foundation (2026-06-10)
+
+**Rama:** `feature/phase3a-price-intelligence-foundation`. **Sin merge a main.**
+
+| Check | Resultado |
+|---|---|
+| `typecheck` | ✅ 0 errores |
+| `lint` | ✅ 0 warnings |
+| Tests: 63 archivos, **809 tests** | ✅ PASS (↑52 vs MVP v1) |
+| `build` | ✅ Compiled 6.8s |
+| `git diff --check` | ✅ Limpio |
+| `validate-claude-agents` | ✅ 214/0/0 |
+| Golden master regression (COP 372.247.170) | ✅ Intacto |
+
+**Tests nuevos (Fase 3A):**
+- `resource-price-observation.test.ts`: fórmula `suggested_net_price` (5 casos) + stale state (9 casos) + validateCreateObservationInput (9 casos) + validateProviderCreateInput (5 casos).
+- `observation-approval.test.ts`: fixture list/summary + errores de escritura + ObservationAlreadyReviewedError + ObservationNotFoundError + ProviderRepository.
+- `observation-security.test.ts`: aislamiento cross-org + campos 🔒 + INTERNAL_PRICE_FIELDS + CreateObservationInput sin campos server-side + clases de error.
+
+**Observaciones de seguridad:**
+- Campos `organization_id`, `created_by`, `approved_by` nunca aceptados desde el navegador: ✅
+- FORCE RLS en `resource_price_observations` con 3 policies: ✅
+- Append-only: UPDATE solo modifica `status/approved_by/approved_at/rejection_reason`: ✅ (verificado por RLS WITH CHECK)
+- Ninguna observación modifica snapshots emitidos: ✅ (by design, sin conexión a BOQ)
+- Campos 🔒 no serializados al rol cliente en UI: ✅ (verificado por condicional ViewerRole)
+
+**Cobertura funcional:**
+- `suggested_net_price` = `round(observed_price × (1 - discount_percent/100), 10)`: ✅ (trigger DB + tests)
+- `isStale` computado en runtime (30d desde approved_at o valid_until expirado): ✅
+- Workflow pending → approved | rejected: ✅ (con InsufficientRoleError para roles no autorizados)
+- Fixture data para modo demo: ✅ (2 proveedores, 3 observaciones MAT-001)
+
+**Pendientes para Oleada QA formal:**
+- Smoke DB real con `supabase db reset` + `PRICE_INTEL_SMOKE_DB=1` (requiere Docker local).
+- RLS runtime harness para `resource_price_observations` (extend `rls-runtime/`).
+- Validación cross-org a nivel de PostgREST con JWT real.
+
+---
 
 ## MVP interno LOCAL-READY (2026-06-09, checkpoint `mvp-internal-local-ready-v1`)
 
