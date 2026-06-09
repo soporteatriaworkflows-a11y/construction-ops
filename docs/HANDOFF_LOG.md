@@ -1,5 +1,72 @@
 # Handoff Log
 
+## 2026-06-10 — FASE 3A — PRICE INTELLIGENCE FOUNDATION IMPLEMENTADA
+
+**Rama:** `feature/phase3a-price-intelligence-foundation` (worktree aislado).  
+**Hash base:** `22a408c` (MVP internal v1 release). **Sin merge a main. Sin deploy.**
+
+### Entregables
+
+**Contrato congelado:**
+- `docs/PRICE_INTELLIGENCE_FOUNDATION_CONTRACT.md` (v1 congelado).
+
+**Migraciones (locales, no aplicadas a remoto):**
+- `20260610090000_resource_price_intelligence.sql` — tabla `resource_price_observations`,
+  extensión `suppliers` (website_url, default_discount_percent, notes, created_by),
+  trigger `app.set_rpo_suggested_net_price()` (invariante DB: `suggested_net_price = round(observed_price × (1 - discount_percent/100), 10)`).
+- `20260610090100_rls_resource_price_intelligence.sql` — FORCE RLS + 3 policies
+  (SELECT todos; INSERT management/internal; UPDATE management/internal solo cols revisión).
+
+**Seed demo:**
+- `supabase/seeds/0005_demo_price_intelligence.sql` — 2 proveedores + 3 observaciones
+  (approved, pending, rejected) para MAT-001.
+
+**Backend (`apps/web/server/pricing/`):**
+- `types.ts` — ProviderView, CreateObservationInput, ResourcePriceObservationView,
+  ObservationStatus, ResourcePriceIntelligenceSummary, ProviderRepository, PriceObservationRepository.
+- `errors.ts` — 6 clases de error de dominio.
+- `validation.ts` — validateCreateObservationInput, validateProviderCreateInput, computeIsStale (runtime, 30d staleAfterDays).
+- `db-provider-repository.ts` — DbProviderRepository (listProviders, createProvider, updateProvider, getProviderById).
+- `db-observation-repository.ts` — DbObservationRepository (list, create, approve, reject, summary).
+- `fixture-repository.ts` — FixtureProviderRepository + FixtureObservationRepository.
+- `index.ts` — getProviderRepository() + getObservationRepository() (fixture/db per READ_MODEL_SOURCE).
+
+**UI (`apps/web/app/(dashboard)/catalog/`):**
+- `providers/page.tsx` — lista de proveedores (campos 🔒 según ViewerRole).
+- `providers/new/page.tsx` — creación de proveedor (mode-guard).
+- `providers/actions.ts` — Server Actions createProviderAction + updateProviderAction.
+- `providers/_components/provider-form.tsx` — Client Component (useActionState React 19).
+- `resources/[resourceId]/price-intelligence/page.tsx` — historial de observaciones + formulario.
+- `resources/[resourceId]/price-intelligence/actions.ts` — Server Actions create/approve/reject.
+- `resources/[resourceId]/price-intelligence/_components/observation-form.tsx` — Client Component.
+- `resources/[resourceId]/price-intelligence/_components/observation-review-buttons.tsx` — Approve/Reject buttons.
+
+**Tests:**
+- `tests/unit/pricing/resource-price-observation.test.ts` — fórmula suggested_net_price + stale state + validaciones.
+- `tests/unit/pricing/observation-approval.test.ts` — fixture repos + workflow errores.
+- `tests/unit/pricing/observation-security.test.ts` — aislamiento org + privacidad + error classes.
+
+### Validación (todo PASS)
+- `typecheck` → ✅ 0 errores
+- `lint` → ✅ 0 warnings
+- `test` → ✅ **63 archivos, 809 tests** (de 757 → +52)
+- `build` → ✅ "Compiled successfully in 6.8s" + nuevas rutas dinámicas
+- `git diff --check` → ✅ limpio
+- `validate-claude-agents` → ✅ **214 PASS / 0 WARN / 0 FAIL**
+- Golden master regression `regression-first-floor.test.ts` → ✅ intacto (COP 372.247.170)
+
+### Seguridad
+- `organization_id`, `created_by`, `approved_by` SIEMPRE server-side.
+- FORCE RLS en `resource_price_observations`.
+- Campos 🔒 nunca serializados a rol cliente.
+- Observaciones append-only (solo UPDATE de status/approved_by/approved_at/rejection_reason).
+- Ninguna observación modifica presupuestos emitidos.
+
+### Pendientes
+- `supabase db reset` local (requiere Docker activo con `supabase start -x realtime,...`).
+- Smoke de escritura real en DB local (gated `PRICE_INTEL_SMOKE_DB=1`, no implementado).
+- Phase 3B (fuera del alcance de esta sesión).
+
 ## 2026-06-09 — RELEASE INTERNO V1 EN PRODUCCIÓN (tag `mvp-internal-release-v1`)
 
 - **Fecha release:** 2026-06-09.
