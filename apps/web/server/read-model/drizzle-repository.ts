@@ -33,7 +33,9 @@ import type {
   Uuid,
   ViewerContext,
 } from '@/lib/contracts/read-model';
-import { DrizzleReadRepository } from '@/server/repositories/read-repository';
+import { AsyncLocalStorage } from 'node:async_hooks';
+import { DrizzleReadRepository, type ReadDb } from '@/server/repositories/read-repository';
+import { withTenantDb, buildRlsClaims } from '@/lib/db/rls';
 import {
   computeApuUnitCost,
   computeDashboard,
@@ -73,10 +75,53 @@ export class DrizzleReadModelRepository implements ReadModelPort {
   /** Identificador legible del modo activo (para logging). */
   readonly source = 'db' as const;
 
-  private readonly repo: DrizzleReadRepository;
+  /**
+   * Repo inyectado (solo en pruebas unitarias, con un `DrizzleReadRepository`
+   * de mocks y sin DB). Si está presente, `read()` lo usa directamente sin abrir
+   * transacción RLS (las pruebas de RLS reales viven en
+   * `scripts/rls-runtime/read-model-isolation.ts` contra la DB local).
+   */
+  private readonly injectedRepo?: DrizzleReadRepository;
 
-  constructor(repo: DrizzleReadRepository = new DrizzleReadRepository()) {
-    this.repo = repo;
+  /**
+   * Contexto request-scoped (P1-A / H-01): dentro de `read()` contiene un
+   * `DrizzleReadRepository` ligado a una conexión RLS-scoped (rol `authenticated`
+   * + claims transaccionales). `AsyncLocalStorage` evita estado global y
+   * contaminación entre solicitudes del pool.
+   */
+  private readonly als = new AsyncLocalStorage<DrizzleReadRepository>();
+
+  constructor(repo?: DrizzleReadRepository) {
+    this.injectedRepo = repo;
+  }
+
+  /** Repo efectivo: el RLS-scoped del `read()` actual; en test el inyectado. */
+  private get repo(): DrizzleReadRepository {
+    return this.als.getStore() ?? this.injectedRepo ?? new DrizzleReadRepository();
+  }
+
+  /**
+   * Ejecuta `fn` con RLS aplicada (P1-A / H-01): en producción abre una
+   * transacción READ ONLY request-scoped con `SET LOCAL ROLE authenticated` +
+   * claims derivados server-side del `viewer`, expone un repo RLS-scoped vía
+   * `AsyncLocalStorage` (consumido por `this.repo` y los helpers) y lo limpia al
+   * terminar. Si hay un repo inyectado (pruebas), lo usa sin transacción/DB. Los
+   * filtros explícitos por `organizationId` se conservan como segunda barrera.
+   */
+  private read<T>(viewer: ViewerContext, fn: () => Promise<T>): Promise<T> {
+    if (this.injectedRepo) {
+      return this.als.run(this.injectedRepo, fn);
+    }
+    const claims = buildRlsClaims({
+      organizationId: viewer.organizationId,
+      profileId: viewer.profileId,
+      role: viewer.role,
+    });
+    return withTenantDb(claims, (scopedDb) =>
+      // La transacción RLS-scoped expone el mismo interfaz de consulta que `db`
+      // (select/from/where); el cast es seguro en runtime.
+      this.als.run(new DrizzleReadRepository(scopedDb as unknown as ReadDb), fn),
+    );
   }
 
   /** Construye la entrada de cómputo de una versión a partir de filas Drizzle. */
@@ -100,17 +145,23 @@ export class DrizzleReadModelRepository implements ReadModelPort {
       name: c.name,
       sortOrder: c.sortOrder,
     }));
-    const rawItems: RawBoqItem[] = items.map((it) => ({
-      id: it.id,
-      chapterId: it.chapterId,
-      code: it.code,
-      descriptionSnapshot: it.descriptionSnapshot,
-      unitSnapshot: it.unitSnapshot,
-      quantitySnapshot: it.quantitySnapshot,
-      unitPriceSnapshot: it.unitPriceSnapshot,
-      subtotal: it.subtotal,
-      sortOrder: it.sortOrder,
-    }));
+    // 4E.2B: `chaptersByVersion`/`boqItemsByVersion` ya excluyen nodos archivados,
+    // pero un ítem ACTIVO cuyo capítulo está ARCHIVADO debe excluirse también de
+    // los totales (su capítulo ya no está en `rawChapters`).
+    const activeChapterIds = new Set(rawChapters.map((c) => c.id));
+    const rawItems: RawBoqItem[] = items
+      .filter((it) => activeChapterIds.has(it.chapterId))
+      .map((it) => ({
+        id: it.id,
+        chapterId: it.chapterId,
+        code: it.code,
+        descriptionSnapshot: it.descriptionSnapshot,
+        unitSnapshot: it.unitSnapshot,
+        quantitySnapshot: it.quantitySnapshot,
+        unitPriceSnapshot: it.unitPriceSnapshot,
+        subtotal: it.subtotal,
+        sortOrder: it.sortOrder,
+      }));
     const rawRules: RawIndirectRule[] = rules.map((r) => ({
       code: r.code,
       name: r.name,
@@ -164,6 +215,7 @@ export class DrizzleReadModelRepository implements ReadModelPort {
   }
 
   async listProjects(viewer: ViewerContext): Promise<ProjectListItem[]> {
+    return this.read(viewer, async () => {
     const projects = await this.repo.projects(viewer.organizationId);
     if (projects.length === 0) return [];
 
@@ -196,12 +248,14 @@ export class DrizzleReadModelRepository implements ReadModelPort {
       scopeCount: scopeCount.get(p.id) ?? 0,
       estimateCount: estimateCount.get(p.id) ?? 0,
     }));
+    });
   }
 
   async getProjectOverview(
     viewer: ViewerContext,
     projectId: Uuid,
   ): Promise<ProjectOverview> {
+    return this.read(viewer, async () => {
     const project = await this.repo.projectById(viewer.organizationId, projectId);
     if (!project) throw new ProjectNotFoundError(projectId);
 
@@ -231,12 +285,14 @@ export class DrizzleReadModelRepository implements ReadModelPort {
       ...(input ? { currentEstimateVersion: summary } : {}),
       budgetSummary: summary,
     };
+    });
   }
 
   async listEstimates(
     viewer: ViewerContext,
     projectId?: Uuid,
   ): Promise<EstimateSummary[]> {
+    return this.read(viewer, async () => {
     const projects = projectId
       ? [await this.repo.projectById(viewer.organizationId, projectId)].filter(
           (p): p is NonNullable<typeof p> => p !== null,
@@ -261,12 +317,14 @@ export class DrizzleReadModelRepository implements ReadModelPort {
       summaries.push(computeEstimate(input).summary);
     }
     return summaries;
+    });
   }
 
   async getEstimateDetail(
     viewer: ViewerContext,
     estimateVersionId: Uuid,
   ): Promise<{ estimate: EstimateSummary; chapters: ChapterSummary[]; items: BoqItemView[] }> {
+    return this.read(viewer, async () => {
     const version = await this.repo.versionById(estimateVersionId);
     if (!version) throw new EstimateVersionNotFoundError(estimateVersionId);
 
@@ -289,7 +347,10 @@ export class DrizzleReadModelRepository implements ReadModelPort {
     );
     const computation: EstimateComputation = computeEstimate(input);
 
+    // 4E.2B: solo ítems activos de capítulos activos (consistente con totales).
+    const activeChapterIds = new Set(computation.chapters.map((c) => c.id));
     const items: BoqItemView[] = (await this.repo.boqItemsByVersion(version.id))
+      .filter((it) => activeChapterIds.has(it.chapterId))
       .sort((a, b) => a.sortOrder - b.sortOrder)
       .map((it) => ({
         id: it.id,
@@ -303,9 +364,11 @@ export class DrizzleReadModelRepository implements ReadModelPort {
       }));
 
     return { estimate: computation.summary, chapters: computation.chapters, items };
+    });
   }
 
   async listApus(viewer: ViewerContext): Promise<ApuSummary[]> {
+    return this.read(viewer, async () => {
     const templates = await this.repo.apuTemplates(viewer.organizationId);
     if (templates.length === 0) return [];
     const components = await this.repo.apuComponentsByTemplates(templates.map((t) => t.id));
@@ -326,12 +389,14 @@ export class DrizzleReadModelRepository implements ReadModelPort {
         componentCount: costs.length,
       };
     });
+    });
   }
 
   async listQuantities(
     viewer: ViewerContext,
     projectScopeId?: Uuid,
   ): Promise<QuantityGroupView[]> {
+    return this.read(viewer, async () => {
     // Restringir a alcances de la organización del viewer.
     const projects = await this.repo.projects(viewer.organizationId);
     const scopes = await this.repo.scopesByProjects(projects.map((p) => p.id));
@@ -362,9 +427,11 @@ export class DrizzleReadModelRepository implements ReadModelPort {
           calculatedQuantity: l.calculatedQuantity,
         })),
     }));
+    });
   }
 
   async listCatalogResources(viewer: ViewerContext): Promise<CatalogResourceView[]> {
+    return this.read(viewer, async () => {
     const resources = await this.repo.resources(viewer.organizationId);
     return resources.map((r) => ({
       id: r.id,
@@ -374,12 +441,14 @@ export class DrizzleReadModelRepository implements ReadModelPort {
       unit: r.unit,
       // budgetReferencePrice se resuelve vía PricingReadPort, no aquí.
     }));
+    });
   }
 
   async getDashboardSummary(
     viewer: ViewerContext,
     projectId: Uuid,
   ): Promise<DashboardSummary> {
+    return this.read(viewer, async () => {
     const project = await this.repo.projectById(viewer.organizationId, projectId);
     if (!project) throw new ProjectNotFoundError(projectId);
 
@@ -400,11 +469,13 @@ export class DrizzleReadModelRepository implements ReadModelPort {
       lastUpdatedAt: input.lastUpdatedAt,
     });
     return projectDashboardForRole(full, viewer.role);
+    });
   }
 
   /* --- Planificación (Oleada 3B — PLANNING_CONTRACT §3) --- */
 
   async getSchedule(viewer: ViewerContext, projectId: Uuid): Promise<ScheduleSummary> {
+    return this.read(viewer, async () => {
     // El proyecto debe pertenecer a la organización del viewer (defensa en
     // profundidad además de RLS, que es la barrera real en runtime).
     const project = await this.repo.projectById(viewer.organizationId, projectId);
@@ -438,6 +509,7 @@ export class DrizzleReadModelRepository implements ReadModelPort {
 
     const full = computeSchedule({ projectId, tasks, dependencies });
     return projectScheduleForRole(full, viewer.role);
+    });
   }
 
   async listProgressEntries(
@@ -445,6 +517,7 @@ export class DrizzleReadModelRepository implements ReadModelPort {
     projectId: Uuid,
     taskId?: Uuid,
   ): Promise<ProgressEntryView[]> {
+    return this.read(viewer, async () => {
     const project = await this.repo.projectById(viewer.organizationId, projectId);
     if (!project) throw new ProjectNotFoundError(projectId);
 
@@ -464,6 +537,7 @@ export class DrizzleReadModelRepository implements ReadModelPort {
       notes: e.notes ?? null,
     }));
     return projectProgressEntriesForRole(entries, viewer.role);
+    });
   }
 
   async listResourceAssignments(
@@ -471,6 +545,7 @@ export class DrizzleReadModelRepository implements ReadModelPort {
     projectId: Uuid,
     taskId?: Uuid,
   ): Promise<ResourceAssignmentView[]> {
+    return this.read(viewer, async () => {
     const project = await this.repo.projectById(viewer.organizationId, projectId);
     if (!project) throw new ProjectNotFoundError(projectId);
 
@@ -504,6 +579,7 @@ export class DrizzleReadModelRepository implements ReadModelPort {
       notes: a.notes ?? null,
     }));
     return projectResourceAssignmentsForRole(assignments, viewer.role);
+    });
   }
 }
 

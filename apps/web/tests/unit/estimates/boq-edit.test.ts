@@ -171,3 +171,72 @@ describe('BOQ manual — actions/UI (fuente)', () => {
     expect(src).toMatch(/chapterEditHref/);
   });
 });
+
+describe('BOQ archive (4E.2B) — fixture solo lectura + fuente actions/UI', () => {
+  it('fixture: archive/restore de capítulo e ítem ⇒ BoqWriteNotSupportedError', async () => {
+    await expect(repo().archiveEstimateChapter(writer, DEMO_ESTIMATE_ID, DEMO_CHAPTER_ID)).rejects.toBeInstanceOf(BoqWriteNotSupportedError);
+    await expect(repo().restoreEstimateChapter(writer, DEMO_ESTIMATE_ID, DEMO_CHAPTER_ID)).rejects.toBeInstanceOf(BoqWriteNotSupportedError);
+    await expect(repo().archiveBoqItem(writer, DEMO_ESTIMATE_ID, DEMO_ITEM_ID)).rejects.toBeInstanceOf(BoqWriteNotSupportedError);
+    await expect(repo().restoreBoqItem(writer, DEMO_ESTIMATE_ID, DEMO_ITEM_ID)).rejects.toBeInstanceOf(BoqWriteNotSupportedError);
+  });
+  it('fixture: lecturas marcan archived=false (demo sin archivados)', async () => {
+    const chs = await repo().listChaptersByEstimateVersion(reader, DEMO_ESTIMATE_ID, { includeArchived: true });
+    expect(chs.every((c) => c.archived === false)).toBe(true);
+    const its = await repo().listItemsByChapter(reader, DEMO_CHAPTER_ID, { includeArchived: true });
+    expect(its.every((i) => i.archived === false)).toBe(true);
+  });
+  it('archive-actions: server, guard de modo + viewer; sin archived_by del navegador', () => {
+    const src = read('archive-actions.ts');
+    expect(src).toMatch(/^'use server';/m);
+    expect(src).toMatch(/isCreationModeEnabled\(\)/);
+    expect(src).toMatch(/resolveAuthenticatedViewer\(\)/);
+    expect(src).toMatch(/archiveEstimateChapter\(|restoreEstimateChapter\(/);
+    expect(src).toMatch(/archiveBoqItem\(|restoreBoqItem\(/);
+    expect(src).not.toMatch(/formData\.get\('archived_by'\)/);
+    expect(src).not.toMatch(/formData\.get\('organizationId'\)/);
+  });
+  it('archive-controls: client, confirm al archivar + Restaurar/Archivar', () => {
+    const src = read('archive-controls.tsx');
+    expect(src).toMatch(/^'use client';/m);
+    expect(src).toMatch(/window\.confirm/);
+    expect(src).toMatch(/Restaurar/);
+    expect(src).toMatch(/Archivar/);
+  });
+  it('detalle: toggle Mostrar archivados + ArchiveControls', () => {
+    const src = read('page.tsx');
+    expect(src).toMatch(/Mostrar archivados/);
+    expect(src).toMatch(/ArchiveControls/);
+    expect(src).toMatch(/includeArchived/);
+  });
+});
+
+describe('Versiones issue/clone (4E.3A) — fixture solo lectura + listado + UI', () => {
+  it('fixture: issue/clone ⇒ BoqWriteNotSupportedError; listEstimateVersions devuelve V01', async () => {
+    await expect(repo().issueEstimateVersion(writer, DEMO_ESTIMATE_ID)).rejects.toBeInstanceOf(BoqWriteNotSupportedError);
+    await expect(repo().cloneIssuedEstimateVersion(writer, DEMO_ESTIMATE_ID)).rejects.toBeInstanceOf(BoqWriteNotSupportedError);
+    const versions = await repo().listEstimateVersions(reader, DEMO_ESTIMATE_ID);
+    expect(versions.length).toBe(1);
+    expect(versions[0]!.isActive).toBe(true);
+  });
+  it('version-actions: server, guard + viewer; sin issued_by del navegador', () => {
+    const src = read('version-actions.ts');
+    expect(src).toMatch(/^'use server';/m);
+    expect(src).toMatch(/isCreationModeEnabled\(\)/);
+    expect(src).toMatch(/resolveAuthenticatedViewer\(\)/);
+    expect(src).toMatch(/issueEstimateVersion\(|cloneIssuedEstimateVersion\(/);
+    expect(src).not.toMatch(/formData\.get\('issued_by'\)/);
+  });
+  it('version-panel: client, Emitir versión + Crear nueva versión + confirm', () => {
+    const src = read('version-panel.tsx');
+    expect(src).toMatch(/^'use client';/m);
+    expect(src).toMatch(/Emitir versión/);
+    expect(src).toMatch(/Crear nueva versión/);
+    expect(src).toMatch(/window\.confirm/);
+  });
+  it('detalle: sección Versiones + VersionPanel + gating por versión emitida', () => {
+    const src = read('page.tsx');
+    expect(src).toMatch(/VersionPanel/);
+    expect(src).toMatch(/canMutate/);
+    expect(src).toMatch(/listEstimateVersions/);
+  });
+});

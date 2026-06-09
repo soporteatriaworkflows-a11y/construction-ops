@@ -70,10 +70,13 @@ export class ExportServiceImpl implements ExportService {
       `requestedAt=${request.requestedAt} requestedBy=<redacted>`,
     );
 
-    // 3. Construir ViewerContext para el perfil
+    // 3. Construir ViewerContext para el perfil.
+    // P1-A / M-02: la organización se deriva SERVER-SIDE de la sesión autenticada
+    // (request.organizationId), NUNCA hardcodeada a la org demo ni recibida del
+    // navegador. En modo demo el route pasa DEMO_ORGANIZATION_ID explícitamente.
     const viewerRole: ViewerRole = request.profile;
     const viewer = {
-      organizationId: DEMO_ORGANIZATION_ID, // En producción: de la sesión auth
+      organizationId: request.organizationId,
       role: viewerRole,
     };
 

@@ -164,6 +164,51 @@ export class BoqItemNotFoundError extends Error {
   }
 }
 
+/** Una versión indicada para comparar no pertenece al estimate dado (4E.3B). */
+export class VersionMismatchError extends Error {
+  readonly code = 'version_mismatch' as const;
+  constructor(message?: string) {
+    super(message ?? 'Las versiones a comparar deben pertenecer al mismo presupuesto.');
+    this.name = 'VersionMismatchError';
+  }
+}
+
+/** Se intentó emitir una versión que no está en `draft` (4E.3A). */
+export class VersionNotDraftError extends Error {
+  readonly code = 'version_not_draft' as const;
+  constructor(message?: string) {
+    super(message ?? 'Solo una versión en borrador puede emitirse.');
+    this.name = 'VersionNotDraftError';
+  }
+}
+
+/** Se intentó clonar una versión que no está `issued` (4E.3A). */
+export class VersionNotIssuedError extends Error {
+  readonly code = 'version_not_issued' as const;
+  constructor(message?: string) {
+    super(message ?? 'Solo una versión emitida puede clonarse a una nueva versión.');
+    this.name = 'VersionNotIssuedError';
+  }
+}
+
+/** Se intentó archivar un nodo BOQ que ya está archivado (rechazo seguro). */
+export class BoqAlreadyArchivedError extends Error {
+  readonly code = 'boq_already_archived' as const;
+  constructor(message?: string) {
+    super(message ?? 'El elemento ya está archivado.');
+    this.name = 'BoqAlreadyArchivedError';
+  }
+}
+
+/** Se intentó restaurar un nodo BOQ que no está archivado (rechazo seguro). */
+export class BoqNotArchivedError extends Error {
+  readonly code = 'boq_not_archived' as const;
+  constructor(message?: string) {
+    super(message ?? 'El elemento no está archivado.');
+    this.name = 'BoqNotArchivedError';
+  }
+}
+
 /** Capítulo destino (para mover) inexistente o de otra versión/organización. */
 export class TargetChapterNotFoundError extends Error {
   readonly code = 'target_chapter_not_found' as const;

@@ -1,5 +1,219 @@
 # Handoff Log
 
+## 2026-06-09 — MVP INTERNO LOCAL-READY (4E.3B integrada + smoke end-to-end + checkpoint)
+
+> **4E.3B integrada** en `integration/p1a-functional-resume` (merge `9695322`).
+> Checkpoint estable **`mvp-internal-local-ready-v1`**. **`main` intacta; sin deploy.**
+
+### Integración 4E.3B
+- `git merge --no-ff` 4E.3B → integration `9695322`, **sin conflictos**.
+
+### Smoke end-to-end del MVP (nuevo)
+- `apps/web/tests/integration/mvp-internal-flow-smoke.test.ts` (gated `BOQ_SMOKE_DB=1`,
+  repo real + RLS, datos sintéticos locales): **10/10 PASS**. Recorre crear→importar
+  BOQ→editar (incl. PATCH-subtotal ignorado + manual)→archive/restore→emitir V01
+  (inmutable)→clonar V02→editar V02 sin alterar V01→comparar V01/V02 (incl. código
+  repetido por ocurrencia)→seguridad cross-org→no-destrucción. **0 defectos** (FASE 4
+  sin correcciones).
+
+### Validación completa (todo PASS)
+- typecheck/lint 0, **757 tests** + **42 integración gated**, build (fixture+db-local),
+  **RLS 106/106**, **read-model isolation 12/12**, **gm:regression 22/22**, gm:import
+  PASS, validador 214/0/0, `git diff --check` limpio. **Sin migración nueva.**
+
+### Documentación
+- `docs/MVP_INTERNAL_LOCAL_READY.md` (flujo cubierto, funciones, pruebas, migraciones
+  candidatas a reconciliar en pre-release, pendientes no bloqueantes).
+
+### Estado / pendientes
+- Migraciones locales `20260606120000`/`20260609120000`/`20260609130000` pendientes
+  de `db push`: en pre-release `db push --dry-run --linked` (read-only) + reconciliar
+  (aplicar solo faltantes confirmadas). `main = origin/main = 2918622` intacta;
+  producción intacta; stashes P1-A intactos. Preview/MV-01 diferidos.
+- **`BOQ_REORDER`/`lineage_id`/`BOQ_AUDIT_TRAIL` NO iniciados.** Siguiente paso:
+  **pre-release controlado**, no nueva feature.
+
+## 2026-06-09 — 4E.3B comparación de versiones IMPLEMENTADA (Opción B, sin migración)
+
+> **4E.3A integrada** en `integration/p1a-functional-resume` (merge `cd18f2d`).
+> **4E.3B** implementada en `feature/wave-4e3b-estimate-version-compare`.
+> **NO merge a integration/main; sin deploy; SIN migración nueva.**
+
+### Decisión
+- **Opción B aprobada**: matching de ítems por `chapterCode + itemCode +
+  occurrenceIndex` (orden `sort_order ASC, id ASC`), `duplicateCodeWarning` + aviso
+  UI. **Sin migración de unicidad.** Capítulos por `code` (único garantizado).
+
+### Implementación (read-only)
+- Módulo PURO `server/estimates/compare.ts` (`computeVersionComparison`): resumen
+  financiero con deltas (% seguro si base≠0, `null` si base=0), diff de capítulos
+  por `code`, diff de ítems por clave de ocurrencia; archivados incluidos en el
+  análisis (no sumados a totals activos).
+- Repo `compareEstimateVersions(viewer, estimateId, baseVersionId, targetVersionId)`
+  (db + fixture): valida mismo estimate (`VersionMismatchError`), RLS/cross-org
+  (`EstimateNotFoundError`), **no muta datos**, sin migración. Tipos client-safe
+  `lib/estimates/compare-types.ts`.
+- UI: página `…/estimates/[estimateId]/compare` (server, GET selectores base/target,
+  `<details>` por capítulo, estados, aviso de código repetido) + enlace "Comparar
+  versiones" en el panel de versiones.
+
+### Deuda futura
+- `lineage_id` (identidad de linaje estable de ítems clonados) **antes** de
+  `BOQ_REORDER` avanzado. **No implementado ahora.**
+
+### Validación (todo PASS)
+- typecheck/lint 0, **757 tests** + **32 integración gated** (incl. 4E.3B: diff
+  puro, ocurrencia/duplicado, seguridad repo, no-mutación), build (`/compare` `ƒ`),
+  **RLS 106/106**, **isolation 12/12**, **gm 22/22**, gm:import PASS, validador
+  214/0/0, diff limpio. **Sin migración nueva.**
+
+### Estado / pendientes
+- Integración de 4E.3B a `integration` **pendiente** (a tu orden). `main =
+  origin/main = 2918622` intacta; producción intacta; stashes P1-A intactos.
+- Migraciones locales `20260606120000`/`20260609120000`/`20260609130000`
+  **pendientes de `db push`**; en pre-release: `db push --dry-run --linked` (read-only)
+  y reconciliar (no asumir cuáles faltan). Preview/MV-01 diferidos.
+- **`BOQ_REORDER` NO iniciado.**
+
+## 2026-06-09 — 4E.3A integrada + 4E.3B DETENIDA por blocker de unicidad de ítems
+
+> **4E.3A integrada** en `integration/p1a-functional-resume` (merge `cd18f2d`,
+> validada). **4E.3B** (`feature/wave-4e3b-estimate-version-compare`) **detenida en
+> FASE 5** por decisión de producto pendiente. NO merge a main/integration; sin deploy.
+
+### Integración 4E.3A
+- `git merge --no-ff` de 4E.3A → integration `cd18f2d`, **sin conflictos**. Validado:
+  typecheck/lint 0, **747 tests**, build, **RLS 106/106**, **isolation 12/12**,
+  **gm 22/22**, gm:import PASS, diff limpio. `main = origin/main = 2918622` intacta.
+  Publicada `integration/p1a-functional-resume = cd18f2d`.
+
+### 4E.3B — contrato congelado + BLOCKER
+- Contrato `docs/ESTIMATE_VERSION_COMPARE_CONTRACT.md` v1 congelado.
+- **BLOCKER (FASE 5):** la clave de comparación de ítems `chapterCode + itemCode`
+  **no es única garantizada**. Índices UNIQUE existentes: solo
+  `chapters_version_code_uq (estimate_version_id, code)` + PKs; **`boq_items` no
+  tiene unicidad por `code`**. `createBoqItem` (4E.2A) e import Excel (4C.2, dup =
+  warning) permiten códigos de ítem repetidos en un capítulo. Datos actuales: 0
+  duplicados — pero el esquema no lo garantiza.
+- **Decisión de producto requerida** (conforme a la regla STOP): (a) migración de
+  unicidad `boq_items_version_chapter_code_uq (estimate_version_id, chapter_id, code)`
+  — con impacto cruzado en `createBoqItem` e import (23505 si hay dup); o (b) clave
+  determinística `chapterCode + itemCode + ocurrencia(n)` por `sort_order` (sin
+  migración). **Capítulos sí tienen clave única garantizada.** Backend/UI/tests de
+  4E.3B **NO implementados** (detenido tras la inspección).
+
+### Nota de migraciones para pre-release (reconciliar, NO asumir)
+- Antes de aplicar al remoto: ejecutar `supabase db push --dry-run --linked`
+  (read-only) y **reconciliar** qué migraciones faltan realmente. **No asumir** que
+  `20260606120000` sigue pendiente sin verificar. Aplicar **solo** las faltantes
+  confirmadas. Candidatas locales: `20260606120000` (4E.2A), `20260609120000`
+  (4E.2B), `20260609130000` (4E.3A).
+
+### Estado
+- `main = origin/main = 2918622` intacta; producción intacta; stashes P1-A intactos.
+  Preview/MV-01 diferidos. **`BOQ_REORDER` NO iniciado.**
+
+## 2026-06-09 — 4E.3A emisión/clonación de versiones implementada (rama funcional)
+
+> **4E.2B integrada** en `integration/p1a-functional-resume` (merge `9f28c26`,
+> validada). **4E.3A** en `feature/wave-4e3a-estimate-issue-clone` (desde
+> integration `9f28c26`). **NO merge a integration/main; sin deploy; sin db push.**
+
+### Alcance entregado (contrato `docs/ESTIMATE_ISSUE_CLONE_CONTRACT.md` v1)
+- **Emisión** `draft → issued` (`issued_at`/`issued_by` server-side; solo draft);
+  issued **inmutable** (edición/creación/movimiento/AIU/archive/restore rechazados
+  vía guards + RLS).
+- **Clonación** issued → nueva `draft` (activa): RPC atómica `clone_issued_estimate_version`
+  (capítulos/ítems remapeados, `source_code`/`source_row` y estado archivado
+  preservados, AIU clonado, número de versión seguro, `source_version_id`);
+  **mismo total activo** que la issued origen; **issued origen intacta** (consultable/
+  exportable por `versionId`).
+- `listEstimateVersions` (tenant-scoped, resumen financiero por versión);
+  export por `versionId` (snapshot histórico). UI: panel de versiones + Emitir /
+  Crear nueva versión; controles editables ocultos en issued.
+
+### Migración local (preparada; NO aplicada a remoto)
+- `20260609130000_estimate_version_issue_clone.sql` (aditiva): `estimate_versions`
+  += `issued_at`, `issued_by` (FK profiles), `source_version_id` (self FK) + índice
+  parcial; RPC `clone_issued_estimate_version` (SECURITY INVOKER, atómica). La RPC
+  lee la versión issued **sin** `FOR UPDATE` (evita falso not-found por RLS de
+  inmutabilidad) y serializa con lock en `estimates`. Verificada con `db reset`.
+
+### Validación (todo PASS)
+- typecheck 0, lint 0, **747 tests** + **28 integración gated** (`BOQ_SMOKE_DB=1`,
+  repo real + RLS; cubren los casos de emisión/inmutabilidad/clonación/lecturas/
+  exports/seguridad de 4E.3A), build fixture+db-local, RLS harness **106/106**,
+  read-model isolation **12/12**, gm:regression **22/22**, gm:import PASS, validador
+  214/0/0, `git diff --check` limpio.
+
+### Estado / pendientes
+- Migraciones locales `20260606120000` (4E.2A), `20260609120000` (4E.2B),
+  `20260609130000` (4E.3A) **pendientes de `db push` remoto**.
+- **Integración a `main` pendiente; deploy pendiente.** `main = origin/main = 2918622`
+  intacta; producción intacta; stashes P1-A intactos. Preview/MV-01 diferidos.
+- **4E.3B NO iniciada.**
+
+## 2026-06-09 — 4E.2B `BOQ_SAFE_DELETE_OR_ARCHIVE` implementada (rama funcional)
+
+> En rama `feature/wave-4e2b-boq-safe-archive` (desde `integration/p1a-functional-resume`
+> `2219f3b`). **NO merge a integration ni main; sin deploy.**
+
+### Alcance entregado (contrato `docs/BOQ_DELETE_ARCHIVE_CONTRACT.md` v1)
+- Soft-archive reversible (archive/restore) de **capítulos** e **ítems** BOQ; **sin
+  DELETE físico**. Trazabilidad mínima `archived_at` + `archived_by` (server-side).
+- Nodos archivados excluidos de vista activa, subtotales, costo directo, AIU,
+  indirectos, total general y **exportaciones activas**. Un capítulo archivado
+  excluye todos sus ítems **sin** reescribirlos; al restaurarlo, los ítems
+  archivados individualmente siguen archivados.
+- Versión emitida = inmutable (RLS + guard `BoqVersionLockedError`); cross-org
+  bloqueado (RLS); fixture solo lectura. Lectura controlada `includeArchived`.
+
+### Migración local (preparada; NO aplicada a remoto)
+- `20260609120000_boq_archive_metadata.sql` (aditiva): `chapters`/`boq_items` +=
+  `archived_at`, `archived_by` (FK `profiles` ON DELETE SET NULL) + índices
+  parciales `WHERE archived_at IS NULL`. Sin DROP/DELETE; RLS sin cambios.
+  Verificada con `supabase db reset` local. **Sin `db push` a remoto.**
+
+### Backend / read-model / UI
+- `EstimatesWriteRepository`: `archiveEstimateChapter`/`restoreEstimateChapter`/
+  `archiveBoqItem`/`restoreBoqItem` + lecturas activas con exclusión y
+  `includeArchived`. Read-model (dashboard) y `read-repository` excluyen archivados.
+- UI: controles Archivar/Restaurar (confirm), estado "Archivado", toggle
+  "Mostrar archivados"; ocultos en versión emitida / modo solo lectura.
+
+### Validación (todo PASS)
+- typecheck 0, lint 0, **743 tests** (+ **19 integración gated** que cubren los 28
+  casos del plan: financieros, read-model, exports, RLS, fixture, UI), build OK,
+  RLS harness **106/106**, read-model isolation **12/12**, gm:regression **22/22**
+  (sin degradar registros activos), gm:import PASS, validador 214/0/0,
+  `git diff --check` limpio.
+
+### Estado / pendientes
+- **Deploy pendiente; integración a `main`/`integration` pendiente** (a tu orden).
+- Preview runtime / **MV-01** siguen **diferidos a pre-release**.
+- `main = origin/main = 2918622` intacta; producción intacta; stashes P1-A intactos.
+- **4E.3 NO iniciada.**
+
+## 2026-06-09 — Integración funcional segura `integration/p1a-functional-resume` (P1-A staged)
+
+> Nota: registrada **solo en la rama de integración** (no en `main`).
+
+- **P1-A code-complete y validada localmente**: H-01 cableado en lecturas tenant-scoped;
+  M-02 export legacy corregido (`organizationId` server-side); filtros explícitos por
+  `organizationId` conservados.
+- **Rama de integración** `integration/p1a-functional-resume` creada **desde `origin/main`
+  (`2918622`)** + `git merge --no-ff origin/fix/security-p1a-read-model-rls-export-legacy`
+  (`a78b74b`), **sin conflictos**. `main` y `origin/main` **intactos en `2918622`**.
+- **Validación local única post-integración (todo PASS)**: typecheck 0, lint 0, build OK,
+  **738 tests** (+11 integración gated, saltados), **RLS harness 106/106**,
+  **read-model isolation 12/12**.
+- **Diferido a pre-release (NO bloquea el MVP interno)**: Preview runtime real de P1-A y
+  validación Vercel/pooler/**MV-01** (deuda de validación pre-release). El sandbox CLI no
+  completa uploads/builds (deployments UNKNOWN); **no se investiga Vercel en esta etapa**.
+- **Producción NO modificada; `main` NO modificada.** Base funcional segura para continuar
+  el MVP: **`integration/p1a-functional-resume`**. Stashes P1-A (`stash@{0}`/`stash@{1}`) y
+  worktree de seguridad intactos (no tocados).
+
 ## 2026-06-07 — 4E.2A CERRADA (automated-ready): smoke automatizado no destructivo
 
 ### Decisión de la usuaria

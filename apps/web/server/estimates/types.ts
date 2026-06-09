@@ -97,10 +97,11 @@ export interface EstimatesWriteRepository {
   ): Promise<EstimateActiveVersionView | null>;
 
   /* --- Revisión operativa (Oleada 4D.1) --- */
-  /** Capítulos de la versión activa del presupuesto (con conteo + subtotal). */
+  /** Capítulos de la versión activa (activos por defecto; `includeArchived` 4E.2B). */
   listChaptersByEstimateVersion(
     viewer: ViewerContext,
     estimateId: Uuid,
+    options?: import('@/lib/estimates/boq-edit-types').ReviewReadOptions,
   ): Promise<import('@/lib/estimates/review-types').ChapterReviewItem[]>;
 
   /** Detalle de un capítulo visible (con contexto proyecto/alcance/presupuesto). */
@@ -109,10 +110,11 @@ export interface EstimatesWriteRepository {
     chapterId: Uuid,
   ): Promise<import('@/lib/estimates/review-types').ChapterDetailView>;
 
-  /** Ítems BOQ de un capítulo visible (ordenados por `sort_order`). */
+  /** Ítems BOQ de un capítulo (activos por defecto; `includeArchived` 4E.2B). */
   listItemsByChapter(
     viewer: ViewerContext,
     chapterId: Uuid,
+    options?: import('@/lib/estimates/boq-edit-types').ReviewReadOptions,
   ): Promise<import('@/lib/estimates/review-types').BoqItemReviewView[]>;
 
   /* --- AIU editable (Oleada 4D.2) --- */
@@ -145,6 +147,7 @@ export interface EstimatesWriteRepository {
   getEstimateExportPayload(
     viewer: ViewerContext,
     estimateId: Uuid,
+    versionId?: Uuid,
   ): Promise<import('@/lib/estimates/export-types').EstimateExportPayload>;
 
   /* --- Edición manual de BOQ (Oleada 4E.2A) --- */
@@ -194,6 +197,63 @@ export interface EstimatesWriteRepository {
     chapterId: Uuid,
     itemId: Uuid,
   ): Promise<import('@/lib/estimates/boq-edit-types').EditableBoqItemView>;
+
+  /* --- Archive/restore no destructivo (Oleada 4E.2B) --- */
+  /** Archiva un capítulo (soft); excluye él y sus ítems de vista/cálculos activos. */
+  archiveEstimateChapter(
+    viewer: AuthenticatedViewer,
+    estimateId: Uuid,
+    chapterId: Uuid,
+  ): Promise<import('@/lib/estimates/boq-edit-types').ChapterMutationResult>;
+
+  /** Restaura un capítulo archivado (los ítems archivados individualmente siguen así). */
+  restoreEstimateChapter(
+    viewer: AuthenticatedViewer,
+    estimateId: Uuid,
+    chapterId: Uuid,
+  ): Promise<import('@/lib/estimates/boq-edit-types').ChapterMutationResult>;
+
+  /** Archiva un ítem (soft). */
+  archiveBoqItem(
+    viewer: AuthenticatedViewer,
+    estimateId: Uuid,
+    itemId: Uuid,
+  ): Promise<import('@/lib/estimates/boq-edit-types').BoqItemArchiveResult>;
+
+  /** Restaura un ítem archivado. */
+  restoreBoqItem(
+    viewer: AuthenticatedViewer,
+    estimateId: Uuid,
+    itemId: Uuid,
+  ): Promise<import('@/lib/estimates/boq-edit-types').BoqItemArchiveResult>;
+
+  /* --- Emisión / clonación de versiones (Oleada 4E.3A) --- */
+  /** Emite la versión activa (draft → issued); registra issued_at/issued_by. */
+  issueEstimateVersion(
+    viewer: AuthenticatedViewer,
+    estimateId: Uuid,
+  ): Promise<import('@/lib/estimates/version-types').EstimateVersionSummary>;
+
+  /** Clona la versión activa issued a una nueva draft (activa); atómico. */
+  cloneIssuedEstimateVersion(
+    viewer: AuthenticatedViewer,
+    estimateId: Uuid,
+  ): Promise<import('@/lib/estimates/version-types').EstimateVersionSummary>;
+
+  /** Lista las versiones del presupuesto (tenant-scoped) con resumen financiero. */
+  listEstimateVersions(
+    viewer: ViewerContext,
+    estimateId: Uuid,
+  ): Promise<import('@/lib/estimates/version-types').EstimateVersionSummary[]>;
+
+  /* --- Comparación de versiones (Oleada 4E.3B, READ-ONLY) --- */
+  /** Compara dos versiones del mismo presupuesto (no muta datos). */
+  compareEstimateVersions(
+    viewer: ViewerContext,
+    estimateId: Uuid,
+    baseVersionId: Uuid,
+    targetVersionId: Uuid,
+  ): Promise<import('@/lib/estimates/compare-types').VersionCompareResult>;
 }
 
 export type { AuthenticatedViewer } from '@/server/auth/types';

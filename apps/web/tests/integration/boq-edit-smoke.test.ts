@@ -17,8 +17,14 @@ import {
   getEstimatesWriteRepository,
   BoqWriteNotSupportedError,
   BoqVersionLockedError,
+  BoqAlreadyArchivedError,
+  BoqNotArchivedError,
   ChapterCodeDuplicateError,
   EstimateNotFoundError,
+  VersionNotDraftError,
+  VersionNotIssuedError,
+  VersionMismatchError,
+  AiuVersionLockedError,
 } from '@/server/estimates';
 import type { AuthenticatedViewer } from '@/server/auth/types';
 
@@ -284,5 +290,303 @@ describe.skipIf(!RUN)('4E.2A — smoke automatizado de edición (repo real + RLS
     await expect(repoA.updateBoqItem(viewerA, estimateId, chImportedId, itImportedId, {
       code: '11.01', description: 'x', unit: 'm3', quantity: base.quantity, unitPrice: base.unitPrice,
     })).rejects.toBeInstanceOf(BoqVersionLockedError);
+  });
+});
+
+describe.skipIf(!RUN)('4E.2B — archive/restore no destructivo (repo real + RLS local)', () => {
+  const clientA = () => clientFor(USER_A);
+  const repoA = new DbEstimatesWriteRepository(async () => clientA());
+  const repoB = new DbEstimatesWriteRepository(async () => clientFor(USER_B));
+
+  let estimateId: string;
+  let versionId: string;
+  let ch11: string;
+  let ch12: string;
+  let itA: string; // 11.01 (1000)
+  let itB: string; // 11.02 (1000)
+  let baseDirect: string;
+  let baseGrand: string;
+
+  beforeAll(async () => {
+    const est = await repoA.insertEstimateWithInitialVersion(viewerA, SCOPE_A, { name: `Smoke 4E2B ${Date.now()}` });
+    estimateId = est.id;
+    versionId = est.activeVersion!.id;
+    const chapters = [
+      { code: '11', name: 'Preliminares', sortOrder: 0, sourceCode: '7', sourceRow: 97 },
+      { code: '12', name: 'Cimentación', sortOrder: 1 },
+    ];
+    const items = [
+      { chapterCode: '11', code: '11.01', description: 'A', unit: 'm3', quantity: '10', unitPrice: '100', sortOrder: 0, sourceCode: '7.01', sourceRow: 98 },
+      { chapterCode: '11', code: '11.02', description: 'B', unit: 'm3', quantity: '5', unitPrice: '200', sortOrder: 1 },
+      { chapterCode: '12', code: '12.01', description: 'C', unit: 'un', quantity: '2', unitPrice: '50', sortOrder: 0 },
+    ];
+    await clientA().rpc('import_boq_into_version', { p_version_id: versionId, p_chapters: chapters, p_items: items });
+    const { data: chs } = await clientA().from('chapters').select('id, code').eq('estimate_version_id', versionId);
+    ch11 = (chs as { id: string; code: string }[]).find((c) => c.code === '11')!.id;
+    ch12 = (chs as { id: string; code: string }[]).find((c) => c.code === '12')!.id;
+    const { data: its } = await clientA().from('boq_items').select('id, code').eq('estimate_version_id', versionId);
+    itA = (its as { id: string; code: string }[]).find((i) => i.code === '11.01')!.id;
+    itB = (its as { id: string; code: string }[]).find((i) => i.code === '11.02')!.id;
+    await repoA.updateEstimateVersionAiu(viewerA, estimateId, { administrationRate: '3.5', contingencyRate: '2.5', utilityRate: '4', utilityVatRate: '19' });
+    const fin = await repoA.calculateEstimateFinancialSummary(viewerA, estimateId);
+    baseDirect = fin.directTotal; // 2100
+    baseGrand = fin.grandTotal;
+  });
+
+  it('baseline directo = 2100', () => {
+    expect(sub(baseDirect)).toBe('2100');
+  });
+
+  it('archivar ítem reduce subtotal de capítulo, costo directo, AIU y total; restaurar recupera', async () => {
+    const res = await repoA.archiveBoqItem(viewerA, estimateId, itB);
+    expect(sub(res.financial.directTotal)).toBe('1100'); // 2100 - 1000
+    expect(res.financial.grandTotal).not.toBe(baseGrand);
+    const chList = await repoA.listChaptersByEstimateVersion(viewerA, estimateId);
+    expect(sub(chList.find((c) => c.id === ch11)!.subtotal)).toBe('1000'); // solo 11.01 activo
+    // No DELETE físico: la fila sigue existiendo con archived_at + archived_by.
+    const { data } = await clientA().from('boq_items').select('archived_at, archived_by').eq('id', itB).single();
+    const r = data as { archived_at: string | null; archived_by: string | null };
+    expect(r.archived_at).not.toBeNull();
+    expect(r.archived_by).toBe(USER_A); // identidad server-side
+    // Restaurar.
+    const back = await repoA.restoreBoqItem(viewerA, estimateId, itB);
+    expect(back.financial.directTotal).toBe(baseDirect);
+    expect(back.financial.grandTotal).toBe(baseGrand);
+  });
+
+  it('archivar capítulo excluye todos sus ítems; restaurar recupera solo los activos individualmente', async () => {
+    // Archivar 11.02 individualmente, luego archivar capítulo 11.
+    await repoA.archiveBoqItem(viewerA, estimateId, itB);
+    const afterItem = await repoA.calculateEstimateFinancialSummary(viewerA, estimateId);
+    expect(sub(afterItem.directTotal)).toBe('1100');
+    const arch = await repoA.archiveEstimateChapter(viewerA, estimateId, ch11);
+    expect(sub(arch.financial.directTotal)).toBe('100'); // solo 12.01
+    // Restaurar capítulo: 11.01 vuelve activo, 11.02 sigue archivado.
+    const rest = await repoA.restoreEstimateChapter(viewerA, estimateId, ch11);
+    expect(sub(rest.financial.directTotal)).toBe('1100'); // 11.01 (1000) + 12.01 (100); 11.02 sigue archivado
+    const archivedView = await repoA.listItemsByChapter(viewerA, ch11, { includeArchived: true });
+    expect(archivedView.find((i) => i.id === itB)!.archived).toBe(true);
+    expect(archivedView.find((i) => i.id === itA)!.archived).toBe(false);
+    // Limpieza: restaurar 11.02 para dejar baseline.
+    await repoA.restoreBoqItem(viewerA, estimateId, itB);
+    const restored = await repoA.calculateEstimateFinancialSummary(viewerA, estimateId);
+    expect(restored.directTotal).toBe(baseDirect);
+  });
+
+  it('archive duplicado y restore de activo se rechazan de forma segura', async () => {
+    await repoA.archiveBoqItem(viewerA, estimateId, itB);
+    await expect(repoA.archiveBoqItem(viewerA, estimateId, itB)).rejects.toBeInstanceOf(BoqAlreadyArchivedError);
+    await repoA.restoreBoqItem(viewerA, estimateId, itB);
+    await expect(repoA.restoreBoqItem(viewerA, estimateId, itB)).rejects.toBeInstanceOf(BoqNotArchivedError);
+  });
+
+  it('read model: vista activa excluye archivados; includeArchived los incluye', async () => {
+    await repoA.archiveBoqItem(viewerA, estimateId, itB);
+    const active = await repoA.listItemsByChapter(viewerA, ch11);
+    expect(active.some((i) => i.id === itB)).toBe(false);
+    const all = await repoA.listItemsByChapter(viewerA, ch11, { includeArchived: true });
+    expect(all.some((i) => i.id === itB)).toBe(true);
+    await repoA.restoreBoqItem(viewerA, estimateId, itB);
+  });
+
+  it('export payload activo excluye el ítem archivado y no filtra de más', async () => {
+    await repoA.archiveBoqItem(viewerA, estimateId, itB);
+    const payload = await repoA.getEstimateExportPayload(viewerA, estimateId);
+    const ch = payload.chapters.find((c) => c.code === '11')!;
+    expect(ch.items.some((i) => i.code === '11.02')).toBe(false); // archivado excluido
+    expect(ch.items.some((i) => i.code === '11.01')).toBe(true); // activo presente
+    await repoA.restoreBoqItem(viewerA, estimateId, itB);
+  });
+
+  it('seguridad: Org B no archiva elementos de Org A', async () => {
+    await expect(repoB.archiveBoqItem(viewerB, estimateId, itA)).rejects.toBeInstanceOf(EstimateNotFoundError);
+  });
+
+  it('versión emitida bloquea archive/restore', async () => {
+    await clientA().from('estimate_versions').update({ status: 'approved' }).eq('id', versionId);
+    await expect(repoA.archiveBoqItem(viewerA, estimateId, itA)).rejects.toBeInstanceOf(BoqVersionLockedError);
+    await expect(repoA.archiveEstimateChapter(viewerA, estimateId, ch12)).rejects.toBeInstanceOf(BoqVersionLockedError);
+  });
+});
+
+describe.skipIf(!RUN)('4E.3A — emisión/clonación de versiones (repo real + RLS local)', () => {
+  const clientA = () => clientFor(USER_A);
+  const repoA = new DbEstimatesWriteRepository(async () => clientA());
+  const repoB = new DbEstimatesWriteRepository(async () => clientFor(USER_B));
+
+  let estimateId: string;
+  let v1Id: string; // versión 1 (se emite)
+  let ch11_v1: string;
+  let itArchived_v1: string;
+  let issuedDirect: string;
+
+  beforeAll(async () => {
+    const est = await repoA.insertEstimateWithInitialVersion(viewerA, SCOPE_A, { name: `Smoke 4E3A ${Date.now()}` });
+    estimateId = est.id;
+    v1Id = est.activeVersion!.id;
+    const chapters = [{ code: '11', name: 'Preliminares', sortOrder: 0, sourceCode: '7', sourceRow: 97 }];
+    const items = [
+      { chapterCode: '11', code: '11.01', description: 'A', unit: 'm3', quantity: '10', unitPrice: '100', sortOrder: 0, sourceCode: '7.01', sourceRow: 98 },
+      { chapterCode: '11', code: '11.02', description: 'B', unit: 'm3', quantity: '5', unitPrice: '200', sortOrder: 1 },
+    ];
+    await clientA().rpc('import_boq_into_version', { p_version_id: v1Id, p_chapters: chapters, p_items: items });
+    const { data: chs } = await clientA().from('chapters').select('id, code').eq('estimate_version_id', v1Id);
+    ch11_v1 = (chs as { id: string; code: string }[]).find((c) => c.code === '11')!.id;
+    const { data: its } = await clientA().from('boq_items').select('id, code').eq('estimate_version_id', v1Id);
+    itArchived_v1 = (its as { id: string; code: string }[]).find((i) => i.code === '11.02')!.id;
+    await repoA.updateEstimateVersionAiu(viewerA, estimateId, { administrationRate: '3.5', contingencyRate: '2.5', utilityRate: '4', utilityVatRate: '19' });
+    // Archivar 11.02 ⇒ activo directo = 1000 (solo 11.01).
+    await repoA.archiveBoqItem(viewerA, estimateId, itArchived_v1);
+    const fin = await repoA.calculateEstimateFinancialSummary(viewerA, estimateId);
+    issuedDirect = fin.directTotal; // 1000
+  });
+
+  it('emitir: draft → issued, issued_at/issued_by server-side', async () => {
+    const res = await repoA.issueEstimateVersion(viewerA, estimateId);
+    expect(res.status).toBe('issued');
+    expect(res.issuedBy).toBe(USER_A);
+    expect(res.issuedAt).not.toBeNull();
+    const { data } = await clientA().from('estimate_versions').select('status, issued_by, issued_at').eq('id', v1Id).single();
+    const r = data as { status: string; issued_by: string | null; issued_at: string | null };
+    expect(r.status).toBe('issued');
+    expect(r.issued_by).toBe(USER_A);
+  });
+
+  it('issued inmutable: archive/create/AIU rechazados', async () => {
+    await expect(repoA.archiveBoqItem(viewerA, estimateId, itArchived_v1)).rejects.toBeInstanceOf(BoqVersionLockedError);
+    await expect(repoA.createEstimateChapter(viewerA, estimateId, { code: 'X', name: 'x' })).rejects.toBeInstanceOf(BoqVersionLockedError);
+    await expect(repoA.updateEstimateVersionAiu(viewerA, estimateId, { administrationRate: '1', contingencyRate: '1', utilityRate: '1', utilityVatRate: '1' })).rejects.toBeInstanceOf(AiuVersionLockedError);
+  });
+
+  it('re-emitir una issued ⇒ VersionNotDraftError', async () => {
+    await expect(repoA.issueEstimateVersion(viewerA, estimateId)).rejects.toBeInstanceOf(VersionNotDraftError);
+  });
+
+  it('clonar issued ⇒ nueva draft activa V02 con source y mismo total; origen intacto', async () => {
+    const issuedExportBefore = await repoA.getEstimateExportPayload(viewerA, estimateId, v1Id);
+    const clone = await repoA.cloneIssuedEstimateVersion(viewerA, estimateId);
+    expect(clone.status).toBe('draft');
+    expect(clone.versionNumber).toBe(2);
+    expect(clone.sourceVersionId).toBe(v1Id);
+    expect(clone.isActive).toBe(true);
+    // Total activo idéntico al issued origen.
+    expect(sub(clone.directTotal)).toBe(sub(issuedDirect));
+    // Origen issued intacto (export por versionId no cambia).
+    const issuedExportAfter = await repoA.getEstimateExportPayload(viewerA, estimateId, v1Id);
+    expect(issuedExportAfter.financial.grandTotal).toBe(issuedExportBefore.financial.grandTotal);
+    expect(issuedExportAfter.version.status).toBe('issued');
+  });
+
+  it('clon: capítulos/ítems clonados con remapeo, origen y estado archivado preservados', async () => {
+    const chs = await repoA.listChaptersByEstimateVersion(viewerA, estimateId, { includeArchived: true });
+    expect(chs.length).toBe(1);
+    const newCh = chs[0]!;
+    expect(newCh.id).not.toBe(ch11_v1); // remapeado (nuevo capítulo)
+    const items = await repoA.listItemsByChapter(viewerA, newCh.id, { includeArchived: true });
+    const active = items.filter((i) => !i.archived);
+    const archived = items.filter((i) => i.archived);
+    expect(active.length).toBe(1); // 11.01
+    expect(archived.length).toBe(1); // 11.02 sigue archivado
+    expect(active[0]!.sourceCode).toBe('7.01'); // origen preservado
+    expect(active[0]!.sourceRow).toBe(98);
+  });
+
+  it('listEstimateVersions: 2 versiones (issued + draft), tenant-scoped', async () => {
+    const versions = await repoA.listEstimateVersions(viewerA, estimateId);
+    expect(versions.length).toBe(2);
+    expect(versions.find((v) => v.versionNumber === 1)!.status).toBe('issued');
+    expect(versions.find((v) => v.versionNumber === 2)!.status).toBe('draft');
+    expect(versions.find((v) => v.versionNumber === 2)!.isActive).toBe(true);
+    // Cross-org: B no ve versiones de A.
+    const vb = await repoB.listEstimateVersions(viewerB, estimateId);
+    expect(vb.length).toBe(0);
+  });
+
+  it('editar la nueva draft NO altera el export del issued origen', async () => {
+    const issuedBefore = await repoA.getEstimateExportPayload(viewerA, estimateId, v1Id);
+    const chs = await repoA.listChaptersByEstimateVersion(viewerA, estimateId);
+    const newCh = chs[0]!;
+    const items = await repoA.listItemsByChapter(viewerA, newCh.id);
+    await repoA.updateBoqItem(viewerA, estimateId, newCh.id, items[0]!.id, {
+      code: '11.01', description: 'A', unit: 'm3', quantity: '999', unitPrice: '100',
+    });
+    const issuedAfter = await repoA.getEstimateExportPayload(viewerA, estimateId, v1Id);
+    expect(issuedAfter.financial.grandTotal).toBe(issuedBefore.financial.grandTotal); // issued intacto
+    const draftExport = await repoA.getEstimateExportPayload(viewerA, estimateId); // activa (draft)
+    expect(draftExport.financial.grandTotal).not.toBe(issuedAfter.financial.grandTotal); // draft cambió
+  });
+
+  it('clonar una draft (activa actual) ⇒ VersionNotIssuedError', async () => {
+    await expect(repoA.cloneIssuedEstimateVersion(viewerA, estimateId)).rejects.toBeInstanceOf(VersionNotIssuedError);
+  });
+
+  it('seguridad: Org B no clona ni emite versiones de A', async () => {
+    await expect(repoB.cloneIssuedEstimateVersion(viewerB, estimateId)).rejects.toBeInstanceOf(EstimateNotFoundError);
+    await expect(repoB.issueEstimateVersion(viewerB, estimateId)).rejects.toBeInstanceOf(EstimateNotFoundError);
+  });
+});
+
+describe.skipIf(!RUN)('4E.3B — comparación de versiones (repo real + RLS local)', () => {
+  const clientA = () => clientFor(USER_A);
+  const repoA = new DbEstimatesWriteRepository(async () => clientA());
+  const repoB = new DbEstimatesWriteRepository(async () => clientFor(USER_B));
+
+  let estimateId: string;
+  let v1Id: string;
+  let v2Id: string;
+  let otherEstimateId: string;
+  let otherVersionId: string;
+
+  beforeAll(async () => {
+    // Estimate con V1 (issued) y V2 (draft clonada, editada).
+    const est = await repoA.insertEstimateWithInitialVersion(viewerA, SCOPE_A, { name: `Smoke 4E3B ${Date.now()}` });
+    estimateId = est.id;
+    v1Id = est.activeVersion!.id;
+    await clientA().rpc('import_boq_into_version', {
+      p_version_id: v1Id,
+      p_chapters: [{ code: '11', name: 'Preliminares', sortOrder: 0 }],
+      p_items: [{ chapterCode: '11', code: '11.01', description: 'A', unit: 'm3', quantity: '10', unitPrice: '100', sortOrder: 0 }],
+    });
+    await repoA.updateEstimateVersionAiu(viewerA, estimateId, { administrationRate: '3.5', contingencyRate: '2.5', utilityRate: '4', utilityVatRate: '19' });
+    await repoA.issueEstimateVersion(viewerA, estimateId);
+    const clone = await repoA.cloneIssuedEstimateVersion(viewerA, estimateId);
+    v2Id = clone.id;
+    // Editar V2: cambiar cantidad del 11.01.
+    const chs = await repoA.listChaptersByEstimateVersion(viewerA, estimateId);
+    const items = await repoA.listItemsByChapter(viewerA, chs[0]!.id);
+    await repoA.updateBoqItem(viewerA, estimateId, chs[0]!.id, items[0]!.id, {
+      code: '11.01', description: 'A', unit: 'm3', quantity: '15', unitPrice: '100',
+    });
+    // Segundo estimate (para cross-estimate).
+    const est2 = await repoA.insertEstimateWithInitialVersion(viewerA, SCOPE_A, { name: `Smoke 4E3B other ${Date.now()}` });
+    otherEstimateId = est2.id;
+    otherVersionId = est2.activeVersion!.id;
+  });
+
+  it('compara dos versiones del mismo estimate; refleja el delta de la edición', async () => {
+    const r = await repoA.compareEstimateVersions(viewerA, estimateId, v1Id, v2Id);
+    expect(r.base.id).toBe(v1Id);
+    expect(r.target.id).toBe(v2Id);
+    // V1 directo = 1000, V2 directo = 1500 ⇒ delta 500.
+    expect(sub(r.financial.directTotal.base)).toBe('1000');
+    expect(sub(r.financial.directTotal.target)).toBe('1500');
+    expect(sub(r.financial.directTotal.delta)).toBe('500');
+    expect(r.chapters[0]!.items[0]!.status).toBe('changed');
+  });
+
+  it('rechaza versiones de estimates distintos (VersionMismatchError)', async () => {
+    await expect(repoA.compareEstimateVersions(viewerA, estimateId, v1Id, otherVersionId)).rejects.toBeInstanceOf(VersionMismatchError);
+  });
+
+  it('cross-org: Org B no compara versiones de A', async () => {
+    await expect(repoB.compareEstimateVersions(viewerB, estimateId, v1Id, v2Id)).rejects.toBeInstanceOf(EstimateNotFoundError);
+  });
+
+  it('comparar NO muta datos (V1 issued intacta)', async () => {
+    const before = await repoA.getEstimateExportPayload(viewerA, estimateId, v1Id);
+    await repoA.compareEstimateVersions(viewerA, estimateId, v1Id, v2Id);
+    const after = await repoA.getEstimateExportPayload(viewerA, estimateId, v1Id);
+    expect(after.financial.grandTotal).toBe(before.financial.grandTotal);
+    expect(after.version.status).toBe('issued');
   });
 });

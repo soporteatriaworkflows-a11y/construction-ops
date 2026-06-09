@@ -456,6 +456,11 @@ export const estimateVersions = pgTable(
     createdAt: createdAt(),
     approvedAt: timestamp("approved_at", { withTimezone: true }),
     notes: text("notes"),
+    // 4E.3A: emisión + clonación.
+    issuedAt: timestamp("issued_at", { withTimezone: true }),
+    issuedBy: uuid("issued_by").references(() => profiles.id, { onDelete: "set null" }),
+    // self-FK declarada en la migración; en Drizzle solo la columna.
+    sourceVersionId: uuid("source_version_id"),
   },
   (t) => [
     uniqueIndex("estimate_versions_estimate_number_uq").on(
@@ -504,6 +509,11 @@ export const chapters = pgTable(
     code: text("code").notNull(),
     name: text("name").notNull(),
     sortOrder: integer("sort_order").notNull().default(0),
+    // Soft-archive (4E.2B): no nulo ⇒ retirado de la vista activa y cálculos.
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    archivedBy: uuid("archived_by").references(() => profiles.id, {
+      onDelete: "set null",
+    }),
   },
   (t) => [
     index("chapters_version_sort_idx").on(t.estimateVersionId, t.sortOrder),
@@ -535,6 +545,11 @@ export const boqItems = pgTable(
     subtotal: money("subtotal").notNull(),
     sortOrder: integer("sort_order").notNull().default(0),
     notes: text("notes"),
+    // Soft-archive (4E.2B): no nulo ⇒ retirado de la vista activa y cálculos.
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    archivedBy: uuid("archived_by").references(() => profiles.id, {
+      onDelete: "set null",
+    }),
   },
   (t) => [
     index("boq_items_version_idx").on(t.estimateVersionId),

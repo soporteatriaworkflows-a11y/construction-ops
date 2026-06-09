@@ -9,6 +9,95 @@ cada ciclo de validación.
 
 ---
 
+## MVP interno LOCAL-READY (2026-06-09, checkpoint `mvp-internal-local-ready-v1`)
+
+- **4E.3B integrada** en `integration/p1a-functional-resume` (merge `9695322`).
+- **Smoke end-to-end** `apps/web/tests/integration/mvp-internal-flow-smoke.test.ts`
+  (gated, repo real + RLS, 10 casos): **10/10 PASS**, **0 defectos**. Cubre el ciclo
+  completo crear→BOQ→editar→archive/restore→emitir→clonar→comparar→seguridad→
+  no-destrucción sobre un estimate sintético local.
+- Validación completa: typecheck/lint 0, **757 tests** + **42 integración gated**,
+  build (fixture+db-local), **RLS 106/106**, **read-model isolation 12/12**,
+  **gm:regression 22/22**, gm:import PASS, validador 214/0/0, diff limpio.
+  **Sin migración nueva.**
+- `main = origin/main = 2918622` intacta; producción intacta; stashes P1-A intactos.
+  Migraciones locales pendientes de reconciliar en pre-release. Siguiente: pre-release
+  controlado (no nueva feature).
+
+## 4E.3B — Comparación de versiones IMPLEMENTADA (2026-06-09, Opción B)
+
+Rama `feature/wave-4e3b-estimate-version-compare`. **Todo PASS, sin migración nueva**:
+- typecheck/lint 0, **757 tests** + **32 integración gated** (`BOQ_SMOKE_DB=1`): diff
+  PURO (deltas financieros, % seguro base=0/≠0, capítulos added/removed/changed/
+  unchanged, ítems por qty/price/desc/unit/archived, **matching por
+  chapterCode+itemCode+occurrenceIndex** con desempate `sort_order,id` y
+  `duplicateCodeWarning`); repo: compara mismo estimate, **VersionMismatchError**
+  para estimates distintos, **cross-org bloqueado**, **no muta datos** (V1 issued
+  intacta).
+- build (`/compare` `ƒ`), **RLS 106/106**, **isolation 12/12**, **gm:regression 22/22**,
+  gm:import PASS, validador 214/0/0, `git diff --check` limpio.
+- Decisión: **Opción B** (matching por ocurrencia, sin migración). Deuda futura
+  `lineage_id` antes de `BOQ_REORDER`.
+- **Sin deploy; sin merge a main/integration.** `main = origin/main = 2918622`
+  intacta; producción intacta; stashes P1-A intactos.
+
+## 4E.3A integración + 4E.3B blocker (2026-06-09)
+
+- **4E.3A integrada** en `integration/p1a-functional-resume` (merge `cd18f2d`).
+  Validación post-integración (todo PASS): typecheck/lint 0, **747 tests** + 28
+  integración gated, build fixture+db-local, **RLS 106/106**, **isolation 12/12**,
+  **gm:regression 22/22**, gm:import PASS, `git diff --check` limpio.
+- **4E.3B (comparación de versiones) DETENIDA en FASE 5 (sin implementar)** por
+  blocker de unicidad de ítems verificado en DB local: índices UNIQUE = solo
+  `chapters_version_code_uq` + PKs; `boq_items` sin unicidad por `code` ⇒ la clave
+  `chapterCode + itemCode` no es única garantizada (datos actuales: 0 duplicados,
+  no garantizado). Contrato congelado con el blocker; **decisión de producto
+  requerida** (migración de unicidad vs clave determinística por ocurrencia).
+- **Pre-release (migraciones):** ejecutar `supabase db push --dry-run --linked`
+  (read-only) y reconciliar las migraciones realmente pendientes; **no asumir** que
+  `20260606120000` sigue pendiente; aplicar solo las faltantes confirmadas.
+- `main = origin/main = 2918622` intacta; producción intacta; stashes P1-A intactos.
+  Preview/MV-01 diferidos. `BOQ_REORDER` no iniciado.
+
+## 4E.3A — Emisión / clonación de versiones (2026-06-09, rama funcional)
+
+Rama `feature/wave-4e3a-estimate-issue-clone` (desde integration `9f28c26` que ya
+incluye 4E.2B). **Todo PASS**:
+- typecheck 0, lint 0, **747 tests** + **28 integración gated** (`BOQ_SMOKE_DB=1`,
+  repo real + RLS): emisión draft→issued (issued_at/issued_by server-side, solo
+  draft, re-emisión rechazada); **inmutabilidad** de issued (archive/create/AIU
+  rechazados); **clonación** issued→nueva draft activa (V02, `source_version_id`,
+  capítulos/ítems remapeados, source_code/source_row + estado archivado
+  preservados, AIU clonado, **mismo total activo**, issued origen intacta);
+  editar la nueva draft NO altera el export del issued (snapshot por `versionId`);
+  clonar una draft rechazado; `listEstimateVersions` tenant-scoped; cross-org
+  bloqueado.
+- build fixture + db-local OK; **RLS harness 106/106**; **read-model isolation
+  12/12** (P1-A intacto); **gm:regression 22/22**; gm:import PASS; validador
+  214/0/0; `git diff --check` limpio.
+- Migración local `20260609130000` verificada con `db reset`; **sin `db push`**.
+- **Sin deploy; sin merge a main/integration.** `main = origin/main = 2918622`
+  intacta; producción intacta; stashes P1-A intactos. **4E.3B NO iniciada.**
+
+## 4E.2B — BOQ safe delete/archive (2026-06-09, rama funcional)
+
+Rama `feature/wave-4e2b-boq-safe-archive`. **Todo PASS**:
+- typecheck 0, lint 0, **743 tests** + **19 integración gated** (`BOQ_SMOKE_DB=1`,
+  repo real + RLS local) que cubren los 28 casos del plan: archivar/restaurar ítem
+  y capítulo con recálculo financiero exacto y restauración al baseline; capítulo
+  archivado excluye sus ítems sin reescribirlos; ítem archivado individualmente
+  sigue archivado tras restaurar el capítulo; duplicate-archive / restore-of-active
+  rechazados; **no DELETE físico** (fila persiste con `archived_at`/`archived_by`);
+  `archived_by` server-side; read-model activo vs `includeArchived`; export excluye
+  archivados; cross-org y versión emitida bloqueados; fixture solo lectura; fuente
+  de actions/controls/UI.
+- build fixture + db-local OK; **RLS harness 106/106**; **read-model isolation 12/12**
+  (P1-A intacto); **gm:regression 22/22** (sin degradar registros activos);
+  gm:import PASS; validador 214/0/0; `git diff --check` limpio.
+- Migración local `20260609120000` verificada con `db reset`; **sin `db push`**.
+- **Sin deploy; sin merge a main/integration.** `main = origin/main = 2918622`
+  intacta; producción intacta; stashes P1-A intactos. Preview/MV-01 diferidos.
+
 ## 4E.2A — Cierre automated-ready (2026-06-07, post-merge)
 
 La usuaria **omitió voluntariamente** el smoke manual de escritura sobre el

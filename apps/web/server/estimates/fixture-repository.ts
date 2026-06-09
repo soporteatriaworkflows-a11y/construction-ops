@@ -30,11 +30,20 @@ import {
   EstimateWriteNotSupportedError,
 } from './errors';
 import type {
+  BoqItemArchiveResult,
   BoqItemMutationResult,
   ChapterMutationResult,
   EditableBoqItemView,
   EditableChapterView,
+  ReviewReadOptions,
 } from '@/lib/estimates/boq-edit-types';
+import type { EstimateVersionSummary } from '@/lib/estimates/version-types';
+import type { VersionCompareResult } from '@/lib/estimates/compare-types';
+import {
+  computeVersionComparison,
+  type CompareItemInput,
+  type VersionSnapshot,
+} from './compare';
 import type {
   BoqItemReviewView,
   ChapterDetailView,
@@ -149,8 +158,10 @@ export class FixtureEstimatesWriteRepository implements EstimatesWriteRepository
   async listChaptersByEstimateVersion(
     viewer: ViewerContext,
     estimateId: Uuid,
+    _options?: ReviewReadOptions,
   ): Promise<ChapterReviewItem[]> {
     if (!sameOrg(viewer) || estimateId !== fixture.estimate.id) return [];
+    // El fixture (demo) no tiene nodos archivados: todo es activo.
     return fixture.chapters
       .slice()
       .sort((a, b) => a.sortOrder - b.sortOrder)
@@ -162,6 +173,7 @@ export class FixtureEstimatesWriteRepository implements EstimatesWriteRepository
         return {
           id: ch.id, code: ch.code, name: ch.name, sortOrder: ch.sortOrder,
           itemCount: items.length, subtotal, sourceCode: null, sourceRow: null,
+          archived: false,
         };
       });
   }
@@ -177,6 +189,7 @@ export class FixtureEstimatesWriteRepository implements EstimatesWriteRepository
     return {
       id: ch.id, code: ch.code, name: ch.name, sortOrder: ch.sortOrder,
       subtotal, itemCount: items.length, sourceCode: null, sourceRow: null,
+      archived: false,
       estimateId: fixture.estimate.id, estimateName: fixture.estimate.name,
       versionNumber: fixture.estimateVersion.versionNumber,
       scopeId: scope?.id ?? '', scopeName: scope?.name ?? null,
@@ -184,7 +197,11 @@ export class FixtureEstimatesWriteRepository implements EstimatesWriteRepository
     };
   }
 
-  async listItemsByChapter(viewer: ViewerContext, chapterId: Uuid): Promise<BoqItemReviewView[]> {
+  async listItemsByChapter(
+    viewer: ViewerContext,
+    chapterId: Uuid,
+    _options?: ReviewReadOptions,
+  ): Promise<BoqItemReviewView[]> {
     const ch = fixture.chapters.find((c) => c.id === chapterId);
     if (!sameOrg(viewer) || !ch) return [];
     return fixture.boqItems
@@ -193,7 +210,7 @@ export class FixtureEstimatesWriteRepository implements EstimatesWriteRepository
       .map((it) => ({
         id: it.id, code: it.code, description: it.descriptionSnapshot, unit: it.unitSnapshot,
         quantity: it.quantitySnapshot, unitPrice: it.unitPriceSnapshot, subtotal: it.subtotal,
-        sortOrder: it.sortOrder, sourceCode: null, sourceRow: null,
+        sortOrder: it.sortOrder, sourceCode: null, sourceRow: null, archived: false,
       }));
   }
 
@@ -227,6 +244,7 @@ export class FixtureEstimatesWriteRepository implements EstimatesWriteRepository
   async getEstimateExportPayload(
     viewer: ViewerContext,
     estimateId: Uuid,
+    _versionId?: Uuid,
   ): Promise<EstimateExportPayload> {
     if (!sameOrg(viewer) || estimateId !== fixture.estimate.id) {
       throw new EstimateNotFoundError(estimateId);
@@ -347,5 +365,80 @@ export class FixtureEstimatesWriteRepository implements EstimatesWriteRepository
       versionNumber: fixture.estimateVersion.versionNumber,
       availableChapters,
     };
+  }
+
+  /* --- Archive/restore (4E.2B): escritura bloqueada (solo lectura). --- */
+  async archiveEstimateChapter(): Promise<ChapterMutationResult> {
+    throw new BoqWriteNotSupportedError();
+  }
+  async restoreEstimateChapter(): Promise<ChapterMutationResult> {
+    throw new BoqWriteNotSupportedError();
+  }
+  async archiveBoqItem(): Promise<BoqItemArchiveResult> {
+    throw new BoqWriteNotSupportedError();
+  }
+  async restoreBoqItem(): Promise<BoqItemArchiveResult> {
+    throw new BoqWriteNotSupportedError();
+  }
+
+  /* --- Emisión / clonación (4E.3A): escritura bloqueada en demo. --- */
+  async issueEstimateVersion(): Promise<EstimateVersionSummary> {
+    throw new BoqWriteNotSupportedError();
+  }
+  async cloneIssuedEstimateVersion(): Promise<EstimateVersionSummary> {
+    throw new BoqWriteNotSupportedError();
+  }
+  async listEstimateVersions(
+    viewer: ViewerContext,
+    estimateId: Uuid,
+  ): Promise<EstimateVersionSummary[]> {
+    if (!sameOrg(viewer) || estimateId !== fixture.estimate.id) return [];
+    const v = fixture.estimateVersion;
+    return [
+      {
+        id: v.id,
+        versionNumber: v.versionNumber,
+        status: v.status,
+        isActive: true,
+        editable: !['approved', 'issued', 'archived'].includes(v.status),
+        issuedAt: null,
+        issuedBy: null,
+        createdAt: fixture.estimate.createdAt,
+        sourceVersionId: null,
+        directTotal: fixture.estimateTotals.costos_directos,
+        grandTotal: fixture.estimateTotals.costos_directos,
+      },
+    ];
+  }
+
+  async compareEstimateVersions(
+    viewer: ViewerContext,
+    estimateId: Uuid,
+    baseVersionId: Uuid,
+    targetVersionId: Uuid,
+  ): Promise<VersionCompareResult> {
+    const vId = fixture.estimateVersion.id;
+    if (!sameOrg(viewer) || estimateId !== fixture.estimate.id) throw new EstimateNotFoundError(estimateId);
+    if (baseVersionId !== vId || targetVersionId !== vId) throw new EstimateNotFoundError(estimateId);
+    // El fixture tiene una sola versión: comparar contra sí misma ⇒ todo sin cambios.
+    const snap = (): VersionSnapshot => {
+      const items: CompareItemInput[] = fixture.boqItems.map((it) => ({
+        id: it.id, chapterCode: fixture.chapters.find((c) => c.id === it.chapterId)?.code ?? '',
+        code: it.code, description: it.descriptionSnapshot, unit: it.unitSnapshot,
+        quantity: it.quantitySnapshot, unitPrice: it.unitPriceSnapshot, subtotal: it.subtotal,
+        archived: false, sortOrder: it.sortOrder,
+      }));
+      return {
+        ref: { id: vId, versionNumber: fixture.estimateVersion.versionNumber, status: fixture.estimateVersion.status },
+        financial: computeFinancialSummary(fixture.estimateTotals.costos_directos, ZERO_FRACTIONS),
+        chapters: fixture.chapters.map((c) => {
+          const sub = fixture.boqItems.filter((i) => i.chapterId === c.id)
+            .reduce((acc, i) => acc.plus(new Decimal(i.subtotal)), new Decimal(0)).toFixed();
+          return { code: c.code, name: c.name, archived: false, subtotal: sub, sortOrder: c.sortOrder };
+        }),
+        items,
+      };
+    };
+    return computeVersionComparison(estimateId, snap(), snap());
   }
 }
