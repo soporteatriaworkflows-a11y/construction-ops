@@ -122,10 +122,24 @@ export default async function DashboardPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Dashboard gerencial"
-        description="Resumen financiero del proyecto activo"
-      />
+      {/* Hero de marca ICONIC: bloque azul amplio + curva + detalle cian */}
+      <section
+        className="relative mb-6 overflow-hidden rounded-2xl px-6 py-7 text-white shadow-sm"
+        style={{ background: 'linear-gradient(120deg, #020148 0%, #013E97 55%, #005DD6 100%)' }}
+      >
+        <svg className="pointer-events-none absolute inset-y-0 right-0 h-full w-1/2 text-white/10" viewBox="0 0 400 200" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M400,0 L400,200 L80,200 C260,140 120,60 400,0 Z" fill="currentColor" />
+        </svg>
+        <div className="relative">
+          <p className="text-xs font-semibold uppercase tracking-wide text-iconic-soft-blue">Dashboard gerencial</p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight">Resumen financiero del proyecto activo</h1>
+          <p className="mt-1 text-sm text-white/75">
+            Estado del presupuesto: <span className="font-semibold text-white">{statusLabel}</span>
+            {' · '}Actualizado {formatDateTime(summary.lastUpdatedAt)}
+          </p>
+          <span className="mt-4 inline-block h-1 w-14 rounded bg-iconic-cyan" aria-hidden="true" />
+        </div>
+      </section>
 
       {/* ------------------------------------------------------------------ */}
       {/* KPIs financieros principales                                         */}
@@ -136,9 +150,9 @@ export default async function DashboardPage() {
             title="Total presupuesto"
             value={formatCOP(summary.budget)}
             description="Costos directos + AIU"
-            valueColor="text-blue-700"
-            icon={<DollarSign className="h-4 w-4 text-blue-700" />}
-            iconBg="bg-blue-50"
+            valueColor="text-iconic-ink"
+            icon={<DollarSign className="h-4 w-4 text-iconic-primary" />}
+            iconBg="bg-brand-50"
           />
           <KpiCard
             title="Costos directos"
