@@ -72,7 +72,9 @@ export {
   TargetChapterNotFoundError,
   VersionNotDraftError,
   VersionNotIssuedError,
+  VersionMismatchError,
 } from './errors';
+export { computeVersionComparison } from './compare';
 export type { BoqValidationIssue } from './errors';
 export {
   validateChapterInput,

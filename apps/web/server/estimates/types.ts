@@ -245,6 +245,15 @@ export interface EstimatesWriteRepository {
     viewer: ViewerContext,
     estimateId: Uuid,
   ): Promise<import('@/lib/estimates/version-types').EstimateVersionSummary[]>;
+
+  /* --- Comparación de versiones (Oleada 4E.3B, READ-ONLY) --- */
+  /** Compara dos versiones del mismo presupuesto (no muta datos). */
+  compareEstimateVersions(
+    viewer: ViewerContext,
+    estimateId: Uuid,
+    baseVersionId: Uuid,
+    targetVersionId: Uuid,
+  ): Promise<import('@/lib/estimates/compare-types').VersionCompareResult>;
 }
 
 export type { AuthenticatedViewer } from '@/server/auth/types';
