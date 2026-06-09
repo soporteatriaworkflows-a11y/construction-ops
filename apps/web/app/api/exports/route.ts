@@ -20,7 +20,7 @@
  */
 
 import type { NextRequest } from 'next/server';
-import { getReadModel, getDemoViewer } from '@/server/read-model';
+import { getReadModel, getDemoViewer, DEMO_ORGANIZATION_ID } from '@/server/read-model';
 import { createExportService } from '@/server/exports/export-service';
 import {
   ExportProfileFormatMismatchError,
@@ -77,6 +77,11 @@ export async function GET(request: NextRequest): Promise<Response> {
   // autenticado y NO permite escalamiento de perfil por query param.
   const mode = resolveAuthMode();
   let requestedBy = '00000000-0000-4000-8000-000000000000';
+  // P1-A / M-02: la organización del visor se DERIVA SERVER-SIDE. En modo demo es
+  // la org demo (fixture sanitizado); en modo supabase es la org de la sesión
+  // autenticada. NUNCA se hardcodea la org demo en producción ni se acepta del
+  // navegador.
+  let organizationId: string = DEMO_ORGANIZATION_ID;
   if (mode === 'supabase') {
     let viewer;
     try {
@@ -90,6 +95,7 @@ export async function GET(request: NextRequest): Promise<Response> {
       return errorResponse(403, 'Perfil no autorizado para la sesión actual.');
     }
     requestedBy = viewer.userId;
+    organizationId = viewer.organizationId;
   }
 
   // Construir el servicio de exportación
@@ -101,6 +107,7 @@ export async function GET(request: NextRequest): Promise<Response> {
   try {
     const result = await exportService.generate({
       profile,
+      organizationId,
       format,
       projectId,
       estimateVersionId: estimateVersionId || undefined,

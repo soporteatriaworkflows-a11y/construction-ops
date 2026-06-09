@@ -43,6 +43,8 @@ let projectId: Uuid;
 
 const REQUESTED_BY = '00000000-0000-4000-8000-000000000000' as Uuid;
 const REQUESTED_AT = '2026-06-01T12:00:00.000Z';
+// P1-A / M-02: la organización se deriva server-side; en tests usamos la org demo.
+const ORG_ID = getDemoViewer('management').organizationId as Uuid;
 
 /** Vista sobre un `ArrayBuffer` para `ExcelJS.load` (evita fricción de tipos Buffer). */
 function toArrayBuffer(u8: Uint8Array): ArrayBuffer {
@@ -66,7 +68,8 @@ describe('ExportService — validación perfil×formato', () => {
         profile: 'management',
         format: 'xlsx-client',
         projectId,
-        requestedBy: REQUESTED_BY,
+        organizationId: ORG_ID,
+      requestedBy: REQUESTED_BY,
         requestedAt: REQUESTED_AT,
       }),
     ).rejects.toBeInstanceOf(ExportProfileFormatMismatchError);
@@ -79,6 +82,7 @@ describe('ExportService — xlsx-client', () => {
       profile: 'client',
       format: 'xlsx-client',
       projectId,
+      organizationId: ORG_ID,
       requestedBy: REQUESTED_BY,
       requestedAt: REQUESTED_AT,
     });
@@ -103,6 +107,7 @@ describe('ExportService — xlsx-client', () => {
       profile: 'client',
       format: 'xlsx-client',
       projectId,
+      organizationId: ORG_ID,
       requestedBy: REQUESTED_BY,
       requestedAt: REQUESTED_AT,
     });
@@ -131,6 +136,7 @@ describe('ExportService — xlsx-internal', () => {
       format: 'xlsx-internal',
       projectId,
       includeSchedule: true,
+      organizationId: ORG_ID,
       requestedBy: REQUESTED_BY,
       requestedAt: REQUESTED_AT,
     });
@@ -150,6 +156,7 @@ describe('ExportService — PDF', () => {
       profile: 'client',
       format: 'pdf-client',
       projectId,
+      organizationId: ORG_ID,
       requestedBy: REQUESTED_BY,
       requestedAt: REQUESTED_AT,
     });
@@ -166,6 +173,7 @@ describe('ExportService — PDF', () => {
       format: 'pdf-management',
       projectId,
       includeSchedule: true,
+      organizationId: ORG_ID,
       requestedBy: REQUESTED_BY,
       requestedAt: REQUESTED_AT,
     });
@@ -181,6 +189,7 @@ describe('ExportService — csv-schedule', () => {
       profile: 'client',
       format: 'csv-schedule',
       projectId,
+      organizationId: ORG_ID,
       requestedBy: REQUESTED_BY,
       requestedAt: REQUESTED_AT,
     });
@@ -199,6 +208,7 @@ describe('ExportService — csv-schedule', () => {
       profile: 'internal',
       format: 'csv-schedule',
       projectId,
+      organizationId: ORG_ID,
       requestedBy: REQUESTED_BY,
       requestedAt: REQUESTED_AT,
     });
@@ -214,6 +224,7 @@ describe('ExportService — csv-schedule', () => {
       profile: 'client',
       format: 'csv-schedule',
       projectId,
+      organizationId: ORG_ID,
       requestedBy: REQUESTED_BY,
       requestedAt: REQUESTED_AT,
     });
@@ -221,5 +232,37 @@ describe('ExportService — csv-schedule', () => {
     for (const token of FORBIDDEN_CLIENT) {
       expect(text).not.toContain(token);
     }
+  });
+});
+
+describe('ExportService — aislamiento por organización (P1-A / M-02)', () => {
+  // El visor de OTRA organización NO debe poder exportar el proyecto demo: el
+  // servicio usa request.organizationId (derivada server-side), no una org demo
+  // hardcodeada, por lo que el read-model niega el acceso cross-org.
+  const FOREIGN_ORG = '00000000-0000-4000-8000-0000000000ff' as Uuid;
+
+  it('una organización ajena no obtiene datos del proyecto demo (cross-org denegado)', async () => {
+    await expect(
+      service.generate({
+        profile: 'client',
+        format: 'xlsx-client',
+        projectId,
+        organizationId: FOREIGN_ORG,
+        requestedBy: REQUESTED_BY,
+        requestedAt: REQUESTED_AT,
+      }),
+    ).rejects.toThrow();
+  });
+
+  it('la misma org (demo) sí exporta (control positivo)', async () => {
+    const res = await service.generate({
+      profile: 'client',
+      format: 'xlsx-client',
+      projectId,
+      organizationId: ORG_ID,
+      requestedBy: REQUESTED_BY,
+      requestedAt: REQUESTED_AT,
+    });
+    expect(res.sizeBytes).toBeGreaterThan(0);
   });
 });
