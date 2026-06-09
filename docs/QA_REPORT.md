@@ -9,6 +9,26 @@ cada ciclo de validación.
 
 ---
 
+## 4E.3A — Emisión / clonación de versiones (2026-06-09, rama funcional)
+
+Rama `feature/wave-4e3a-estimate-issue-clone` (desde integration `9f28c26` que ya
+incluye 4E.2B). **Todo PASS**:
+- typecheck 0, lint 0, **747 tests** + **28 integración gated** (`BOQ_SMOKE_DB=1`,
+  repo real + RLS): emisión draft→issued (issued_at/issued_by server-side, solo
+  draft, re-emisión rechazada); **inmutabilidad** de issued (archive/create/AIU
+  rechazados); **clonación** issued→nueva draft activa (V02, `source_version_id`,
+  capítulos/ítems remapeados, source_code/source_row + estado archivado
+  preservados, AIU clonado, **mismo total activo**, issued origen intacta);
+  editar la nueva draft NO altera el export del issued (snapshot por `versionId`);
+  clonar una draft rechazado; `listEstimateVersions` tenant-scoped; cross-org
+  bloqueado.
+- build fixture + db-local OK; **RLS harness 106/106**; **read-model isolation
+  12/12** (P1-A intacto); **gm:regression 22/22**; gm:import PASS; validador
+  214/0/0; `git diff --check` limpio.
+- Migración local `20260609130000` verificada con `db reset`; **sin `db push`**.
+- **Sin deploy; sin merge a main/integration.** `main = origin/main = 2918622`
+  intacta; producción intacta; stashes P1-A intactos. **4E.3B NO iniciada.**
+
 ## 4E.2B — BOQ safe delete/archive (2026-06-09, rama funcional)
 
 Rama `feature/wave-4e2b-boq-safe-archive`. **Todo PASS**:

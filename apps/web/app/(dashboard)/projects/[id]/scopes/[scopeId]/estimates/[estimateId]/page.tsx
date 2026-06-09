@@ -27,6 +27,7 @@ import {
   Download,
   Plus,
   Pencil,
+  ClipboardList,
 } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
 import { EstimateVersionBadge } from '@/components/shared/status-badge';
@@ -48,6 +49,7 @@ import { formatVersionLabel } from '../../estimate-format';
 import { AiuForm } from './aiu-form';
 import { ExportButtons } from './export-buttons';
 import { ArchiveControls } from './archive-controls';
+import { VersionPanel } from './version-panel';
 
 interface PageProps {
   params: Promise<{ id: string; scopeId: string; estimateId: string }>;
@@ -90,8 +92,19 @@ export default async function EstimateDetailPage({ params, searchParams }: PageP
   const importHref = `${scopeHref}/estimates/${estimateId}/import`;
 
   const versionEditable = !!active && !['approved', 'issued', 'archived'].includes(active.status);
-  const canEdit = canImport; // edición manual = mismo gate que importación (supabase+db)
-  const canArchive = canEdit && versionEditable;
+  const canEdit = canImport; // gate de modo (supabase+db)
+  const canMutate = canEdit && versionEditable; // editable solo si la versión NO está emitida
+  const canArchive = canMutate;
+
+  // Versiones (emisión/clonación, 4E.3A).
+  let versions: import('@/lib/estimates/version-types').EstimateVersionSummary[] = [];
+  if (active) {
+    try {
+      versions = await getEstimatesWriteRepository().listEstimateVersions(viewer, estimateId);
+    } catch {
+      versions = [];
+    }
+  }
 
   // Capítulos del presupuesto (revisión operativa, 4D.1 + archive 4E.2B).
   let chapters: ChapterReviewItem[] = [];
@@ -301,6 +314,19 @@ export default async function EstimateDetailPage({ params, searchParams }: PageP
       </section>
 
       {/* ------------------------------------------------------------------ */}
+      {/* Versiones: emitir / clonar (4E.3A)                                  */}
+      {/* ------------------------------------------------------------------ */}
+      {active && versions.length > 0 && (
+        <section aria-label="Versiones" className="mt-8">
+          <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-600">
+            <ClipboardList className="h-4 w-4 text-gray-400" aria-hidden="true" />
+            Versiones
+          </h2>
+          <VersionPanel estimateId={estimateId} versions={versions} canManage={canEdit} />
+        </section>
+      )}
+
+      {/* ------------------------------------------------------------------ */}
       {/* Capítulos del presupuesto (revisión operativa, 4D.1)                */}
       {/* ------------------------------------------------------------------ */}
       {chaptersSectionVisible && (
@@ -314,7 +340,7 @@ export default async function EstimateDetailPage({ params, searchParams }: PageP
               <Link href={archiveToggleHref} className="text-xs font-medium text-gray-500 hover:underline">
                 {showArchived ? 'Ocultar archivados' : 'Mostrar archivados'}
               </Link>
-              {canEdit ? (
+              {canMutate ? (
                 <Button asChild size="sm" variant="outline">
                   <Link href={chapterNewHref}>
                     <Plus className="h-4 w-4" aria-hidden="true" />
@@ -322,7 +348,7 @@ export default async function EstimateDetailPage({ params, searchParams }: PageP
                   </Link>
                 </Button>
               ) : (
-                <Button size="sm" variant="outline" disabled aria-disabled="true" title="Disponible en modo supabase+db">
+                <Button size="sm" variant="outline" disabled aria-disabled="true" title={versionEditable ? 'Disponible en modo supabase+db' : 'Versión emitida (inmutable)'}>
                   <Plus className="h-4 w-4" aria-hidden="true" />
                   Nuevo capítulo
                 </Button>
@@ -372,7 +398,7 @@ export default async function EstimateDetailPage({ params, searchParams }: PageP
                           {canArchive && (
                             <ArchiveControls kind="chapter" estimateId={estimateId} targetId={ch.id} archived={ch.archived} canWrite={canArchive} />
                           )}
-                          {canEdit && !ch.archived && (
+                          {canMutate && !ch.archived && (
                             <Link href={chapterEditHref(ch.id)} className="inline-flex items-center gap-0.5 text-xs font-medium text-gray-600 hover:underline">
                               <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                               Editar

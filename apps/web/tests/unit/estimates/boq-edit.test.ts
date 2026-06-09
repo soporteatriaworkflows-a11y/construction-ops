@@ -209,3 +209,34 @@ describe('BOQ archive (4E.2B) — fixture solo lectura + fuente actions/UI', () 
     expect(src).toMatch(/includeArchived/);
   });
 });
+
+describe('Versiones issue/clone (4E.3A) — fixture solo lectura + listado + UI', () => {
+  it('fixture: issue/clone ⇒ BoqWriteNotSupportedError; listEstimateVersions devuelve V01', async () => {
+    await expect(repo().issueEstimateVersion(writer, DEMO_ESTIMATE_ID)).rejects.toBeInstanceOf(BoqWriteNotSupportedError);
+    await expect(repo().cloneIssuedEstimateVersion(writer, DEMO_ESTIMATE_ID)).rejects.toBeInstanceOf(BoqWriteNotSupportedError);
+    const versions = await repo().listEstimateVersions(reader, DEMO_ESTIMATE_ID);
+    expect(versions.length).toBe(1);
+    expect(versions[0]!.isActive).toBe(true);
+  });
+  it('version-actions: server, guard + viewer; sin issued_by del navegador', () => {
+    const src = read('version-actions.ts');
+    expect(src).toMatch(/^'use server';/m);
+    expect(src).toMatch(/isCreationModeEnabled\(\)/);
+    expect(src).toMatch(/resolveAuthenticatedViewer\(\)/);
+    expect(src).toMatch(/issueEstimateVersion\(|cloneIssuedEstimateVersion\(/);
+    expect(src).not.toMatch(/formData\.get\('issued_by'\)/);
+  });
+  it('version-panel: client, Emitir versión + Crear nueva versión + confirm', () => {
+    const src = read('version-panel.tsx');
+    expect(src).toMatch(/^'use client';/m);
+    expect(src).toMatch(/Emitir versión/);
+    expect(src).toMatch(/Crear nueva versión/);
+    expect(src).toMatch(/window\.confirm/);
+  });
+  it('detalle: sección Versiones + VersionPanel + gating por versión emitida', () => {
+    const src = read('page.tsx');
+    expect(src).toMatch(/VersionPanel/);
+    expect(src).toMatch(/canMutate/);
+    expect(src).toMatch(/listEstimateVersions/);
+  });
+});

@@ -456,6 +456,11 @@ export const estimateVersions = pgTable(
     createdAt: createdAt(),
     approvedAt: timestamp("approved_at", { withTimezone: true }),
     notes: text("notes"),
+    // 4E.3A: emisión + clonación.
+    issuedAt: timestamp("issued_at", { withTimezone: true }),
+    issuedBy: uuid("issued_by").references(() => profiles.id, { onDelete: "set null" }),
+    // self-FK declarada en la migración; en Drizzle solo la columna.
+    sourceVersionId: uuid("source_version_id"),
   },
   (t) => [
     uniqueIndex("estimate_versions_estimate_number_uq").on(

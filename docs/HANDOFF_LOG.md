@@ -1,5 +1,45 @@
 # Handoff Log
 
+## 2026-06-09 — 4E.3A emisión/clonación de versiones implementada (rama funcional)
+
+> **4E.2B integrada** en `integration/p1a-functional-resume` (merge `9f28c26`,
+> validada). **4E.3A** en `feature/wave-4e3a-estimate-issue-clone` (desde
+> integration `9f28c26`). **NO merge a integration/main; sin deploy; sin db push.**
+
+### Alcance entregado (contrato `docs/ESTIMATE_ISSUE_CLONE_CONTRACT.md` v1)
+- **Emisión** `draft → issued` (`issued_at`/`issued_by` server-side; solo draft);
+  issued **inmutable** (edición/creación/movimiento/AIU/archive/restore rechazados
+  vía guards + RLS).
+- **Clonación** issued → nueva `draft` (activa): RPC atómica `clone_issued_estimate_version`
+  (capítulos/ítems remapeados, `source_code`/`source_row` y estado archivado
+  preservados, AIU clonado, número de versión seguro, `source_version_id`);
+  **mismo total activo** que la issued origen; **issued origen intacta** (consultable/
+  exportable por `versionId`).
+- `listEstimateVersions` (tenant-scoped, resumen financiero por versión);
+  export por `versionId` (snapshot histórico). UI: panel de versiones + Emitir /
+  Crear nueva versión; controles editables ocultos en issued.
+
+### Migración local (preparada; NO aplicada a remoto)
+- `20260609130000_estimate_version_issue_clone.sql` (aditiva): `estimate_versions`
+  += `issued_at`, `issued_by` (FK profiles), `source_version_id` (self FK) + índice
+  parcial; RPC `clone_issued_estimate_version` (SECURITY INVOKER, atómica). La RPC
+  lee la versión issued **sin** `FOR UPDATE` (evita falso not-found por RLS de
+  inmutabilidad) y serializa con lock en `estimates`. Verificada con `db reset`.
+
+### Validación (todo PASS)
+- typecheck 0, lint 0, **747 tests** + **28 integración gated** (`BOQ_SMOKE_DB=1`,
+  repo real + RLS; cubren los casos de emisión/inmutabilidad/clonación/lecturas/
+  exports/seguridad de 4E.3A), build fixture+db-local, RLS harness **106/106**,
+  read-model isolation **12/12**, gm:regression **22/22**, gm:import PASS, validador
+  214/0/0, `git diff --check` limpio.
+
+### Estado / pendientes
+- Migraciones locales `20260606120000` (4E.2A), `20260609120000` (4E.2B),
+  `20260609130000` (4E.3A) **pendientes de `db push` remoto**.
+- **Integración a `main` pendiente; deploy pendiente.** `main = origin/main = 2918622`
+  intacta; producción intacta; stashes P1-A intactos. Preview/MV-01 diferidos.
+- **4E.3B NO iniciada.**
+
 ## 2026-06-09 — 4E.2B `BOQ_SAFE_DELETE_OR_ARCHIVE` implementada (rama funcional)
 
 > En rama `feature/wave-4e2b-boq-safe-archive` (desde `integration/p1a-functional-resume`
