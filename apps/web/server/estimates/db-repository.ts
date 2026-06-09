@@ -38,10 +38,17 @@ import {
   EstimateNotFoundError,
   ScopeNotFoundError,
   TargetChapterNotFoundError,
+  VersionMismatchError,
   VersionNotDraftError,
   VersionNotIssuedError,
 } from './errors';
 import type { EstimateVersionSummary } from '@/lib/estimates/version-types';
+import type { VersionCompareResult } from '@/lib/estimates/compare-types';
+import {
+  computeVersionComparison,
+  type CompareItemInput,
+  type VersionSnapshot,
+} from './compare';
 import {
   validateChapterInput,
   validateBoqItemInput,
@@ -1121,5 +1128,75 @@ export class DbEstimatesWriteRepository implements EstimatesWriteRepository {
       .single();
     if (readErr) throw new Error(`estimate_version_read_failed: ${readErr.code ?? 'unknown'}`);
     return this.versionSummaryRow(supabase, row as Parameters<typeof this.versionSummaryRow>[1], true);
+  }
+
+  /* ----------------------------------------------------------------------
+   * Comparación de versiones (Oleada 4E.3B, READ-ONLY).
+   * -------------------------------------------------------------------- */
+
+  /** Snapshot de una versión (capítulos + ítems incl. archivados + financiero). */
+  private async buildCompareSnapshot(
+    viewer: ViewerContext,
+    supabase: SupabaseClient,
+    estimateId: Uuid,
+    versionId: Uuid,
+  ): Promise<VersionSnapshot> {
+    const { data, error } = await supabase
+      .from('estimate_versions')
+      .select('id, version_number, status, estimate_id')
+      .eq('id', versionId)
+      .maybeSingle();
+    if (error) throw new Error(`estimate_version_read_failed: ${error.code ?? 'unknown'}`);
+    const v = data as { id: string; version_number: number; status: string; estimate_id: string } | null;
+    if (!v) throw new EstimateNotFoundError(estimateId);
+    if (v.estimate_id !== estimateId) throw new VersionMismatchError();
+
+    const chapters = await this.listChaptersForVersion(supabase, versionId, true);
+    const items: CompareItemInput[] = [];
+    for (const ch of chapters) {
+      const its = await this.listItemsByChapter(viewer, ch.id, { includeArchived: true });
+      for (const it of its) {
+        items.push({
+          id: it.id,
+          chapterCode: ch.code,
+          code: it.code,
+          description: it.description,
+          unit: it.unit,
+          quantity: it.quantity,
+          unitPrice: it.unitPrice,
+          subtotal: it.subtotal,
+          archived: it.archived,
+          sortOrder: it.sortOrder,
+        });
+      }
+    }
+    const rollup = await this.versionRollup(supabase, versionId);
+    const { fractions } = await this.readAiuFractions(supabase, versionId);
+    const financial = computeFinancialSummary(rollup.directTotal, fractions);
+    return {
+      ref: { id: v.id, versionNumber: v.version_number, status: v.status as VersionSnapshot['ref']['status'] },
+      financial,
+      chapters: chapters.map((c) => ({
+        code: c.code,
+        name: c.name,
+        archived: c.archived,
+        subtotal: c.subtotal,
+        sortOrder: c.sortOrder,
+      })),
+      items,
+    };
+  }
+
+  async compareEstimateVersions(
+    viewer: ViewerContext,
+    estimateId: Uuid,
+    baseVersionId: Uuid,
+    targetVersionId: Uuid,
+  ): Promise<VersionCompareResult> {
+    const supabase = await this.clientFactory();
+    // Defensa: ambas versiones del mismo estimate (RLS ⇒ cross-org Not-Found).
+    const base = await this.buildCompareSnapshot(viewer, supabase, estimateId, baseVersionId);
+    const target = await this.buildCompareSnapshot(viewer, supabase, estimateId, targetVersionId);
+    return computeVersionComparison(estimateId, base, target);
   }
 }

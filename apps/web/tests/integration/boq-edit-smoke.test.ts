@@ -23,6 +23,7 @@ import {
   EstimateNotFoundError,
   VersionNotDraftError,
   VersionNotIssuedError,
+  VersionMismatchError,
   AiuVersionLockedError,
 } from '@/server/estimates';
 import type { AuthenticatedViewer } from '@/server/auth/types';
@@ -522,5 +523,70 @@ describe.skipIf(!RUN)('4E.3A — emisión/clonación de versiones (repo real + R
   it('seguridad: Org B no clona ni emite versiones de A', async () => {
     await expect(repoB.cloneIssuedEstimateVersion(viewerB, estimateId)).rejects.toBeInstanceOf(EstimateNotFoundError);
     await expect(repoB.issueEstimateVersion(viewerB, estimateId)).rejects.toBeInstanceOf(EstimateNotFoundError);
+  });
+});
+
+describe.skipIf(!RUN)('4E.3B — comparación de versiones (repo real + RLS local)', () => {
+  const clientA = () => clientFor(USER_A);
+  const repoA = new DbEstimatesWriteRepository(async () => clientA());
+  const repoB = new DbEstimatesWriteRepository(async () => clientFor(USER_B));
+
+  let estimateId: string;
+  let v1Id: string;
+  let v2Id: string;
+  let otherEstimateId: string;
+  let otherVersionId: string;
+
+  beforeAll(async () => {
+    // Estimate con V1 (issued) y V2 (draft clonada, editada).
+    const est = await repoA.insertEstimateWithInitialVersion(viewerA, SCOPE_A, { name: `Smoke 4E3B ${Date.now()}` });
+    estimateId = est.id;
+    v1Id = est.activeVersion!.id;
+    await clientA().rpc('import_boq_into_version', {
+      p_version_id: v1Id,
+      p_chapters: [{ code: '11', name: 'Preliminares', sortOrder: 0 }],
+      p_items: [{ chapterCode: '11', code: '11.01', description: 'A', unit: 'm3', quantity: '10', unitPrice: '100', sortOrder: 0 }],
+    });
+    await repoA.updateEstimateVersionAiu(viewerA, estimateId, { administrationRate: '3.5', contingencyRate: '2.5', utilityRate: '4', utilityVatRate: '19' });
+    await repoA.issueEstimateVersion(viewerA, estimateId);
+    const clone = await repoA.cloneIssuedEstimateVersion(viewerA, estimateId);
+    v2Id = clone.id;
+    // Editar V2: cambiar cantidad del 11.01.
+    const chs = await repoA.listChaptersByEstimateVersion(viewerA, estimateId);
+    const items = await repoA.listItemsByChapter(viewerA, chs[0]!.id);
+    await repoA.updateBoqItem(viewerA, estimateId, chs[0]!.id, items[0]!.id, {
+      code: '11.01', description: 'A', unit: 'm3', quantity: '15', unitPrice: '100',
+    });
+    // Segundo estimate (para cross-estimate).
+    const est2 = await repoA.insertEstimateWithInitialVersion(viewerA, SCOPE_A, { name: `Smoke 4E3B other ${Date.now()}` });
+    otherEstimateId = est2.id;
+    otherVersionId = est2.activeVersion!.id;
+  });
+
+  it('compara dos versiones del mismo estimate; refleja el delta de la edición', async () => {
+    const r = await repoA.compareEstimateVersions(viewerA, estimateId, v1Id, v2Id);
+    expect(r.base.id).toBe(v1Id);
+    expect(r.target.id).toBe(v2Id);
+    // V1 directo = 1000, V2 directo = 1500 ⇒ delta 500.
+    expect(sub(r.financial.directTotal.base)).toBe('1000');
+    expect(sub(r.financial.directTotal.target)).toBe('1500');
+    expect(sub(r.financial.directTotal.delta)).toBe('500');
+    expect(r.chapters[0]!.items[0]!.status).toBe('changed');
+  });
+
+  it('rechaza versiones de estimates distintos (VersionMismatchError)', async () => {
+    await expect(repoA.compareEstimateVersions(viewerA, estimateId, v1Id, otherVersionId)).rejects.toBeInstanceOf(VersionMismatchError);
+  });
+
+  it('cross-org: Org B no compara versiones de A', async () => {
+    await expect(repoB.compareEstimateVersions(viewerB, estimateId, v1Id, v2Id)).rejects.toBeInstanceOf(EstimateNotFoundError);
+  });
+
+  it('comparar NO muta datos (V1 issued intacta)', async () => {
+    const before = await repoA.getEstimateExportPayload(viewerA, estimateId, v1Id);
+    await repoA.compareEstimateVersions(viewerA, estimateId, v1Id, v2Id);
+    const after = await repoA.getEstimateExportPayload(viewerA, estimateId, v1Id);
+    expect(after.financial.grandTotal).toBe(before.financial.grandTotal);
+    expect(after.version.status).toBe('issued');
   });
 });

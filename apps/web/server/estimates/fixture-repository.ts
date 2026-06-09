@@ -38,6 +38,12 @@ import type {
   ReviewReadOptions,
 } from '@/lib/estimates/boq-edit-types';
 import type { EstimateVersionSummary } from '@/lib/estimates/version-types';
+import type { VersionCompareResult } from '@/lib/estimates/compare-types';
+import {
+  computeVersionComparison,
+  type CompareItemInput,
+  type VersionSnapshot,
+} from './compare';
 import type {
   BoqItemReviewView,
   ChapterDetailView,
@@ -403,5 +409,36 @@ export class FixtureEstimatesWriteRepository implements EstimatesWriteRepository
         grandTotal: fixture.estimateTotals.costos_directos,
       },
     ];
+  }
+
+  async compareEstimateVersions(
+    viewer: ViewerContext,
+    estimateId: Uuid,
+    baseVersionId: Uuid,
+    targetVersionId: Uuid,
+  ): Promise<VersionCompareResult> {
+    const vId = fixture.estimateVersion.id;
+    if (!sameOrg(viewer) || estimateId !== fixture.estimate.id) throw new EstimateNotFoundError(estimateId);
+    if (baseVersionId !== vId || targetVersionId !== vId) throw new EstimateNotFoundError(estimateId);
+    // El fixture tiene una sola versión: comparar contra sí misma ⇒ todo sin cambios.
+    const snap = (): VersionSnapshot => {
+      const items: CompareItemInput[] = fixture.boqItems.map((it) => ({
+        id: it.id, chapterCode: fixture.chapters.find((c) => c.id === it.chapterId)?.code ?? '',
+        code: it.code, description: it.descriptionSnapshot, unit: it.unitSnapshot,
+        quantity: it.quantitySnapshot, unitPrice: it.unitPriceSnapshot, subtotal: it.subtotal,
+        archived: false, sortOrder: it.sortOrder,
+      }));
+      return {
+        ref: { id: vId, versionNumber: fixture.estimateVersion.versionNumber, status: fixture.estimateVersion.status },
+        financial: computeFinancialSummary(fixture.estimateTotals.costos_directos, ZERO_FRACTIONS),
+        chapters: fixture.chapters.map((c) => {
+          const sub = fixture.boqItems.filter((i) => i.chapterId === c.id)
+            .reduce((acc, i) => acc.plus(new Decimal(i.subtotal)), new Decimal(0)).toFixed();
+          return { code: c.code, name: c.name, archived: false, subtotal: sub, sortOrder: c.sortOrder };
+        }),
+        items,
+      };
+    };
+    return computeVersionComparison(estimateId, snap(), snap());
   }
 }

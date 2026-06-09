@@ -164,6 +164,15 @@ export class BoqItemNotFoundError extends Error {
   }
 }
 
+/** Una versión indicada para comparar no pertenece al estimate dado (4E.3B). */
+export class VersionMismatchError extends Error {
+  readonly code = 'version_mismatch' as const;
+  constructor(message?: string) {
+    super(message ?? 'Las versiones a comparar deben pertenecer al mismo presupuesto.');
+    this.name = 'VersionMismatchError';
+  }
+}
+
 /** Se intentó emitir una versión que no está en `draft` (4E.3A). */
 export class VersionNotDraftError extends Error {
   readonly code = 'version_not_draft' as const;
