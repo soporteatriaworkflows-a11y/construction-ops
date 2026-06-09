@@ -8,7 +8,7 @@
  */
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, ListTree, Hash, DollarSign, FolderOpen, Layers, ClipboardList, Plus, Pencil, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, ListTree, Hash, DollarSign, FolderOpen, Layers, ClipboardList, Plus, Pencil, CheckCircle2, Archive } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,7 @@ import { resolveViewer } from '@/server/auth/resolve-viewer';
 import { getEstimatesWriteRepository, ChapterNotFoundError } from '@/server/estimates';
 import type { BoqItemReviewView } from '@/lib/estimates/review-types';
 import { isCreationModeEnabled } from '../../../../../../../mode-guard';
+import { ArchiveControls } from '../../archive-controls';
 
 interface PageProps {
   params: Promise<{ id: string; scopeId: string; estimateId: string; chapterId: string }>;
@@ -29,11 +30,13 @@ export default async function ChapterDetailPage({ params, searchParams }: PagePr
   const { id, scopeId, estimateId, chapterId } = await params;
   const sp = searchParams ? await searchParams : {};
   const justSaved = sp['saved'] === '1';
+  const showArchived = sp['archived'] === '1';
   const estimateHref = `/projects/${id}/scopes/${scopeId}/estimates/${estimateId}`;
   const chapterBase = `${estimateHref}/chapters/${chapterId}`;
   const itemNewHref = `${chapterBase}/items/new`;
   const itemEditHref = (itemId: string) => `${chapterBase}/items/${itemId}/edit`;
   const chapterEditHref = `${chapterBase}/edit`;
+  const archiveToggleHref = `${chapterBase}${showArchived ? '' : '?archived=1'}`;
   const canEdit = isCreationModeEnabled();
 
   let viewer: Awaited<ReturnType<typeof resolveViewer>>;
@@ -57,10 +60,20 @@ export default async function ChapterDetailPage({ params, searchParams }: PagePr
     notFound();
   }
 
+  // Versión activa editable ⇒ habilita acciones de archive/restore.
+  let versionEditable = false;
+  try {
+    const av = await repo.getEstimateActiveVersion(viewer, estimateId);
+    versionEditable = !!av && !['approved', 'issued', 'archived'].includes(av.status);
+  } catch {
+    versionEditable = false;
+  }
+  const canArchive = canEdit && versionEditable;
+
   let items: BoqItemReviewView[] = [];
   let itemsError: string | null = null;
   try {
-    items = await repo.listItemsByChapter(viewer, chapterId);
+    items = await repo.listItemsByChapter(viewer, chapterId, { includeArchived: showArchived });
   } catch (e) {
     itemsError = e instanceof Error ? e.message : 'Error al cargar ítems';
   }
@@ -89,14 +102,27 @@ export default async function ChapterDetailPage({ params, searchParams }: PagePr
         </div>
       )}
 
-      {canEdit && (
-        <div className="mb-4">
+      {chapter.archived && (
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700" role="status">
+          <Archive className="h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
+          <span>Capítulo <strong>archivado</strong>: excluido de la vista activa y de los cálculos.</span>
+          {canArchive && (
+            <ArchiveControls kind="chapter" estimateId={estimateId} targetId={chapter.id} archived canWrite={canArchive} />
+          )}
+        </div>
+      )}
+
+      {canEdit && !chapter.archived && (
+        <div className="mb-4 flex items-center gap-3">
           <Button asChild size="sm" variant="outline">
             <Link href={chapterEditHref}>
               <Pencil className="h-4 w-4" aria-hidden="true" />
               Editar capítulo
             </Link>
           </Button>
+          {canArchive && (
+            <ArchiveControls kind="chapter" estimateId={estimateId} targetId={chapter.id} archived={false} canWrite={canArchive} />
+          )}
         </div>
       )}
 
@@ -154,24 +180,29 @@ export default async function ChapterDetailPage({ params, searchParams }: PagePr
 
       {/* Ítems BOQ */}
       <section aria-label="Ítems BOQ" className="mt-6">
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3 flex items-center justify-between gap-2">
           <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-600">
             <ListTree className="h-4 w-4 text-gray-400" aria-hidden="true" />
             Ítems BOQ
           </h2>
-          {canEdit ? (
-            <Button asChild size="sm" variant="outline">
-              <Link href={itemNewHref}>
+          <div className="flex items-center gap-3">
+            <Link href={archiveToggleHref} className="text-xs font-medium text-gray-500 hover:underline">
+              {showArchived ? 'Ocultar archivados' : 'Mostrar archivados'}
+            </Link>
+            {canEdit && !chapter.archived ? (
+              <Button asChild size="sm" variant="outline">
+                <Link href={itemNewHref}>
+                  <Plus className="h-4 w-4" aria-hidden="true" />
+                  Nuevo ítem
+                </Link>
+              </Button>
+            ) : (
+              <Button size="sm" variant="outline" disabled aria-disabled="true" title={chapter.archived ? 'Capítulo archivado' : 'Disponible en modo supabase+db'}>
                 <Plus className="h-4 w-4" aria-hidden="true" />
                 Nuevo ítem
-              </Link>
-            </Button>
-          ) : (
-            <Button size="sm" variant="outline" disabled aria-disabled="true" title="Disponible en modo supabase+db">
-              <Plus className="h-4 w-4" aria-hidden="true" />
-              Nuevo ítem
-            </Button>
-          )}
+              </Button>
+            )}
+          </div>
         </div>
         {itemsError ? (
           <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
@@ -195,10 +226,15 @@ export default async function ChapterDetailPage({ params, searchParams }: PagePr
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {items.map((it) => (
-                  <tr key={it.id} className="hover:bg-gray-50">
+                  <tr key={it.id} className={`hover:bg-gray-50 ${it.archived ? 'bg-gray-50/60 text-gray-400' : ''}`}>
                     <td className="px-3 py-2">
                       <span className="font-mono text-xs text-gray-600">{it.code}</span>
-                      {it.sourceCode && it.sourceCode !== it.code && (
+                      {it.archived && (
+                        <span className="ml-1.5 rounded bg-gray-200 px-1 py-0.5 text-[10px] font-medium text-gray-600">
+                          Archivado
+                        </span>
+                      )}
+                      {!it.archived && it.sourceCode && it.sourceCode !== it.code && (
                         <span
                           className="ml-1.5 rounded bg-amber-50 px-1 py-0.5 text-[10px] font-medium text-amber-700"
                           title={`Código original: ${it.sourceCode}${it.sourceRow ? ` (fila ${it.sourceRow})` : ''}`}
@@ -214,10 +250,17 @@ export default async function ChapterDetailPage({ params, searchParams }: PagePr
                     <td className="px-3 py-2 text-right tabular-nums font-medium">{formatCOP(it.subtotal)}</td>
                     {canEdit && (
                       <td className="px-3 py-2 text-right">
-                        <Link href={itemEditHref(it.id)} className="inline-flex items-center gap-0.5 text-xs font-medium text-gray-600 hover:underline">
-                          <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
-                          Editar
-                        </Link>
+                        <div className="inline-flex items-center gap-3">
+                          {canArchive && (
+                            <ArchiveControls kind="item" estimateId={estimateId} targetId={it.id} archived={it.archived} canWrite={canArchive} />
+                          )}
+                          {!it.archived && (
+                            <Link href={itemEditHref(it.id)} className="inline-flex items-center gap-0.5 text-xs font-medium text-gray-600 hover:underline">
+                              <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                              Editar
+                            </Link>
+                          )}
+                        </div>
                       </td>
                     )}
                   </tr>

@@ -47,6 +47,7 @@ import { isCreationModeEnabled } from '../../../../../mode-guard';
 import { formatVersionLabel } from '../../estimate-format';
 import { AiuForm } from './aiu-form';
 import { ExportButtons } from './export-buttons';
+import { ArchiveControls } from './archive-controls';
 
 interface PageProps {
   params: Promise<{ id: string; scopeId: string; estimateId: string }>;
@@ -58,6 +59,7 @@ export default async function EstimateDetailPage({ params, searchParams }: PageP
   const sp = searchParams ? await searchParams : {};
   const justImported = sp['imported'] === '1';
   const justSaved = sp['saved'] === '1';
+  const showArchived = sp['archived'] === '1';
   const scopeHref = `/projects/${id}/scopes/${scopeId}`;
 
   let viewer: Awaited<ReturnType<typeof resolveViewer>>;
@@ -87,22 +89,31 @@ export default async function EstimateDetailPage({ params, searchParams }: PageP
   const canImport = isCreationModeEnabled();
   const importHref = `${scopeHref}/estimates/${estimateId}/import`;
 
-  // Capítulos del presupuesto importado (revisión operativa, 4D.1).
+  const versionEditable = !!active && !['approved', 'issued', 'archived'].includes(active.status);
+  const canEdit = canImport; // edición manual = mismo gate que importación (supabase+db)
+  const canArchive = canEdit && versionEditable;
+
+  // Capítulos del presupuesto (revisión operativa, 4D.1 + archive 4E.2B).
   let chapters: ChapterReviewItem[] = [];
   let chaptersError: string | null = null;
-  if (hasContent) {
+  if (hasContent || showArchived) {
     try {
-      chapters = await getEstimatesWriteRepository().listChaptersByEstimateVersion(viewer, estimateId);
+      chapters = await getEstimatesWriteRepository().listChaptersByEstimateVersion(
+        viewer,
+        estimateId,
+        { includeArchived: showArchived },
+      );
     } catch (e) {
       chaptersError = e instanceof Error ? e.message : 'Error al cargar capítulos';
     }
   }
+  const chaptersSectionVisible = hasContent || (showArchived && chapters.length > 0);
   const chapterHref = (chapterId: string) =>
     `${scopeHref}/estimates/${estimateId}/chapters/${chapterId}`;
   const chapterNewHref = `${scopeHref}/estimates/${estimateId}/chapters/new`;
   const chapterEditHref = (chapterId: string) =>
     `${scopeHref}/estimates/${estimateId}/chapters/${chapterId}/edit`;
-  const canEdit = canImport; // edición manual = mismo gate que importación (supabase+db)
+  const archiveToggleHref = `${scopeHref}/estimates/${estimateId}${showArchived ? '' : '?archived=1'}`;
 
   // AIU + resumen financiero (4D.2). Solo si hay una versión activa.
   let aiu: AiuRatesView | null = null;
@@ -292,26 +303,31 @@ export default async function EstimateDetailPage({ params, searchParams }: PageP
       {/* ------------------------------------------------------------------ */}
       {/* Capítulos del presupuesto (revisión operativa, 4D.1)                */}
       {/* ------------------------------------------------------------------ */}
-      {hasContent && (
+      {chaptersSectionVisible && (
         <section aria-label="Capítulos del presupuesto" className="mt-8">
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3 flex items-center justify-between gap-2">
             <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-600">
               <ListTree className="h-4 w-4 text-gray-400" aria-hidden="true" />
               Capítulos
             </h2>
-            {canEdit ? (
-              <Button asChild size="sm" variant="outline">
-                <Link href={chapterNewHref}>
+            <div className="flex items-center gap-3">
+              <Link href={archiveToggleHref} className="text-xs font-medium text-gray-500 hover:underline">
+                {showArchived ? 'Ocultar archivados' : 'Mostrar archivados'}
+              </Link>
+              {canEdit ? (
+                <Button asChild size="sm" variant="outline">
+                  <Link href={chapterNewHref}>
+                    <Plus className="h-4 w-4" aria-hidden="true" />
+                    Nuevo capítulo
+                  </Link>
+                </Button>
+              ) : (
+                <Button size="sm" variant="outline" disabled aria-disabled="true" title="Disponible en modo supabase+db">
                   <Plus className="h-4 w-4" aria-hidden="true" />
                   Nuevo capítulo
-                </Link>
-              </Button>
-            ) : (
-              <Button size="sm" variant="outline" disabled aria-disabled="true" title="Disponible en modo supabase+db">
-                <Plus className="h-4 w-4" aria-hidden="true" />
-                Nuevo capítulo
-              </Button>
-            )}
+                </Button>
+              )}
+            </div>
           </div>
           {chaptersError ? (
             <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
@@ -331,10 +347,15 @@ export default async function EstimateDetailPage({ params, searchParams }: PageP
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {chapters.map((ch) => (
-                    <tr key={ch.id} className="hover:bg-gray-50">
+                    <tr key={ch.id} className={`hover:bg-gray-50 ${ch.archived ? 'bg-gray-50/60 text-gray-400' : ''}`}>
                       <td className="px-3 py-2">
                         <span className="font-mono text-xs text-gray-600">{ch.code}</span>
-                        {ch.sourceCode && ch.sourceCode !== ch.code && (
+                        {ch.archived && (
+                          <span className="ml-1.5 rounded bg-gray-200 px-1 py-0.5 text-[10px] font-medium text-gray-600">
+                            Archivado
+                          </span>
+                        )}
+                        {!ch.archived && ch.sourceCode && ch.sourceCode !== ch.code && (
                           <span
                             className="ml-1.5 rounded bg-amber-50 px-1 py-0.5 text-[10px] font-medium text-amber-700"
                             title={`Código original: ${ch.sourceCode}${ch.sourceRow ? ` (fila ${ch.sourceRow})` : ''}`}
@@ -348,16 +369,21 @@ export default async function EstimateDetailPage({ params, searchParams }: PageP
                       <td className="px-3 py-2 text-right tabular-nums font-medium">{formatCOP(ch.subtotal)}</td>
                       <td className="px-3 py-2 text-right">
                         <div className="inline-flex items-center gap-3">
-                          {canEdit && (
+                          {canArchive && (
+                            <ArchiveControls kind="chapter" estimateId={estimateId} targetId={ch.id} archived={ch.archived} canWrite={canArchive} />
+                          )}
+                          {canEdit && !ch.archived && (
                             <Link href={chapterEditHref(ch.id)} className="inline-flex items-center gap-0.5 text-xs font-medium text-gray-600 hover:underline">
                               <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                               Editar
                             </Link>
                           )}
-                          <Link href={chapterHref(ch.id)} className="inline-flex items-center gap-0.5 text-xs font-medium text-blue-700 hover:underline">
-                            Ver detalle
-                            <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
-                          </Link>
+                          {!ch.archived && (
+                            <Link href={chapterHref(ch.id)} className="inline-flex items-center gap-0.5 text-xs font-medium text-blue-700 hover:underline">
+                              Ver detalle
+                              <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+                            </Link>
+                          )}
                         </div>
                       </td>
                     </tr>
