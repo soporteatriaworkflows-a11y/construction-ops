@@ -50,12 +50,18 @@ que asume el rol `authenticated` (sin `bypassrls`) y fija `request.jwt.claims`
 
 ## Estado de implementación en P1-A
 
-- **Entregado y probado:** utilidad `apps/web/lib/db/rls.ts` (`withTenantRls`,
-  `buildRlsClaims`) + prueba de aislamiento `scripts/rls-runtime/read-model-isolation.ts`
-  (8/8 PASS en local) que demuestra el bug y el fix.
-- **Pendiente (rollout escalonado, ver `20_P1A_DEPLOYMENT_CHECKLIST.md`):** cablear
-  `withTenantRls` en los métodos del `DrizzleReadModelRepository` /
-  `DrizzleReadRepository`. Se hace por método con validación, NO en un único
-  cambio masivo, para no arriesgar las rutas de lectura productivas
-  (dashboard/planning/presupuesto). El filtro por organización vigente mantiene la
-  aislación mientras se completa el rollout.
+- **Entregado, CABLEADO y probado (local):**
+  - `apps/web/lib/db/rls.ts`: `withTenantRls` (raw) + **`withTenantDb`** (vía
+    `db.transaction(fn, { accessMode: 'read only' })` + `SET LOCAL ROLE
+    authenticated` + claims) + `buildRlsClaims`.
+  - `apps/web/server/read-model/drizzle-repository.ts`: los **11 métodos**
+    tenant-scoped envueltos en `read(viewer, …)` (AsyncLocalStorage; repo
+    RLS-scoped consumido por `this.repo` y helpers; 39 call-sites intactos;
+    filtros por org conservados; repo inyectado en tests = sin DB).
+  - Prueba `scripts/rls-runtime/read-model-isolation.ts`: **12/12 PASS**
+    (mecanismo + repo end-to-end).
+- **Nota de implementación:** construir Drizzle sobre `reserve()` fallaba
+  (`reading 'parsers'`); la vía soportada es `db.transaction`, que toma una
+  conexión del pool y revierte rol/claims al COMMIT (sin contaminación).
+- **Pendiente (no bloqueante local, ver `20_…`):** confirmar el rol de
+  `DATABASE_URL` en producción (MV-01) y smoke en Preview.

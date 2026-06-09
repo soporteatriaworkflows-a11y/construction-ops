@@ -5,9 +5,9 @@
 
 > **Progreso P1-A (2026-06-08, rama `fix/security-p1a-...`, sin merge):**
 > - **M-02 (export legacy):** ✅ ASEGURADO (org server-side + tests cross-org).
-> - **H-01 (read-model RLS):** 🟡 EN PROGRESO — `withTenantRls` (Alt B) implementada
->   y probada 8/8; cableado escalonado en el read-model + confirmación del rol de
->   `DATABASE_URL` en prod = pendiente (docs 17–20).
+> - **H-01 (read-model RLS):** 🟢 CABLEADO LOCAL — `withTenantDb` (Alt B) cableado
+>   en los 11 métodos del read-model (ALS); aislamiento 12/12. Pendiente solo:
+>   confirmar rol de `DATABASE_URL` en prod (MV-01) + smoke Preview (docs 17–20).
 > - Resto de P1/P2/P3: sin iniciar.
 
 ## OLEADA P0 — Contención inmediata

@@ -4,13 +4,15 @@
 > desplegó, **no** se tocó Supabase remoto, **no** se expusieron secretos.
 > Generado en la rama aislada `audit/security-baseline-construction-ops`.
 
-> **Actualización P1-A (2026-06-08):** remediación parcial en worktree aislado
+> **Actualización P1-A (2026-06-08):** remediación en worktree aislado
 > `construction-ops-security-p1a` (rama `fix/security-p1a-read-model-rls-export-legacy`).
-> **M-02 ASEGURADO** (export legacy deriva la organización server-side). **H-01:**
-> `DATABASE_URL_RLS_STATUS = BYPASSRLS_ROLE` confirmado; utilidad `withTenantRls`
-> (Alternativa B) implementada y **probada (aislamiento 8/8)**; cableado en el
-> read-model = rollout escalonado pendiente. Sin migración, sin deploy, sin merge.
-> Ver docs **17–20**. typecheck/lint/build OK · 714 tests · harness 93/93.
+> **M-02 ASEGURADO** (export legacy deriva la organización server-side). **H-01
+> CABLEADO localmente:** `DATABASE_URL_RLS_STATUS = BYPASSRLS_ROLE` confirmado;
+> `withTenantDb` (Alternativa B vía `db.transaction` read-only + `SET LOCAL ROLE
+> authenticated`) cableado en los **11 métodos** del read-model (ALS); aislamiento
+> **12/12** (mecanismo + repo e2e). **Pendiente:** confirmar rol de `DATABASE_URL`
+> en producción (MV-01) + smoke en Preview. Sin migración, sin deploy, sin merge.
+> Ver docs **17–20**. typecheck/lint/build (fixture+db) OK · 714 tests · harness 93/93.
 
 - **Repo:** `D:/ICONIC/SOFTWARE PRESUPUESTOS/construction-ops`
 - **Rama base auditada:** `main` · **commit** `7af91ea`

@@ -12,7 +12,7 @@
 | build | PASS | PASS (`/api/exports` `ƒ`) | medido |
 | vitest | 712 | **714** (+2 cross-org M-02) | medido |
 | RLS harness (`run.ts`) | 93/93 | **93/93** | medido |
-| read-model isolation (`read-model-isolation.ts`) | n/a | **8/8** | medido (nuevo) |
+| read-model isolation (`read-model-isolation.ts`) | n/a | **12/12** | medido (mecanismo + repo e2e) |
 
 ## Matriz de aislamiento del read-model (medida)
 
@@ -27,6 +27,10 @@ Resultado de `scripts/rls-runtime/read-model-isolation.ts` (8/8 PASS):
 | Reutilización de conexión tras tx RLS | No filtra contexto (vuelve a estado base) | ✓ sin contaminación |
 | `withTenantRls({sub:''})` | Deny (lanza) | ✓ lanza |
 | `withTenantRls({sub: usuario sin perfil})` | 0 filas (`current_org()` NULL) | ✓ 0 filas |
+| **repo e2e** `DrizzleReadModelRepository.listProjects(A)` | solo proyectos de A | ✓ |
+| **repo e2e** `.listProjects(B)` | solo proyectos de B | ✓ |
+| **repo e2e** A ∩ B (proyectos) | disjuntos (sin fuga) | ✓ |
+| **repo e2e** `.listProjects({org:''})` | deny (lanza) | ✓ |
 
 ## Matriz M-02 (export legacy, medida vía vitest)
 

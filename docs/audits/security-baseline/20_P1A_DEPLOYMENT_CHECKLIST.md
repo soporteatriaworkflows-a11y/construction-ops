@@ -21,12 +21,16 @@
       sin cambios.
 
 ## 4. Orden de despliegue
-1. [ ] Merge de M-02 (export legacy asegurado) — bajo riesgo, sin migración.
-2. [ ] Rollout escalonado de `withTenantRls` en el read-model (por método), cada
-       uno validado en Preview antes de Production.
-3. [ ] (Recomendado) cambiar `DATABASE_URL` a un rol sin `bypassrls` una vez que
-       TODAS las lecturas pasen por `withTenantRls` (si no, RLS denegaría lecturas
-       no envueltas).
+> El cableado de los 11 métodos del read-model con `withTenantDb` ya está hecho en
+> la rama P1-A (no es rollout por partes; va completo). Pasos:
+1. [ ] Merge de la rama P1-A (M-02 + cableado RLS del read-model) — sin migración.
+2. [ ] Confirmar que el pooler de `DATABASE_URL` soporta transacciones (Supabase
+       transaction pooler sí). Cada lectura abre una transacción READ ONLY.
+3. [ ] Validar en Preview: dashboard/planning/presupuesto cargan datos correctos
+       por organización (smoke); export `/api/estimates/export` y `/api/exports`.
+4. [ ] (Opcional, recomendado) cambiar `DATABASE_URL` a un rol sin `bypassrls`.
+       Con el cableado actual NO es estrictamente necesario (el `SET LOCAL ROLE
+       authenticated` ya fuerza RLS), pero refuerza la defensa en profundidad.
 
 ## 5. Validación previa (local + Preview)
 - [ ] typecheck/lint/build/tests verdes.

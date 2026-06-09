@@ -17,11 +17,14 @@ escritura sí es RLS-bound, por eso no es CRITICAL.
 
 > **Actualización P1-A (2026-06-08) — H-01:** `DATABASE_URL_RLS_STATUS =
 > BYPASSRLS_ROLE` **confirmado** (`current_user=postgres`, `rolbypassrls=true`).
-> Utilidad `withTenantRls` (Alt B) implementada (`apps/web/lib/db/rls.ts`) y
-> **probada 8/8** (`scripts/rls-runtime/read-model-isolation.ts`): reproduce la
-> fuga cruda y demuestra el fix (RLS aplica, sin cross-org, sin contaminación de
-> pool, deny-by-default). **Sin migración.** Pendiente: cableado escalonado en el
-> read-model + confirmar/migrar rol de `DATABASE_URL` (docs 17–20). **EN PROGRESO.**
+> `withTenantDb` (Alt B vía `db.transaction` read-only + `SET LOCAL ROLE
+> authenticated` + claims) **CABLEADO en los 11 métodos** del
+> `DrizzleReadModelRepository` (ALS, sin tocar 39 call-sites; filtros por org
+> conservados). Aislamiento **12/12** (mecanismo + repo end-to-end:
+> `listProjects(A)`≠`listProjects(B)`, disjuntos, deny sin org). **Sin migración.**
+> **Pendiente** (no bloqueante local): confirmar rol de `DATABASE_URL` en
+> producción (MV-01) + smoke Preview (docs 17–20). Estado: **CABLEADO LOCAL; falta
+> validación de producción.**
 >
 > **Actualización P1-A — M-02:** **ASEGURADO** (en rama P1-A, sin merge).
 > `/api/exports` deriva la organización server-side (`request.organizationId`);
