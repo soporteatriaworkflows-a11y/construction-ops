@@ -1,8 +1,7 @@
 /**
  * auth-card.tsx — Tarjeta contenedora compartida para las pantallas de auth.
- * Propiedad: agent-frontend-boq. Oleada 4A.2.
+ * Propiedad: agent-frontend-boq. Refresh visual: UI/Branding V1.
  */
-import { Building2 } from 'lucide-react';
 import {
   Card,
   CardContent,
@@ -10,6 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { WorkspaceBrand } from '@/components/shared/workspace-brand';
 
 interface AuthCardProps {
   title: string;
@@ -19,17 +19,12 @@ interface AuthCardProps {
 
 export function AuthCard({ title, description, children }: AuthCardProps) {
   return (
-    <Card>
-      <CardHeader className="space-y-1 text-center">
-        <div className="mb-3 flex justify-center">
-          <div
-            className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-700 text-white"
-            aria-hidden="true"
-          >
-            <Building2 className="h-6 w-6" />
-          </div>
+    <Card className="border-iconic-soft/70 shadow-xl">
+      <CardHeader className="space-y-3 text-center">
+        <div className="mb-1 flex justify-center">
+          <WorkspaceBrand variant="login" />
         </div>
-        <CardTitle className="text-2xl">Construction Ops</CardTitle>
+        <CardTitle className="sr-only">{title}</CardTitle>
         <CardDescription>{description}</CardDescription>
         {title !== description && (
           <p className="text-sm font-medium text-gray-700">{title}</p>
