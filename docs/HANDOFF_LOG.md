@@ -1,5 +1,46 @@
 # Handoff Log
 
+## 2026-06-09 — 4E.2B `BOQ_SAFE_DELETE_OR_ARCHIVE` implementada (rama funcional)
+
+> En rama `feature/wave-4e2b-boq-safe-archive` (desde `integration/p1a-functional-resume`
+> `2219f3b`). **NO merge a integration ni main; sin deploy.**
+
+### Alcance entregado (contrato `docs/BOQ_DELETE_ARCHIVE_CONTRACT.md` v1)
+- Soft-archive reversible (archive/restore) de **capítulos** e **ítems** BOQ; **sin
+  DELETE físico**. Trazabilidad mínima `archived_at` + `archived_by` (server-side).
+- Nodos archivados excluidos de vista activa, subtotales, costo directo, AIU,
+  indirectos, total general y **exportaciones activas**. Un capítulo archivado
+  excluye todos sus ítems **sin** reescribirlos; al restaurarlo, los ítems
+  archivados individualmente siguen archivados.
+- Versión emitida = inmutable (RLS + guard `BoqVersionLockedError`); cross-org
+  bloqueado (RLS); fixture solo lectura. Lectura controlada `includeArchived`.
+
+### Migración local (preparada; NO aplicada a remoto)
+- `20260609120000_boq_archive_metadata.sql` (aditiva): `chapters`/`boq_items` +=
+  `archived_at`, `archived_by` (FK `profiles` ON DELETE SET NULL) + índices
+  parciales `WHERE archived_at IS NULL`. Sin DROP/DELETE; RLS sin cambios.
+  Verificada con `supabase db reset` local. **Sin `db push` a remoto.**
+
+### Backend / read-model / UI
+- `EstimatesWriteRepository`: `archiveEstimateChapter`/`restoreEstimateChapter`/
+  `archiveBoqItem`/`restoreBoqItem` + lecturas activas con exclusión y
+  `includeArchived`. Read-model (dashboard) y `read-repository` excluyen archivados.
+- UI: controles Archivar/Restaurar (confirm), estado "Archivado", toggle
+  "Mostrar archivados"; ocultos en versión emitida / modo solo lectura.
+
+### Validación (todo PASS)
+- typecheck 0, lint 0, **743 tests** (+ **19 integración gated** que cubren los 28
+  casos del plan: financieros, read-model, exports, RLS, fixture, UI), build OK,
+  RLS harness **106/106**, read-model isolation **12/12**, gm:regression **22/22**
+  (sin degradar registros activos), gm:import PASS, validador 214/0/0,
+  `git diff --check` limpio.
+
+### Estado / pendientes
+- **Deploy pendiente; integración a `main`/`integration` pendiente** (a tu orden).
+- Preview runtime / **MV-01** siguen **diferidos a pre-release**.
+- `main = origin/main = 2918622` intacta; producción intacta; stashes P1-A intactos.
+- **4E.3 NO iniciada.**
+
 ## 2026-06-09 — Integración funcional segura `integration/p1a-functional-resume` (P1-A staged)
 
 > Nota: registrada **solo en la rama de integración** (no en `main`).
