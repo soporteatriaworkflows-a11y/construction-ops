@@ -42,3 +42,11 @@ export function getObservationRepository(): PriceObservationRepository {
   if (source === 'db') return new DbObservationRepository();
   return new FixtureObservationRepository();
 }
+
+// ---- Phase 3B: Price Validation Agent ----
+export {
+  validatePublicPriceUrl,
+  confirmPublicPriceObservation,
+} from './validation/index';
+export type { PriceValidationProposal } from './validation/index';
+export { UrlValidationError, PriceMissingError, FetchPublicPageError } from './validation/types';
