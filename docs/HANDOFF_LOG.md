@@ -1,5 +1,43 @@
 # Handoff Log
 
+## 2026-06-09 — 4E.3A integrada + 4E.3B DETENIDA por blocker de unicidad de ítems
+
+> **4E.3A integrada** en `integration/p1a-functional-resume` (merge `cd18f2d`,
+> validada). **4E.3B** (`feature/wave-4e3b-estimate-version-compare`) **detenida en
+> FASE 5** por decisión de producto pendiente. NO merge a main/integration; sin deploy.
+
+### Integración 4E.3A
+- `git merge --no-ff` de 4E.3A → integration `cd18f2d`, **sin conflictos**. Validado:
+  typecheck/lint 0, **747 tests**, build, **RLS 106/106**, **isolation 12/12**,
+  **gm 22/22**, gm:import PASS, diff limpio. `main = origin/main = 2918622` intacta.
+  Publicada `integration/p1a-functional-resume = cd18f2d`.
+
+### 4E.3B — contrato congelado + BLOCKER
+- Contrato `docs/ESTIMATE_VERSION_COMPARE_CONTRACT.md` v1 congelado.
+- **BLOCKER (FASE 5):** la clave de comparación de ítems `chapterCode + itemCode`
+  **no es única garantizada**. Índices UNIQUE existentes: solo
+  `chapters_version_code_uq (estimate_version_id, code)` + PKs; **`boq_items` no
+  tiene unicidad por `code`**. `createBoqItem` (4E.2A) e import Excel (4C.2, dup =
+  warning) permiten códigos de ítem repetidos en un capítulo. Datos actuales: 0
+  duplicados — pero el esquema no lo garantiza.
+- **Decisión de producto requerida** (conforme a la regla STOP): (a) migración de
+  unicidad `boq_items_version_chapter_code_uq (estimate_version_id, chapter_id, code)`
+  — con impacto cruzado en `createBoqItem` e import (23505 si hay dup); o (b) clave
+  determinística `chapterCode + itemCode + ocurrencia(n)` por `sort_order` (sin
+  migración). **Capítulos sí tienen clave única garantizada.** Backend/UI/tests de
+  4E.3B **NO implementados** (detenido tras la inspección).
+
+### Nota de migraciones para pre-release (reconciliar, NO asumir)
+- Antes de aplicar al remoto: ejecutar `supabase db push --dry-run --linked`
+  (read-only) y **reconciliar** qué migraciones faltan realmente. **No asumir** que
+  `20260606120000` sigue pendiente sin verificar. Aplicar **solo** las faltantes
+  confirmadas. Candidatas locales: `20260606120000` (4E.2A), `20260609120000`
+  (4E.2B), `20260609130000` (4E.3A).
+
+### Estado
+- `main = origin/main = 2918622` intacta; producción intacta; stashes P1-A intactos.
+  Preview/MV-01 diferidos. **`BOQ_REORDER` NO iniciado.**
+
 ## 2026-06-09 — 4E.3A emisión/clonación de versiones implementada (rama funcional)
 
 > **4E.2B integrada** en `integration/p1a-functional-resume` (merge `9f28c26`,

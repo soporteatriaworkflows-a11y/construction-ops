@@ -9,6 +9,24 @@ cada ciclo de validación.
 
 ---
 
+## 4E.3A integración + 4E.3B blocker (2026-06-09)
+
+- **4E.3A integrada** en `integration/p1a-functional-resume` (merge `cd18f2d`).
+  Validación post-integración (todo PASS): typecheck/lint 0, **747 tests** + 28
+  integración gated, build fixture+db-local, **RLS 106/106**, **isolation 12/12**,
+  **gm:regression 22/22**, gm:import PASS, `git diff --check` limpio.
+- **4E.3B (comparación de versiones) DETENIDA en FASE 5 (sin implementar)** por
+  blocker de unicidad de ítems verificado en DB local: índices UNIQUE = solo
+  `chapters_version_code_uq` + PKs; `boq_items` sin unicidad por `code` ⇒ la clave
+  `chapterCode + itemCode` no es única garantizada (datos actuales: 0 duplicados,
+  no garantizado). Contrato congelado con el blocker; **decisión de producto
+  requerida** (migración de unicidad vs clave determinística por ocurrencia).
+- **Pre-release (migraciones):** ejecutar `supabase db push --dry-run --linked`
+  (read-only) y reconciliar las migraciones realmente pendientes; **no asumir** que
+  `20260606120000` sigue pendiente; aplicar solo las faltantes confirmadas.
+- `main = origin/main = 2918622` intacta; producción intacta; stashes P1-A intactos.
+  Preview/MV-01 diferidos. `BOQ_REORDER` no iniciado.
+
 ## 4E.3A — Emisión / clonación de versiones (2026-06-09, rama funcional)
 
 Rama `feature/wave-4e3a-estimate-issue-clone` (desde integration `9f28c26` que ya
