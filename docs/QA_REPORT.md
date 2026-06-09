@@ -9,6 +9,20 @@ cada ciclo de validación.
 
 ---
 
+## Oleada UI / Branding V1 (2026-06-09, rama `feature/ui-branding-wave-v1`)
+
+Refresh visual (sin lógica). **Todo PASS:**
+- typecheck 0, lint 0, **757 tests** (sin regresión — ningún test asserta el texto
+  de marca de la UI), build OK, `git diff --check` limpio.
+- Cambios visuales: naming "Presupuestos"/"Grupo ICONIC", shell navy ICONIC + nav
+  activa + topbar, login branded, dashboard hero, empty states branded, primitivas
+  (botón/badge/card) en azul ICONIC; tokens ICONIC en Tailwind; branding multi-tenant
+  ready (`lib/branding/workspace.ts`). Logos oficiales reutilizados.
+- **Sin** cambios de negocio/cálculos/RLS/migraciones/Supabase/Vercel/deploy.
+  `main = 2918622` intacta; producción intacta; stashes P1-A intactos. No se
+  re-ejecutó la suite funcional remota (no se tocó lógica). Doc
+  `docs/UI_BRANDING_WAVE_V1.md`.
+
 ## MVP interno LOCAL-READY (2026-06-09, checkpoint `mvp-internal-local-ready-v1`)
 
 - **4E.3B integrada** en `integration/p1a-functional-resume` (merge `9695322`).

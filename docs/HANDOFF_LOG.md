@@ -1,5 +1,27 @@
 # Handoff Log
 
+## 2026-06-09 — OLEADA UI / BRANDING V1 (rama `feature/ui-branding-wave-v1`)
+
+> Refresh **visual** del MVP liberado. **Sin lógica/cálculos/RLS/migraciones/
+> Vercel/deploy. `main` intacta (`22a408c`); producción intacta.**
+
+- **Naming visible:** "Construction Ops" → **"Presupuestos"** (producto) +
+  **"Grupo ICONIC"** (workspace). Reemplazado en: sidebar del dashboard, título de
+  documento (`app/layout.tsx`), tarjeta de login. Internos técnicos (repo, exports)
+  sin tocar.
+- **Branding config multi-tenant ready:** `lib/branding/workspace.ts`
+  (`getActiveWorkspace()`); tokens ICONIC en `tailwind.config.ts` (`brand`/`iconic`).
+- **Componentes nuevos:** `WorkspaceBrand`/`WorkspaceLogo` (`next/image`, logos
+  oficiales ya en `public/branding/iconic/`), `SidebarNav` (estado activo).
+- **Shell:** sidebar navy ICONIC + nav activa + top header con chip de workspace.
+  **Login:** fondo navy con acento + logo + Presupuestos/Grupo ICONIC. **Dashboard:**
+  hero con degradado de marca. **Empty states** branded. **Primitivas:** botón/badge
+  primario azul ICONIC, cards con hover.
+- **Validación:** typecheck/lint 0, **757 tests** (sin regresión), build OK,
+  `git diff --check` limpio. Doc `docs/UI_BRANDING_WAVE_V1.md`.
+- **Deuda:** branding por tenant aún estático; metadata de exports sigue "Construction
+  Ops" (interno). **No merge a main; no deploy; sin nuevas features.**
+
 ## 2026-06-09 — RELEASE INTERNO V1 EN PRODUCCIÓN (tag `mvp-internal-release-v1`)
 
 - **Fecha release:** 2026-06-09.
