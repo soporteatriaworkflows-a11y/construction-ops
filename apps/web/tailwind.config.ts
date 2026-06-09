@@ -10,18 +10,27 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Design tokens de Construction Ops
+        // Design tokens de marca (paleta ICONIC oficial). El nombre visible del
+        // producto es "Presupuestos"; estos tokens son swappables por tenant.
         brand: {
-          50: '#eff6ff',
-          100: '#dbeafe',
-          200: '#bfdbfe',
-          300: '#93c5fd',
-          400: '#60a5fa',
-          500: '#3b82f6',
-          600: '#2563eb',
-          700: '#1d4ed8',
-          800: '#1e40af',
-          900: '#1e3a8a',
+          50: '#e8f1fd',
+          100: '#c7dced', // softBlueGray ICONIC
+          200: '#9fcbf5',
+          300: '#5aa6f0',
+          400: '#1e7fe0',
+          500: '#005dd6', // azul ICONIC principal
+          600: '#0050bc',
+          700: '#013e97',
+          800: '#012e73',
+          900: '#020148', // navy profundo ICONIC
+        },
+        iconic: {
+          primary: '#005DD6',
+          accent: '#00B8FF', // cian de acento
+          navy: '#020148',
+          graphite: '#1B1F3E',
+          soft: '#C7DCED',
+          light: '#F2F4F7',
         },
       },
       fontFamily: {
