@@ -28,29 +28,52 @@
  * authenticated` el rol ACTUAL es `authenticated` (sin bypass) y RLS se aplica.
  */
 import type { ReservedSql } from 'postgres';
-import { getSql } from './index';
+import { sql } from 'drizzle-orm';
+import { getSql, db } from './index';
+
+/**
+ * Tipo del cliente Drizzle transaccional RLS-scoped que recibe `withTenantDb`.
+ * Es la transacción que entrega `db.transaction(...)` (no el `db` global).
+ */
+export type TenantScopedDb = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 /** Claims mínimos que leen las policies (`app.current_org()` / `app._auth_uid()`). */
 export interface RlsClaims {
-  /** `auth.uid()` efectivo: identifica al usuario (policies resuelven org por perfil). */
-  sub: string;
-  /** Organización (belt-and-suspenders; `current_org()` la prioriza si está presente). */
+  /**
+   * `auth.uid()` efectivo (claim `sub`): identifica al usuario; las policies
+   * resuelven la organización por perfil cuando no hay claim `organization_id`.
+   * Opcional si se aporta `organization_id` (autoridad server-side equivalente).
+   */
+  sub?: string;
+  /** Organización (autoridad server-side; `current_org()` la prioriza si está presente). */
   organization_id?: string;
   /** Rol de negocio (para `current_role()`). */
   user_role?: string;
 }
 
-/** Construye los claims RLS desde una identidad verificada server-side. */
+/**
+ * Construye los claims RLS desde una identidad verificada server-side. Acepta
+ * `userId` (escritura) y/o `profileId` (read-model: `ViewerContext.profileId`).
+ * El `organization_id` SIEMPRE proviene del servidor, nunca del navegador.
+ */
 export function buildRlsClaims(viewer: {
-  userId: string;
+  userId?: string;
+  profileId?: string;
   organizationId: string;
   role?: string;
 }): RlsClaims {
+  const sub = viewer.userId ?? viewer.profileId;
   return {
-    sub: viewer.userId,
+    ...(sub ? { sub } : {}),
     organization_id: viewer.organizationId,
     ...(viewer.role ? { user_role: viewer.role } : {}),
   };
+}
+
+/** `true` si los claims contienen alguna autoridad server-side (sub u org). */
+function hasIdentity(claims: RlsClaims | null | undefined): boolean {
+  return !!claims && ((!!claims.sub && claims.sub.trim().length > 0) ||
+    (!!claims.organization_id && claims.organization_id.trim().length > 0));
 }
 
 /**
@@ -69,8 +92,8 @@ export async function withTenantRls<T>(
   claims: RlsClaims,
   fn: (q: ReservedSql) => Promise<T>,
 ): Promise<T> {
-  if (!claims || !claims.sub || claims.sub.trim().length === 0) {
-    throw new Error('withTenantRls: identidad requerida (claims.sub vacío).');
+  if (!hasIdentity(claims)) {
+    throw new Error('withTenantRls: identidad requerida (sub u organization_id).');
   }
   const r = await getSql().reserve();
   try {
@@ -92,4 +115,31 @@ export async function withTenantRls<T>(
   } finally {
     r.release();
   }
+}
+
+/**
+ * Variante de `withTenantRls` que entrega un cliente **Drizzle** ligado a la
+ * conexión RLS-scoped (rol `authenticated` + claims transaccionales). Pensada
+ * para envolver lecturas del read-model que usan Drizzle. Mismas garantías:
+ * transacción READ ONLY request-scoped, sin contaminación del pool, deny si no
+ * hay identidad/organización server-side.
+ */
+export async function withTenantDb<T>(
+  claims: RlsClaims,
+  fn: (db: TenantScopedDb) => Promise<T>,
+): Promise<T> {
+  if (!hasIdentity(claims)) {
+    throw new Error('withTenantDb: identidad requerida (sub u organization_id).');
+  }
+  // Transacción READ ONLY de Drizzle: toma UNA conexión del pool, fija el rol y
+  // los claims de forma transaccional (`is_local=true` / `SET LOCAL`) y los
+  // revierte al COMMIT/ROLLBACK ⇒ sin contaminación entre solicitudes.
+  return db.transaction(
+    async (tx) => {
+      await tx.execute(sql`SELECT set_config('request.jwt.claims', ${JSON.stringify(claims)}, true)`);
+      await tx.execute(sql`SET LOCAL ROLE authenticated`);
+      return fn(tx);
+    },
+    { accessMode: 'read only' },
+  );
 }

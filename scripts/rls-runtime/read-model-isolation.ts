@@ -20,6 +20,7 @@ process.env.DATABASE_URL ??= 'postgresql://postgres:postgres@127.0.0.1:54322/pos
 import postgres from 'postgres';
 import { withTenantRls, buildRlsClaims } from '../../apps/web/lib/db/rls';
 import { getSql } from '../../apps/web/lib/db/index';
+import { DrizzleReadModelRepository } from '../../apps/web/server/read-model/drizzle-repository';
 
 const ORG_A = '00000000-0000-0000-0000-0000000000a1';
 const USER_A_ADMIN = '00000000-0000-0000-0000-0000000000b1';
@@ -98,6 +99,21 @@ async function main(): Promise<void> {
     return Number(rows[0].n);
   });
   check('deny-by-default: identidad sin perfil ⇒ 0 filas (current_org NULL)', noProfile === 0, `n=${noProfile}`);
+
+  // (5) End-to-end: el repositorio REAL del read-model (DrizzleReadModelRepository)
+  // ya aplica RLS vía withTenantDb. Verifica aislamiento por organización.
+  const repo = new DrizzleReadModelRepository();
+  const projA = await repo.listProjects({ organizationId: ORG_A, role: 'admin' });
+  const projB = await repo.listProjects({ organizationId: ORG_B, role: 'admin' });
+  check('repo.listProjects(A) devuelve solo proyectos de A', projA.length === totalA, `A=${projA.length} esperado=${totalA}`);
+  check('repo.listProjects(B) devuelve solo proyectos de B', projB.length === totalB, `B=${projB.length} esperado=${totalB}`);
+  check('repo.listProjects: A y B son conjuntos disjuntos (sin fuga cross-org)',
+    projA.every((p) => !projB.some((q) => q.id === p.id)), `A∩B≠∅`);
+
+  // (6) Deny-by-default en el repo: viewer sin organización ⇒ withTenantDb rechaza.
+  let repoDenied = false;
+  try { await repo.listProjects({ organizationId: '', role: 'admin' }); } catch { repoDenied = true; }
+  check('repo.listProjects sin organización (deny-by-default) lanza', repoDenied);
 
   console.log(`\nRESULTADO READ-MODEL ISOLATION: ${pass} PASS / ${fail} FAIL`);
   if (fail > 0) { console.log('Fallos:'); for (const f of failures) console.log(`  - ${f}`); }
