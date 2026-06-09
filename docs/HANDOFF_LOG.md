@@ -1,5 +1,41 @@
 # Handoff Log
 
+## 2026-06-09 — PRE-RELEASE V1: migraciones remotas aplicadas; Preview Git NO dispara (STOP FASE 4)
+
+> Rama `release/mvp-internal-v1` (desde `integration/p1a-functional-resume` `ed681d1`).
+> **`main = origin/main = 2918622` intacta; producción anterior intacta; sin deploy.**
+
+### Reconciliación de migraciones (read-only) + aplicación
+- `migration list --linked`: remoto tenía aplicado TODO hasta **`20260606120000`**
+  (el invariant de subtotal 4E.2A se había aplicado en una sesión previa).
+- Pendientes reales = **`20260609120000`** (4E.2B archive) + **`20260609130000`**
+  (4E.3A issue/clone). `db push --dry-run` confirmó solo esas dos, 0 seeds, nada
+  aplicado en dry-run.
+- UP de ambas: aditivas (ADD COLUMN/CREATE INDEX/CREATE FUNCTION); sin DROP/DELETE/
+  TRUNCATE/seed/reset. **GATE verde.**
+- `db push --linked` aplicó las dos ⇒ **23/23 Local = Remote**; dry-run final
+  "Remote database is up to date"; `db lint --linked` "No schema errors found".
+  Sin `--include-seed`, sin reset/pull/repair, sin datos remotos.
+
+### Vercel git connect + Preview
+- `vercel git connect --yes` ⇒ **"already connected to your project"** (no-op; repo
+  ya vinculado). Rama release publicada.
+- **BLOCKER:** ~13 min tras el push, **NO se generó Preview automático** por Git
+  (el deployment más nuevo seguía siendo uno previo al push). Indicios: los Previews
+  recientes carecen de metadata git y su usuario es la cuenta CLI ⇒ deploys CLI de
+  sesiones previas; la integración Git **no dispara builds por push**.
+- **Causa probable:** la **GitHub App de Vercel no está instalada/autorizada (o sin
+  webhook)** en `soporteatriaworkflows-a11y/construction-ops`. Requiere
+  **autorización humana en GitHub** (instalar/autorizar la Vercel GitHub App + fijar
+  Production Branch = main). Excepción permitida (autorización externa imposible
+  desde terminal).
+- **STOP en FASE 4** (regla explícita): NO usar `vercel deploy` como fallback; NO
+  merge a main. Migraciones remotas ya quedaron al día (aditivas, reversibles).
+
+### Próximo paso (humano)
+- Autorizar la Vercel GitHub App en el repo; reintentar push para Preview; si Ready,
+  continuar FASE 6+ (merge a main + Production automático por Git).
+
 ## 2026-06-09 — MVP INTERNO LOCAL-READY (4E.3B integrada + smoke end-to-end + checkpoint)
 
 > **4E.3B integrada** en `integration/p1a-functional-resume` (merge `9695322`).
