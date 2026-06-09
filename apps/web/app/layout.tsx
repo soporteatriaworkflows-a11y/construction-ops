@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { getActiveWorkspace } from "@/lib/branding/workspace";
+
+const ws = getActiveWorkspace();
 
 export const metadata: Metadata = {
-  title: "Construction Ops",
-  description: "Plataforma interna de gestión de costos y seguimiento de obra.",
+  title: { default: `${ws.productName} · ${ws.workspaceName}`, template: `%s · ${ws.productName}` },
+  description: `${ws.descriptor} — ${ws.workspaceName}.`,
 };
 
 export default function RootLayout({
