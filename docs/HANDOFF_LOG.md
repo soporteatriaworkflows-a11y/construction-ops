@@ -1,5 +1,38 @@
 # Handoff Log
 
+## 2026-06-09 — MVP INTERNO LOCAL-READY (4E.3B integrada + smoke end-to-end + checkpoint)
+
+> **4E.3B integrada** en `integration/p1a-functional-resume` (merge `9695322`).
+> Checkpoint estable **`mvp-internal-local-ready-v1`**. **`main` intacta; sin deploy.**
+
+### Integración 4E.3B
+- `git merge --no-ff` 4E.3B → integration `9695322`, **sin conflictos**.
+
+### Smoke end-to-end del MVP (nuevo)
+- `apps/web/tests/integration/mvp-internal-flow-smoke.test.ts` (gated `BOQ_SMOKE_DB=1`,
+  repo real + RLS, datos sintéticos locales): **10/10 PASS**. Recorre crear→importar
+  BOQ→editar (incl. PATCH-subtotal ignorado + manual)→archive/restore→emitir V01
+  (inmutable)→clonar V02→editar V02 sin alterar V01→comparar V01/V02 (incl. código
+  repetido por ocurrencia)→seguridad cross-org→no-destrucción. **0 defectos** (FASE 4
+  sin correcciones).
+
+### Validación completa (todo PASS)
+- typecheck/lint 0, **757 tests** + **42 integración gated**, build (fixture+db-local),
+  **RLS 106/106**, **read-model isolation 12/12**, **gm:regression 22/22**, gm:import
+  PASS, validador 214/0/0, `git diff --check` limpio. **Sin migración nueva.**
+
+### Documentación
+- `docs/MVP_INTERNAL_LOCAL_READY.md` (flujo cubierto, funciones, pruebas, migraciones
+  candidatas a reconciliar en pre-release, pendientes no bloqueantes).
+
+### Estado / pendientes
+- Migraciones locales `20260606120000`/`20260609120000`/`20260609130000` pendientes
+  de `db push`: en pre-release `db push --dry-run --linked` (read-only) + reconciliar
+  (aplicar solo faltantes confirmadas). `main = origin/main = 2918622` intacta;
+  producción intacta; stashes P1-A intactos. Preview/MV-01 diferidos.
+- **`BOQ_REORDER`/`lineage_id`/`BOQ_AUDIT_TRAIL` NO iniciados.** Siguiente paso:
+  **pre-release controlado**, no nueva feature.
+
 ## 2026-06-09 — 4E.3B comparación de versiones IMPLEMENTADA (Opción B, sin migración)
 
 > **4E.3A integrada** en `integration/p1a-functional-resume` (merge `cd18f2d`).

@@ -9,6 +9,21 @@ cada ciclo de validación.
 
 ---
 
+## MVP interno LOCAL-READY (2026-06-09, checkpoint `mvp-internal-local-ready-v1`)
+
+- **4E.3B integrada** en `integration/p1a-functional-resume` (merge `9695322`).
+- **Smoke end-to-end** `apps/web/tests/integration/mvp-internal-flow-smoke.test.ts`
+  (gated, repo real + RLS, 10 casos): **10/10 PASS**, **0 defectos**. Cubre el ciclo
+  completo crear→BOQ→editar→archive/restore→emitir→clonar→comparar→seguridad→
+  no-destrucción sobre un estimate sintético local.
+- Validación completa: typecheck/lint 0, **757 tests** + **42 integración gated**,
+  build (fixture+db-local), **RLS 106/106**, **read-model isolation 12/12**,
+  **gm:regression 22/22**, gm:import PASS, validador 214/0/0, diff limpio.
+  **Sin migración nueva.**
+- `main = origin/main = 2918622` intacta; producción intacta; stashes P1-A intactos.
+  Migraciones locales pendientes de reconciliar en pre-release. Siguiente: pre-release
+  controlado (no nueva feature).
+
 ## 4E.3B — Comparación de versiones IMPLEMENTADA (2026-06-09, Opción B)
 
 Rama `feature/wave-4e3b-estimate-version-compare`. **Todo PASS, sin migración nueva**:
