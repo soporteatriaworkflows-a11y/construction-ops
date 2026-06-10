@@ -34,9 +34,9 @@ export default async function ProvidersPage() {
   let viewerRole = 'consulta';
   let canCreate = false;
   let error: string | null = null;
+  let mode = resolveAuthMode();
 
   try {
-    const mode = resolveAuthMode();
     if (mode === 'demo') {
       const viewer = await resolveViewer('demo');
       viewerRole = viewer.role;
@@ -60,6 +60,12 @@ export default async function ProvidersPage() {
   }
 
   const showInternalFields = INTERNAL_ROLES.includes(viewerRole);
+  const isDemoMode = mode === 'demo';
+  const disabledNotice = !canCreate
+    ? isDemoMode
+      ? 'Modo demostración: puedes explorar proveedores. Para registrar uno nuevo, inicia sesión con datos reales.'
+      : 'No tienes permisos para crear registros. Solicita acceso a un administrador.'
+    : null;
 
   if (error) {
     return (
@@ -79,14 +85,27 @@ export default async function ProvidersPage() {
     <Button asChild size="sm">
       <Link href="/catalog/providers/new">Nuevo proveedor</Link>
     </Button>
-  ) : null;
+  ) : (
+    <Button
+      size="sm"
+      disabled
+      title={
+        isDemoMode
+          ? 'Disponible con datos reales — inicia sesión para registrar proveedores'
+          : 'Sin permisos de creación — solicita acceso a un administrador'
+      }
+      aria-disabled="true"
+    >
+      Nuevo proveedor
+    </Button>
+  );
 
   return (
     <div>
       <PageHeader
         title="Proveedores"
         description="Proveedores registrados para inteligencia de precios"
-        actions={headerActions ?? undefined}
+        actions={headerActions}
         breadcrumb={
           <Link
             href="/catalog"
@@ -96,6 +115,16 @@ export default async function ProvidersPage() {
           </Link>
         }
       />
+
+      {disabledNotice && (
+        <div
+          className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800"
+          role="note"
+          aria-label={isDemoMode ? 'Modo demostración activo' : 'Acceso de solo lectura'}
+        >
+          {disabledNotice}
+        </div>
+      )}
 
       {providers.length === 0 ? (
         <EmptyState
@@ -107,7 +136,26 @@ export default async function ProvidersPage() {
               <Button asChild>
                 <Link href="/catalog/providers/new">Crear primer proveedor</Link>
               </Button>
-            ) : undefined
+            ) : (
+              <div className="flex flex-col items-center gap-1.5">
+                <Button
+                  disabled
+                  aria-disabled="true"
+                  title={
+                    isDemoMode
+                      ? 'Disponible con datos reales — inicia sesión para registrar proveedores'
+                      : 'Sin permisos de creación — solicita acceso a un administrador'
+                  }
+                >
+                  Crear primer proveedor
+                </Button>
+                {disabledNotice && (
+                  <p className="text-xs text-amber-700" role="note">
+                    {disabledNotice}
+                  </p>
+                )}
+              </div>
+            )
           }
         />
       ) : (

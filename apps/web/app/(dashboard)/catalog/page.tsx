@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { formatCOP, RESOURCE_TYPE_LABELS } from '@/lib/utils/format';
 import { getReadModel } from '@/server/read-model';
 import { resolveViewer } from '@/server/auth/resolve-viewer';
+import { resolveAuthMode } from '@/lib/supabase/env';
 import { isCreationModeEnabled } from '@/app/(dashboard)/projects/mode-guard';
 import type { CatalogResourceView } from '@/lib/contracts/read-model';
 
@@ -45,28 +46,39 @@ const RESOURCE_TYPE_VARIANT: Record<
 export default async function CatalogPage() {
   const rm = getReadModel();
   let resources: CatalogResourceView[] = [];
+  let viewerRole: string = 'consulta';
   let error: string | null = null;
 
   try {
     const viewer = await resolveViewer();
+    viewerRole = viewer.role;
     resources = await rm.listCatalogResources(viewer);
   } catch (e) {
     error = e instanceof Error ? e.message : 'Error al cargar catalogo';
   }
 
-  // Determinado server-side — el action lo verificara de nuevo con autenticacion real
-  const canCreate = isCreationModeEnabled();
+  const authMode = resolveAuthMode();
+  const CREATE_ROLES = ['management', 'internal'] as const;
+  const canCreate =
+    isCreationModeEnabled() && (CREATE_ROLES as readonly string[]).includes(viewerRole);
+  const isDemoMode = authMode === 'demo';
+
+  const disabledNotice = !canCreate
+    ? isDemoMode
+      ? 'Modo demostración: puedes explorar el catálogo. Para crear recursos, inicia sesión con datos reales.'
+      : 'No tienes permisos para crear registros. Solicita acceso a un administrador.'
+    : null;
 
   if (error) {
     return (
       <div>
-        <PageHeader title="Catalogo de Recursos" />
+        <PageHeader title="Catálogo de Recursos" />
         <div
           className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
           role="alert"
           aria-live="assertive"
         >
-          Error al cargar catalogo: {error}
+          Error al cargar catálogo: {error}
         </div>
       </div>
     );
@@ -92,7 +104,11 @@ export default async function CatalogPage() {
         <Button
           size="sm"
           disabled
-          title="Disponible en modo supabase+db"
+          title={
+            isDemoMode
+              ? 'Disponible con datos reales — inicia sesión para crear recursos'
+              : 'Sin permisos de creación — solicita acceso a un administrador'
+          }
           aria-disabled="true"
         >
           Nuevo recurso
@@ -104,30 +120,55 @@ export default async function CatalogPage() {
     </>
   );
 
+  const emptyStateAction = canCreate ? (
+    <Button asChild>
+      <Link href="/catalog/resources/new">Crear primer recurso</Link>
+    </Button>
+  ) : (
+    <div className="flex flex-col items-center gap-1.5">
+      <Button
+        disabled
+        aria-disabled="true"
+        title={
+          isDemoMode
+            ? 'Disponible con datos reales — inicia sesión para crear recursos'
+            : 'Sin permisos de creación — solicita acceso a un administrador'
+        }
+      >
+        Crear primer recurso
+      </Button>
+      {disabledNotice && (
+        <p className="text-xs text-amber-700" role="note">
+          {disabledNotice}
+        </p>
+      )}
+    </div>
+  );
+
   return (
     <div>
       <PageHeader
-        title="Catalogo de Recursos"
+        title="Catálogo de Recursos"
         description="Materiales, mano de obra y equipos disponibles para APU y BOQ"
         actions={headerActions}
       />
 
+      {disabledNotice && (
+        <div
+          className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800"
+          role="note"
+          aria-label={isDemoMode ? 'Modo demostración activo' : 'Acceso de solo lectura'}
+        >
+          {disabledNotice}
+        </div>
+      )}
+
       {resources.length === 0 ? (
         <EmptyState
           icon={BookOpen}
-          title="Catalogo vacio"
-          description="No hay recursos en el catalogo de la organizacion."
-          action={
-            canCreate ? (
-              <Button asChild>
-                <Link href="/catalog/resources/new">Crear primer recurso</Link>
-              </Button>
-            ) : (
-              <Button disabled aria-disabled="true" title="Disponible en modo supabase+db">
-                Crear primer recurso
-              </Button>
-            )
-          }
+          title="Catálogo vacío"
+          description="No hay recursos en el catálogo de la organización."
+          action={emptyStateAction}
           secondaryAction={
             <Button variant="outline" asChild>
               <Link href="/catalog/providers">Gestionar proveedores</Link>
@@ -162,7 +203,7 @@ export default async function CatalogPage() {
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                          Codigo
+                          Código
                         </th>
                         <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                           Nombre
@@ -182,7 +223,7 @@ export default async function CatalogPage() {
                           key={resource.id}
                           className="hover:bg-gray-50 transition-colors"
                         >
-                          {/* Fila completa como enlace hacia price-intelligence */}
+                          {/* Código enlazado a Price Intelligence */}
                           <td className="px-4 py-2.5">
                             <Link
                               href={`/catalog/resources/${resource.id}/price-intelligence`}
@@ -222,7 +263,9 @@ export default async function CatalogPage() {
 
       {/* Nota de privacidad — campos internos no mostrados */}
       {/* negotiated_discount_pct, observedPrice, supplierSku, productUrl,
-          locationReference y ahorros son campos y NO se muestran aqui. */}
+          locationReference y ahorros son campos 🔒 y NO se muestran aquí. */}
+
+      {/* Deuda: CATALOG_BULK_ONBOARDING_V1 — importación masiva de recursos diferida */}
     </div>
   );
 }
