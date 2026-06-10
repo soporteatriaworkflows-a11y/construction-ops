@@ -42,6 +42,23 @@ interface ValidationDeps {
   fetcher?: PageFetcher;
 }
 
+function hostnameOf(url: string): string | undefined {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Sonda de corte temprano (páginas pesadas): si el HTML acumulado ya entrega
+ * precio + moneda estructurados, no hace falta seguir descargando.
+ */
+function sufficientEvidenceProbe(textSoFar: string, url: string): boolean {
+  const extracted = runAdapters(textSoFar, hostnameOf(url));
+  return !!(extracted.rawPrice && extracted.currency);
+}
+
 /**
  * Valida una URL pública y devuelve una propuesta de observación.
  * No persiste nada. El usuario debe confirmar explícitamente.
@@ -55,13 +72,23 @@ export async function validatePublicPriceUrl(
   checkRole(viewer);
 
   const validated = await validatePublicUrl(input.url, deps?.dnsLookup);
-  const page = await fetchPublicPage(validated.href, deps?.fetcher, deps?.dnsLookup);
+  const page = await fetchPublicPage(
+    validated.href,
+    deps?.fetcher,
+    deps?.dnsLookup,
+    sufficientEvidenceProbe,
+  );
 
-  const extracted = runAdapters(page.text);
+  const extracted = runAdapters(page.text, hostnameOf(page.finalUrl));
   const confidence = computeConfidence(extracted);
   const extractedAt = new Date().toISOString();
 
-  return normalizeExtraction(extracted, page.finalUrl, extractedAt, confidence);
+  const proposal = normalizeExtraction(extracted, page.finalUrl, extractedAt, confidence);
+  // Avisos del fetch (página pesada / HTML truncado) viajan en la propuesta.
+  if (page.warnings && page.warnings.length > 0) {
+    proposal.warnings.push(...page.warnings);
+  }
+  return proposal;
 }
 
 /**
