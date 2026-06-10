@@ -2,12 +2,18 @@
  * price-list-wizard.tsx — Wizard cliente de importación de lista de precios de
  * proveedor (CATALOG_BULK_ONBOARDING_V1). Propiedad: agent-frontend-boq.
  *
- * Proveedor → archivo → analizar → mapeo → confirmar. Cada precio crea una
- * observación pendiente; las filas sin asociar se exportan para revisión.
+ * Contrato UX (PROVIDER_PRICE_LIST_MAPPING_UX_FIX_V1):
+ *  - Requiere solo: observedPrice + al menos uno de externalSku/externalReference/code.
+ *  - NO requiere name ni resourceType (esos son del importador de catálogo).
+ *  - Panel de mapeo avanzado colapsable: cerrado cuando el mapeo obligatorio
+ *    está completo; abierto automáticamente si faltan campos obligatorios.
+ *  - Resumen de auto-detección siempre visible tras el análisis.
+ *  - Protección: una columna no puede asignarse a dos campos (re-asignación
+ *    silenciosa + auto-apertura del panel si faltan requeridos).
  */
 'use client';
 
-import { useRef, useState, useTransition } from 'react';
+import { useMemo, useRef, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -18,6 +24,17 @@ import {
   type PriceListRowReport,
 } from '@/lib/catalog-import/types';
 import { previewPriceListAction, confirmPriceListAction } from '../actions';
+
+// ─── Constantes de contrato ──────────────────────────────────────────────────
+
+/** Campos identificadores para matching (al menos uno requerido). */
+const IDENTIFIER_FIELDS = ['externalSku', 'externalReference', 'code'] as const;
+
+/** Campos opcionales de la lista de precios. */
+const OPTIONAL_PL_FIELDS = [
+  'description', 'unit', 'discountPercent', 'currency',
+  'sourceUrl', 'observedAt', 'validUntil', 'notes',
+] as const;
 
 const MATCH_BADGE: Record<
   PriceListRowReport['matchType'],
@@ -30,6 +47,8 @@ const MATCH_BADGE: Record<
   ambiguous: { label: 'Ambiguo', variant: 'destructive' },
 };
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
 function downloadCsv(csv: string, fileName: string) {
   const blob = new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
@@ -39,6 +58,14 @@ function downloadCsv(csv: string, fileName: string) {
   a.click();
   URL.revokeObjectURL(url);
 }
+
+/** Calcula si el mapeo tiene todos los campos obligatorios para la lista de precios. */
+function isPriceListMappingComplete(mapping: ColumnAssignment[]): boolean {
+  const mapped = new Set(mapping.filter((a) => a.columnIndex !== null).map((a) => a.field));
+  return mapped.has('observedPrice') && IDENTIFIER_FIELDS.some((f) => mapped.has(f));
+}
+
+// ─── Componente principal ─────────────────────────────────────────────────────
 
 export function PriceListWizard({
   providers,
@@ -51,7 +78,30 @@ export function PriceListWizard({
   const [mapping, setMapping] = useState<ColumnAssignment[]>([]);
   const [result, setResult] = useState<PriceListResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
   const [pending, startTransition] = useTransition();
+
+  // ── Cálculo derivado del estado del mapeo ───────────────────────────────
+  const mappedSet = useMemo(
+    () => new Set(mapping.filter((a) => a.columnIndex !== null).map((a) => a.field)),
+    [mapping],
+  );
+  const hasPrice = mappedSet.has('observedPrice');
+  const detectedIdentifier = IDENTIFIER_FIELDS.find((f) => mappedSet.has(f)) ?? null;
+  const hasIdentifier = detectedIdentifier !== null;
+  const requiredComplete = hasPrice && hasIdentifier;
+  const optionalDetected = (OPTIONAL_PL_FIELDS as readonly string[]).filter((f) =>
+    mappedSet.has(f),
+  ).length;
+
+  function priceColumnLabel(): string {
+    if (!preview) return '';
+    const a = mapping.find((m) => m.field === 'observedPrice');
+    if (a?.columnIndex == null) return '';
+    return preview.headers[a.columnIndex] ?? `Columna ${a.columnIndex + 1}`;
+  }
+
+  // ── Acciones ────────────────────────────────────────────────────────────
 
   function runPreview(currentMapping: ColumnAssignment[] | null) {
     const file = fileRef.current?.files?.[0];
@@ -73,7 +123,10 @@ export function PriceListWizard({
       const res = await previewPriceListAction(fd);
       if (res.ok) {
         setPreview(res.preview);
-        setMapping(res.preview.mapping);
+        const newMapping = res.preview.mapping;
+        setMapping(newMapping);
+        // Abre automáticamente si faltan campos obligatorios
+        setIsAdvancedOpen(!isPriceListMappingComplete(newMapping));
       } else {
         setError(res.error);
       }
@@ -101,24 +154,34 @@ export function PriceListWizard({
 
   function updateMapping(field: string, value: string) {
     const columnIndex = value === '' ? null : Number(value);
-    setMapping((prev) =>
-      prev.map((a) =>
+    setMapping((prev) => {
+      const newMapping = prev.map((a) =>
         a.field === field
           ? { ...a, columnIndex }
-          : a.columnIndex === columnIndex
+          : // Protección: una columna no puede asignarse a dos campos
+            a.columnIndex === columnIndex
             ? { ...a, columnIndex: null }
             : a,
-      ),
-    );
+      );
+      // Abre panel automáticamente si el cambio deja campos obligatorios sin asignar
+      if (!isPriceListMappingComplete(newMapping)) {
+        setIsAdvancedOpen(true);
+      }
+      return newMapping;
+    });
   }
+
+  // ── Render ───────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-6">
+      {/* Paso 1 — Proveedor y archivo */}
       <section className="rounded-lg border border-gray-200 bg-white p-4">
         <h2 className="mb-1 text-sm font-semibold text-gray-900">1. Proveedor y archivo</h2>
         <p className="mb-3 text-xs text-gray-500">
-          Cada precio crea una observación <strong>pendiente de aprobación</strong> para el
-          proveedor seleccionado. Nunca modifica presupuestos, AIU ni exportaciones.
+          Cada precio crea una observación{' '}
+          <strong>pendiente de aprobación</strong> para el proveedor seleccionado.
+          Nunca modifica presupuestos, AIU ni exportaciones.
         </p>
         <div className="flex flex-wrap items-center gap-3">
           <select
@@ -165,41 +228,131 @@ export function PriceListWizard({
         </div>
       )}
 
+      {/* Paso 2 — Campos detectados + panel avanzado colapsable */}
       {preview && !result && (
         <section className="rounded-lg border border-gray-200 bg-white p-4">
-          <h2 className="mb-1 text-sm font-semibold text-gray-900">2. Mapeo de columnas</h2>
+          <h2 className="mb-1 text-sm font-semibold text-gray-900">2. Campos detectados</h2>
           <p className="mb-3 text-xs text-gray-500">
-            Obligatorio: precio observado y al menos un identificador (SKU externo,
-            referencia externa o código).
+            Necesitamos el precio y al menos un identificador para asociarlo con un recurso
+            existente: SKU, referencia o código.
           </p>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {mapping.map((a) => (
-              <label key={a.field} className="flex items-center justify-between gap-2 text-sm">
-                <span className="text-gray-600">{FIELD_LABELS[a.field] ?? a.field}</span>
-                <select
-                  className="w-40 rounded-md border border-gray-300 bg-white px-2 py-1 text-xs"
-                  value={a.columnIndex === null ? '' : String(a.columnIndex)}
-                  onChange={(e) => updateMapping(a.field, e.target.value)}
-                  aria-label={`Columna para ${FIELD_LABELS[a.field] ?? a.field}`}
-                >
-                  <option value="">— Sin asignar —</option>
-                  {preview.headers.map((h, idx) => (
-                    <option key={idx} value={idx}>
-                      {h || `Columna ${idx + 1}`}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ))}
+
+          {/* Resumen de auto-detección */}
+          <div
+            className="mb-3 space-y-1.5 rounded-md border border-gray-100 bg-gray-50 px-3 py-2.5"
+            aria-label="Resumen de auto-mapeo"
+          >
+            <MappingIndicator
+              ok={hasPrice}
+              label="Precio observado"
+              detail={hasPrice ? `→ "${priceColumnLabel()}"` : 'Sin asignar — requerido'}
+            />
+            <MappingIndicator
+              ok={hasIdentifier}
+              label="Identificador (SKU / referencia / código)"
+              detail={
+                detectedIdentifier
+                  ? `→ ${FIELD_LABELS[detectedIdentifier] ?? detectedIdentifier} detectado`
+                  : 'Sin asignar — al menos uno requerido'
+              }
+            />
+            {optionalDetected > 0 && (
+              <p className="text-xs text-gray-400">
+                {optionalDetected} campo(s) opcional(es) detectado(s) automáticamente.
+              </p>
+            )}
+            {requiredComplete && (
+              <p className="text-xs text-emerald-600">
+                Mapeo obligatorio completo. Revisa el ajuste avanzado solo si alguna
+                columna no fue reconocida.
+              </p>
+            )}
           </div>
+
+          {/* Botón de panel avanzado colapsable */}
+          <button
+            type="button"
+            className="flex items-center gap-1.5 text-xs font-medium text-gray-600 hover:text-gray-900"
+            onClick={() => setIsAdvancedOpen((v) => !v)}
+            aria-expanded={isAdvancedOpen}
+            aria-controls="advanced-mapping-panel"
+          >
+            <span aria-hidden="true">{isAdvancedOpen ? '▼' : '▶'}</span>
+            Ajustar mapeo de columnas
+          </button>
+
+          {/* Panel avanzado — grid completo de asignaciones */}
+          {isAdvancedOpen && (
+            <div
+              id="advanced-mapping-panel"
+              className="mt-3 rounded-md border border-gray-200 bg-white p-3"
+            >
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {mapping.map((a) => {
+                  const isPrice = a.field === 'observedPrice';
+                  const isIdentifier = (IDENTIFIER_FIELDS as readonly string[]).includes(a.field);
+                  return (
+                    <label
+                      key={a.field}
+                      className="flex items-center justify-between gap-2 text-sm"
+                    >
+                      <span
+                        className={
+                          isPrice || isIdentifier ? 'font-medium text-gray-900' : 'text-gray-600'
+                        }
+                      >
+                        {FIELD_LABELS[a.field] ?? a.field}
+                        {isPrice && (
+                          <span className="ml-0.5 text-red-600" title="Requerido">
+                            {' '}
+                            *
+                          </span>
+                        )}
+                        {isIdentifier && (
+                          <span className="ml-0.5 text-blue-600" title="Al menos uno requerido">
+                            {' '}
+                            †
+                          </span>
+                        )}
+                      </span>
+                      <select
+                        className="w-40 rounded-md border border-gray-300 bg-white px-2 py-1 text-xs"
+                        value={a.columnIndex === null ? '' : String(a.columnIndex)}
+                        onChange={(e) => updateMapping(a.field, e.target.value)}
+                        aria-label={`Columna para ${FIELD_LABELS[a.field] ?? a.field}`}
+                      >
+                        <option value="">— Sin asignar —</option>
+                        {preview.headers.map((h, idx) => (
+                          <option key={idx} value={idx}>
+                            {h || `Columna ${idx + 1}`}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  );
+                })}
+              </div>
+              <p className="mt-2 text-xs text-gray-400">
+                * Precio obligatorio · † Al menos un identificador requerido (SKU, referencia o
+                código) · Una columna no puede asignarse a dos campos.
+              </p>
+            </div>
+          )}
+
           <div className="mt-3">
-            <Button size="sm" variant="outline" onClick={() => runPreview(mapping)} disabled={pending}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => runPreview(mapping)}
+              disabled={pending}
+            >
               {pending ? 'Recalculando…' : 'Recalcular vista previa'}
             </Button>
           </div>
         </section>
       )}
 
+      {/* Paso 3 — Vista previa */}
       {preview && !result && (
         <section className="rounded-lg border border-gray-200 bg-white p-4">
           <h2 className="mb-3 text-sm font-semibold text-gray-900">
@@ -245,6 +398,7 @@ export function PriceListWizard({
         </section>
       )}
 
+      {/* Paso 4 — Resultado */}
       {result && (
         <section className="rounded-lg border border-emerald-200 bg-emerald-50/40 p-4">
           <h2 className="mb-3 text-sm font-semibold text-gray-900">4. Resultado</h2>
@@ -278,6 +432,31 @@ export function PriceListWizard({
           </div>
         </section>
       )}
+    </div>
+  );
+}
+
+// ─── Sub-componentes ──────────────────────────────────────────────────────────
+
+function MappingIndicator({
+  ok,
+  label,
+  detail,
+}: {
+  ok: boolean;
+  label: string;
+  detail: string;
+}) {
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      <span
+        className={ok ? 'text-emerald-600' : 'text-red-600'}
+        aria-label={ok ? 'detectado' : 'faltante'}
+      >
+        {ok ? '✓' : '✗'}
+      </span>
+      <span className={ok ? 'text-gray-700' : 'font-medium text-red-700'}>{label}</span>
+      <span className="text-gray-400">{detail}</span>
     </div>
   );
 }
