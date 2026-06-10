@@ -138,6 +138,14 @@ export default async function PriceIntelligencePage({ params }: PageProps) {
         }
       />
 
+      {/* Disclaimer visible a todos los roles */}
+      <div
+        className="mb-6 rounded bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800"
+        role="note"
+      >
+        La validación web propone una observación. No modifica automáticamente presupuestos ni aprueba precios. Toda observación requiere revisión y aprobación manual.
+      </div>
+
       {/* Formulario nueva observación + validación desde URL */}
       {canCreate && (
         <section aria-label="Nueva observación de precio" className="mb-8 space-y-8">

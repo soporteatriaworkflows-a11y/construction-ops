@@ -63,7 +63,7 @@ export default async function ApuPage() {
         <EmptyState
           icon={Calculator}
           title="Sin plantillas APU"
-          description="No hay plantillas APU en el catálogo."
+          description="Las plantillas APU se crean desde el proceso de importacion del presupuesto. Si ya importaste un presupuesto, revisa la seccion Proyectos."
         />
       ) : (
         <div className="space-y-4">

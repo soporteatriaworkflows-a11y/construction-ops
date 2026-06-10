@@ -95,7 +95,7 @@ export default async function QuantitiesPage() {
         <EmptyState
           icon={Hash}
           title="Sin grupos de cantidades"
-          description="No hay grupos de cantidades registrados para este alcance."
+          description="Las cantidades se registran al importar o crear un presupuesto vinculado a un alcance del proyecto."
         />
       ) : (
         <div className="space-y-6">

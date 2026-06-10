@@ -1,10 +1,10 @@
 /**
- * Página de lista de proveedores — /catalog/providers (Fase 3A).
+ * Pagina de lista de proveedores — /catalog/providers (Fase 3A + Bootstrap CTAs).
  * Server Component. Propiedad: agent-frontend-boq.
- * Campos 🔒 (defaultDiscountPercent, notes) solo visibles a admin/gerencia/compras.
+ * Campos (defaultDiscountPercent, notes) solo visibles a admin/gerencia/compras.
  */
 import Link from 'next/link';
-import { Building2, PlusCircle } from 'lucide-react';
+import { Building2 } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Badge } from '@/components/ui/badge';
@@ -65,65 +65,86 @@ export default async function ProvidersPage() {
     return (
       <div>
         <PageHeader title="Proveedores" />
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+        <div
+          className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+          role="alert"
+        >
           Error al cargar proveedores: {error}
         </div>
       </div>
     );
   }
 
+  const headerActions = canCreate ? (
+    <Button asChild size="sm">
+      <Link href="/catalog/providers/new">Nuevo proveedor</Link>
+    </Button>
+  ) : null;
+
   return (
     <div>
       <PageHeader
         title="Proveedores"
         description="Proveedores registrados para inteligencia de precios"
+        actions={headerActions ?? undefined}
         breadcrumb={
-          <Link href="/catalog" className="text-sm text-gray-500 hover:text-gray-700">
-            Catálogo
+          <Link
+            href="/catalog"
+            className="text-sm text-gray-500 hover:text-gray-700"
+          >
+            Catalogo
           </Link>
         }
       />
-
-      {canCreate && (
-        <div className="mb-4">
-          <Link href="/catalog/providers/new">
-            <Button size="sm">
-              <PlusCircle className="h-4 w-4" aria-hidden="true" />
-              Nuevo proveedor
-            </Button>
-          </Link>
-        </div>
-      )}
 
       {providers.length === 0 ? (
         <EmptyState
           icon={Building2}
           title="Sin proveedores"
-          description="No hay proveedores registrados para esta organización."
+          description="No hay proveedores registrados para esta organizacion."
+          action={
+            canCreate ? (
+              <Button asChild>
+                <Link href="/catalog/providers/new">Crear primer proveedor</Link>
+              </Button>
+            ) : undefined
+          }
         />
       ) : (
         <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
           <table className="w-full text-sm" aria-label="Lista de proveedores">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Nombre</th>
-                <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Tipo</th>
-                <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Sitio web</th>
+                <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Nombre
+                </th>
+                <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Tipo
+                </th>
+                <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Sitio web
+                </th>
                 {showInternalFields && (
                   <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
                     Descuento (%)
                   </th>
                 )}
-                <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">Estado</th>
+                <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Estado
+                </th>
                 {canCreate && (
-                  <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Acciones</th>
+                  <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    Acciones
+                  </th>
                 )}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {providers.map((p) => (
                 <tr key={p.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-2.5 font-medium text-gray-900">{p.name}</td>
+                  <td className="px-4 py-2.5 font-medium text-gray-900">
+                    {p.name}
+                  </td>
                   <td className="px-4 py-2.5 text-gray-600">
                     {SUPPLIER_TYPE_LABELS[p.supplierType] ?? p.supplierType}
                   </td>
@@ -149,7 +170,9 @@ export default async function ProvidersPage() {
                   {canCreate && (
                     <td className="px-4 py-2.5 text-right">
                       <Link href={`/catalog/providers/${p.id}/edit`}>
-                        <Button size="sm" variant="outline">Editar</Button>
+                        <Button size="sm" variant="outline">
+                          Editar
+                        </Button>
                       </Link>
                     </td>
                   )}
