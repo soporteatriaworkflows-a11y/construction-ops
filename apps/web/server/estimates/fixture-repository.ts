@@ -388,6 +388,11 @@ export class FixtureEstimatesWriteRepository implements EstimatesWriteRepository
   async cloneIssuedEstimateVersion(): Promise<EstimateVersionSummary> {
     throw new BoqWriteNotSupportedError();
   }
+  async countIssuedEstimateVersions(viewer: ViewerContext): Promise<number> {
+    if (!sameOrg(viewer)) return 0;
+    return fixture.estimateVersion.status === 'issued' ? 1 : 0;
+  }
+
   async listEstimateVersions(
     viewer: ViewerContext,
     estimateId: Uuid,

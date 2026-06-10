@@ -6,3 +6,4 @@
 export * from './version-status';
 export * from './snapshot';
 export * from './clone';
+export * from './commercial-simulation';

@@ -101,6 +101,17 @@ export class DbObservationRepository implements PriceObservationRepository {
     this.clientFactory = clientFactory;
   }
 
+  async countPendingResourcePriceObservations(viewer: AuthenticatedViewer): Promise<number> {
+    const supabase = await this.clientFactory();
+    const { count, error } = await supabase
+      .from('resource_price_observations')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', viewer.organizationId)
+      .eq('status', 'pending');
+    if (error) throw new Error(`observation_count_failed: ${error.code ?? 'unknown'}`);
+    return count ?? 0;
+  }
+
   async listResourcePriceObservations(
     viewer: AuthenticatedViewer,
     resourceId: Uuid,
