@@ -21,7 +21,20 @@
  */
 
 import Link from 'next/link';
-import { DollarSign, TrendingUp, BarChart2, Calendar, LayoutDashboard } from 'lucide-react';
+import {
+  DollarSign,
+  TrendingUp,
+  BarChart2,
+  Calendar,
+  LayoutDashboard,
+  FolderOpen,
+  ClipboardList,
+  Send,
+  Tags,
+  ArrowRight,
+  Package,
+  Truck,
+} from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Button } from '@/components/ui/button';
@@ -29,6 +42,8 @@ import { KpiCard, FinancialKpiCard } from '@/modules/dashboard/kpi-card';
 import { ChapterDistributionSection } from '@/modules/dashboard/chapter-distribution-section';
 import { SavingsSection } from '@/modules/dashboard/savings-section';
 import { getReadModel, resolveSource } from '@/server/read-model';
+import { getEstimatesWriteRepository } from '@/server/estimates';
+import { getObservationRepository } from '@/server/pricing';
 import { resolveViewer } from '@/server/auth/resolve-viewer';
 import { formatCOP, formatDateTime, ESTIMATE_VERSION_STATUS_LABELS } from '@/lib/utils/format';
 import { isCreationModeEnabled } from '../projects/mode-guard';
@@ -36,6 +51,22 @@ import { selectActiveProjectId } from './select-active-project';
 
 /** Render en REQUEST-TIME (ver cabecera). Igual que `/projects` y `/projects/new`. */
 export const dynamic = 'force-dynamic';
+
+/** Acceso rápido del dashboard operativo (navegación, sin datos sensibles). */
+function QuickLink({ href, label, icon }: { href: string; label: string; icon: React.ReactNode }) {
+  return (
+    <Link
+      href={href}
+      className="group flex items-center justify-between rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium text-iconic-ink transition-colors hover:border-iconic-primary/40 hover:bg-brand-50"
+    >
+      <span className="inline-flex items-center gap-2">
+        <span className="text-iconic-primary">{icon}</span>
+        {label}
+      </span>
+      <ArrowRight className="h-4 w-4 text-gray-300 transition-transform group-hover:translate-x-0.5 group-hover:text-iconic-primary" aria-hidden="true" />
+    </Link>
+  );
+}
 
 /** Bloque de error amable reutilizable (mismo patrón que `/projects`). */
 function DashboardError({ message }: { message: string }) {
@@ -68,8 +99,10 @@ export default async function DashboardPage() {
 
   // Proyecto activo derivado de la lista REAL de proyectos visibles (sin UUID demo).
   let projectId: string | null;
+  let projectCount = 0;
   try {
     const projects = await rm.listProjects(viewer);
+    projectCount = projects.length;
     projectId = selectActiveProjectId(projects);
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Error al cargar proyectos';
@@ -117,15 +150,63 @@ export default async function DashboardPage() {
 
   const isAuthorizedForSavings = viewer.role === 'management' || viewer.role === 'internal';
 
+  // ------------------------------------------------------------------
+  // KPIs operativos (Oleada OPERATIONAL BUDGET UX V1) — lecturas aditivas,
+  // tolerantes a fallo (null ⇒ la tarjeta no muestra valor, no rompe la página).
+  // ------------------------------------------------------------------
+  let activeEstimateCount: number | null = null;
+  let issuedVersionCount: number | null = null;
+  try {
+    const estimatesRepo = getEstimatesWriteRepository();
+    const estimates = await estimatesRepo.listVisibleEstimates(viewer);
+    activeEstimateCount = estimates.filter((e) => e.status === 'active').length;
+    issuedVersionCount = await estimatesRepo.countIssuedEstimateVersions(viewer);
+  } catch {
+    activeEstimateCount = null;
+    issuedVersionCount = null;
+  }
+
+  // 🔒 Pendientes de revisión de precios: solo roles management/internal.
+  let pendingPriceCount: number | null = null;
+  if (isAuthorizedForSavings) {
+    try {
+      const pricingViewer = {
+        userId: viewer.profileId ?? viewer.organizationId,
+        profileId: viewer.profileId ?? viewer.organizationId,
+        organizationId: viewer.organizationId,
+        role: viewer.role,
+      };
+      pendingPriceCount = await getObservationRepository().countPendingResourcePriceObservations(
+        pricingViewer,
+      );
+    } catch {
+      pendingPriceCount = null;
+    }
+  }
+
   const statusLabel =
     ESTIMATE_VERSION_STATUS_LABELS[summary.estimateStatus] ?? summary.estimateStatus;
 
   return (
     <div>
-      <PageHeader
-        title="Dashboard gerencial"
-        description="Resumen financiero del proyecto activo"
-      />
+      {/* Hero de marca ICONIC: bloque azul amplio + curva + detalle cian */}
+      <section
+        className="relative mb-6 overflow-hidden rounded-2xl px-6 py-7 text-white shadow-sm"
+        style={{ background: 'linear-gradient(120deg, #020148 0%, #013E97 55%, #005DD6 100%)' }}
+      >
+        <svg className="pointer-events-none absolute inset-y-0 right-0 h-full w-1/2 text-white/10" viewBox="0 0 400 200" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M400,0 L400,200 L80,200 C260,140 120,60 400,0 Z" fill="currentColor" />
+        </svg>
+        <div className="relative">
+          <p className="text-xs font-semibold uppercase tracking-wide text-iconic-soft-blue">Dashboard gerencial</p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight">Resumen financiero del proyecto activo</h1>
+          <p className="mt-1 text-sm text-white/75">
+            Estado del presupuesto: <span className="font-semibold text-white">{statusLabel}</span>
+            {' · '}Actualizado {formatDateTime(summary.lastUpdatedAt)}
+          </p>
+          <span className="mt-4 inline-block h-1 w-14 rounded bg-iconic-cyan" aria-hidden="true" />
+        </div>
+      </section>
 
       {/* ------------------------------------------------------------------ */}
       {/* KPIs financieros principales                                         */}
@@ -136,9 +217,9 @@ export default async function DashboardPage() {
             title="Total presupuesto"
             value={formatCOP(summary.budget)}
             description="Costos directos + AIU"
-            valueColor="text-blue-700"
-            icon={<DollarSign className="h-4 w-4 text-blue-700" />}
-            iconBg="bg-blue-50"
+            valueColor="text-iconic-ink"
+            icon={<DollarSign className="h-4 w-4 text-iconic-primary" />}
+            iconBg="bg-brand-50"
           />
           <KpiCard
             title="Costos directos"
@@ -161,6 +242,53 @@ export default async function DashboardPage() {
             icon={<Calendar className="h-4 w-4 text-purple-700" />}
             iconBg="bg-purple-50"
           />
+        </div>
+      </section>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Operación (Oleada OPERATIONAL BUDGET UX V1)                          */}
+      {/* ------------------------------------------------------------------ */}
+      <section aria-label="Operación" className="mt-6">
+        <h2 className="mb-4 text-base font-semibold text-gray-900">Operación</h2>
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <KpiCard
+            title="Proyectos"
+            value={String(projectCount)}
+            description="Visibles para tu organización"
+            icon={<FolderOpen className="h-4 w-4 text-iconic-primary" />}
+            iconBg="bg-brand-50"
+          />
+          <KpiCard
+            title="Presupuestos activos"
+            value={activeEstimateCount === null ? '—' : String(activeEstimateCount)}
+            description="Presupuestos de trabajo vigentes"
+            icon={<ClipboardList className="h-4 w-4 text-green-700" />}
+            iconBg="bg-green-50"
+          />
+          <KpiCard
+            title="Versiones emitidas"
+            value={issuedVersionCount === null ? '—' : String(issuedVersionCount)}
+            description="Snapshots inmutables entregados"
+            icon={<Send className="h-4 w-4 text-purple-700" />}
+            iconBg="bg-purple-50"
+          />
+          {isAuthorizedForSavings && (
+            <KpiCard
+              title="Precios por revisar"
+              value={pendingPriceCount === null ? '—' : String(pendingPriceCount)}
+              description="Observaciones pendientes de aprobación"
+              icon={<Tags className="h-4 w-4 text-amber-700" />}
+              iconBg="bg-amber-50"
+            />
+          )}
+        </div>
+
+        {/* Accesos rápidos */}
+        <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <QuickLink href="/projects" label="Proyectos" icon={<FolderOpen className="h-4 w-4" aria-hidden="true" />} />
+          <QuickLink href="/catalog" label="Catálogo" icon={<Package className="h-4 w-4" aria-hidden="true" />} />
+          <QuickLink href="/catalog/providers" label="Proveedores" icon={<Truck className="h-4 w-4" aria-hidden="true" />} />
+          <QuickLink href="/catalog" label="Inteligencia de precios" icon={<Tags className="h-4 w-4" aria-hidden="true" />} />
         </div>
       </section>
 

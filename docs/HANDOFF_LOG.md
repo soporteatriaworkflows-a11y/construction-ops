@@ -1,5 +1,407 @@
 # Handoff Log
 
+## 2026-06-09 — PRE-RELEASE: Migraciones Pricing aplicadas al remoto (rama `integration/operational-ux-price-validation-v1`)
+
+> **Aplicación de 3 migraciones pricing al DB remoto.** Sin seeds, sin reset, sin db pull. DB remota: 26/26 Local = Remote. Lint sin errores.
+
+- **FASE 0 — Precheck:** invariants confirmados (rama candidata, HEAD=29f5a9f, main=22a408c, origin candidata=29f5a9f, stashes intactos).
+- **FASE 1 — Dry-run:** 3 migraciones pendientes detectadas — exactamente las esperadas: 20260610090000, 090100, 090200 (pricing). GATE ESTRICTO PASS (aditivas, sin DROP destructivo, sin DELETE, sin seeds, RLS coherente, trigger coherente).
+- **FASE 2 — `supabase db push --linked`:** 3 migraciones aplicadas. `migration list --linked` = **26/26 Local = Remote**. Dry-run final: "Remote database is up to date." `db lint --linked`: "No schema errors found."
+- **Migraciones aplicadas al remoto:**
+  - `20260610090000_resource_price_intelligence.sql` (tabla `resource_price_observations`, extensión `suppliers`, trigger `app.set_rpo_suggested_net_price`)
+  - `20260610090100_rls_resource_price_intelligence.sql` (ENABLE FORCE RLS + 3 policies)
+  - `20260610090200_fix_discount_percent_precision.sql` (NUMERIC(6,4)→(7,4), DROP+RECREATE policy necesario para ALTER COLUMN TYPE)
+- **Deuda registrada:** `PUBLIC_SOURCE_COMPATIBILITY_BENCHMARK` — durante la revisión visual local una URL pública real no fue compatible con los adaptadores genéricos V1 (probable JS-rendering o anti-bot). No bloquea el release. Evaluar post-release con fuentes reales (Homecenter, Decorcerámica). Sin headless browser, sin evasión, sin scraping.
+- **Revisión visual:** aprobada por la usuaria.
+- **Estado:** candidata lista para merge a main.
+
+---
+
+## 2026-06-09 — INTEGRACIÓN FINAL LOCAL: Operational UX + Phase 3B + SSRF Fix (rama `integration/operational-ux-price-validation-v1`)
+
+> **Integración controlada de 3 oleadas** sobre base `integration/iconic-ui-price-intelligence-v1` @ `d944bc1`.
+> **main = `22a408c` intacta; producción intacta; sin deploy; sin db push remoto.**
+> Ejecutada por agent-orchestrator. HEAD inicial `d944bc1` → HEAD final `110a5f6`.
+
+### FASE 0 — Precheck
+- Invariantes confirmados: rama, árbol limpio, origin/main=22a408c, operational-ux=105d106, phase3b=6da64b1, stashes P1-A intactos.
+
+### FASE 1 — Merge Operational Budget UX V1
+- `git merge --no-ff origin/feature/operational-budget-ux-v1` → merge `3f6fd6d` — **sin conflictos** (26 archivos, 2626 inserciones).
+- Archivos clave: `boq-workspace.tsx`, `commercial-simulator.tsx`, `workspace/page.tsx`, `simulator-actions.ts`, `workspace-view.ts`, `commercial-simulation.ts`, `breakdown.ts`.
+
+### FASE 2 — Merge Phase 3B + SSRF Fix
+- `git merge --no-ff origin/feature/phase3b-price-validation-agent-v1` → **3 conflictos en docs/** (DECISIONS, HANDOFF_LOG, QA_REPORT) resueltos preservando ambas secciones → merge `6618877`.
+- Fix de integración: `countPendingResourcePriceObservations` añadido al mock de Phase 3B (`service.test.ts`) → commit `110a5f6`. Typecheck 0 errores post-fix.
+
+### FASE 3 — DB Reset Local
+- `npx supabase db reset --local` → **26/26 migraciones** + 5 seeds aplicados sin errores de DB.
+- Error `Updating vector buckets 404` = B-004 conocido (vector/realtime unhealthy en Docker Windows). No bloqueante.
+- Tablas pricing disponibles; trigger `rpo_set_suggested_net_price` activo; RLS pricing habilitado; constraints correctos.
+- Sin conexión remota. Sin db push.
+
+### FASE 4 — Validación Integral
+- typecheck: **0 errores** ✅
+- lint: **0 errores** ✅
+- tests: **944/944 PASS** (42 skipped gated) — +66 Operational UX +85 Phase 3B vs 809 base ✅
+- build: **PASS** (ruta `/workspace` y `/catalog/.../price-intelligence` presentes) ✅
+- RLS runtime: **106/106 PASS** (25 tablas FORCE RLS) ✅
+- read-model isolation: **12/12 PASS** ✅
+- gm:regression: **22/22 PASS** — golden master COP 372.247.170 intacto ✅
+- gm:import: **PASS** (diff=1.9e-8, tol 0.01) ✅
+- MVP smoke E2E gated `BOQ_SMOKE_DB=1`: **10/10 PASS** ✅
+- git diff --check: **limpio** ✅
+- validate-claude-agents: **214/0/0 PASS** ✅
+
+### FASE 5 — Seguridad Phase 3B
+- Redirect tests: **15/15 PASS** (R01–R15) ✅
+- SSRF tests: **T1–T11 + extras PASS** ✅
+- Adapters + normalize + service: PASS ✅
+- Invariantes: propuesta siempre pending, BOQ nunca modificado, AIU nunca modificada, red externa no usada en tests ✅
+
+### FASE 6 — Coherencia Visual
+- Dashboard: KPIs operativos, conteos (issuedVersions, pendingPriceObservations 🔒), accesos rápidos (Proveedores, Inteligencia de precios) ✅
+- BOQ Workspace: tabla densa, sticky header, capítulos colapsables, filtros, búsqueda, resumen financiero, simulador comercial (borde dashed cian, disclaimer) ✅
+- Price Intelligence: UrlValidationPanel wired con resourceId ✅
+- Branding: "Presupuestos" + "Grupo ICONIC"; sin "Construction Ops" visible; tokens ICONIC heredados ✅
+- Sin regresión visual en login, catálogo, proyectos ✅
+
+### Documentación
+- HANDOFF_LOG, DECISIONS, QA_REPORT, INTEGRATION_REQUESTS actualizados.
+- Ramas de feature usadas solo como origen de merge; no tocadas.
+
+### Estado al cierre
+- HEAD final: `110a5f6` · **main intacta** = `22a408c` · **producción intacta** · **stashes intactos**
+- Pendientes: revisión visual interactiva de la usuaria + aprobación para release.
+- NO merge a main. NO deploy. NO nueva feature.
+
+**Rutas prioritarias para revisión visual (`http://localhost:3030`):**
+- `/login` — identidad ICONIC
+- `/dashboard` — hero + KPIs operativos + accesos rápidos
+- `/projects` — lista de proyectos con shell ICONIC
+- `/projects/<id>/scopes/<scopeId>/estimates/<estimateId>` — detalle presupuesto
+- `/projects/<id>/scopes/<scopeId>/estimates/<estimateId>/workspace` — BOQ workspace + simulador
+- `/catalog` — catálogo
+- `/catalog/providers` — proveedores (Price Intelligence)
+- `/catalog/resources/<resourceId>/price-intelligence` — panel validar precio desde URL
+
+---
+
+## 2026-06-09 — OLEADA OPERATIONAL BUDGET UX V1 (rama `feature/operational-budget-ux-v1`)
+
+> Base `integration/iconic-ui-price-intelligence-v1` @ `d944bc1`. **main = `22a408c` intacta;
+> producción intacta; sin deploy; sin db push remoto; Phase 3B NO iniciada; stashes intactos.
+> 0 migraciones nuevas.** Ejecutada por agent-orchestrator (sin subagentes: oleada cohesiva
+> UI+dominio; se evitó solape de archivos y cold-start; ownership respetado e integrado).
+
+### Entregado
+- **A+B — BOQ Workspace denso** (`…/estimates/[estimateId]/workspace`): sticky toolbar
+  (búsqueda código/descripción, filtros activos/archivados/todos, expandir/colapsar,
+  total general siempre visible) + grilla densa con header sticky, capítulos agrupados
+  colapsables, badges (Archivado/normalizado secundario), archive/restore inline
+  (reutiliza `ArchiveControls`), footer de costo directo. **Edición rápida** de
+  cantidad/precio reutilizando `updateItemAction` 4E.2A: navegador envía SOLO campos
+  permitidos; subtotal + resumen vuelven del servidor; feedback Guardando/Guardado/error;
+  `router.refresh()` re-sincroniza; issued ⇒ banner inmutable + edición deshabilitada.
+  Helpers puros client-safe en `lib/estimates/workspace-view.ts` (sin matemática financiera).
+  CTA "Abrir workspace" en el detalle del presupuesto.
+- **C — Resumen financiero visual**: 7 cards ICONIC compactas (directo, A, I, U, IVA/U,
+  indirectos, total) server-derived, vivas tras cada quick-edit.
+- **D — Desglose por capítulos**: `server/estimates/breakdown.ts`
+  (`computeChapterBreakdown`, Decimal, shares 0..1, base cero segura) + barras de
+  participación. **Cost-type NO confiable** (boq_items sin clasificación) ⇒ deuda
+  `COST_TYPE_BREAKDOWN_FOUNDATION` registrada (INTEGRATION_REQUESTS + DECISIONS).
+- **E+F — Simulador comercial V1**: dominio puro
+  `modules/estimates/commercial-simulation.ts` (fórmula del mandato, validación de
+  porcentajes/objetivo, 3 estados vs objetivo, Decimal, determinista) + server action
+  (base = `grandTotal` server-derived, READ-ONLY) + panel separado visualmente
+  (borde dashed cian, badge, disclaimer obligatorio) + vista previa comercial limpia.
+  **SIN persistencia** (decisión registrada; slice futuro `COMMERCIAL_SIMULATION_PERSISTENCE`).
+- **G — Dashboard operativo**: sección "Operación" (proyectos, presupuestos activos,
+  versiones emitidas, 🔒 precios por revisar solo management/internal; tolerantes a fallo)
+  + accesos rápidos (Proyectos/Catálogo/Proveedores/Inteligencia de precios). Extensión
+  aditiva: `countIssuedEstimateVersions` (estimates db+fixture) y
+  `countPendingResourcePriceObservations` (pricing db+fixture).
+
+### Validación (todo PASS)
+- typecheck 0 · lint 0 · **875 tests** (+66 de la oleada) · build Next 16.2.6 (ruta
+  `/workspace`) · `supabase db reset --local` (26 migraciones + 5 seeds) ·
+  **RLS runtime 106/106** · **read-model isolation 12/12** · **gm:regression 22/22** ·
+  **gm:import PASS** ($372.247.170 intacto) · smoke E2E gated `BOQ_SMOKE_DB=1` **42/42** ·
+  `validate-claude-agents` **214/0/0** · `git diff --check` limpio.
+
+### Documentación
+- Nuevo `docs/OPERATIONAL_BUDGET_UX_V1_CONTRACT.md`. Actualizados DECISIONS (3 filas),
+  QA_REPORT (sección de la oleada), INTEGRATION_REQUESTS (extensión aditiva + 2 deudas).
+
+### Próximo paso
+- Revisión visual de la usuaria en `http://localhost:3020` (workspace + simulador +
+  dashboard). Si aprueba: integrar a la rama de integración / pre-release. NO merge a
+  main ni deploy sin orden expresa.
+
+### Agentes activos al cierre
+- Ninguno.
+## 2026-06-09 — PHASE 3B — SECURITY FIX: Redirect SSRF (rama `feature/phase3b-price-validation-agent-v1`)
+
+> **Fix acotado de seguridad post-implementación.** Sin DB reset, sin migraciones, sin servidor local, sin merge a main. Mismos constraints paralelo-seguros que Phase 3B.
+
+**Problema identificado:** `fetch-public-page.ts` usaba `redirect: 'follow'` (hasta 20 saltos nativos sin validación SSRF en saltos intermedios). Un redirect a `http://169.254.169.254/` en un salto intermedio pasaría desapercibido porque el check `isFinalUrlSafe` solo evaluaba la URL final.
+
+**Fix aplicado:**
+- Reescrito `fetch-public-page.ts`: `redirect: 'manual'` + loop manual (máx 5 saltos).
+- Antes de cada hop: `validatePublicUrl(currentUrl, dnsLookup)` con resolución DNS real. Cualquier `UrlValidationError` → `FetchPublicPageError('redirect_to_private', ...)`.
+- Loop detection: `Set<string>` de URLs visitadas → `redirect_loop`.
+- 3xx sin Location → `redirect_missing_location`.
+- Location con URL inválida → `redirect_invalid_url`.
+- Redirects relativos: `new URL(location, currentUrl)`.
+- Firma actualizada: `fetchPublicPage(url, fetcher?, dnsLookup?)` — backward compatible.
+- `index.ts` actualizado para propagar `deps?.dnsLookup` a `fetchPublicPage`.
+- 15 tests nuevos `redirect.test.ts` (R01–R15) con `vi.stubGlobal('fetch', mock)` + DNS inyectado.
+
+**Validación:** typecheck 0, lint 0, **878/878 tests PASS** (↑15 vs 863), git diff --check limpio.
+
+**HEAD final (antes del push):** pendiente commit `fix(pricing): validate every redirect hop before public price fetch`.
+
+---
+
+## 2026-06-09 — PHASE 3B — PRICE VALIDATION AGENT V1 (rama `feature/phase3b-price-validation-agent-v1`)
+
+> **Ejecución paralela segura.** Base `integration/iconic-ui-price-intelligence-v1` @ `d944bc1`. Sin DB reset, sin migraciones, sin servidor local, sin merge a main.
+
+- **FASE 0 — Precheck:** invariants confirmados (worktree correcto, rama correcta, HEAD=d944bc1, árbol limpio, origin/main=22a408c, stashes intactos).
+- **FASE 1 — Inspección:** server/pricing/ (Phase 3A), UI price-intelligence, tests unitarios pricing.
+- **FASE 2 — Contrato congelado:** `docs/PRICE_VALIDATION_AGENT_V1_CONTRACT.md` → commit `ea71df9`.
+- **FASE 3 — Backend aislado:** `apps/web/server/pricing/validation/` (9 archivos: types, validate-url + SSRF, fetch-public-page, adapters JSON-LD + meta + index, normalize, confidence, service index) → commit `8253386`. Exportaciones Phase 3B en `server/pricing/index.ts`.
+- **FASE 4 — UI Price Intelligence:** `url-validation-panel.tsx` (client, useActionState React 19), `actions.ts` extendido (validatePublicUrlAction + confirmProposalAction), `page.tsx` integrado → commit `8b90ed3`.
+- **FASE 5 — Tests unitarios puros (sin red, sin DB):** 70 tests nuevos en `tests/unit/pricing/validation/` (validate-url: 14, adapters: 13, normalize: 12, service: 13) — **863/863 PASS** total. Covers T1–T38 del spec.
+- **FASE 6 — Validación:** typecheck **0 errores**, lint **0 errores**, tests **863/863 PASS**, git diff **limpio**.
+- **FASE 7 — Documentación:** HANDOFF_LOG, DECISIONS, QA_REPORT actualizados.
+- **FASE 8 — Publicar:** rama `feature/phase3b-price-validation-agent-v1` publicada → origin. STOP.
+
+**HEAD final:** `8b90ed3` · **main intacta** = `22a408c` · **producción intacta** · **stashes intactos** · **sin merge, sin deploy, sin DB reset**
+
+**Checks diferidos (trabajo paralelo operational-budget-ux-v1 activo):**
+- supabase db reset local
+- RLS runtime harness (106/106 esperado sin cambio de esquema)
+- smoke MVP e2e
+- revisión visual servidor local
+- merge de ramas en orden
+- deploy Vercel
+
+**Siguiente acción:** esperar cierre de Operational UX → integrar ramas → db reset local → RLS + smoke → revisión visual → decidir release.
+
+---
+
+## 2026-06-09 — INTEGRACIÓN ICONIC UI + PRICE INTELLIGENCE (rama `integration/iconic-ui-price-intelligence-v1`)
+
+> **Integración controlada de 2 oleadas** sobre base `main` = `22a408c`. Sin merge a main; sin deploy; sin db push remoto.
+
+- **FASE 0 — Precheck:** invariants confirmados (rama, working tree limpio, origin/main=22a408c, ui-branding=d4c9dbd, phase3a=03bc334, stashes intactos).
+- **FASE 1 — Merge Branding ICONIC V1:** `git merge --no-ff origin/feature/ui-branding-iconic-v1` → merge `c647989`, **sin conflictos** (20 archivos: tokens, shell, login, sidebar, empty-state, workspace-brand, página-header, button/badge/card, dashboard hero).
+- **FASE 2 — Merge Price Intelligence 3A:** `git merge --no-ff origin/feature/phase3a-price-intelligence-foundation` → conflictos esperados en docs/ resueltos preservando ambas secciones → merge `a9ac86d` (30 archivos: server/pricing/, 4 páginas pricing, 3 migraciones pricing, seeds, validación DB).
+- **Fix harness RLS:** contador tablas FORCE RLS 24→25 (`resource_price_observations` añadida en Fase 3A) → commit `533ee67`.
+- **FASE 3 — DB reset local:** `supabase db reset --local` → **26/26 migraciones** + 5 seeds aplicados. Trigger `rpo_set_suggested_net_price` PASS, 3 policies RLS, seeds pricing OK.
+  - Nota: el QA_REPORT de Fase 3A menciona "27 migraciones" (error de conteo anterior; el actual es 26).
+- **FASE 4 — Validación completa:**
+  - typecheck: **0 errores**
+  - lint: **0 errores**
+  - tests: **809/809 PASS** (42 skipped gated) — golden master $372.247.170 intacto
+  - pricing tests: **99/99 PASS**
+  - build: **PASS** (`/catalog/resources/[resourceId]/price-intelligence` ruta dinámica presente)
+  - RLS runtime: **106/106 PASS** (25 tablas FORCE)
+  - read-model isolation: **12/12 PASS**
+  - gm:regression: **22/22 PASS**
+  - gm:import: **9/9 PASS** (diff=0 en total_costo)
+  - git diff --check: **limpio**
+  - validate-claude-agents: **214/0/0 PASS**
+- **FASE 5 — Coherencia visual pricing + ICONIC:** páginas pricing heredan shell ICONIC; `PageHeader`/`EmptyState`/`Badge`/`Button` ICONIC; sidebar "Presupuestos" + "Grupo ICONIC"; sin "Construction Ops" visible; sin pantalla en blanco; auth intacta. Deuda conocida `text-blue-600` en website URL (diferida).
+- **FASE 6 — Documentación:** esta entrada.
+- **FASE 7 — Rama publicada:** `integration/iconic-ui-price-intelligence-v1` → `origin`.
+- **FASE 8 — Entorno local:** servidor en `http://localhost:3010` (ver rutas prioritarias abajo).
+
+**Estado HEAD:** `533ee67` · **main intacta** = `22a408c` · **producción intacta** · **stashes P1-A intactos**
+
+**Rutas prioritarias para revisión visual:**
+- `/login` — identidad ICONIC (navy + curva + cian)
+- `/dashboard` — hero ICONIC + KPIs
+- `/catalog` — catálogo con tokens ICONIC
+- `/catalog/providers` — lista de proveedores (Price Intelligence)
+- `/catalog/resources/<resourceId>/price-intelligence` — historial + formulario de observaciones
+- `/projects` — proyectos con shell ICONIC
+- Una vista de presupuesto → `/projects/<id>/scopes/<scopeId>/estimates/<estimateId>`
+- Comparación de versiones → `.../compare`
+
+**Pendientes:**
+- Revisión visual de la usuaria (local).
+- `main` intacta hasta aprobación.
+- Phase 3B NOT iniciada.
+
+## 2026-06-09 — OLEADA UI / BRANDING ICONIC V1 (rama `feature/ui-branding-iconic-v1`)
+
+> Refresh **visual** desde `main` (`22a408c`). **Sin lógica/cálculos/RLS/migraciones/
+> Vercel/deploy. `main` intacta; producción intacta.** (Reemplaza la rama previa
+> `feature/ui-branding-wave-v1` con el set ICONIC completo.)
+
+- **Naming visible:** "Construction Ops" → **"Presupuestos"** (producto) + **"Grupo
+  ICONIC"** (workspace) + descriptor "Gestión de presupuestos de obra". Migrado en
+  sidebar, título del navegador y login. Internos técnicos sin tocar.
+- **Tokens oficiales:** CSS vars `--iconic-*` en `globals.css` + Tailwind `iconic.*`/
+  `brand.*` (paleta ICONIC). body `bg-iconic-gray`, focus ring ICONIC.
+- **Branding config multi-tenant ready:** `lib/branding/workspace.ts`.
+- **Assets oficiales reutilizados** (no redibujados): `grupo-iconic-logo-full.png`
+  (login) + `grupo-iconic-logo-symbol.png` (avatar). Guía
+  `docs/branding/ICONIC_EXPORTS_VISUAL_GUIDE.pdf` **ya existe** en el repo.
+- **Superficies:** login (panel navy + curva + cian), shell (sidebar ink + topbar +
+  nav activa), dashboard (hero + KPI ink), reutilizables (button/badge primario
+  ICONIC, card hover, empty-state branded, page-header navy + acento). Propaga a
+  proyectos/presupuestos/catálogo/cantidades/planeación/comparación vía componentes.
+- **Validación:** typecheck/lint 0, **757 tests** (sin regresión), build OK,
+  `git diff --check` limpio. Doc `docs/UI_BRANDING_ICONIC_V1.md`.
+- **Deuda visual:** branding por tenant aún estático; headers de tabla navy
+  (diferido, tablas inline); `text-blue-700` inline → ICONIC; metadata de exports
+  interna. **No merge a main; no deploy; sin nuevas features.**
+## 2026-06-10 — FASE 3A — CIERRE FORMAL (DB RESET + VALIDACIÓN REAL + PRECISION FIX)
+
+**Rama:** `feature/phase3a-price-intelligence-foundation`.  
+**Continuación de la sesión anterior.** Se ejecutó el `supabase db reset --local` pendiente,
+se validaron las 27 migraciones + 5 seeds contra PostgreSQL local, y se detectó + corrigió
+un bug de precisión en `discount_percent`.
+
+### Fix detectado durante validación DB real
+
+**Bug:** `discount_percent NUMERIC(6,4)` solo permite valores hasta `99.9999`. Insertar `100`
+(descuento del 100%, válido por el CHECK) disparaba `numeric_field_overflow` en lugar del
+`check_violation` esperado. El constraint `rpo_discount_range (discount_percent <= 100)` era
+inalcanzable para su límite superior.
+
+**Fix aplicado:** Migración `20260610090200_fix_discount_percent_precision.sql` — cambia
+ambas columnas a `NUMERIC(7,4)` (permite 100.0000). Se requirió DROP + RECREATE de la
+política RLS `rpo_update_review_only` (que referencia `discount_percent`) alrededor del
+`ALTER COLUMN TYPE`.
+
+**Otros hallazgos:** El seed `0005_demo_price_intelligence.sql` no estaba listado en
+`supabase/config.toml [db.seed]`. Corregido.
+
+### Resultados de validación DB (27 tests)
+
+| Test | Resultado |
+|---|---|
+| T1 — tabla `resource_price_observations` existe | ✅ PASS |
+| T2 — 3 columnas nuevas en `suppliers` | ✅ PASS |
+| T3 — función trigger `app.set_rpo_suggested_net_price` existe | ✅ PASS |
+| T4 — trigger `rpo_set_suggested_net_price` vinculado a la tabla (BEFORE INSERT+UPDATE) | ✅ PASS |
+| T5 — 7 constraints presentes | ✅ PASS |
+| T6 — 4 índices presentes | ✅ PASS |
+| T7 — RLS habilitado | ✅ true |
+| T8 — FORCE RLS habilitado | ✅ true |
+| T9 — 3 policies RLS | ✅ PASS |
+| T10 — nombres: `rpo_select_own_org`, `rpo_insert_authorized`, `rpo_update_review_only` | ✅ PASS |
+| T11 — 2 proveedores demo en seeds | ✅ PASS |
+| T12 — 3 observaciones para MAT-001 en seeds | ✅ PASS |
+| T13 — fórmula trigger: 28000×(1−0.08)=25760, 29500×(1−0.05)=28025, 35000×(1−0)=35000 | ✅ PASS |
+| T14 — observación approved tiene approved_by + approved_at | ✅ PASS |
+| T15 — observación pending: approved_by=NULL, approved_at=NULL | ✅ PASS |
+| T16 — observación rejected tiene rejection_reason no vacío | ✅ PASS |
+| T17 — constraint rechaza observed_price negativo (check_violation) | ✅ PASS |
+| T18 — constraint rechaza discount_percent > 100 (check_violation post-fix) | ✅ PASS |
+| T19 — constraint rechaza currency inválido | ✅ PASS |
+| T20 — constraint rechaza source_type inválido | ✅ PASS |
+| T21 — constraint rechaza status inválido | ✅ PASS |
+| T22 — constraint rechaza `rejected` sin rejection_reason | ✅ PASS |
+| T23 — constraint rechaza `approved` sin approved_by | ✅ PASS |
+| T24 — sin policy DELETE (FORCE RLS deniega) | ✅ PASS |
+| T25 — 20 columnas en `resource_price_observations` | ✅ PASS |
+| T26 — tipo final `discount_percent`: `numeric(7,4)` | ✅ PASS |
+| T27 — tipo final `default_discount_percent` suppliers: `numeric(7,4)` | ✅ PASS |
+
+### Suite completa (Phase 3A closure)
+
+| Check | Resultado |
+|---|---|
+| `supabase db reset --local` (27 migraciones + 5 seeds) | ✅ Aplicado |
+| `typecheck` | ✅ 0 errores |
+| `lint` | ✅ 0 warnings |
+| Tests: 63 archivos, **809 tests** | ✅ PASS |
+| Tests pricing: 10 archivos, **99 tests** | ✅ PASS |
+| `build` (Next.js 16 Turbopack) | ✅ 0 errores, 0 warnings |
+| `git diff --check` | ✅ Limpio |
+
+### Archivos nuevos en este cierre
+
+- `supabase/migrations/20260610090200_fix_discount_percent_precision.sql`
+- `supabase/config.toml` (seed 0005 agregado a `sql_paths`)
+- `supabase/scripts/phase3a_db_validation.sql` (script de validación reutilizable)
+- `docs/HANDOFF_LOG.md`, `docs/DECISIONS.md`, `docs/QA_REPORT.md` (actualizados)
+
+---
+
+## 2026-06-10 — FASE 3A — PRICE INTELLIGENCE FOUNDATION IMPLEMENTADA
+
+**Rama:** `feature/phase3a-price-intelligence-foundation` (worktree aislado).  
+**Hash base:** `22a408c` (MVP internal v1 release). **Sin merge a main. Sin deploy.**
+
+### Entregables
+
+**Contrato congelado:**
+- `docs/PRICE_INTELLIGENCE_FOUNDATION_CONTRACT.md` (v1 congelado).
+
+**Migraciones (locales, no aplicadas a remoto):**
+- `20260610090000_resource_price_intelligence.sql` — tabla `resource_price_observations`,
+  extensión `suppliers` (website_url, default_discount_percent, notes, created_by),
+  trigger `app.set_rpo_suggested_net_price()` (invariante DB: `suggested_net_price = round(observed_price × (1 - discount_percent/100), 10)`).
+- `20260610090100_rls_resource_price_intelligence.sql` — FORCE RLS + 3 policies
+  (SELECT todos; INSERT management/internal; UPDATE management/internal solo cols revisión).
+
+**Seed demo:**
+- `supabase/seeds/0005_demo_price_intelligence.sql` — 2 proveedores + 3 observaciones
+  (approved, pending, rejected) para MAT-001.
+
+**Backend (`apps/web/server/pricing/`):**
+- `types.ts` — ProviderView, CreateObservationInput, ResourcePriceObservationView,
+  ObservationStatus, ResourcePriceIntelligenceSummary, ProviderRepository, PriceObservationRepository.
+- `errors.ts` — 6 clases de error de dominio.
+- `validation.ts` — validateCreateObservationInput, validateProviderCreateInput, computeIsStale (runtime, 30d staleAfterDays).
+- `db-provider-repository.ts` — DbProviderRepository (listProviders, createProvider, updateProvider, getProviderById).
+- `db-observation-repository.ts` — DbObservationRepository (list, create, approve, reject, summary).
+- `fixture-repository.ts` — FixtureProviderRepository + FixtureObservationRepository.
+- `index.ts` — getProviderRepository() + getObservationRepository() (fixture/db per READ_MODEL_SOURCE).
+
+**UI (`apps/web/app/(dashboard)/catalog/`):**
+- `providers/page.tsx` — lista de proveedores (campos 🔒 según ViewerRole).
+- `providers/new/page.tsx` — creación de proveedor (mode-guard).
+- `providers/actions.ts` — Server Actions createProviderAction + updateProviderAction.
+- `providers/_components/provider-form.tsx` — Client Component (useActionState React 19).
+- `resources/[resourceId]/price-intelligence/page.tsx` — historial de observaciones + formulario.
+- `resources/[resourceId]/price-intelligence/actions.ts` — Server Actions create/approve/reject.
+- `resources/[resourceId]/price-intelligence/_components/observation-form.tsx` — Client Component.
+- `resources/[resourceId]/price-intelligence/_components/observation-review-buttons.tsx` — Approve/Reject buttons.
+
+**Tests:**
+- `tests/unit/pricing/resource-price-observation.test.ts` — fórmula suggested_net_price + stale state + validaciones.
+- `tests/unit/pricing/observation-approval.test.ts` — fixture repos + workflow errores.
+- `tests/unit/pricing/observation-security.test.ts` — aislamiento org + privacidad + error classes.
+
+### Validación (todo PASS)
+- `typecheck` → ✅ 0 errores
+- `lint` → ✅ 0 warnings
+- `test` → ✅ **63 archivos, 809 tests** (de 757 → +52)
+- `build` → ✅ "Compiled successfully in 6.8s" + nuevas rutas dinámicas
+- `git diff --check` → ✅ limpio
+- `validate-claude-agents` → ✅ **214 PASS / 0 WARN / 0 FAIL**
+- Golden master regression `regression-first-floor.test.ts` → ✅ intacto (COP 372.247.170)
+
+### Seguridad
+- `organization_id`, `created_by`, `approved_by` SIEMPRE server-side.
+- FORCE RLS en `resource_price_observations`.
+- Campos 🔒 nunca serializados a rol cliente.
+- Observaciones append-only (solo UPDATE de status/approved_by/approved_at/rejection_reason).
+- Ninguna observación modifica presupuestos emitidos.
+
+### Pendientes
+- `supabase db reset` local (requiere Docker activo con `supabase start -x realtime,...`).
+- Smoke de escritura real en DB local (gated `PRICE_INTEL_SMOKE_DB=1`, no implementado).
+- Phase 3B (fuera del alcance de esta sesión).
+
 ## 2026-06-09 — RELEASE INTERNO V1 EN PRODUCCIÓN (tag `mvp-internal-release-v1`)
 
 - **Fecha release:** 2026-06-09.

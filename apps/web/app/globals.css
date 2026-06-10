@@ -8,6 +8,17 @@
 @tailwind utilities;
 
 @layer base {
+  /* Tokens de marca ICONIC (fuente de verdad de color en la app). */
+  :root {
+    --iconic-primary: #005dd6;
+    --iconic-cyan: #00b8ff;
+    --iconic-ink: #020148;
+    --iconic-graphite: #1b1f3e;
+    --iconic-soft-blue: #c7dced;
+    --iconic-gray: #f2f4f7;
+    --iconic-white: #ffffff;
+  }
+
   *,
   *::before,
   *::after {
@@ -21,13 +32,14 @@
   }
 
   body {
-    @apply bg-gray-50 text-gray-900 antialiased;
+    /* Gris claro arquitectónico como soporte; blanco como respiración (cards). */
+    @apply bg-iconic-gray text-iconic-graphite antialiased;
     font-family: 'Inter', system-ui, sans-serif;
   }
 
-  /* Focus visible accesible */
+  /* Focus visible accesible (azul ICONIC) */
   :focus-visible {
-    @apply outline-none ring-2 ring-blue-600 ring-offset-2;
+    @apply outline-none ring-2 ring-iconic-primary ring-offset-2;
   }
 
   /* Scrollbar sutil */

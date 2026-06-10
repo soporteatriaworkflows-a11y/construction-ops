@@ -3,9 +3,282 @@
 Este documento es propiedad de **agent-qa**. Se actualiza al final de
 cada ciclo de validación.
 
+---
+
+## Pre-Release DB Sync — Migraciones Pricing aplicadas (2026-06-09, rama `integration/operational-ux-price-validation-v1`)
+
+**Rama candidata:** HEAD `29f5a9f`. main=`22a408c`. Sin merge; sin seeds remotos; sin db reset; sin db pull.
+
+| Check | Resultado | Detalle |
+|---|---|---|
+| dry-run migraciones | ✅ GATE PASS | Exactamente 3 pendientes: 090000, 090100, 090200 — aditivas, sin DROP destructivo, sin DELETE, sin seeds |
+| `supabase db push --linked` | ✅ PASS | 3 migraciones aplicadas sin error |
+| migration list --linked | ✅ **26/26 Local = Remote** | Paridad completa |
+| dry-run post-push | ✅ PASS | "Remote database is up to date" |
+| db lint --linked | ✅ PASS | "No schema errors found" |
+| Revisión visual | ✅ Aprobada por usuaria | Dashboard, workspace BOQ, price-intelligence coherentes |
+| PUBLIC_SOURCE_COMPATIBILITY_BENCHMARK | ⚠️ DEUDA | URL real no compatible con adaptadores genéricos V1 durante revisión local (probable JS-rendering / anti-bot). No bloquea. |
+
+**Migraciones aplicadas al remoto:**
+- `20260610090000` — `resource_price_observations` tabla + `suppliers` extensión + trigger `set_rpo_suggested_net_price`
+- `20260610090100` — ENABLE FORCE RLS + 3 policies en `resource_price_observations`
+- `20260610090200` — `discount_percent` NUMERIC(6,4)→(7,4); DROP+RECREATE `rpo_update_review_only` (requerido por ALTER COLUMN TYPE)
+
+---
+
+## Integración Final Local — Operational UX + Phase 3B + SSRF Fix (2026-06-09, rama `integration/operational-ux-price-validation-v1`)
+
+**Base:** `integration/iconic-ui-price-intelligence-v1` @ `d944bc1`. **Sin merge a main; sin deploy; sin db push remoto. main=22a408c intacta.**
+
+| Check | Resultado | Detalle |
+|---|---|---|
+| typecheck | ✅ PASS | 0 errores (fix mock `countPendingResourcePriceObservations` en Phase 3B) |
+| lint | ✅ PASS | 0 errores (ESLint 9 flat) |
+| tests suite completa | ✅ **944/944 PASS** | 42 skipped gated; +66 Operational UX +85 Phase 3B vs 809 base |
+| redirect tests | ✅ **15/15 PASS** | R01–R15: SSRF por salto confirmado |
+| Phase 3B security tests | ✅ **PASS** | T1–T38 + extras; sin red externa |
+| build | ✅ PASS | Next 16.2.6; `/workspace` y `/price-intelligence` presentes |
+| DB reset local | ✅ **26/26 migraciones** + 5 seeds | sin errores DB; B-004 vector no bloqueante |
+| RLS runtime | ✅ **106/106 PASS** | 25 tablas FORCE RLS, sin cambio de esquema |
+| read-model isolation | ✅ **12/12 PASS** | cross-org disjunto, deny-by-default |
+| gm:regression | ✅ **22/22 PASS** | golden master COP 372.247.170 intacto |
+| gm:import | ✅ PASS | diff=1.9e-8 (tol 0.01); sin fugas privadas |
+| MVP smoke E2E gated | ✅ **10/10 PASS** | `BOQ_SMOKE_DB=1` contra Supabase local |
+| git diff --check | ✅ limpio | sin trailing whitespace ni marcadores de conflicto |
+| validate-claude-agents | ✅ **214/0/0** | PASS/WARN/FAIL |
+
+**Fix de integración detectado:** `tests/unit/pricing/validation/service.test.ts` — mock `PriceObservationRepository` no incluía `countPendingResourcePriceObservations` (método añadido por Operational UX al dashboard). Corregido con `vi.fn().mockResolvedValue(0)` sin cambiar aserciones de tests. Commit `110a5f6`.
+
+**Seguridad Phase 3B verificada:**
+- URL inicial privada rechazada (T1–T11) ✅
+- Redirect → privado rechazado ANTES del fetch (R05, R06) ✅
+- Redirect → metadata rechazado (R11) ✅
+- Loop rechazado (R07) ✅
+- > 5 saltos rechazado (R04) ✅
+- 3xx sin Location rechazado (R08) ✅
+- Location inválido rechazado (R13) ✅
+- Redirect relativo resuelto (R09) ✅
+- Propuesta siempre pending (T32b) ✅
+- BOQ/AIU nunca modificados (T33, T34) ✅
+- Red externa no usada en tests (DNS inyectado, fetch mocked) ✅
+
+**Riesgos residuales:**
+- Revisión visual interactiva de la usuaria pendiente (workspace + simulador comercial + panel URL).
+- Deudas activas: `COST_TYPE_BREAKDOWN_FOUNDATION`, `COMMERCIAL_SIMULATION_PERSISTENCE`, B-004 (Realtime/vector Docker Windows).
+- DB remota no validada (no se hará hasta release aprobado).
+
+---
+
+## Phase 3B — Security Fix: Redirect SSRF (2026-06-09, rama `feature/phase3b-price-validation-agent-v1`)
+
+**Fix acotado post-implementación.** Sin migración, sin DB reset, sin merge a main. Mismos constraints paralelo-seguros que Phase 3B.
+
+| Check | Resultado | Detalle |
+|---|---|---|
+| typecheck | ✅ PASS | 0 errores (fetch-public-page.ts reescrito) |
+| lint | ✅ PASS | 0 errores |
+| tests nuevos redirect | ✅ **15/15 PASS** | R01–R15: 301/302, 5 hops, 6→too_many, private IP directo, DNS privado, loop, no-Location, relativo, localhost, metadata, 200-directo, IPv6-inválido, credenciales, ftp |
+| suite completa | ✅ **878/878 PASS** | ↑15 vs 863 anterior; 42 skipped (gated DB); 0 regresiones |
+| git diff --check | ✅ PASS | sin trailing whitespace |
+| build | ⏳ DIFERIDO | Trabajo paralelo activo |
+| RLS runtime | ⏳ DIFERIDO | Sin cambio de esquema |
+| supabase db reset | ⏳ DIFERIDO | Trabajo paralelo activo |
+
+**Archivos modificados:**
+- `apps/web/server/pricing/validation/fetch-public-page.ts` — rewrite completo: `redirect: 'follow'` → `redirect: 'manual'` + loop manual con SSRF por salto
+- `apps/web/server/pricing/validation/index.ts` — pasa `deps?.dnsLookup` a `fetchPublicPage`
+- `apps/web/tests/unit/pricing/validation/redirect.test.ts` — 15 tests nuevos (R01–R15)
+- `docs/PRICE_VALIDATION_AGENT_V1_CONTRACT.md` — sección "Seguridad de redirecciones" añadida
+
+**Vectores de ataque cubiertos por los nuevos tests:**
+- Redirect directo a IP privada (192.168.x, 10.x, 169.254.x, localhost)
+- Redirect a host que DNS resuelve a IP privada (DNS rebinding via Location)
+- Redirect loop (misma URL o ciclo A→B→A)
+- Exceso de redirecciones (>5 saltos)
+- 3xx sin Location
+- Location con URL inválida (IPv6 malformado)
+- Location con credenciales embebidas
+- Location con esquema ftp://
+- Redirect relativo correctamente resuelto
+
+---
+
+## Phase 3B — Price Validation Agent V1 (2026-06-09, rama `feature/phase3b-price-validation-agent-v1`)
+
+**Base:** `integration/iconic-ui-price-intelligence-v1` @ `d944bc1`. **Ejecución paralela segura — sin DB reset, sin migraciones, sin servidor local, sin merge a main.**
+## OLEADA OPERATIONAL BUDGET UX V1 (2026-06-09, rama `feature/operational-budget-ux-v1`)
+
+**Base:** `integration/iconic-ui-price-intelligence-v1` @ `d944bc1`. **main = `22a408c` intacta; producción intacta; sin deploy; sin db push remoto; Phase 3B NO iniciada. 0 migraciones nuevas.**
+
+| Check | Resultado | Detalle |
+|---|---|---|
+| typecheck | ✅ PASS | 0 errores |
+| lint | ✅ PASS | 0 errores |
+| tests nuevos Phase 3B | ✅ **70/70 PASS** | validate-url×14, adapters×13+extras, normalize×12, service×13+extras |
+| suite completa | ✅ **863/863 PASS** | 42 skipped (gated DB); 0 regresiones |
+| git diff --check | ✅ PASS | sin trailing whitespace |
+| build | ⏳ DIFERIDO | No ejecutado (trabajo paralelo activo operational-budget-ux-v1) |
+| RLS runtime | ⏳ DIFERIDO | Sin cambio de esquema; 106/106 esperado igual que base |
+| supabase db reset | ⏳ DIFERIDO | Trabajo paralelo activo |
+| smoke MVP e2e | ⏳ DIFERIDO | Trabajo paralelo activo |
+| validate-claude-agents | ⏳ DIFERIDO | Trabajo paralelo activo |
+
+**Cobertura de tests Phase 3B:**
+
+| Módulo | Tests | Cobertura |
+|---|---|---|
+| SSRF / validate-url | T1–T11 + 3 extra | localhost, 127.x, ::1, IP privada, metadata, credenciales, DNS privado, DNS vacío, ftp, URL inválida, data:, 10.x, metadata.google |
+| Extracción JSON-LD | T12–T13 | Product+Offer, múltiples Offers |
+| Extracción meta tags | T14–T17 | og:title+price, title fallback, currency, itemprop sku |
+| runAdapters | T18–T20 + extra | sin precio, precio inválido, method none, fallback title |
+| Confianza | T21–T24 | high (JSON-LD), medium (meta), low (sin precio), medium sin moneda |
+| Normalización | T25–T30 + extra | unit null, sku null, sourceType, sourceUrl, extractedAt, PriceMissingError×2, formato COP, coma decimal, warning moneda, sku propagado, no-status |
+| Servicio mock | T31–T38 + extra | propuesta válida, no-status, sin BOQ, no-orgId, InsufficientRole, sku; pending, no-approved, solo-create, no-AIU, resourceId, discountPercent-0, sourceReference, InsufficientRole |
+
+**Reglas invariantes verificadas:**
+- NUNCA aprobación automática (`status='pending'` siempre al confirmar)
+- NUNCA modificación de BOQ o AIU
+- organizationId y userId siempre server-side (no en propuesta)
+- sourceType = 'public_web' siempre
+- discountPercent = '0' para precios públicos
+- Precio obligatorio para generar propuesta (PriceMissingError si falta)
+- SSRF: IPs privadas, metadata, localhost, credenciales rechazados
+
+---
+| lint | ✅ PASS | 0 errores (ESLint 9 flat + react-hooks) |
+| tests unitarios | ✅ **875/875 PASS** | 42 skipped (gated); +66 tests de la oleada |
+| tests de la oleada | ✅ **66/66 PASS** | commercial-simulation (23) + workspace-view/breakdown (13) + guardas de fuente (26) + conteos operativos (4) |
+| smoke E2E gated | ✅ **42/42 PASS** | `BOQ_SMOKE_DB=1` contra Supabase local (repo real + RLS) |
+| build | ✅ PASS | Next 16.2.6; ruta `/projects/.../estimates/[estimateId]/workspace` presente |
+| DB reset local | ✅ PASS | `supabase db reset --local`: 26 migraciones + 5 seeds |
+| RLS runtime | ✅ **106/106 PASS** | 25 tablas FORCE RLS, sin cambios de esquema |
+| read-model isolation | ✅ **12/12 PASS** | cross-org disjunto, deny-by-default |
+| gm:regression | ✅ **22/22 PASS** | golden master intacto |
+| gm:import | ✅ PASS | total_costo=$372.247.169,98 (diff 1.9e-8, tol 0.01); sin fugas privadas |
+| git diff --check | ✅ limpio | sin trailing whitespace ni marcadores |
+| validate-claude-agents | ✅ **214/0/0** | PASS/WARN/FAIL |
+| no-modificación de exports | ✅ PASS | `server/estimates/export/*` y `/api/*` sin cambios (git status) |
+| no-modificación de Price Intelligence | ✅ PASS | solo adición de `countPendingResourcePriceObservations` (read-only, count head) |
+| simulador read-only | ✅ PASS | guard test: sin mutaciones, base server-derived, disclaimer presente |
+| issued inmutable | ✅ PASS | smoke 42/42 + banner UI + gating `canMutate` |
+
+**Cobertura nueva exigida por el mandato:** BOQ workspace (filtros, búsqueda,
+collapse), edición rápida (campos permitidos, sin subtotal del navegador),
+bloqueo issued, recalculado server-side, resumen financiero, desglose por
+capítulos (incl. base cero), simulador (porcentajes inválidos, base cero,
+3 estados de objetivo, pureza/no-modificación), golden master intacto.
+
+**Riesgos residuales:**
+- Revisión visual interactiva de la usuaria pendiente (workspace denso + simulador).
+- La edición rápida solo opera en modo `supabase+db` (igual que 4E.2A); en fixture es read-only por diseño.
+- Deudas registradas: `COST_TYPE_BREAKDOWN_FOUNDATION`, `COMMERCIAL_SIMULATION_PERSISTENCE`; B-004 (Realtime) sigue vigente.
+
+## Integración ICONIC UI + Price Intelligence 3A (2026-06-09, rama `integration/iconic-ui-price-intelligence-v1`)
+
+**Base:** `main` = `22a408c`. **Sin merge a main; sin deploy; sin db push remoto.**
+
+| Check | Resultado | Detalle |
+|---|---|---|
+| typecheck | ✅ PASS | 0 errores |
+| lint | ✅ PASS | 0 errores |
+| tests unitarios | ✅ **809/809 PASS** | 42 skipped (gated) |
+| pricing tests | ✅ **99/99 PASS** | tests/unit/pricing/ |
+| build | ✅ PASS | `/catalog/.../price-intelligence` ruta dinámica presente |
+| RLS runtime | ✅ **106/106 PASS** | 25 tablas FORCE RLS (actualizado +1 por `resource_price_observations`) |
+| read-model isolation | ✅ **12/12 PASS** | cross-org, deny-by-default, pool |
+| gm:regression | ✅ **22/22 PASS** | golden master intacto |
+| gm:import | ✅ PASS | total_costo=$372.247.170 diff=0 |
+| git diff --check | ✅ limpio | sin trailing whitespace ni marcadores |
+| validate-claude-agents | ✅ **214/0/0** | PASS/WARN/FAIL |
+| DB reset local | ✅ **26/26 migraciones** + 5 seeds | supabase db reset --local |
+| DB pricing validation | ✅ PASS | trigger T13/T24/T25, 3 policies RLS, seeds cargados |
+| coherencia visual pricing + ICONIC | ✅ PASS | inspección de código: shell ICONIC heredado, naming correcto |
+
+**Riesgos residuales:**
+- Revisión visual interactiva por la usuaria pendiente (servidor local corriendo).
+- `text-blue-600` en website URL de proveedores — deuda diferida, no es token ICONIC.
+- 26 migraciones (QA_REPORT de Fase 3A mencionaba "27" por error de conteo).
+
 > Validación de **integración de Oleada 1** realizada por el orquestador en
 > `integration/wave-1` (pre-merge). La validación QA integral formal es de
 > Oleada 4 (`agent-qa`).
+
+---
+
+## Oleada UI / Branding ICONIC V1 (2026-06-09, rama `feature/ui-branding-iconic-v1`)
+
+Refresh visual (sin lógica). **Todo PASS:**
+- typecheck 0, lint 0, **757 tests** (sin regresión — ningún test asserta texto de
+  marca de la UI), build OK, `git diff --check` limpio.
+- Alcance: tokens ICONIC (CSS vars + Tailwind), naming Presupuestos/Grupo ICONIC,
+  login branded (panel navy + curva + cian), shell ink + topbar + nav activa,
+  dashboard hero, reutilizables (button/badge/card/empty-state/page-header), branding
+  multi-tenant ready. Logos oficiales reutilizados; guía PDF ya en repo.
+- **Verificación de no-regresión funcional (inspección):** sin cambios de negocio/
+  cálculos/Decimal/Supabase/RLS/migraciones/Vercel/deploy. No se re-ejecutó la suite
+  funcional remota (no se tocó lógica). `main = 2918622` intacta; producción intacta;
+  stashes P1-A intactos. Doc `docs/UI_BRANDING_ICONIC_V1.md`.
+## Fase 3A — Price Intelligence Foundation — Cierre Formal DB (2026-06-10 closure)
+
+**Rama:** `feature/phase3a-price-intelligence-foundation`. **Sin merge a main.**  
+**`supabase db reset --local` ejecutado.** 27 migraciones + 5 seeds aplicados. Bug de precisión corregido.
+
+| Check | Resultado |
+|---|---|
+| `supabase db reset --local` (27 migraciones + 5 seeds) | ✅ Aplicado limpiamente |
+| `typecheck` | ✅ 0 errores |
+| `lint` | ✅ 0 warnings |
+| Tests: 63 archivos, **809 tests** (42 skipped esperados) | ✅ PASS |
+| Tests pricing: 10 archivos, **99 tests** | ✅ PASS |
+| `build` (Next.js 16 Turbopack) | ✅ 0 errores, 0 warnings |
+| `git diff --check` | ✅ Limpio |
+| DB T1–T27 (tabla, trigger, constraints, indexes, RLS, seed, precisión) | ✅ 27/27 PASS |
+
+**Bug corregido:** `discount_percent NUMERIC(6,4)` → `NUMERIC(7,4)`.  
+`NUMERIC(6,4)` desbordaba para 100 antes del CHECK → `NUMERIC(7,4)` hace al CHECK el árbitro correcto.
+
+**Pendientes para Oleada QA formal:**
+- RLS runtime harness para `resource_price_observations` (extend `rls-runtime/`).
+- Validación cross-org a nivel de PostgREST con JWT real.
+
+---
+
+## Fase 3A — Price Intelligence Foundation (2026-06-10)
+
+**Rama:** `feature/phase3a-price-intelligence-foundation`. **Sin merge a main.**
+
+| Check | Resultado |
+|---|---|
+| `typecheck` | ✅ 0 errores |
+| `lint` | ✅ 0 warnings |
+| Tests: 63 archivos, **809 tests** | ✅ PASS (↑52 vs MVP v1) |
+| `build` | ✅ Compiled 6.8s |
+| `git diff --check` | ✅ Limpio |
+| `validate-claude-agents` | ✅ 214/0/0 |
+| Golden master regression (COP 372.247.170) | ✅ Intacto |
+
+**Tests nuevos (Fase 3A):**
+- `resource-price-observation.test.ts`: fórmula `suggested_net_price` (5 casos) + stale state (9 casos) + validateCreateObservationInput (9 casos) + validateProviderCreateInput (5 casos).
+- `observation-approval.test.ts`: fixture list/summary + errores de escritura + ObservationAlreadyReviewedError + ObservationNotFoundError + ProviderRepository.
+- `observation-security.test.ts`: aislamiento cross-org + campos 🔒 + INTERNAL_PRICE_FIELDS + CreateObservationInput sin campos server-side + clases de error.
+
+**Observaciones de seguridad:**
+- Campos `organization_id`, `created_by`, `approved_by` nunca aceptados desde el navegador: ✅
+- FORCE RLS en `resource_price_observations` con 3 policies: ✅
+- Append-only: UPDATE solo modifica `status/approved_by/approved_at/rejection_reason`: ✅ (verificado por RLS WITH CHECK)
+- Ninguna observación modifica snapshots emitidos: ✅ (by design, sin conexión a BOQ)
+- Campos 🔒 no serializados al rol cliente en UI: ✅ (verificado por condicional ViewerRole)
+
+**Cobertura funcional:**
+- `suggested_net_price` = `round(observed_price × (1 - discount_percent/100), 10)`: ✅ (trigger DB + tests)
+- `isStale` computado en runtime (30d desde approved_at o valid_until expirado): ✅
+- Workflow pending → approved | rejected: ✅ (con InsufficientRoleError para roles no autorizados)
+- Fixture data para modo demo: ✅ (2 proveedores, 3 observaciones MAT-001)
+
+**Pendientes para Oleada QA formal:**
+- Smoke DB real con `supabase db reset` + `PRICE_INTEL_SMOKE_DB=1` (requiere Docker local).
+- RLS runtime harness para `resource_price_observations` (extend `rls-runtime/`).
+- Validación cross-org a nivel de PostgREST con JWT real.
 
 ---
 

@@ -173,8 +173,8 @@ async function main(): Promise<void> {
     FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
     WHERE n.nspname = 'public' AND c.relkind = 'r'
       AND c.relrowsecurity AND c.relforcerowsecurity`;
-  // 20 tablas de Oleada 1 + 4 de planning (Oleada 3B) = 24.
-  check('Pre-flight: 24 tablas con RLS FORCE', rlsTables === '24', `rlsTables=${rlsTables}`);
+  // 20 tablas de Oleada 1 + 4 de planning (Oleada 3B) + 1 resource_price_observations (Fase 3A) = 25.
+  check('Pre-flight: 25 tablas con RLS FORCE', rlsTables === '25', `rlsTables=${rlsTables}`);
 
   const [{ count: taskCount }] = await sql<{ count: string }[]>`
     SELECT count(*)::text AS count FROM schedule_tasks WHERE id = ${TASK_A}`;
