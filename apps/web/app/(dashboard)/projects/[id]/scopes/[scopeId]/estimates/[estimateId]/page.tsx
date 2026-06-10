@@ -28,6 +28,7 @@ import {
   Plus,
   Pencil,
   ClipboardList,
+  LayoutGrid,
 } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
 import { EstimateVersionBadge } from '@/components/shared/status-badge';
@@ -178,6 +179,25 @@ export default async function EstimateDetailPage({ params, searchParams }: PageP
         >
           <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
           Cambios guardados. El resumen, el AIU y el total general reflejan los datos actuales.
+        </div>
+      )}
+
+      {/* Acceso al BOQ Workspace (Oleada OPERATIONAL BUDGET UX V1) */}
+      {hasContent && (
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-iconic-soft-blue/60 bg-brand-50/60 px-4 py-3">
+          <LayoutGrid className="h-5 w-5 text-iconic-primary" aria-hidden="true" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-iconic-ink">BOQ Workspace</p>
+            <p className="text-xs text-gray-500">
+              Vista densa con búsqueda, filtros, edición rápida, desglose por capítulos y simulador comercial.
+            </p>
+          </div>
+          <Button asChild size="sm">
+            <Link href={`${scopeHref}/estimates/${estimateId}/workspace`}>
+              Abrir workspace
+              <ChevronRight className="h-4 w-4" aria-hidden="true" />
+            </Link>
+          </Button>
         </div>
       )}
 

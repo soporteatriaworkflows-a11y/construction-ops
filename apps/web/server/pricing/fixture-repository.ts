@@ -150,6 +150,11 @@ export class FixtureObservationRepository implements PriceObservationRepository 
     return DEMO_OBSERVATIONS.filter((o) => o.resourceId === resourceId);
   }
 
+  async countPendingResourcePriceObservations(viewer: AuthenticatedViewer): Promise<number> {
+    if (viewer.organizationId !== DEMO_ORG) return 0;
+    return DEMO_OBSERVATIONS.filter((o) => o.status === 'pending').length;
+  }
+
   async createResourcePriceObservation(
     _viewer: AuthenticatedViewer,
     _input: CreateObservationInput,

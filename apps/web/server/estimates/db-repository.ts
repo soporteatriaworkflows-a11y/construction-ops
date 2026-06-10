@@ -1060,6 +1060,17 @@ export class DbEstimatesWriteRepository implements EstimatesWriteRepository {
     };
   }
 
+  async countIssuedEstimateVersions(viewer: ViewerContext): Promise<number> {
+    void viewer; // RLS limita las versiones visibles a la org del viewer.
+    const supabase = await this.clientFactory();
+    const { count, error } = await supabase
+      .from('estimate_versions')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'issued');
+    if (error) throw new Error(`estimate_versions_count_failed: ${error.code ?? 'unknown'}`);
+    return count ?? 0;
+  }
+
   async listEstimateVersions(
     viewer: ViewerContext,
     estimateId: Uuid,

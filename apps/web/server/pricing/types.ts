@@ -166,4 +166,9 @@ export interface PriceObservationRepository {
     viewer: AuthenticatedViewer,
     resourceId: Uuid,
   ): Promise<ResourcePriceIntelligenceSummary | null>;
+  /**
+   * Conteo org-wide de observaciones `pending` (KPI del dashboard operativo,
+   * Oleada OPERATIONAL BUDGET UX V1). 🔒 solo roles internal/management.
+   */
+  countPendingResourcePriceObservations(viewer: AuthenticatedViewer): Promise<number>;
 }

@@ -240,6 +240,12 @@ export interface EstimatesWriteRepository {
     estimateId: Uuid,
   ): Promise<import('@/lib/estimates/version-types').EstimateVersionSummary>;
 
+  /**
+   * Conteo org-wide de versiones `issued` visibles (KPI del dashboard operativo,
+   * Oleada OPERATIONAL BUDGET UX V1). READ-ONLY; RLS limita a la org del viewer.
+   */
+  countIssuedEstimateVersions(viewer: ViewerContext): Promise<number>;
+
   /** Lista las versiones del presupuesto (tenant-scoped) con resumen financiero. */
   listEstimateVersions(
     viewer: ViewerContext,

@@ -1,5 +1,60 @@
 # Handoff Log
 
+## 2026-06-09 — OLEADA OPERATIONAL BUDGET UX V1 (rama `feature/operational-budget-ux-v1`)
+
+> Base `integration/iconic-ui-price-intelligence-v1` @ `d944bc1`. **main = `22a408c` intacta;
+> producción intacta; sin deploy; sin db push remoto; Phase 3B NO iniciada; stashes intactos.
+> 0 migraciones nuevas.** Ejecutada por agent-orchestrator (sin subagentes: oleada cohesiva
+> UI+dominio; se evitó solape de archivos y cold-start; ownership respetado e integrado).
+
+### Entregado
+- **A+B — BOQ Workspace denso** (`…/estimates/[estimateId]/workspace`): sticky toolbar
+  (búsqueda código/descripción, filtros activos/archivados/todos, expandir/colapsar,
+  total general siempre visible) + grilla densa con header sticky, capítulos agrupados
+  colapsables, badges (Archivado/normalizado secundario), archive/restore inline
+  (reutiliza `ArchiveControls`), footer de costo directo. **Edición rápida** de
+  cantidad/precio reutilizando `updateItemAction` 4E.2A: navegador envía SOLO campos
+  permitidos; subtotal + resumen vuelven del servidor; feedback Guardando/Guardado/error;
+  `router.refresh()` re-sincroniza; issued ⇒ banner inmutable + edición deshabilitada.
+  Helpers puros client-safe en `lib/estimates/workspace-view.ts` (sin matemática financiera).
+  CTA "Abrir workspace" en el detalle del presupuesto.
+- **C — Resumen financiero visual**: 7 cards ICONIC compactas (directo, A, I, U, IVA/U,
+  indirectos, total) server-derived, vivas tras cada quick-edit.
+- **D — Desglose por capítulos**: `server/estimates/breakdown.ts`
+  (`computeChapterBreakdown`, Decimal, shares 0..1, base cero segura) + barras de
+  participación. **Cost-type NO confiable** (boq_items sin clasificación) ⇒ deuda
+  `COST_TYPE_BREAKDOWN_FOUNDATION` registrada (INTEGRATION_REQUESTS + DECISIONS).
+- **E+F — Simulador comercial V1**: dominio puro
+  `modules/estimates/commercial-simulation.ts` (fórmula del mandato, validación de
+  porcentajes/objetivo, 3 estados vs objetivo, Decimal, determinista) + server action
+  (base = `grandTotal` server-derived, READ-ONLY) + panel separado visualmente
+  (borde dashed cian, badge, disclaimer obligatorio) + vista previa comercial limpia.
+  **SIN persistencia** (decisión registrada; slice futuro `COMMERCIAL_SIMULATION_PERSISTENCE`).
+- **G — Dashboard operativo**: sección "Operación" (proyectos, presupuestos activos,
+  versiones emitidas, 🔒 precios por revisar solo management/internal; tolerantes a fallo)
+  + accesos rápidos (Proyectos/Catálogo/Proveedores/Inteligencia de precios). Extensión
+  aditiva: `countIssuedEstimateVersions` (estimates db+fixture) y
+  `countPendingResourcePriceObservations` (pricing db+fixture).
+
+### Validación (todo PASS)
+- typecheck 0 · lint 0 · **875 tests** (+66 de la oleada) · build Next 16.2.6 (ruta
+  `/workspace`) · `supabase db reset --local` (26 migraciones + 5 seeds) ·
+  **RLS runtime 106/106** · **read-model isolation 12/12** · **gm:regression 22/22** ·
+  **gm:import PASS** ($372.247.170 intacto) · smoke E2E gated `BOQ_SMOKE_DB=1` **42/42** ·
+  `validate-claude-agents` **214/0/0** · `git diff --check` limpio.
+
+### Documentación
+- Nuevo `docs/OPERATIONAL_BUDGET_UX_V1_CONTRACT.md`. Actualizados DECISIONS (3 filas),
+  QA_REPORT (sección de la oleada), INTEGRATION_REQUESTS (extensión aditiva + 2 deudas).
+
+### Próximo paso
+- Revisión visual de la usuaria en `http://localhost:3020` (workspace + simulador +
+  dashboard). Si aprueba: integrar a la rama de integración / pre-release. NO merge a
+  main ni deploy sin orden expresa.
+
+### Agentes activos al cierre
+- Ninguno.
+
 ## 2026-06-09 — INTEGRACIÓN ICONIC UI + PRICE INTELLIGENCE (rama `integration/iconic-ui-price-intelligence-v1`)
 
 > **Integración controlada de 2 oleadas** sobre base `main` = `22a408c`. Sin merge a main; sin deploy; sin db push remoto.

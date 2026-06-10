@@ -75,6 +75,7 @@ export {
   VersionMismatchError,
 } from './errors';
 export { computeVersionComparison } from './compare';
+export { computeChapterBreakdown, type ChapterBreakdownRow } from './breakdown';
 export type { BoqValidationIssue } from './errors';
 export {
   validateChapterInput,
