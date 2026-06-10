@@ -55,7 +55,7 @@ export async function validatePublicPriceUrl(
   checkRole(viewer);
 
   const validated = await validatePublicUrl(input.url, deps?.dnsLookup);
-  const page = await fetchPublicPage(validated.href, deps?.fetcher);
+  const page = await fetchPublicPage(validated.href, deps?.fetcher, deps?.dnsLookup);
 
   const extracted = runAdapters(page.text);
   const confidence = computeConfidence(extracted);

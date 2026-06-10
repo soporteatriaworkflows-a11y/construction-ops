@@ -1,5 +1,28 @@
 # Handoff Log
 
+## 2026-06-09 — PHASE 3B — SECURITY FIX: Redirect SSRF (rama `feature/phase3b-price-validation-agent-v1`)
+
+> **Fix acotado de seguridad post-implementación.** Sin DB reset, sin migraciones, sin servidor local, sin merge a main. Mismos constraints paralelo-seguros que Phase 3B.
+
+**Problema identificado:** `fetch-public-page.ts` usaba `redirect: 'follow'` (hasta 20 saltos nativos sin validación SSRF en saltos intermedios). Un redirect a `http://169.254.169.254/` en un salto intermedio pasaría desapercibido porque el check `isFinalUrlSafe` solo evaluaba la URL final.
+
+**Fix aplicado:**
+- Reescrito `fetch-public-page.ts`: `redirect: 'manual'` + loop manual (máx 5 saltos).
+- Antes de cada hop: `validatePublicUrl(currentUrl, dnsLookup)` con resolución DNS real. Cualquier `UrlValidationError` → `FetchPublicPageError('redirect_to_private', ...)`.
+- Loop detection: `Set<string>` de URLs visitadas → `redirect_loop`.
+- 3xx sin Location → `redirect_missing_location`.
+- Location con URL inválida → `redirect_invalid_url`.
+- Redirects relativos: `new URL(location, currentUrl)`.
+- Firma actualizada: `fetchPublicPage(url, fetcher?, dnsLookup?)` — backward compatible.
+- `index.ts` actualizado para propagar `deps?.dnsLookup` a `fetchPublicPage`.
+- 15 tests nuevos `redirect.test.ts` (R01–R15) con `vi.stubGlobal('fetch', mock)` + DNS inyectado.
+
+**Validación:** typecheck 0, lint 0, **878/878 tests PASS** (↑15 vs 863), git diff --check limpio.
+
+**HEAD final (antes del push):** pendiente commit `fix(pricing): validate every redirect hop before public price fetch`.
+
+---
+
 ## 2026-06-09 — PHASE 3B — PRICE VALIDATION AGENT V1 (rama `feature/phase3b-price-validation-agent-v1`)
 
 > **Ejecución paralela segura.** Base `integration/iconic-ui-price-intelligence-v1` @ `d944bc1`. Sin DB reset, sin migraciones, sin servidor local, sin merge a main.

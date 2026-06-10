@@ -24,7 +24,7 @@ Propone una observación a partir de contenido público; la aprobación es siemp
 
 ## SSRF Protection
 
-Rechazado:
+Rechazado en URL inicial Y en cada salto de redirección:
 - Esquemas no http/https
 - Credenciales en URL
 - localhost, 127.0.0.1, ::1
@@ -35,6 +35,20 @@ Rechazado:
 - Respuestas > 512KB
 - Timeout > 10 segundos
 - Content-type no HTML/JSON
+
+## Seguridad de redirecciones (fix 2026-06-09)
+
+`fetch-public-page.ts` usa `redirect: 'manual'` con loop manual:
+- Máximo 5 saltos (`MAX_REDIRECTS = 5`).
+- Antes de cada fetch (incluyendo el primero), se llama `validatePublicUrl(currentUrl, dnsLookup)` con resolución DNS real. Cualquier `UrlValidationError` lanza `FetchPublicPageError('redirect_to_private', ...)`.
+- Loop detection vía `Set<string>`: si una URL ya fue visitada, lanza `redirect_loop`.
+- Sin `Location` en 3xx → `redirect_missing_location`.
+- `Location` que no parsea como URL válida → `redirect_invalid_url`.
+- Redirects relativos resueltos con `new URL(location, currentUrl)`.
+- `DnsLookup` inyectable para tests: los 15 tests de `redirect.test.ts` mockean `globalThis.fetch` vía `vi.stubGlobal` sin red real.
+
+Antes: `redirect: 'follow'` con verificación solo post-redirect (gap de seguridad).
+Después: validación completa en CADA salto antes del fetch.
 
 ## Extracción V1
 
