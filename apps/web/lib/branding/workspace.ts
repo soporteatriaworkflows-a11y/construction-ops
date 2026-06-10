@@ -1,14 +1,17 @@
 /**
- * workspace.ts — Branding del WORKSPACE/tenant (UI). Oleada UI/Branding ICONIC V1.
+ * workspace.ts — Branding del WORKSPACE/tenant (UI). Oleada UI/Branding ICONIC V1
+ * + ICONIC OPS LOGIN/INSTANCE-READY BRANDING.
  *
- * Fuente única del naming visible y los assets del workspace. FUTURE-READY para
- * multi-tenant (ligero): hoy `getActiveWorkspace()` devuelve el workspace por
- * defecto (Grupo ICONIC); mañana puede resolver branding por organización
- * (nombre, avatar, tokens) sin tocar las vistas.
+ * El naming/assets visibles se resuelven desde la configuración CENTRALIZADA de
+ * instancia (`@/lib/branding/instance`): defaults públicos ICONIC OPS +
+ * overrides `NEXT_PUBLIC_INSTANCE_*` sanitizados. Este módulo conserva la API
+ * `getActiveWorkspace()` que ya consumen layouts y componentes, y añade los
+ * tokens de color de la paleta ICONIC.
  *
  * NOTA: "Construction Ops" es solo el nombre técnico interno del repo/proyecto;
- * el nombre VISIBLE del producto es "Presupuestos".
+ * el nombre VISIBLE del producto en esta instancia es "ICONIC OPS".
  */
+import { getInstanceBranding } from './instance';
 
 /** Tokens de color de marca (paleta ICONIC oficial). Coinciden con las CSS vars. */
 export interface WorkspaceTheme {
@@ -49,12 +52,11 @@ export const ICONIC_THEME: WorkspaceTheme = {
 };
 
 /**
- * Workspace por defecto (Grupo ICONIC). Logos oficiales versionados en
- * `public/branding/iconic/`. Para multi-tenant, sustituir por una resolución por
- * organización conservando esta misma forma.
+ * Workspace por defecto (instancia ICONIC OPS sin overrides). Conservado por
+ * compatibilidad; la resolución activa vive en `getActiveWorkspace()`.
  */
 export const DEFAULT_WORKSPACE: Workspace = {
-  productName: 'Presupuestos',
+  productName: 'ICONIC OPS',
   workspaceName: 'Grupo ICONIC',
   descriptor: 'Gestión de presupuestos de obra',
   logoFull: '/branding/iconic/grupo-iconic-logo-full.png',
@@ -63,7 +65,19 @@ export const DEFAULT_WORKSPACE: Workspace = {
   theme: ICONIC_THEME,
 };
 
-/** Resuelve el workspace activo (hoy el por defecto; multi-tenant ready). */
+/**
+ * Resuelve el workspace activo desde la configuración de instancia
+ * (defaults ICONIC OPS + overrides NEXT_PUBLIC sanitizados).
+ */
 export function getActiveWorkspace(): Workspace {
-  return DEFAULT_WORKSPACE;
+  const instance = getInstanceBranding();
+  return {
+    productName: instance.productName,
+    workspaceName: instance.workspaceName,
+    descriptor: instance.descriptor,
+    logoFull: instance.logoFull,
+    logoSymbol: instance.logoSymbol,
+    initials: instance.initials,
+    theme: ICONIC_THEME,
+  };
 }
