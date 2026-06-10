@@ -1,5 +1,30 @@
 # Handoff Log
 
+## 2026-06-10 — AJUSTE FINAL UX: Acciones deshabilitadas explicativas en demo y read-only (rama `fix/bootstrap-empty-state-ctas`)
+
+> **Ajuste acotado post-revisión visual.** Problema observado: /catalog/providers no mostraba "Nuevo proveedor" ni CTA cuando canCreate=false. /catalog tenía mensajes de title técnicos y solo cubría el caso demo, no el usuario read-only en modo supabase. Sin migración, sin db push, sin deploy, main intacta, producción intacta.
+
+- **HEAD inicial:** `94513c3` → **HEAD final:** `884703c`
+- **Archivos modificados:** 3 (catalog/page.tsx, catalog/providers/page.tsx, tests/unit/catalog/disabled-actions.test.ts)
+- **`/catalog`:** `canCreate` ahora combina env gate (`isCreationModeEnabled`) + role check (`management|internal`). `isDemoMode` derivado de `resolveAuthMode() === 'demo'`. `disabledNotice` diferencia mensaje demo vs. mensaje de sin permisos. Titles de botones ahora son español legible.
+- **`/catalog/providers`:** `headerActions` ahora siempre muestra "Nuevo proveedor" (disabled con aria-disabled cuando `canCreate=false`). EmptyState "Crear primer proveedor" siempre visible (disabled con nota inline). Banner `disabledNotice` añadido bajo PageHeader.
+- **Tests:** `disabled-actions.test.ts` — 42 tests de inspección de fuente cubriendo los 15 ítems del spec.
+- **Validación:** typecheck 0 errores ✅ | lint 0 errores ✅ | tests **1012/1012 PASS** (42 skipped gated) ✅ | build **PASS** ✅ | gm:regression 22/22 ✅ | gm:import PASS ✅ | git diff --check limpio ✅
+- **Rama publicada:** `fix/bootstrap-empty-state-ctas` → `94513c3..884703c`
+- **Deuda registrada:** `CATALOG_BULK_ONBOARDING_V1` — importación masiva diferida a oleada separada.
+
+### Comportamiento resultante
+| Escenario | "Nuevo recurso" | "Gestionar proveedores" | "Nuevo proveedor" | Mensaje visible |
+|---|---|---|---|---|
+| Demo (APP_AUTH_MODE=demo) | visible, disabled | habilitado | visible, disabled | "Modo demostración: puedes explorar..." |
+| Usuario read-only supabase | visible, disabled | habilitado | visible, disabled | "No tienes permisos para crear..." |
+| Autorizado (supabase+db+management/internal) | habilitado | habilitado | habilitado | ninguno |
+
+### Estado al cierre
+- HEAD: `884703c` · **main intacta** = `2f16e4a` · **producción intacta** · **sin deploy** · **sin migración** · **stashes intactos**
+
+---
+
 ## 2026-06-10 — HOTFIX: Bootstrap empty state CTAs y descubribilidad del catálogo (rama `fix/bootstrap-empty-state-ctas`)
 
 > **Hotfix acotado de UX.** Bootstrap dead-end detectado en prueba real: organización vacía no tenía acciones visibles. Sin migración, sin db push, sin deploy, main intacta, producción intacta.
