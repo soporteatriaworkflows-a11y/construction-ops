@@ -78,19 +78,21 @@ describe('Catálogo — explicación de modo demo visible', () => {
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
-// 3. Catálogo vacío demo: "Crear primer recurso" visible y disabled
+// 3. Catálogo vacío: CTA principal "Importar catálogo" + manual como excepción
+//    (CATALOG_BULK_ONBOARDING_V1 reemplaza "Crear primer recurso").
 // ──────────────────────────────────────────────────────────────────────────────
-describe('Catálogo EmptyState — "Crear primer recurso" en demo', () => {
-  it('el texto "Crear primer recurso" aparece en la página', () => {
-    expect(catalogSrc).toMatch(/Crear primer recurso/);
+describe('Catálogo EmptyState — bulk onboarding', () => {
+  it('el CTA principal "Importar catálogo" aparece en la página', () => {
+    expect(catalogSrc).toMatch(/Importar catálogo/);
   });
 
-  it('hay una rama disabled para "Crear primer recurso"', () => {
-    expect(catalogSrc).toMatch(/disabled[\s\S]{0,600}Crear primer recurso/);
+  it('el secundario "Crear recurso manualmente" existe con rama disabled', () => {
+    expect(catalogSrc).toMatch(/Crear recurso manualmente/);
+    expect(catalogSrc).toMatch(/disabled[\s\S]{0,600}Crear recurso manualmente/);
   });
 
   it('la rama disabled muestra el disabledNotice', () => {
-    // El bloque del emptyStateAction no-canCreate usa disabledNotice
+    // El bloque del emptyStateAction usa disabledNotice
     expect(catalogSrc).toMatch(/emptyStateAction[\s\S]{0,600}disabledNotice/);
   });
 });
@@ -199,7 +201,7 @@ describe('Usuario autorizado supabase+db — lógica de habilitación', () => {
   });
 
   it('catálogo: cuando canCreate=true muestra Button asChild para "Nuevo recurso"', () => {
-    expect(catalogSrc).toMatch(/canCreate.*asChild[\s\S]{0,100}Nuevo recurso|asChild[\s\S]{0,100}Nuevo recurso[\s\S]{0,600}canCreate/);
+    expect(catalogSrc).toMatch(/canCreate \? \([\s\S]{0,200}asChild[\s\S]{0,200}Nuevo recurso/);
   });
 });
 

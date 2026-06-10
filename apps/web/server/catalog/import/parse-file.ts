@@ -81,6 +81,9 @@ export function parseCatalogFile(buffer: Buffer, fileName: string): ParsedCatalo
       cellFormula: false,
       cellHTML: false,
       sheetRows: sheetRowsCap,
+      // CSV/TXT: lectura literal — una celda "=SUM(...)" queda como texto,
+      // jamás se interpreta como fórmula.
+      raw: true,
     });
   } catch {
     throw new CatalogImportParseError('El archivo no se pudo leer o está dañado.');
