@@ -5,6 +5,46 @@ cada ciclo de validación.
 
 ---
 
+## Phase 3B — Price Validation Agent V1 (2026-06-09, rama `feature/phase3b-price-validation-agent-v1`)
+
+**Base:** `integration/iconic-ui-price-intelligence-v1` @ `d944bc1`. **Ejecución paralela segura — sin DB reset, sin migraciones, sin servidor local, sin merge a main.**
+
+| Check | Resultado | Detalle |
+|---|---|---|
+| typecheck | ✅ PASS | 0 errores |
+| lint | ✅ PASS | 0 errores |
+| tests nuevos Phase 3B | ✅ **70/70 PASS** | validate-url×14, adapters×13+extras, normalize×12, service×13+extras |
+| suite completa | ✅ **863/863 PASS** | 42 skipped (gated DB); 0 regresiones |
+| git diff --check | ✅ PASS | sin trailing whitespace |
+| build | ⏳ DIFERIDO | No ejecutado (trabajo paralelo activo operational-budget-ux-v1) |
+| RLS runtime | ⏳ DIFERIDO | Sin cambio de esquema; 106/106 esperado igual que base |
+| supabase db reset | ⏳ DIFERIDO | Trabajo paralelo activo |
+| smoke MVP e2e | ⏳ DIFERIDO | Trabajo paralelo activo |
+| validate-claude-agents | ⏳ DIFERIDO | Trabajo paralelo activo |
+
+**Cobertura de tests Phase 3B:**
+
+| Módulo | Tests | Cobertura |
+|---|---|---|
+| SSRF / validate-url | T1–T11 + 3 extra | localhost, 127.x, ::1, IP privada, metadata, credenciales, DNS privado, DNS vacío, ftp, URL inválida, data:, 10.x, metadata.google |
+| Extracción JSON-LD | T12–T13 | Product+Offer, múltiples Offers |
+| Extracción meta tags | T14–T17 | og:title+price, title fallback, currency, itemprop sku |
+| runAdapters | T18–T20 + extra | sin precio, precio inválido, method none, fallback title |
+| Confianza | T21–T24 | high (JSON-LD), medium (meta), low (sin precio), medium sin moneda |
+| Normalización | T25–T30 + extra | unit null, sku null, sourceType, sourceUrl, extractedAt, PriceMissingError×2, formato COP, coma decimal, warning moneda, sku propagado, no-status |
+| Servicio mock | T31–T38 + extra | propuesta válida, no-status, sin BOQ, no-orgId, InsufficientRole, sku; pending, no-approved, solo-create, no-AIU, resourceId, discountPercent-0, sourceReference, InsufficientRole |
+
+**Reglas invariantes verificadas:**
+- NUNCA aprobación automática (`status='pending'` siempre al confirmar)
+- NUNCA modificación de BOQ o AIU
+- organizationId y userId siempre server-side (no en propuesta)
+- sourceType = 'public_web' siempre
+- discountPercent = '0' para precios públicos
+- Precio obligatorio para generar propuesta (PriceMissingError si falta)
+- SSRF: IPs privadas, metadata, localhost, credenciales rechazados
+
+---
+
 ## Integración ICONIC UI + Price Intelligence 3A (2026-06-09, rama `integration/iconic-ui-price-intelligence-v1`)
 
 **Base:** `main` = `22a408c`. **Sin merge a main; sin deploy; sin db push remoto.**

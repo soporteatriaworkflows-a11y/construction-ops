@@ -1,5 +1,33 @@
 # Handoff Log
 
+## 2026-06-09 — PHASE 3B — PRICE VALIDATION AGENT V1 (rama `feature/phase3b-price-validation-agent-v1`)
+
+> **Ejecución paralela segura.** Base `integration/iconic-ui-price-intelligence-v1` @ `d944bc1`. Sin DB reset, sin migraciones, sin servidor local, sin merge a main.
+
+- **FASE 0 — Precheck:** invariants confirmados (worktree correcto, rama correcta, HEAD=d944bc1, árbol limpio, origin/main=22a408c, stashes intactos).
+- **FASE 1 — Inspección:** server/pricing/ (Phase 3A), UI price-intelligence, tests unitarios pricing.
+- **FASE 2 — Contrato congelado:** `docs/PRICE_VALIDATION_AGENT_V1_CONTRACT.md` → commit `ea71df9`.
+- **FASE 3 — Backend aislado:** `apps/web/server/pricing/validation/` (9 archivos: types, validate-url + SSRF, fetch-public-page, adapters JSON-LD + meta + index, normalize, confidence, service index) → commit `8253386`. Exportaciones Phase 3B en `server/pricing/index.ts`.
+- **FASE 4 — UI Price Intelligence:** `url-validation-panel.tsx` (client, useActionState React 19), `actions.ts` extendido (validatePublicUrlAction + confirmProposalAction), `page.tsx` integrado → commit `8b90ed3`.
+- **FASE 5 — Tests unitarios puros (sin red, sin DB):** 70 tests nuevos en `tests/unit/pricing/validation/` (validate-url: 14, adapters: 13, normalize: 12, service: 13) — **863/863 PASS** total. Covers T1–T38 del spec.
+- **FASE 6 — Validación:** typecheck **0 errores**, lint **0 errores**, tests **863/863 PASS**, git diff **limpio**.
+- **FASE 7 — Documentación:** HANDOFF_LOG, DECISIONS, QA_REPORT actualizados.
+- **FASE 8 — Publicar:** rama `feature/phase3b-price-validation-agent-v1` publicada → origin. STOP.
+
+**HEAD final:** `8b90ed3` · **main intacta** = `22a408c` · **producción intacta** · **stashes intactos** · **sin merge, sin deploy, sin DB reset**
+
+**Checks diferidos (trabajo paralelo operational-budget-ux-v1 activo):**
+- supabase db reset local
+- RLS runtime harness (106/106 esperado sin cambio de esquema)
+- smoke MVP e2e
+- revisión visual servidor local
+- merge de ramas en orden
+- deploy Vercel
+
+**Siguiente acción:** esperar cierre de Operational UX → integrar ramas → db reset local → RLS + smoke → revisión visual → decidir release.
+
+---
+
 ## 2026-06-09 — INTEGRACIÓN ICONIC UI + PRICE INTELLIGENCE (rama `integration/iconic-ui-price-intelligence-v1`)
 
 > **Integración controlada de 2 oleadas** sobre base `main` = `22a408c`. Sin merge a main; sin deploy; sin db push remoto.
