@@ -69,7 +69,7 @@ export default async function PlanningPage() {
         <EmptyState
           icon={CalendarRange}
           title="Sin cronograma"
-          description="Aún no hay tareas de planificación para este proyecto."
+          description="El cronograma se configura desde el modulo de proyectos. Primero crea un proyecto y luego define su planificacion."
         />
       </div>
     );

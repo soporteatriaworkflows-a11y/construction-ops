@@ -1,18 +1,22 @@
 /**
- * Página de catálogo de recursos — Oleada 3A.
+ * Pagina de catalogo de recursos — Oleada 3A + Bootstrap CTAs.
  * Server Component. Propiedad: agent-frontend-boq.
  *
- * Consume el read-model canónico (@/server/read-model) en lugar de mocks estáticos.
- * NO importa @/lib/utils/mocks. NO expone campos 🔒 (precios internos, SKU, etc.).
- * budgetReferencePrice es cliente-safe y se muestra solo si está disponible.
+ * Consume el read-model canonico (@/server/read-model) en lugar de mocks estaticos.
+ * NO importa @/lib/utils/mocks. NO expone campos (precios internos, SKU, etc.).
+ * budgetReferencePrice es cliente-safe y se muestra solo si esta disponible.
  */
+import Link from 'next/link';
 import { BookOpen } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { formatCOP, RESOURCE_TYPE_LABELS } from '@/lib/utils/format';
 import { getReadModel } from '@/server/read-model';
 import { resolveViewer } from '@/server/auth/resolve-viewer';
+import { resolveAuthMode } from '@/lib/supabase/env';
+import { isCreationModeEnabled } from '@/app/(dashboard)/projects/mode-guard';
 import type { CatalogResourceView } from '@/lib/contracts/read-model';
 
 // Render request-time: viewer real por modo (db=autenticado, fixture=demo).
@@ -42,14 +46,28 @@ const RESOURCE_TYPE_VARIANT: Record<
 export default async function CatalogPage() {
   const rm = getReadModel();
   let resources: CatalogResourceView[] = [];
+  let viewerRole: string = 'consulta';
   let error: string | null = null;
 
   try {
     const viewer = await resolveViewer();
+    viewerRole = viewer.role;
     resources = await rm.listCatalogResources(viewer);
   } catch (e) {
-    error = e instanceof Error ? e.message : 'Error al cargar catálogo';
+    error = e instanceof Error ? e.message : 'Error al cargar catalogo';
   }
+
+  const authMode = resolveAuthMode();
+  const CREATE_ROLES = ['management', 'internal'] as const;
+  const canCreate =
+    isCreationModeEnabled() && (CREATE_ROLES as readonly string[]).includes(viewerRole);
+  const isDemoMode = authMode === 'demo';
+
+  const disabledNotice = !canCreate
+    ? isDemoMode
+      ? 'Modo demostración: puedes explorar el catálogo. Para crear recursos, inicia sesión con datos reales.'
+      : 'No tienes permisos para crear registros. Solicita acceso a un administrador.'
+    : null;
 
   if (error) {
     return (
@@ -73,7 +91,58 @@ export default async function CatalogPage() {
       acc[r.resourceType]!.push(r);
       return acc;
     },
-    {}
+    {},
+  );
+
+  const headerActions = (
+    <>
+      {canCreate ? (
+        <Button asChild size="sm">
+          <Link href="/catalog/resources/new">Nuevo recurso</Link>
+        </Button>
+      ) : (
+        <Button
+          size="sm"
+          disabled
+          title={
+            isDemoMode
+              ? 'Disponible con datos reales — inicia sesión para crear recursos'
+              : 'Sin permisos de creación — solicita acceso a un administrador'
+          }
+          aria-disabled="true"
+        >
+          Nuevo recurso
+        </Button>
+      )}
+      <Button asChild size="sm" variant="outline">
+        <Link href="/catalog/providers">Gestionar proveedores</Link>
+      </Button>
+    </>
+  );
+
+  const emptyStateAction = canCreate ? (
+    <Button asChild>
+      <Link href="/catalog/resources/new">Crear primer recurso</Link>
+    </Button>
+  ) : (
+    <div className="flex flex-col items-center gap-1.5">
+      <Button
+        disabled
+        aria-disabled="true"
+        title={
+          isDemoMode
+            ? 'Disponible con datos reales — inicia sesión para crear recursos'
+            : 'Sin permisos de creación — solicita acceso a un administrador'
+        }
+      >
+        Crear primer recurso
+      </Button>
+      {disabledNotice && (
+        <p className="text-xs text-amber-700" role="note">
+          {disabledNotice}
+        </p>
+      )}
+    </div>
   );
 
   return (
@@ -81,13 +150,30 @@ export default async function CatalogPage() {
       <PageHeader
         title="Catálogo de Recursos"
         description="Materiales, mano de obra y equipos disponibles para APU y BOQ"
+        actions={headerActions}
       />
+
+      {disabledNotice && (
+        <div
+          className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800"
+          role="note"
+          aria-label={isDemoMode ? 'Modo demostración activo' : 'Acceso de solo lectura'}
+        >
+          {disabledNotice}
+        </div>
+      )}
 
       {resources.length === 0 ? (
         <EmptyState
           icon={BookOpen}
           title="Catálogo vacío"
           description="No hay recursos en el catálogo de la organización."
+          action={emptyStateAction}
+          secondaryAction={
+            <Button variant="outline" asChild>
+              <Link href="/catalog/providers">Gestionar proveedores</Link>
+            </Button>
+          }
         />
       ) : (
         <div className="space-y-8">
@@ -137,21 +223,32 @@ export default async function CatalogPage() {
                           key={resource.id}
                           className="hover:bg-gray-50 transition-colors"
                         >
+                          {/* Código enlazado a Price Intelligence */}
                           <td className="px-4 py-2.5">
-                            <span className="font-mono text-xs text-gray-500">
+                            <Link
+                              href={`/catalog/resources/${resource.id}/price-intelligence`}
+                              className="font-mono text-xs text-blue-600 hover:text-blue-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+                            >
                               {resource.code}
-                            </span>
+                            </Link>
                           </td>
                           <td className="px-4 py-2.5 font-medium text-gray-900">
-                            {resource.name}
+                            <Link
+                              href={`/catalog/resources/${resource.id}/price-intelligence`}
+                              className="hover:text-blue-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+                            >
+                              {resource.name}
+                            </Link>
                           </td>
                           <td className="px-4 py-2.5 text-center text-gray-600">
                             {resource.unit}
                           </td>
                           <td className="px-4 py-2.5 text-right tabular-nums text-gray-600">
-                            {resource.budgetReferencePrice
-                              ? formatCOP(resource.budgetReferencePrice)
-                              : <span className="text-gray-300 text-xs">—</span>}
+                            {resource.budgetReferencePrice ? (
+                              formatCOP(resource.budgetReferencePrice)
+                            ) : (
+                              <span className="text-gray-300 text-xs">—</span>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -167,6 +264,8 @@ export default async function CatalogPage() {
       {/* Nota de privacidad — campos internos no mostrados */}
       {/* negotiated_discount_pct, observedPrice, supplierSku, productUrl,
           locationReference y ahorros son campos 🔒 y NO se muestran aquí. */}
+
+      {/* Deuda: CATALOG_BULK_ONBOARDING_V1 — importación masiva de recursos diferida */}
     </div>
   );
 }

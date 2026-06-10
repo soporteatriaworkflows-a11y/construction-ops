@@ -13,6 +13,7 @@ import { ClipboardList, Layers, FolderOpen, ChevronRight, Calendar } from 'lucid
 import { PageHeader } from '@/components/shared/page-header';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { formatDate } from '@/lib/utils/format';
 import { resolveViewer } from '@/server/auth/resolve-viewer';
 import { getEstimatesWriteRepository } from '@/server/estimates';
@@ -80,7 +81,12 @@ export default async function EstimatesPage() {
         <EmptyState
           icon={ClipboardList}
           title="Sin presupuestos"
-          description="Aún no hay presupuestos registrados en esta organización. Crea uno desde el alcance de un proyecto."
+          description="Aún no hay presupuestos registrados en esta organización. Los presupuestos se crean desde un proyecto: ve a Proyectos, selecciona un alcance y crea su presupuesto."
+          action={
+            <Button asChild>
+              <Link href="/projects">Ir a Proyectos</Link>
+            </Button>
+          }
         />
       ) : (
         <ul role="list" className="space-y-3">

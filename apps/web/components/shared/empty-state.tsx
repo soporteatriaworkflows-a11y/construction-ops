@@ -6,6 +6,17 @@ interface EmptyStateProps {
   title: string;
   description?: string;
   action?: React.ReactNode;
+  /**
+   * Accion secundaria que se muestra debajo de `action` cuando esta presente.
+   * Backward-compatible: los usos existentes que no pasan esta prop no se ven afectados.
+   */
+  secondaryAction?: React.ReactNode;
+  /**
+   * Mensaje informativo para contextos de solo lectura.
+   * Cuando esta presente, reemplaza a `action` y `secondaryAction` y se muestra
+   * con estilo sutil (sin botones) para no inducir a error en roles sin permiso.
+   */
+  readOnlyMessage?: string;
   className?: string;
 }
 
@@ -14,6 +25,8 @@ export function EmptyState({
   title,
   description,
   action,
+  secondaryAction,
+  readOnlyMessage,
   className,
 }: EmptyStateProps) {
   return (
@@ -37,7 +50,14 @@ export function EmptyState({
       {description && (
         <p className="mb-4 max-w-sm text-sm text-iconic-graphite/60">{description}</p>
       )}
-      {action && <div className="mt-2">{action}</div>}
+      {readOnlyMessage ? (
+        <p className="mt-2 max-w-sm text-xs text-iconic-graphite/40 italic">{readOnlyMessage}</p>
+      ) : (
+        <>
+          {action && <div className="mt-2">{action}</div>}
+          {secondaryAction && <div className="mt-2">{secondaryAction}</div>}
+        </>
+      )}
     </div>
   );
 }
