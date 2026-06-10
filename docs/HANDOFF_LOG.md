@@ -1,5 +1,31 @@
 # Handoff Log
 
+## 2026-06-10 — RELEASE CONTROLADO: Bootstrap Empty State CTAs → main (tag `bootstrap-empty-state-ctas-hotfix-v1`)
+
+> **Release controlado del hotfix.** Merge `--no-ff` de `fix/bootstrap-empty-state-ctas` a main. Sin migración, sin db push, sin deploy CLI. Producción intacta al inicio; deployment automático vía GitHub→Vercel.
+
+- **main inicial:** `2f16e4a` → **main final:** `26f3fca`
+- **Merge commit:** `26f3fca` (padres: `2f16e4a` + `3658f6b`) ✅ no-ff confirmado
+- **Fase 0 — Precheck:** carpeta ✅ rama ✅ HEAD `3658f6b` ✅ árbol limpio ✅ origin/main `2f16e4a` ✅ stashes intactos ✅ sin migraciones nuevas ✅
+- **Fase 1 — Merge + validación:** merge sin conflictos → typecheck 0 ✅ lint 0 ✅ tests 1012/1012 ✅ build PASS ✅ gm:regression 22/22 ✅ gm:import PASS ✅ diff --check limpio ✅ → `git push origin main` aceptado ✅
+- **Fase 2 — Deploy automático:** push `2f16e4a→26f3fca` aceptado por GitHub. Vercel MCP devuelve 403 (cuenta Vercel no vinculada al MCP); deployment confirmación queda a cargo de la usuaria. URL de producción responde durante smoke.
+- **Fase 3 — Smoke no destructivo:** `construction-ops-psi.vercel.app` — `/` 307 ✅ `/login` 200 ✅ `/dashboard` 307 ✅ `/catalog` 307 ✅ `/catalog/providers` 307 ✅ `/catalog/resources/new` 307 ✅ `/projects` 307 ✅ `/apu` 307 ✅ `/quantities` 307 ✅ `/planning` 307 ✅ — Sin HTTP 500. Rutas protegidas redireccionan.
+- **Fase 4 — Tag:** `bootstrap-empty-state-ctas-hotfix-v1` publicado en origin ✅
+- **Sin db push** ✅ | **Sin migraciones** ✅ | **Sin deploy CLI** ✅ | **Stashes intactos** ✅ | **main anterior no destruida** ✅
+
+### Siguiente acción recomendada
+1. Verificar en producción que el nuevo deployment está activo (nuevo hash visible en Vercel dashboard).
+2. Probar con usuario real: modo demo → confirmar botones deshabilitados con explicación visible.
+3. Probar con usuario autorizado supabase+db management/internal → confirmar botones habilitados.
+4. Crear proveedor Decorcerámica como primer proveedor real.
+5. Crear un único recurso Dolce Vita Sei.
+6. Registrar observación manual de precio.
+7. Validar URL pública del proveedor.
+8. Documentar compatibilidad real.
+9. Iniciar después `CATALOG_BULK_ONBOARDING_V1`.
+
+---
+
 ## 2026-06-10 — AJUSTE FINAL UX: Acciones deshabilitadas explicativas en demo y read-only (rama `fix/bootstrap-empty-state-ctas`)
 
 > **Ajuste acotado post-revisión visual.** Problema observado: /catalog/providers no mostraba "Nuevo proveedor" ni CTA cuando canCreate=false. /catalog tenía mensajes de title técnicos y solo cubría el caso demo, no el usuario read-only en modo supabase. Sin migración, sin db push, sin deploy, main intacta, producción intacta.
