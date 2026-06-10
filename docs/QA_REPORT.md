@@ -5,6 +5,49 @@ cada ciclo de validación.
 
 ---
 
+## Integración Final Local — Operational UX + Phase 3B + SSRF Fix (2026-06-09, rama `integration/operational-ux-price-validation-v1`)
+
+**Base:** `integration/iconic-ui-price-intelligence-v1` @ `d944bc1`. **Sin merge a main; sin deploy; sin db push remoto. main=22a408c intacta.**
+
+| Check | Resultado | Detalle |
+|---|---|---|
+| typecheck | ✅ PASS | 0 errores (fix mock `countPendingResourcePriceObservations` en Phase 3B) |
+| lint | ✅ PASS | 0 errores (ESLint 9 flat) |
+| tests suite completa | ✅ **944/944 PASS** | 42 skipped gated; +66 Operational UX +85 Phase 3B vs 809 base |
+| redirect tests | ✅ **15/15 PASS** | R01–R15: SSRF por salto confirmado |
+| Phase 3B security tests | ✅ **PASS** | T1–T38 + extras; sin red externa |
+| build | ✅ PASS | Next 16.2.6; `/workspace` y `/price-intelligence` presentes |
+| DB reset local | ✅ **26/26 migraciones** + 5 seeds | sin errores DB; B-004 vector no bloqueante |
+| RLS runtime | ✅ **106/106 PASS** | 25 tablas FORCE RLS, sin cambio de esquema |
+| read-model isolation | ✅ **12/12 PASS** | cross-org disjunto, deny-by-default |
+| gm:regression | ✅ **22/22 PASS** | golden master COP 372.247.170 intacto |
+| gm:import | ✅ PASS | diff=1.9e-8 (tol 0.01); sin fugas privadas |
+| MVP smoke E2E gated | ✅ **10/10 PASS** | `BOQ_SMOKE_DB=1` contra Supabase local |
+| git diff --check | ✅ limpio | sin trailing whitespace ni marcadores de conflicto |
+| validate-claude-agents | ✅ **214/0/0** | PASS/WARN/FAIL |
+
+**Fix de integración detectado:** `tests/unit/pricing/validation/service.test.ts` — mock `PriceObservationRepository` no incluía `countPendingResourcePriceObservations` (método añadido por Operational UX al dashboard). Corregido con `vi.fn().mockResolvedValue(0)` sin cambiar aserciones de tests. Commit `110a5f6`.
+
+**Seguridad Phase 3B verificada:**
+- URL inicial privada rechazada (T1–T11) ✅
+- Redirect → privado rechazado ANTES del fetch (R05, R06) ✅
+- Redirect → metadata rechazado (R11) ✅
+- Loop rechazado (R07) ✅
+- > 5 saltos rechazado (R04) ✅
+- 3xx sin Location rechazado (R08) ✅
+- Location inválido rechazado (R13) ✅
+- Redirect relativo resuelto (R09) ✅
+- Propuesta siempre pending (T32b) ✅
+- BOQ/AIU nunca modificados (T33, T34) ✅
+- Red externa no usada en tests (DNS inyectado, fetch mocked) ✅
+
+**Riesgos residuales:**
+- Revisión visual interactiva de la usuaria pendiente (workspace + simulador comercial + panel URL).
+- Deudas activas: `COST_TYPE_BREAKDOWN_FOUNDATION`, `COMMERCIAL_SIMULATION_PERSISTENCE`, B-004 (Realtime/vector Docker Windows).
+- DB remota no validada (no se hará hasta release aprobado).
+
+---
+
 ## Phase 3B — Security Fix: Redirect SSRF (2026-06-09, rama `feature/phase3b-price-validation-agent-v1`)
 
 **Fix acotado post-implementación.** Sin migración, sin DB reset, sin merge a main. Mismos constraints paralelo-seguros que Phase 3B.

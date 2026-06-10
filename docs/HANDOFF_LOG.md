@@ -1,5 +1,75 @@
 # Handoff Log
 
+## 2026-06-09 — INTEGRACIÓN FINAL LOCAL: Operational UX + Phase 3B + SSRF Fix (rama `integration/operational-ux-price-validation-v1`)
+
+> **Integración controlada de 3 oleadas** sobre base `integration/iconic-ui-price-intelligence-v1` @ `d944bc1`.
+> **main = `22a408c` intacta; producción intacta; sin deploy; sin db push remoto.**
+> Ejecutada por agent-orchestrator. HEAD inicial `d944bc1` → HEAD final `110a5f6`.
+
+### FASE 0 — Precheck
+- Invariantes confirmados: rama, árbol limpio, origin/main=22a408c, operational-ux=105d106, phase3b=6da64b1, stashes P1-A intactos.
+
+### FASE 1 — Merge Operational Budget UX V1
+- `git merge --no-ff origin/feature/operational-budget-ux-v1` → merge `3f6fd6d` — **sin conflictos** (26 archivos, 2626 inserciones).
+- Archivos clave: `boq-workspace.tsx`, `commercial-simulator.tsx`, `workspace/page.tsx`, `simulator-actions.ts`, `workspace-view.ts`, `commercial-simulation.ts`, `breakdown.ts`.
+
+### FASE 2 — Merge Phase 3B + SSRF Fix
+- `git merge --no-ff origin/feature/phase3b-price-validation-agent-v1` → **3 conflictos en docs/** (DECISIONS, HANDOFF_LOG, QA_REPORT) resueltos preservando ambas secciones → merge `6618877`.
+- Fix de integración: `countPendingResourcePriceObservations` añadido al mock de Phase 3B (`service.test.ts`) → commit `110a5f6`. Typecheck 0 errores post-fix.
+
+### FASE 3 — DB Reset Local
+- `npx supabase db reset --local` → **26/26 migraciones** + 5 seeds aplicados sin errores de DB.
+- Error `Updating vector buckets 404` = B-004 conocido (vector/realtime unhealthy en Docker Windows). No bloqueante.
+- Tablas pricing disponibles; trigger `rpo_set_suggested_net_price` activo; RLS pricing habilitado; constraints correctos.
+- Sin conexión remota. Sin db push.
+
+### FASE 4 — Validación Integral
+- typecheck: **0 errores** ✅
+- lint: **0 errores** ✅
+- tests: **944/944 PASS** (42 skipped gated) — +66 Operational UX +85 Phase 3B vs 809 base ✅
+- build: **PASS** (ruta `/workspace` y `/catalog/.../price-intelligence` presentes) ✅
+- RLS runtime: **106/106 PASS** (25 tablas FORCE RLS) ✅
+- read-model isolation: **12/12 PASS** ✅
+- gm:regression: **22/22 PASS** — golden master COP 372.247.170 intacto ✅
+- gm:import: **PASS** (diff=1.9e-8, tol 0.01) ✅
+- MVP smoke E2E gated `BOQ_SMOKE_DB=1`: **10/10 PASS** ✅
+- git diff --check: **limpio** ✅
+- validate-claude-agents: **214/0/0 PASS** ✅
+
+### FASE 5 — Seguridad Phase 3B
+- Redirect tests: **15/15 PASS** (R01–R15) ✅
+- SSRF tests: **T1–T11 + extras PASS** ✅
+- Adapters + normalize + service: PASS ✅
+- Invariantes: propuesta siempre pending, BOQ nunca modificado, AIU nunca modificada, red externa no usada en tests ✅
+
+### FASE 6 — Coherencia Visual
+- Dashboard: KPIs operativos, conteos (issuedVersions, pendingPriceObservations 🔒), accesos rápidos (Proveedores, Inteligencia de precios) ✅
+- BOQ Workspace: tabla densa, sticky header, capítulos colapsables, filtros, búsqueda, resumen financiero, simulador comercial (borde dashed cian, disclaimer) ✅
+- Price Intelligence: UrlValidationPanel wired con resourceId ✅
+- Branding: "Presupuestos" + "Grupo ICONIC"; sin "Construction Ops" visible; tokens ICONIC heredados ✅
+- Sin regresión visual en login, catálogo, proyectos ✅
+
+### Documentación
+- HANDOFF_LOG, DECISIONS, QA_REPORT, INTEGRATION_REQUESTS actualizados.
+- Ramas de feature usadas solo como origen de merge; no tocadas.
+
+### Estado al cierre
+- HEAD final: `110a5f6` · **main intacta** = `22a408c` · **producción intacta** · **stashes intactos**
+- Pendientes: revisión visual interactiva de la usuaria + aprobación para release.
+- NO merge a main. NO deploy. NO nueva feature.
+
+**Rutas prioritarias para revisión visual (`http://localhost:3030`):**
+- `/login` — identidad ICONIC
+- `/dashboard` — hero + KPIs operativos + accesos rápidos
+- `/projects` — lista de proyectos con shell ICONIC
+- `/projects/<id>/scopes/<scopeId>/estimates/<estimateId>` — detalle presupuesto
+- `/projects/<id>/scopes/<scopeId>/estimates/<estimateId>/workspace` — BOQ workspace + simulador
+- `/catalog` — catálogo
+- `/catalog/providers` — proveedores (Price Intelligence)
+- `/catalog/resources/<resourceId>/price-intelligence` — panel validar precio desde URL
+
+---
+
 ## 2026-06-09 — OLEADA OPERATIONAL BUDGET UX V1 (rama `feature/operational-budget-ux-v1`)
 
 > Base `integration/iconic-ui-price-intelligence-v1` @ `d944bc1`. **main = `22a408c` intacta;
