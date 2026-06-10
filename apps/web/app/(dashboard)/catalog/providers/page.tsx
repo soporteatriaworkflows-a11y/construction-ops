@@ -81,23 +81,31 @@ export default async function ProvidersPage() {
     );
   }
 
-  const headerActions = canCreate ? (
-    <Button asChild size="sm">
-      <Link href="/catalog/providers/new">Nuevo proveedor</Link>
-    </Button>
-  ) : (
-    <Button
-      size="sm"
-      disabled
-      title={
-        isDemoMode
-          ? 'Disponible con datos reales — inicia sesión para registrar proveedores'
-          : 'Sin permisos de creación — solicita acceso a un administrador'
-      }
-      aria-disabled="true"
-    >
-      Nuevo proveedor
-    </Button>
+  const headerActions = (
+    <>
+      {canCreate ? (
+        <Button asChild size="sm">
+          <Link href="/catalog/providers/new">Nuevo proveedor</Link>
+        </Button>
+      ) : (
+        <Button
+          size="sm"
+          disabled
+          title={
+            isDemoMode
+              ? 'Disponible con datos reales — inicia sesión para registrar proveedores'
+              : 'Sin permisos de creación — solicita acceso a un administrador'
+          }
+          aria-disabled="true"
+        >
+          Nuevo proveedor
+        </Button>
+      )}
+      {/* La ruta de importación siempre es navegable: explica demo/read-only sin botones rotos. */}
+      <Button asChild size="sm" variant="outline">
+        <Link href="/catalog/providers/import">Importar lista de precios</Link>
+      </Button>
+    </>
   );
 
   return (

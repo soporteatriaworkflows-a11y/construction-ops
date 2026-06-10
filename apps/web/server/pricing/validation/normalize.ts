@@ -113,7 +113,7 @@ export function normalizeExtraction(
   extractedAt: string,
   confidence: ConfidenceLevel,
 ): PriceValidationProposal {
-  const warnings: string[] = [];
+  const warnings: string[] = [...(data.warnings ?? [])];
 
   const observedPrice = parseRawPrice(data.rawPrice ?? '');
   if (!observedPrice) {

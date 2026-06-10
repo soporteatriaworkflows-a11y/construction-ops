@@ -19,6 +19,8 @@ export interface ExtractedProductData {
   externalReference: string | null;
   unit: string | null;
   extractionMethod: ExtractionMethod;
+  /** Avisos del extractor (p. ej. múltiples precios detectados). */
+  warnings?: string[];
 }
 
 /** Propuesta de observación (no persistida hasta confirmación humana). */
@@ -72,6 +74,16 @@ export interface FetchedPage {
   text: string;
   contentType: string;
   finalUrl: string;
+  /** Avisos de fetch (página pesada, HTML truncado…). Opcional: mocks legados. */
+  warnings?: string[];
+  /** `true` si el stream se canceló con evidencia suficiente (HTML parcial). */
+  truncated?: boolean;
 }
 
 export type PageFetcher = (url: string) => Promise<FetchedPage>;
+
+/**
+ * Sonda de corte temprano: recibe el HTML acumulado y la URL actual; si
+ * devuelve `true`, el stream se cancela (ya hay evidencia suficiente).
+ */
+export type EarlyStopProbe = (textSoFar: string, url: string) => boolean;
