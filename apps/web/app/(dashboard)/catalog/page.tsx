@@ -94,15 +94,21 @@ export default async function CatalogPage() {
     {},
   );
 
+  // CTA primario: importación masiva (flujo principal). La ruta /catalog/import
+  // siempre es navegable: explica el modo demo/read-only sin botones rotos.
   const headerActions = (
     <>
+      <Button asChild size="sm">
+        <Link href="/catalog/import">Importar catálogo</Link>
+      </Button>
       {canCreate ? (
-        <Button asChild size="sm">
+        <Button asChild size="sm" variant="outline">
           <Link href="/catalog/resources/new">Nuevo recurso</Link>
         </Button>
       ) : (
         <Button
           size="sm"
+          variant="outline"
           disabled
           title={
             isDemoMode
@@ -120,22 +126,10 @@ export default async function CatalogPage() {
     </>
   );
 
-  const emptyStateAction = canCreate ? (
-    <Button asChild>
-      <Link href="/catalog/resources/new">Crear primer recurso</Link>
-    </Button>
-  ) : (
+  const emptyStateAction = (
     <div className="flex flex-col items-center gap-1.5">
-      <Button
-        disabled
-        aria-disabled="true"
-        title={
-          isDemoMode
-            ? 'Disponible con datos reales — inicia sesión para crear recursos'
-            : 'Sin permisos de creación — solicita acceso a un administrador'
-        }
-      >
-        Crear primer recurso
+      <Button asChild>
+        <Link href="/catalog/import">Importar catálogo</Link>
       </Button>
       {disabledNotice && (
         <p className="text-xs text-amber-700" role="note">
@@ -143,6 +137,25 @@ export default async function CatalogPage() {
         </p>
       )}
     </div>
+  );
+
+  const emptyStateSecondary = canCreate ? (
+    <Button variant="outline" asChild>
+      <Link href="/catalog/resources/new">Crear recurso manualmente</Link>
+    </Button>
+  ) : (
+    <Button
+      variant="outline"
+      disabled
+      aria-disabled="true"
+      title={
+        isDemoMode
+          ? 'Disponible con datos reales — inicia sesión para crear recursos'
+          : 'Sin permisos de creación — solicita acceso a un administrador'
+      }
+    >
+      Crear recurso manualmente
+    </Button>
   );
 
   return (
@@ -167,13 +180,9 @@ export default async function CatalogPage() {
         <EmptyState
           icon={BookOpen}
           title="Catálogo vacío"
-          description="No hay recursos en el catálogo de la organización."
+          description="Carga recursos desde Excel o CSV. La creación manual queda disponible para casos puntuales."
           action={emptyStateAction}
-          secondaryAction={
-            <Button variant="outline" asChild>
-              <Link href="/catalog/providers">Gestionar proveedores</Link>
-            </Button>
-          }
+          secondaryAction={emptyStateSecondary}
         />
       ) : (
         <div className="space-y-8">
