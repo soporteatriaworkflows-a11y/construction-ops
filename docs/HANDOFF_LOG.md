@@ -1,5 +1,22 @@
 # Handoff Log
 
+## 2026-06-09 — PRE-RELEASE: Migraciones Pricing aplicadas al remoto (rama `integration/operational-ux-price-validation-v1`)
+
+> **Aplicación de 3 migraciones pricing al DB remoto.** Sin seeds, sin reset, sin db pull. DB remota: 26/26 Local = Remote. Lint sin errores.
+
+- **FASE 0 — Precheck:** invariants confirmados (rama candidata, HEAD=29f5a9f, main=22a408c, origin candidata=29f5a9f, stashes intactos).
+- **FASE 1 — Dry-run:** 3 migraciones pendientes detectadas — exactamente las esperadas: 20260610090000, 090100, 090200 (pricing). GATE ESTRICTO PASS (aditivas, sin DROP destructivo, sin DELETE, sin seeds, RLS coherente, trigger coherente).
+- **FASE 2 — `supabase db push --linked`:** 3 migraciones aplicadas. `migration list --linked` = **26/26 Local = Remote**. Dry-run final: "Remote database is up to date." `db lint --linked`: "No schema errors found."
+- **Migraciones aplicadas al remoto:**
+  - `20260610090000_resource_price_intelligence.sql` (tabla `resource_price_observations`, extensión `suppliers`, trigger `app.set_rpo_suggested_net_price`)
+  - `20260610090100_rls_resource_price_intelligence.sql` (ENABLE FORCE RLS + 3 policies)
+  - `20260610090200_fix_discount_percent_precision.sql` (NUMERIC(6,4)→(7,4), DROP+RECREATE policy necesario para ALTER COLUMN TYPE)
+- **Deuda registrada:** `PUBLIC_SOURCE_COMPATIBILITY_BENCHMARK` — durante la revisión visual local una URL pública real no fue compatible con los adaptadores genéricos V1 (probable JS-rendering o anti-bot). No bloquea el release. Evaluar post-release con fuentes reales (Homecenter, Decorcerámica). Sin headless browser, sin evasión, sin scraping.
+- **Revisión visual:** aprobada por la usuaria.
+- **Estado:** candidata lista para merge a main.
+
+---
+
 ## 2026-06-09 — INTEGRACIÓN FINAL LOCAL: Operational UX + Phase 3B + SSRF Fix (rama `integration/operational-ux-price-validation-v1`)
 
 > **Integración controlada de 3 oleadas** sobre base `integration/iconic-ui-price-intelligence-v1` @ `d944bc1`.

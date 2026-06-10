@@ -5,6 +5,27 @@ cada ciclo de validación.
 
 ---
 
+## Pre-Release DB Sync — Migraciones Pricing aplicadas (2026-06-09, rama `integration/operational-ux-price-validation-v1`)
+
+**Rama candidata:** HEAD `29f5a9f`. main=`22a408c`. Sin merge; sin seeds remotos; sin db reset; sin db pull.
+
+| Check | Resultado | Detalle |
+|---|---|---|
+| dry-run migraciones | ✅ GATE PASS | Exactamente 3 pendientes: 090000, 090100, 090200 — aditivas, sin DROP destructivo, sin DELETE, sin seeds |
+| `supabase db push --linked` | ✅ PASS | 3 migraciones aplicadas sin error |
+| migration list --linked | ✅ **26/26 Local = Remote** | Paridad completa |
+| dry-run post-push | ✅ PASS | "Remote database is up to date" |
+| db lint --linked | ✅ PASS | "No schema errors found" |
+| Revisión visual | ✅ Aprobada por usuaria | Dashboard, workspace BOQ, price-intelligence coherentes |
+| PUBLIC_SOURCE_COMPATIBILITY_BENCHMARK | ⚠️ DEUDA | URL real no compatible con adaptadores genéricos V1 durante revisión local (probable JS-rendering / anti-bot). No bloquea. |
+
+**Migraciones aplicadas al remoto:**
+- `20260610090000` — `resource_price_observations` tabla + `suppliers` extensión + trigger `set_rpo_suggested_net_price`
+- `20260610090100` — ENABLE FORCE RLS + 3 policies en `resource_price_observations`
+- `20260610090200` — `discount_percent` NUMERIC(6,4)→(7,4); DROP+RECREATE `rpo_update_review_only` (requerido por ALTER COLUMN TYPE)
+
+---
+
 ## Integración Final Local — Operational UX + Phase 3B + SSRF Fix (2026-06-09, rama `integration/operational-ux-price-validation-v1`)
 
 **Base:** `integration/iconic-ui-price-intelligence-v1` @ `d944bc1`. **Sin merge a main; sin deploy; sin db push remoto. main=22a408c intacta.**
