@@ -1,6 +1,43 @@
 # QA Report — Construction Ops
 
 Este documento es propiedad de **agent-qa**. Se actualiza al final de
+
+---
+
+## Hotfix Bootstrap CTAs (2026-06-10, rama `fix/bootstrap-empty-state-ctas`)
+
+**Commit:** `ab2f4e0` · **Rama:** `fix/bootstrap-empty-state-ctas` · **main = `2f16e4a` intacta** · **producción intacta**
+
+| Check | Resultado | Detalle |
+|---|---|---|
+| typecheck | ✅ 0 errores | `tsc --noEmit` sin output |
+| lint | ✅ 0 errores | `eslint .` sin output |
+| tests | ✅ **970/970 PASS** | 42 skipped gated; +26 nuevos (catalog module) |
+| build | ✅ PASS | `/catalog/resources/new` presente en build output |
+| gm:regression | ✅ **22/22 PASS** | Golden master $372.247.170 intacto |
+| git diff --check | ✅ limpio | Solo advertencias CRLF Windows (normales) |
+| main intacta | ✅ | 2f16e4a intacto |
+| producción intacta | ✅ | Sin deploy |
+| migración nueva | ✅ ninguna | server/catalog sin migración |
+| db push remoto | ✅ ninguno | Solo lectura local |
+| botones falsos | ✅ ninguno | APU/Cantidades/Cronograma sin CTA; solo texto explicativo |
+| RLS conservado | ✅ | organizationId siempre server-side; RLS-bound client |
+| branding ICONIC | ✅ intacto | Tokens, colores y layout sin cambios |
+
+### Módulos corregidos
+- `/catalog`: header actions + EmptyState CTAs + filas → Price Intelligence
+- `/catalog/providers`: button en PageHeader + EmptyState CTA
+- `/catalog/resources/new`: nueva ruta funcional con guard de modo
+- `/catalog/resources/[id]/price-intelligence`: disclaimer visible
+- `/apu`, `/quantities`, `/planning`: EmptyState con texto honesto
+- `/estimates`: EmptyState con guía + CTA → Proyectos
+
+### Deudas identificadas
+- `APU_CREATE_FLOW`: no existe flujo de creación manual de APUs
+- `QUANTITIES_CREATE_FLOW`: no existe flujo manual de cantidades
+- `PLANNING_CREATE_FLOW`: no existe flujo manual de cronograma
+
+---
 cada ciclo de validación.
 
 ---

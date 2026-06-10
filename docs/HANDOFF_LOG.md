@@ -1,5 +1,41 @@
 # Handoff Log
 
+## 2026-06-10 — HOTFIX: Bootstrap empty state CTAs y descubribilidad del catálogo (rama `fix/bootstrap-empty-state-ctas`)
+
+> **Hotfix acotado de UX.** Bootstrap dead-end detectado en prueba real: organización vacía no tenía acciones visibles. Sin migración, sin db push, sin deploy, main intacta, producción intacta.
+
+- **FASE 0 — Precheck:** rama `fix/bootstrap-empty-state-ctas`, árbol limpio, `origin/main = 2f16e4a`, stashes intactos (P1-A security WIP).
+- **FASE 1 — Auditoría:** 8 pantallas auditadas. /catalog y /catalog/providers sin CTAs; Price Intelligence sin disclaimer; APU/Cantidades/Cronograma/Presupuestos con EmptyState sin guía útil; Proyectos ya correcto.
+- **FASE 2 — Catálogo:** Header: [Nuevo recurso, Gestionar proveedores]. EmptyState: [Crear primer recurso, Gestionar proveedores]. Filas de recurso enlazadas a Price Intelligence. Módulo `server/catalog/` creado (types, errors, validation, db-repository, index). Ruta `/catalog/resources/new` con formulario seguro (code/name/resourceType/unit, organizationId server-side, RLS-bound, validación pura).
+- **FASE 3 — Price Intelligence:** Disclaimer visible a todos los roles: "La validación web propone una observación. No modifica automáticamente presupuestos ni aprueba precios."
+- **FASE 4 — Otros módulos:** APU/Cantidades/Cronograma: EmptyState con texto explicativo real (sin CTAs falsos). Presupuestos: guía de flujo preservando texto "Aún no hay presupuestos registrados" + CTA "Ir a Proyectos". Proveedores: botón movido a PageHeader.actions, CTA en EmptyState.
+- **FASE 5 — EmptyState:** Props `secondaryAction` y `readOnlyMessage` añadidas de forma retrocompatible.
+- **FASE 6 — Tests:** 3 nuevos archivos de test (bootstrap-ctas, route-config, empty-state-ctas) — validación pura sin DB.
+- **FASE 7 — Validación:** typecheck 0 errores ✅ | lint 0 errores ✅ | tests **970/970 PASS** (42 skipped gated) ✅ | build **PASS** (`/catalog/resources/new` presente) ✅ | gm:regression 22/22 ✅ | git diff --check limpio ✅
+- **Commit:** `ab2f4e0` — 19 files, +1002/-49 lines.
+- **Rama publicada:** `fix/bootstrap-empty-state-ctas` → origin.
+- **Servidor local:** `http://localhost:3040` listo.
+
+### Rutas para revisión visual
+- `http://localhost:3040/catalog` — Header + EmptyState con CTAs
+- `http://localhost:3040/catalog/providers` — Header button + EmptyState CTA
+- `http://localhost:3040/catalog/resources/new` — Formulario de nuevo recurso
+- `http://localhost:3040/apu` — EmptyState mejorado
+- `http://localhost:3040/quantities` — EmptyState mejorado
+- `http://localhost:3040/planning` — EmptyState mejorado
+- `http://localhost:3040/estimates` — EmptyState con guía + CTA
+- `http://localhost:3040/projects` — Sin cambios (ya tenía CTAs)
+
+### Módulos sin backend de creación (sin CTA de creación)
+- APU: no existe flujo de creación manual; se llena desde importación de presupuesto.
+- Cantidades: no existe flujo manual; se cargan desde scopes del proyecto.
+- Cronograma: no existe flujo manual; requiere módulo de planning.
+- Deudas registradas en INTEGRATION_REQUESTS.
+
+### Estado al cierre
+- HEAD: `ab2f4e0` · **main intacta** = `2f16e4a` · **producción intacta** · **sin deploy** · **sin migración** · **stashes intactos**
+- Pendiente: revisión visual de la usuaria → release hotfix corto → continuar prueba Decorcerámica.
+
 ## 2026-06-09 — PRE-RELEASE: Migraciones Pricing aplicadas al remoto (rama `integration/operational-ux-price-validation-v1`)
 
 > **Aplicación de 3 migraciones pricing al DB remoto.** Sin seeds, sin reset, sin db pull. DB remota: 26/26 Local = Remote. Lint sin errores.
