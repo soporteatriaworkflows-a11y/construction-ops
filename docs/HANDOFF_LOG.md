@@ -54,6 +54,56 @@
 
 ### Agentes activos al cierre
 - Ninguno.
+## 2026-06-09 — PHASE 3B — SECURITY FIX: Redirect SSRF (rama `feature/phase3b-price-validation-agent-v1`)
+
+> **Fix acotado de seguridad post-implementación.** Sin DB reset, sin migraciones, sin servidor local, sin merge a main. Mismos constraints paralelo-seguros que Phase 3B.
+
+**Problema identificado:** `fetch-public-page.ts` usaba `redirect: 'follow'` (hasta 20 saltos nativos sin validación SSRF en saltos intermedios). Un redirect a `http://169.254.169.254/` en un salto intermedio pasaría desapercibido porque el check `isFinalUrlSafe` solo evaluaba la URL final.
+
+**Fix aplicado:**
+- Reescrito `fetch-public-page.ts`: `redirect: 'manual'` + loop manual (máx 5 saltos).
+- Antes de cada hop: `validatePublicUrl(currentUrl, dnsLookup)` con resolución DNS real. Cualquier `UrlValidationError` → `FetchPublicPageError('redirect_to_private', ...)`.
+- Loop detection: `Set<string>` de URLs visitadas → `redirect_loop`.
+- 3xx sin Location → `redirect_missing_location`.
+- Location con URL inválida → `redirect_invalid_url`.
+- Redirects relativos: `new URL(location, currentUrl)`.
+- Firma actualizada: `fetchPublicPage(url, fetcher?, dnsLookup?)` — backward compatible.
+- `index.ts` actualizado para propagar `deps?.dnsLookup` a `fetchPublicPage`.
+- 15 tests nuevos `redirect.test.ts` (R01–R15) con `vi.stubGlobal('fetch', mock)` + DNS inyectado.
+
+**Validación:** typecheck 0, lint 0, **878/878 tests PASS** (↑15 vs 863), git diff --check limpio.
+
+**HEAD final (antes del push):** pendiente commit `fix(pricing): validate every redirect hop before public price fetch`.
+
+---
+
+## 2026-06-09 — PHASE 3B — PRICE VALIDATION AGENT V1 (rama `feature/phase3b-price-validation-agent-v1`)
+
+> **Ejecución paralela segura.** Base `integration/iconic-ui-price-intelligence-v1` @ `d944bc1`. Sin DB reset, sin migraciones, sin servidor local, sin merge a main.
+
+- **FASE 0 — Precheck:** invariants confirmados (worktree correcto, rama correcta, HEAD=d944bc1, árbol limpio, origin/main=22a408c, stashes intactos).
+- **FASE 1 — Inspección:** server/pricing/ (Phase 3A), UI price-intelligence, tests unitarios pricing.
+- **FASE 2 — Contrato congelado:** `docs/PRICE_VALIDATION_AGENT_V1_CONTRACT.md` → commit `ea71df9`.
+- **FASE 3 — Backend aislado:** `apps/web/server/pricing/validation/` (9 archivos: types, validate-url + SSRF, fetch-public-page, adapters JSON-LD + meta + index, normalize, confidence, service index) → commit `8253386`. Exportaciones Phase 3B en `server/pricing/index.ts`.
+- **FASE 4 — UI Price Intelligence:** `url-validation-panel.tsx` (client, useActionState React 19), `actions.ts` extendido (validatePublicUrlAction + confirmProposalAction), `page.tsx` integrado → commit `8b90ed3`.
+- **FASE 5 — Tests unitarios puros (sin red, sin DB):** 70 tests nuevos en `tests/unit/pricing/validation/` (validate-url: 14, adapters: 13, normalize: 12, service: 13) — **863/863 PASS** total. Covers T1–T38 del spec.
+- **FASE 6 — Validación:** typecheck **0 errores**, lint **0 errores**, tests **863/863 PASS**, git diff **limpio**.
+- **FASE 7 — Documentación:** HANDOFF_LOG, DECISIONS, QA_REPORT actualizados.
+- **FASE 8 — Publicar:** rama `feature/phase3b-price-validation-agent-v1` publicada → origin. STOP.
+
+**HEAD final:** `8b90ed3` · **main intacta** = `22a408c` · **producción intacta** · **stashes intactos** · **sin merge, sin deploy, sin DB reset**
+
+**Checks diferidos (trabajo paralelo operational-budget-ux-v1 activo):**
+- supabase db reset local
+- RLS runtime harness (106/106 esperado sin cambio de esquema)
+- smoke MVP e2e
+- revisión visual servidor local
+- merge de ramas en orden
+- deploy Vercel
+
+**Siguiente acción:** esperar cierre de Operational UX → integrar ramas → db reset local → RLS + smoke → revisión visual → decidir release.
+
+---
 
 ## 2026-06-09 — INTEGRACIÓN ICONIC UI + PRICE INTELLIGENCE (rama `integration/iconic-ui-price-intelligence-v1`)
 
