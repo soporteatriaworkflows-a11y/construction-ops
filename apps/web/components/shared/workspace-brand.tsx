@@ -45,10 +45,12 @@ export function WorkspaceBrand({ variant = 'sidebar', className }: { variant?: V
 
   if (variant === 'login') {
     return (
-      <div className={cn('flex flex-col items-center gap-4', className)}>
-        <WorkspaceLogoFull />
+      <div className={cn('flex flex-col items-center gap-3 sm:gap-4', className)}>
+        <WorkspaceLogoFull className="max-w-[210px] sm:max-w-none" />
         <div className="text-center">
-          <p className="text-2xl font-bold tracking-tight text-iconic-ink">{ws.productName}</p>
+          <p className="text-xl font-bold tracking-tight text-iconic-ink sm:text-2xl">
+            {ws.productName}
+          </p>
           <p className="mt-0.5 text-sm font-medium text-iconic-primary">{ws.workspaceName}</p>
           <p className="mt-1 text-xs text-iconic-graphite/70">{ws.descriptor}</p>
         </div>
