@@ -1,5 +1,48 @@
 # Handoff Log
 
+## 2026-06-10 — OLEADA CATALOG_BULK_ONBOARDING_V1 + PUBLIC SOURCE COMPATIBILITY FIX V1 (rama `feature/catalog-bulk-onboarding-v1`)
+
+> **Centro de incorporación de catálogo + compatibilidad con páginas comerciales grandes.** Base `origin/main = 26f3fca`. Sin merge a main, sin deploy, sin db push remoto, sin datos dummy remotos, stashes intactos.
+
+- **Commits:** `d933ceb` (contrato) → `1f145e8` (dominio import) → `83de756` (UI) → `04c01db` (large-page + adapter) → `5cc1057` (tests) → docs (este commit).
+- **Contrato congelado:** `docs/CATALOG_BULK_ONBOARDING_V1_CONTRACT.md`.
+
+### A. Importación masiva de recursos — `/catalog/import`
+- Formatos: `.xlsx`, `.xls`, `.csv` (SheetJS, `cellFormula:false`, lectura `raw` para CSV ⇒ jamás ejecuta fórmulas/macros). Límites server-side: 10MB, 5.000 filas de datos.
+- Mapeo de columnas por sinónimos es/en + corrección manual en wizard (el mapeo viaja como intención y se re-valida server-side).
+- Preview: total/nuevas/existentes/duplicadas/inválidas/omitidas/observaciones pendientes; validaciones de código (patrón + vacío), nombre, resourceType (sinónimos), unidad (vacía=error, no reconocida=warning), precio/descuento/moneda, referencias externas repetidas.
+- **Nunca sobrescribe**: existente ⇒ `skip_existing`; duplicado en archivo ⇒ solo primera ocurrencia; carrera 23505 ⇒ skip reportado.
+- Confirmación batch: digest SHA-256 preview↔confirm; inserts por chunks RLS-bound; `organization_id`/`created_by` server-side; precio válido ⇒ observación `pending` (`supplier_csv`/`manual`); precio inválido ⇒ recurso importa, observación rechazada y reportada.
+- Reporte CSV descargable **sanitizado** contra formula injection (`lib/catalog-import/csv.ts`).
+- CTAs en el catálogo: primario "Importar catálogo", secundario "Nuevo recurso", acceso "Gestionar proveedores"; estado vacío según mandato ("Carga recursos desde Excel o CSV. La creación manual queda disponible para casos puntuales.").
+
+### B. Lista de precios de proveedor — `/catalog/providers/import`
+- Selección de proveedor existente; matching V1 estricto: `externalSku` → `externalReference` → `code`; ambiguos (≥2 recursos) ⇒ "Sin asociar" con motivo; sin match ⇒ "Sin asociar" exportable. NUNCA crea recursos.
+- Cada precio ⇒ observación `pending` del proveedor (`supplier_csv`). Nunca `approved`; nunca toca BOQ/AIU/exports; el trigger DB `set_rpo_suggested_net_price` conserva el invariante del neto.
+
+### C. BOQ → catálogo asistido — DIFERIDO
+- Deuda `BOQ_TO_CATALOG_ASSISTED_BOOTSTRAP` registrada (INTEGRATION_REQUESTS + contrato §7): el parser BOQ expone actividades, no recursos (faltan resourceType, desglose APU, código de catálogo, precio de insumo).
+
+### D. Large-page fix + Adapter Decorcerámica
+- Evidencia real: URL autorizada = 1.295.123 bytes (~1,26MB), HTTP 200 — el cap previo de 512KB la rechazaba.
+- `fetch-public-page`: hard cap **3MB**; 512KB ⇒ warning "página pesada"; sonda de corte temprano (precio+moneda estructurados ⇒ stream cancelado + warning `truncated`). SSRF/DNS por salto, redirects manuales ≤5, loop detection, timeout 10s, content-type guard INTACTOS. Sin crawling/headless/evasión.
+- Adapter `decorceramica.com` aislado por hostname (registro en `adapters/index.ts`; genéricos = fallback): AggregateOffer + ofertas anidadas, mpn `KP04NG1620`, meta sku `6751`, 169000 COP; múltiples precios ⇒ warning explícito (propone el menor); unit SIEMPRE null. Fixture sanitizado `tests/fixtures/decorceramica-product.html` (sin red en tests).
+
+### E. Migración y archivos compartidos
+- `20260611090000_resources_import_metadata.sql` — aditiva local: `resources` + description/category/brand/external_reference/external_sku + CHECKs de longitud + índices parciales de matching. RLS heredado (FORCE existente). **NO aplicada al remoto.**
+- `next.config.mjs` (orquestador): `bodySizeLimit` 4mb→12mb. Riesgo Vercel (~4.5MB) documentado ⇒ deuda `LARGE_FILE_DIRECT_UPLOAD`.
+
+### Validación (todo PASS)
+typecheck 0 · lint 0 · suite **1075/1075** (42 gated) · smoke gated DB local **42/42** (`BOQ_SMOKE_DB=1`) · build (rutas nuevas presentes) · `db reset --local` 27 migraciones + 5 seeds · RLS harness **106/106** · read-model isolation **12/12** · gm:regression **22/22** · gm:import PASS · redirect 15/15 · validador agentes **214/0/0** · `git diff --check` limpio.
+
+### Deudas registradas
+`DOCUMENT_LIST_IMPORT_V1` · `BOQ_TO_CATALOG_ASSISTED_BOOTSTRAP` · `COLUMN_MAPPING_PRESETS` · `LARGE_FILE_DIRECT_UPLOAD`.
+
+### Estado al cierre
+- **main intacta** = `26f3fca` · **producción intacta** (construction-ops-psi.vercel.app) · **sin deploy** · **sin db push remoto** · **stashes intactos** (2 WIP P1-A) · release pendiente (el pre-release aplicará la migración nueva con dry-run gate).
+
+---
+
 ## 2026-06-10 — AJUSTE FINAL UX: Acciones deshabilitadas explicativas en demo y read-only (rama `fix/bootstrap-empty-state-ctas`)
 
 > **Ajuste acotado post-revisión visual.** Problema observado: /catalog/providers no mostraba "Nuevo proveedor" ni CTA cuando canCreate=false. /catalog tenía mensajes de title técnicos y solo cubría el caso demo, no el usuario read-only en modo supabase. Sin migración, sin db push, sin deploy, main intacta, producción intacta.

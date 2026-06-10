@@ -204,12 +204,19 @@ necesariamente un rol de fila; se trata en el perfil de exports).
 | unit | TEXT | NOT NULL | unidad de medida |
 | default_waste_pct | NUMERIC(20,10) | NOT NULL | DEFAULT 0 (fracción, ej. 0.05) |
 | active | BOOLEAN | NOT NULL | DEFAULT true |
+| description | TEXT | NULL | CATALOG_BULK_ONBOARDING_V1; len ≤500 |
+| category | TEXT | NULL | CATALOG_BULK_ONBOARDING_V1; len ≤120 |
+| brand | TEXT | NULL | CATALOG_BULK_ONBOARDING_V1; len ≤120 |
+| external_reference | TEXT | NULL | matching listas de precios; len ≤120 |
+| external_sku | TEXT | NULL | matching listas de precios; len ≤120 |
 | created_at | TIMESTAMPTZ | NOT NULL | |
 | updated_at | TIMESTAMPTZ | NOT NULL | |
 6. **PK**: `id`. 7. **FK**: `organization_id`. 8. **ON DELETE**: org CASCADE.
 9. **organization_id**: directo. 10. **RLS**: por organización.
-11. **Índices**: PK; `(organization_id)`; UNIQUE `(organization_id, code)`; `(organization_id, resource_type)`.
-12. **Integridad**: `default_waste_pct >= 0`.
+11. **Índices**: PK; `(organization_id)`; UNIQUE `(organization_id, code)`; `(organization_id, resource_type)`;
+    parciales `(organization_id, external_sku)` y `(organization_id, external_reference)` (NO únicos:
+    la ambigüedad de matching se reporta en aplicación, nunca se resuelve en silencio).
+12. **Integridad**: `default_waste_pct >= 0`; CHECKs de longitud en columnas de importación.
 13. **Enums**: `resource_type IN ('material','labor','equipment','tool','subcontract','other')`.
 14-15. **Inmutabilidad/Snapshot**: —.
 16. 🔒 INTERNO: —. 17. **Dudas**: `default_waste_pct` como fracción (0–1) — confirmado v1.

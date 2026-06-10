@@ -4,6 +4,36 @@ Este documento es propiedad de **agent-qa**. Se actualiza al final de
 
 ---
 
+## CATALOG_BULK_ONBOARDING_V1 + PUBLIC SOURCE COMPATIBILITY FIX V1 (2026-06-10, rama `feature/catalog-bulk-onboarding-v1`)
+
+**Base:** `origin/main = 26f3fca` · **main intacta** · **producción intacta** · **sin db push remoto**
+
+| Check | Resultado | Detalle |
+|---|---|---|
+| typecheck | ✅ 0 errores | `tsc --noEmit` sin output |
+| lint | ✅ 0 errores | `eslint .` sin output |
+| suite completa | ✅ **1075/1075 PASS** | +63 nuevos (catalog-import 47, large-page 9, decorceramica 10, ajuste disabled-actions) |
+| smoke gated (DB local) | ✅ **42/42 PASS** | `BOQ_SMOKE_DB=1`: MVP e2e 10/10 + BOQ edit/archive/issue/compare 32/32 |
+| build | ✅ PASS | `/catalog/import` y `/catalog/providers/import` presentes |
+| RLS harness | ✅ **106/106 PASS** | `db reset --local`: 27 migraciones (incl. `20260611090000`) + 5 seeds |
+| read-model isolation | ✅ **12/12 PASS** | cross-org disjunto, deny-by-default |
+| gm:regression | ✅ **22/22 PASS** | Golden master $372.247.170 intacto |
+| gm:import | ✅ PASS | fixture canónico, sin fugas privadas, idempotente |
+| redirect tests | ✅ 15/15 (en suite) | R01–R15 intactos con el nuevo fetcher |
+| validate-claude-agents | ✅ 214 / 0 / 0 | PASS global |
+| git diff --check | ✅ limpio | solo avisos CRLF de Windows |
+| migración nueva | ✅ aditiva local | columnas de importación en `resources`; aplicada solo local |
+| seguridad import | ✅ | organizationId/created_by server-side; sin fórmulas; CSV sanitizado; sin sobrescrituras; observaciones siempre `pending` |
+| seguridad web fetch | ✅ | hard cap 3MB; SSRF por salto; redirects manuales ≤5; timeout; content-type guard; T37–T43 |
+
+### Cobertura del mandato (56 casos)
+- Archivos T01–T08 ✅ · Mapeo T09–T14 ✅ · Preview T15–T20 ✅ · Import T21–T27 ✅
+- Lista proveedor T28–T36 ✅ (T36: invariante de neto delegado al trigger DB `set_rpo_suggested_net_price`, verificado vía RLS harness + migración)
+- Web large page T37–T43 ✅ · Decorcerámica T44–T50 ✅ (fixture sanitizado, sin red)
+- Regresión T51–T56 ✅: Price Intelligence 3A, Price Validation Agent (incl. redirect 15/15), BOQ workspace, branding ICONIC, bootstrap CTAs (spec actualizada a bulk onboarding), golden master — todo en verde en la suite completa.
+
+---
+
 ## Hotfix Bootstrap CTAs (2026-06-10, rama `fix/bootstrap-empty-state-ctas`)
 
 **Commit:** `ab2f4e0` · **Rama:** `fix/bootstrap-empty-state-ctas` · **main = `2f16e4a` intacta** · **producción intacta**
