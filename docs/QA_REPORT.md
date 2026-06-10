@@ -5,6 +5,41 @@ cada ciclo de validación.
 
 ---
 
+## OLEADA OPERATIONAL BUDGET UX V1 (2026-06-09, rama `feature/operational-budget-ux-v1`)
+
+**Base:** `integration/iconic-ui-price-intelligence-v1` @ `d944bc1`. **main = `22a408c` intacta; producción intacta; sin deploy; sin db push remoto; Phase 3B NO iniciada. 0 migraciones nuevas.**
+
+| Check | Resultado | Detalle |
+|---|---|---|
+| typecheck | ✅ PASS | 0 errores |
+| lint | ✅ PASS | 0 errores (ESLint 9 flat + react-hooks) |
+| tests unitarios | ✅ **875/875 PASS** | 42 skipped (gated); +66 tests de la oleada |
+| tests de la oleada | ✅ **66/66 PASS** | commercial-simulation (23) + workspace-view/breakdown (13) + guardas de fuente (26) + conteos operativos (4) |
+| smoke E2E gated | ✅ **42/42 PASS** | `BOQ_SMOKE_DB=1` contra Supabase local (repo real + RLS) |
+| build | ✅ PASS | Next 16.2.6; ruta `/projects/.../estimates/[estimateId]/workspace` presente |
+| DB reset local | ✅ PASS | `supabase db reset --local`: 26 migraciones + 5 seeds |
+| RLS runtime | ✅ **106/106 PASS** | 25 tablas FORCE RLS, sin cambios de esquema |
+| read-model isolation | ✅ **12/12 PASS** | cross-org disjunto, deny-by-default |
+| gm:regression | ✅ **22/22 PASS** | golden master intacto |
+| gm:import | ✅ PASS | total_costo=$372.247.169,98 (diff 1.9e-8, tol 0.01); sin fugas privadas |
+| git diff --check | ✅ limpio | sin trailing whitespace ni marcadores |
+| validate-claude-agents | ✅ **214/0/0** | PASS/WARN/FAIL |
+| no-modificación de exports | ✅ PASS | `server/estimates/export/*` y `/api/*` sin cambios (git status) |
+| no-modificación de Price Intelligence | ✅ PASS | solo adición de `countPendingResourcePriceObservations` (read-only, count head) |
+| simulador read-only | ✅ PASS | guard test: sin mutaciones, base server-derived, disclaimer presente |
+| issued inmutable | ✅ PASS | smoke 42/42 + banner UI + gating `canMutate` |
+
+**Cobertura nueva exigida por el mandato:** BOQ workspace (filtros, búsqueda,
+collapse), edición rápida (campos permitidos, sin subtotal del navegador),
+bloqueo issued, recalculado server-side, resumen financiero, desglose por
+capítulos (incl. base cero), simulador (porcentajes inválidos, base cero,
+3 estados de objetivo, pureza/no-modificación), golden master intacto.
+
+**Riesgos residuales:**
+- Revisión visual interactiva de la usuaria pendiente (workspace denso + simulador).
+- La edición rápida solo opera en modo `supabase+db` (igual que 4E.2A); en fixture es read-only por diseño.
+- Deudas registradas: `COST_TYPE_BREAKDOWN_FOUNDATION`, `COMMERCIAL_SIMULATION_PERSISTENCE`; B-004 (Realtime) sigue vigente.
+
 ## Integración ICONIC UI + Price Intelligence 3A (2026-06-09, rama `integration/iconic-ui-price-intelligence-v1`)
 
 **Base:** `main` = `22a408c`. **Sin merge a main; sin deploy; sin db push remoto.**
