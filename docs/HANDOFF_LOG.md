@@ -1,5 +1,54 @@
 # Handoff Log
 
+## 2026-06-10 — HOTFIX PROVIDER_PRICE_LIST_MAPPING_UX_FIX_V1 (rama `fix/provider-price-list-mapping-ux-v1`)
+
+> **Hotfix acotado de UX de mapeo de lista de precios de proveedor.** Base `origin/main = bd97abb`. Sin merge a main, sin deploy, sin db push, sin migración, sin features nuevas.
+
+- **HEAD inicial:** `bd97abb` → **HEAD final:** (commit pendiente de release)
+- **Archivos modificados:** 4 (price-list-wizard.tsx, catalog-import-wizard.tsx, +2 test files nuevos)
+- **Causa raíz:** El wizard de lista de precios (`/catalog/providers/import`) no diferenciaba visualmente entre campos requeridos vs opcionales, mostraba todos los campos como una tabla plana sin indicadores, y no tenía resumen de auto-detección. Esto generaba confusión donde la usuaria veía el mapeo de catálogo (que SÍ exige name/resourceType) como referencia, y el error del servidor sobre campos faltantes no era lo suficientemente claro en contexto.
+- **Contratos separados confirmados y documentados:**
+  - CATÁLOGO: requeridos `code, name, resourceType, unit`. Opcionales: description, category, brand, externalReference, externalSku, defaultWastePct, providerName, sourceUrl, observedPrice, discountPercent, currency, validUntil, notes.
+  - LISTA DE PRECIOS: requerido `observedPrice` + al menos uno de `externalSku/externalReference/code`. Opcionales: description, unit, discountPercent, currency, sourceUrl, observedAt, validUntil, notes. **Nunca requiere name ni resourceType.**
+
+### Cambios implementados
+
+**`price-list-wizard.tsx`** — UX completamente renovada:
+- Resumen de auto-detección (`MappingIndicator`): ✓/✗ para precio y para identificador, con columna detectada.
+- Panel "Ajustar mapeo de columnas" colapsable: **cerrado** cuando mapeo obligatorio completo; **abierto automáticamente** si faltan campos obligatorios.
+- Indicadores visuales en panel avanzado: `*` precio requerido, `†` identificador requerido.
+- Mensaje humano: "Necesitamos el precio y al menos un identificador para asociarlo con un recurso existente: SKU, referencia o código."
+- Protección de columnas duplicadas: `updateMapping` silencia re-asignación y auto-abre panel si queda incompleto.
+- `isPriceListMappingComplete()` pura y reutilizable.
+
+**`catalog-import-wizard.tsx`** — mejoras de UX:
+- Sección de mapeo convertida a panel colapsable "Ajustar mapeo de columnas".
+- Abierto automáticamente cuando faltan campos obligatorios; cerrado cuando está completo.
+- Mensaje contextual: "Revisa el ajuste únicamente si alguna columna no fue reconocida."
+- `isCatalogMappingComplete()` añadida para determinar estado inicial del panel.
+- Funcionalidad de importación intacta — contrato original sin cambios.
+
+**Tests nuevos (2 archivos, +41 tests):**
+- `price-list-validation.test.ts`: PL-1 a PL-15 + fixture Decorcerámica real.
+  - Confirma: no requiere name (PL-1), no requiere resourceType (PL-2), exige observedPrice (PL-3), exige identificador (PL-4), matching SKU/ref/code (PL-5–7), sin match = sin asociar (PL-8), ambiguo no resuelto (PL-9), no crea recursos (PL-10), pending sin approved (PL-11–12), no toca BOQ/AIU/exports (PL-13–15).
+- `price-list-ux-mapping.test.ts`: PL-16 a PL-21.
+  - Panel lógica: completo→panel cerrado (PL-16), faltantes→panel abierto (PL-17), columnas duplicadas rechazadas (PL-18), recalcular preview (PL-19), catálogo conserva contrato (PL-20–21).
+
+### Validación (todo PASS)
+- typecheck: `tsc --noEmit` sin output ✅
+- lint: `eslint .` sin output ✅
+- suite: **1116/1116 PASS** (42 skipped gated) ✅
+- build: ✅ `Compiled successfully` + rutas presentes
+- gm:regression: **22/22 PASS** ✅
+- gm:import: PASS ✅
+- git diff --check: limpio (solo advertencia CRLF esperada en Windows) ✅
+
+### Estado al cierre
+- **main intacta** = `bd97abb` · **producción intacta** · **sin deploy** · **sin db push remoto** · **sin migración**
+- Siguiente acción: release corto → repetir prueba de lista Decorcerámica → confirmar URL real
+
+---
+
 ## 2026-06-10 — OLEADA CATALOG_BULK_ONBOARDING_V1 + PUBLIC SOURCE COMPATIBILITY FIX V1 (rama `feature/catalog-bulk-onboarding-v1`)
 
 > **Centro de incorporación de catálogo + compatibilidad con páginas comerciales grandes.** Base `origin/main = 26f3fca`. Sin merge a main, sin deploy, sin db push remoto, sin datos dummy remotos, stashes intactos.

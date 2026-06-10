@@ -26,6 +26,11 @@ import {
   confirmCatalogImportAction,
 } from '../actions';
 
+function isCatalogMappingComplete(mapping: ColumnAssignment[]): boolean {
+  const mapped = new Set(mapping.filter((a) => a.columnIndex !== null).map((a) => a.field));
+  return (CATALOG_REQUIRED_FIELDS as readonly string[]).every((f) => mapped.has(f));
+}
+
 const STATUS_BADGE: Record<
   CatalogImportRowReport['status'],
   { label: string; variant: 'success' | 'secondary' | 'warning' | 'destructive' }
@@ -52,6 +57,7 @@ export function CatalogImportWizard() {
   const [mapping, setMapping] = useState<ColumnAssignment[]>([]);
   const [result, setResult] = useState<CatalogImportResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
   const [pending, startTransition] = useTransition();
 
   const requiredMissing = mapping
@@ -77,7 +83,10 @@ export function CatalogImportWizard() {
       const res = await previewCatalogImportAction(fd);
       if (res.ok) {
         setPreview(res.preview);
-        setMapping(res.preview.mapping);
+        const newMapping = res.preview.mapping;
+        setMapping(newMapping);
+        // Abre automáticamente si faltan campos obligatorios
+        setIsAdvancedOpen(!isCatalogMappingComplete(newMapping));
       } else {
         setError(res.error);
       }
@@ -156,46 +165,72 @@ export function CatalogImportWizard() {
       {/* Paso 2 — mapeo */}
       {preview && !result && (
         <section className="rounded-lg border border-gray-200 bg-white p-4">
-          <h2 className="mb-1 text-sm font-semibold text-gray-900">2. Mapeo de columnas</h2>
+          <h2 className="mb-1 text-sm font-semibold text-gray-900">2. Campos del catálogo</h2>
           <p className="mb-3 text-xs text-gray-500">
-            Asigna cada campo del sistema a una columna del archivo. Obligatorios:
-            código, nombre, tipo de recurso y unidad.
+            {requiredMissing.length === 0
+              ? 'Mapeo obligatorio completo. Revisa el ajuste únicamente si alguna columna no fue reconocida.'
+              : 'Asigna las columnas obligatorias: código, nombre, tipo de recurso y unidad.'}
           </p>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {mapping.map((a) => {
-              const isRequired = (CATALOG_REQUIRED_FIELDS as readonly string[]).includes(a.field);
-              return (
-                <label key={a.field} className="flex items-center justify-between gap-2 text-sm">
-                  <span className={isRequired ? 'font-medium text-gray-900' : 'text-gray-600'}>
-                    {FIELD_LABELS[a.field] ?? a.field}
-                    {isRequired && <span className="text-red-600"> *</span>}
-                  </span>
-                  <select
-                    className="w-40 rounded-md border border-gray-300 bg-white px-2 py-1 text-xs"
-                    value={a.columnIndex === null ? '' : String(a.columnIndex)}
-                    onChange={(e) => updateMapping(a.field, e.target.value)}
-                    aria-label={`Columna para ${FIELD_LABELS[a.field] ?? a.field}`}
-                  >
-                    <option value="">— Sin asignar —</option>
-                    {preview.headers.map((h, idx) => (
-                      <option key={idx} value={idx}>
-                        {h || `Columna ${idx + 1}`}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              );
-            })}
-          </div>
+
+          {requiredMissing.length > 0 && (
+            <p className="mb-3 text-xs font-medium text-amber-700" role="note">
+              Falta asignar: {requiredMissing.join(', ')}.
+            </p>
+          )}
+
+          {/* Panel colapsable de ajuste de mapeo */}
+          <button
+            type="button"
+            className="flex items-center gap-1.5 text-xs font-medium text-gray-600 hover:text-gray-900"
+            onClick={() => setIsAdvancedOpen((v) => !v)}
+            aria-expanded={isAdvancedOpen}
+            aria-controls="catalog-mapping-panel"
+          >
+            <span aria-hidden="true">{isAdvancedOpen ? '▼' : '▶'}</span>
+            Ajustar mapeo de columnas
+          </button>
+
+          {isAdvancedOpen && (
+            <div
+              id="catalog-mapping-panel"
+              className="mt-3 rounded-md border border-gray-200 bg-white p-3"
+            >
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {mapping.map((a) => {
+                  const isRequired = (CATALOG_REQUIRED_FIELDS as readonly string[]).includes(a.field);
+                  return (
+                    <label key={a.field} className="flex items-center justify-between gap-2 text-sm">
+                      <span className={isRequired ? 'font-medium text-gray-900' : 'text-gray-600'}>
+                        {FIELD_LABELS[a.field] ?? a.field}
+                        {isRequired && <span className="text-red-600"> *</span>}
+                      </span>
+                      <select
+                        className="w-40 rounded-md border border-gray-300 bg-white px-2 py-1 text-xs"
+                        value={a.columnIndex === null ? '' : String(a.columnIndex)}
+                        onChange={(e) => updateMapping(a.field, e.target.value)}
+                        aria-label={`Columna para ${FIELD_LABELS[a.field] ?? a.field}`}
+                      >
+                        <option value="">— Sin asignar —</option>
+                        {preview.headers.map((h, idx) => (
+                          <option key={idx} value={idx}>
+                            {h || `Columna ${idx + 1}`}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  );
+                })}
+              </div>
+              <p className="mt-2 text-xs text-gray-400">
+                * Requerido · Una columna no puede asignarse a dos campos.
+              </p>
+            </div>
+          )}
+
           <div className="mt-3 flex items-center gap-3">
             <Button size="sm" variant="outline" onClick={() => runPreview(mapping)} disabled={pending}>
               {pending ? 'Recalculando…' : 'Recalcular vista previa'}
             </Button>
-            {requiredMissing.length > 0 && (
-              <p className="text-xs text-amber-700" role="note">
-                Falta asignar: {requiredMissing.join(', ')}.
-              </p>
-            )}
           </div>
         </section>
       )}

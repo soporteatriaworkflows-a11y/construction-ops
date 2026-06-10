@@ -4,6 +4,43 @@ Este documento es propiedad de **agent-qa**. Se actualiza al final de
 
 ---
 
+## PROVIDER_PRICE_LIST_MAPPING_UX_FIX_V1 (2026-06-10, rama `fix/provider-price-list-mapping-ux-v1`)
+
+**Base:** `origin/main = bd97abb` · **main intacta** · **producción intacta** · **sin db push remoto** · **sin migración**
+
+| Check | Resultado | Detalle |
+|---|---|---|
+| typecheck | ✅ 0 errores | `pnpm tsc --noEmit` sin output |
+| lint | ✅ 0 errores | `pnpm eslint .` sin output |
+| suite completa | ✅ **1116/1116 PASS** | +41 nuevos (price-list-validation 28, price-list-ux-mapping 13) · 42 gated |
+| build | ✅ PASS | `Compiled successfully in 8.0s` · rutas `/catalog/import` y `/catalog/providers/import` presentes |
+| gm:regression | ✅ **22/22 PASS** | Golden master $372.247.170 intacto |
+| gm:import | ✅ PASS | Todas las verificaciones pasaron |
+| git diff --check | ✅ Limpio | Solo advertencia CRLF (Windows, esperada) |
+
+**Tests específicos del hotfix:**
+- PL-1: price-list no exige name ✅
+- PL-2: price-list no exige resourceType ✅
+- PL-3: price-list exige observedPrice ✅
+- PL-4: price-list exige al menos un identificador ✅
+- PL-5–7: matching exacto SKU / referencia / código ✅
+- PL-8: sin match queda sin asociar ✅
+- PL-9: múltiples matches quedan ambiguos ✅
+- PL-10: no crea recursos ✅
+- PL-11: observación = pending ✅
+- PL-12: nunca approved ✅
+- PL-13–15: no toca BOQ/AIU/exports ✅
+- PL-16: mapeo completo → panel cerrado ✅
+- PL-17: faltantes → panel abierto ✅
+- PL-18: columnas duplicadas rechazadas ✅
+- PL-19: preview se recalcula ✅
+- PL-20–21: catálogo conserva contrato original ✅
+- Fixture Decorcerámica (SKU 6751 → match, SKU 9999 → sin asociar) ✅
+
+**Regresión catálogo:** importación masiva continúa funcionando (1116 tests, golden master intacto).
+
+---
+
 ## CATALOG_BULK_ONBOARDING_V1 + PUBLIC SOURCE COMPATIBILITY FIX V1 (2026-06-10, rama `feature/catalog-bulk-onboarding-v1`)
 
 **Base:** `origin/main = 26f3fca` · **main intacta** · **producción intacta** · **sin db push remoto**
