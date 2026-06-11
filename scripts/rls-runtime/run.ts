@@ -1322,6 +1322,131 @@ async function main(): Promise<void> {
   });
   check('monitor: idempotency_key duplicada por org bloqueada (UNIQUE)', monIdemBlocked);
 
+  // === 19) APU FOUNDATION (FASE 4B.1) — labor_role_id, default_tool_pct ===
+  console.log('\n[19] APU foundation — trazabilidad labor_role_id y default_tool_pct');
+  const ROLE_AY_A = '00000000-0000-0000-0000-0000000000f2'; // Ayudante (seed 0006)
+  const APU_CREW_A = '00000000-0000-0000-0000-000000000202'; // APU-002 (seed 0006)
+  const ROLE_B = '00000000-0000-0000-0000-0000000000f9'; // rol de org B (setup)
+
+  // 19a) labor_role_id NULLABLE retrocompatible: componente sin rol se inserta.
+  const apuNullable = await asUser(realA, async (q) => {
+    const [row] = await q<{ id: string; labor_role_id: string | null }[]>`
+      INSERT INTO apu_components (apu_template_id, component_type, quantity, waste_pct,
+        unit_price_source, unit_price_snapshot, total_component_cost, sort_order)
+      VALUES (${APU_A}, 'material', 1, 0, 'manual', 100, 100, 90)
+      RETURNING id, labor_role_id`;
+    return row!;
+  });
+  check('apu: labor_role_id nullable (componente sin rol OK, retrocompatible)',
+    !!apuNullable.id && apuNullable.labor_role_id === null);
+
+  // 19b) FK válida: labor_role_id inexistente bloqueado.
+  let apuFkBlocked = false;
+  await asUser(realA, async (q) => {
+    await q.unsafe('SAVEPOINT sp_apu_fk');
+    try {
+      await q`INSERT INTO apu_components (apu_template_id, labor_role_id, component_type,
+        quantity, waste_pct, unit_price_source, unit_price_snapshot, total_component_cost, sort_order)
+        VALUES (${APU_A}, '00000000-0000-0000-0000-00000000dead', 'labor', 1, 0, 'labor_role', 100, 100, 91)`;
+    } catch {
+      apuFkBlocked = true;
+      await q.unsafe('ROLLBACK TO SAVEPOINT sp_apu_fk');
+    }
+  });
+  check('apu: labor_role_id inexistente bloqueado (FK/trigger)', apuFkBlocked);
+
+  // 19c) Componente trazable del seed 0006 visible para A con su rol.
+  const apuSeenA = await asUser(realA, async (q) => {
+    const rows = await q<{ labor_role_id: string | null }[]>`
+      SELECT labor_role_id FROM apu_components
+      WHERE apu_template_id = ${APU_CREW_A} AND labor_role_id = ${ROLE_AY_A}`;
+    return rows.length;
+  });
+  check('apu: A ve componente labor trazable (labor_role_id Ayudante)', apuSeenA === 1, `n=${apuSeenA}`);
+
+  // 19d) B NO ve componentes del APU de A (aislamiento por JOIN a template).
+  const apuSeenB = await asUser(claimsB, async (q) => {
+    const rows = await q<{ id: string }[]>`
+      SELECT id FROM apu_components WHERE apu_template_id = ${APU_CREW_A}`;
+    return rows.length;
+  });
+  check('apu: B NO ve componentes del APU de A (cross-org SELECT = 0)', apuSeenB === 0, `n=${apuSeenB}`);
+
+  // 19e) B NO puede insertar componentes en el template de A (RLS WITH CHECK).
+  let apuCrossInsertBlocked = false;
+  await asUser(claimsB, async (q) => {
+    await q.unsafe('SAVEPOINT sp_apu_cross');
+    try {
+      await q`INSERT INTO apu_components (apu_template_id, component_type, quantity, waste_pct,
+        unit_price_source, unit_price_snapshot, total_component_cost, sort_order)
+        VALUES (${APU_CREW_A}, 'material', 1, 0, 'manual', 100, 100, 92)`;
+    } catch {
+      apuCrossInsertBlocked = true;
+      await q.unsafe('ROLLBACK TO SAVEPOINT sp_apu_cross');
+    }
+  });
+  check('apu: INSERT cross-org en template de A bloqueado (RLS)', apuCrossInsertBlocked);
+
+  // 19f) Trigger same-org: vincular un rol de OTRA org al template de A bloqueado.
+  let apuSameOrgBlocked = false;
+  await asUser(
+    realA,
+    async (q) => {
+      await q.unsafe('SAVEPOINT sp_apu_sameorg');
+      try {
+        await q`INSERT INTO apu_components (apu_template_id, labor_role_id, component_type,
+          quantity, waste_pct, unit_price_source, unit_price_snapshot, total_component_cost, sort_order)
+          VALUES (${APU_CREW_A}, ${ROLE_B}, 'labor', 1, 0, 'labor_role', 100, 100, 93)`;
+      } catch {
+        apuSameOrgBlocked = true;
+        await q.unsafe('ROLLBACK TO SAVEPOINT sp_apu_sameorg');
+      }
+    },
+    async (q) => {
+      await q`INSERT INTO labor_roles (id, organization_id, code, name, base_salary,
+        working_days_month, working_hours_day)
+        VALUES (${ROLE_B}, ${ORG_B}, 'LR-B-001', 'Oficial B', 1000000, 24, 8)
+        ON CONFLICT (id) DO NOTHING`;
+    },
+  );
+  check('apu: labor_role_id de otra org bloqueado (trigger same-org)', apuSameOrgBlocked);
+
+  // 19g) default_tool_pct: válido OK; fuera de rango (>1 y <0) bloqueado (CHECK).
+  const toolPct = await asUser(realA, async (q) => {
+    const [ok] = await q<{ default_tool_pct: string }[]>`
+      UPDATE apu_templates SET default_tool_pct = 0.05 WHERE id = ${APU_A}
+      RETURNING default_tool_pct`;
+    let highBlocked = false;
+    await q.unsafe('SAVEPOINT sp_tool_high');
+    try {
+      await q`UPDATE apu_templates SET default_tool_pct = 1.5 WHERE id = ${APU_A}`;
+    } catch {
+      highBlocked = true;
+      await q.unsafe('ROLLBACK TO SAVEPOINT sp_tool_high');
+    }
+    let negBlockedPct = false;
+    await q.unsafe('SAVEPOINT sp_tool_neg');
+    try {
+      await q`UPDATE apu_templates SET default_tool_pct = -0.01 WHERE id = ${APU_A}`;
+    } catch {
+      negBlockedPct = true;
+      await q.unsafe('ROLLBACK TO SAVEPOINT sp_tool_neg');
+    }
+    return { ok: Number(ok!.default_tool_pct) === 0.05, highBlocked, negBlockedPct };
+  });
+  check('apu: default_tool_pct = 0.05 aceptado', toolPct.ok);
+  check('apu: default_tool_pct > 1 bloqueado (CHECK rango)', toolPct.highBlocked);
+  check('apu: default_tool_pct negativo bloqueado (CHECK rango)', toolPct.negBlockedPct);
+
+  // 19h) RLS ENABLE + FORCE conservado en las tablas APU tras las migraciones.
+  const apuForce = await sql<{ relname: string; rls: boolean; force: boolean }[]>`
+    SELECT relname, relrowsecurity AS rls, relforcerowsecurity AS force
+    FROM pg_class
+    WHERE relname IN ('apu_templates', 'apu_components', 'labor_roles')`;
+  check('apu: RLS ENABLE+FORCE conservado (apu_templates/apu_components/labor_roles)',
+    apuForce.length === 3 && apuForce.every((r) => r.rls && r.force),
+    JSON.stringify(apuForce));
+
   // --- Resumen ---
   console.log(`\nRESULTADO RLS RUNTIME: ${pass} PASS / ${fail} FAIL`);
   if (fail > 0) {
