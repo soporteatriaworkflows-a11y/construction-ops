@@ -23,6 +23,7 @@ import {
   type PriceListRowReport,
 } from '@/lib/catalog-import/types';
 import { makeFieldGetter, parseCellDate, parsePositiveDecimal } from './mapping';
+import { unitsEquivalent } from '@/server/pricing/units';
 import type { ParsedCatalogSheet } from './parse-file';
 
 /** Identidad mínima de un recurso existente para matching (server-side). */
@@ -196,7 +197,9 @@ export function buildPriceListPreview(
         }
 
         const fileUnit = get(row, 'unit');
-        if (fileUnit && fileUnit.toLowerCase() !== resource.unit.toLowerCase()) {
+        // UNIT_ALIAS_NORMALIZATION_V1: comparación por unidad canónica —
+        // m2 vs m² (o und vs unidad) NO genera warning falso.
+        if (fileUnit && !unitsEquivalent(fileUnit, resource.unit)) {
           messages.push(
             `Unidad del archivo ("${fileUnit}") difiere de la del recurso ("${resource.unit}"). Se conserva la del archivo en la observación.`,
           );
