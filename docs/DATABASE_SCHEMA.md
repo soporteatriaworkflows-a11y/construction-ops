@@ -665,3 +665,37 @@ derivado server-side (sin float); campos `wbs_code`/`dependency_type`/`lag_days`
 | 2026-05-31 | **Planning congelado v1** (`schedule_tasks`, `task_dependencies`, `progress_entries`, `resource_assignments`) — Oleada 3B | (db-rls) | orchestrator |
 | 2026-06-01 | **Auth/RLS por identidad (Oleada 4A.1)** — helpers de identidad real (`auth.uid()`→`profiles`) con compat demo; membresía single-org reutilizando `profiles` (sin tablas nuevas). Ver `docs/AUTH_CONTRACT.md` | (db-rls) | orchestrator |
 | 2026-06-01 | **Integración 4A.1** (merge `adeafbe`) — helpers de identidad real integrados; RLS runtime 47/47; reutiliza `profiles`/`organizations` (sin tablas nuevas) | (db-rls) | orchestrator |
+| 2026-06-11 | **Price Monitoring Agent V1 (Fase 4A)** — 3 tablas nuevas con RLS FORCE (ver sección siguiente) | `20260612090000` + `20260612090100` | orchestrator |
+
+---
+
+## Price Monitoring — entidades congeladas v1 (Fase 4A)
+
+Esquema del agente automático de monitoreo de precios. Contrato:
+`docs/PRICE_MONITORING_AGENT_V1_CONTRACT.md §4`. Las tres tablas tienen
+`organization_id` directo + **RLS ENABLE + FORCE** (`app.current_org()`),
+SELECT para toda la org, INSERT/UPDATE solo roles
+`admin/gerencia/presupuestos/compras`, **DELETE sin política** (denegado).
+
+- **`price_monitor_targets`**: fuentes habilitadas explícitamente. FK a
+  `resources` (RESTRICT), `suppliers` (SET NULL), `resource_price_observations`
+  (baseline, SET NULL), `profiles` (created_by, RESTRICT).
+  `cadence_days CHECK IN (1,7,15,30)`; `source_url CHECK ~* '^https?://'`;
+  **UNIQUE (organization_id, resource_id, source_url)**; índice parcial de
+  vencimiento `(next_check_at) WHERE enabled`. Pausar = `enabled=false`.
+- **`price_monitor_runs`**: corridas TENANT-SCOPED (una por org y ventana).
+  `trigger_type IN ('scheduled','manual')`; `status IN
+  ('running','completed','partial','failed')`; `counters` JSONB;
+  **UNIQUE (organization_id, idempotency_key)** — idempotencia del cron
+  (`scheduled:<YYYY-MM-DD>`) y rate limit manual por ventana
+  (`manual-org:<w>` 5min / `manual-target:<id>:<w>` 1min).
+- **`price_monitor_results`**: resultado por target y corrida, **append-only**
+  (sin política UPDATE/DELETE). `status IN ('unchanged','changed',
+  'pending_created','unreachable','blocked','parse_failed','invalid_response')`;
+  `unit` = unidad RAW detectada (la comparación usa la canónica,
+  UNIT_ALIAS_NORMALIZATION_V1); FK opcional a la observación pending creada.
+
+Reglas: el monitor NUNCA aprueba (toda observación nace `pending` vía el
+invariante de Fase 3A); el cron escribe observaciones SIEMPRE RLS-bound con
+claims del usuario que habilitó el target (contrato §4.5); las corridas
+manuales son 100% RLS-bound con el viewer.

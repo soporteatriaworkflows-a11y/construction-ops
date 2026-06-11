@@ -1,5 +1,78 @@
 # Handoff Log
 
+## 2026-06-11 — FASE 4A: PRICE_MONITORING_AGENT_V1 + UNIT_ALIAS_NORMALIZATION_V1 (rama `feature/price-monitoring-agent-v1`)
+
+> **Agente automático del sistema para monitoreo periódico de precios públicos + normalización semántica de unidades.** Base `origin/main = 9f6816f` (verificado HEAD exacto, sin divergencia). Worktree dedicado `construction-ops-price-monitoring-agent-v1`. **Sin merge a main, sin deploy, sin db push remoto, sin variables remotas, stashes intactos (2 WIP).**
+
+### Commits de la oleada
+- `c1b1dd6` docs(pricing): freeze automatic price monitoring agent contract
+- `a6090f5` feat(db): price monitoring targets/runs/results schema + RLS FORCE + harness checks
+- `908e868` feat(pricing): unit alias normalization v1 - canonical m2/und/dia + fix false unit warning
+- `6fe898b` feat(pricing): price monitor domain engine - compare, check-target, locks, idempotency, stores
+- `7ac2f0d` feat(cron): protected price-monitor cron endpoint + daily vercel cron 11:00 UTC
+- `9fb79d5` feat(ui): monitoring center, resource auto-monitoring section, dashboard monitor KPIs
+- `f23ad26` test(pricing): monitor engine, cron protection, roles, UI guards and invariants (64 tests)
+- (este commit) docs de cierre.
+
+### A. Contrato
+- **`docs/PRICE_MONITORING_AGENT_V1_CONTRACT.md`** congelado: system agent no conversacional, scheduler, targets explícitos, cadencias {1,7,15,30}, batch ≤25, locks, idempotencia, 7 estados de resultado, comparación con baseline, pending observations, fallos/retry conservador, UI, roles, seguridad (checklist 20 puntos), CRON_SECRET requirement, aliases de unidades, fuera de alcance y deudas (`PRICE_MONITORING_EMAIL_NOTIFICATIONS_V1`, `OPERATIONAL_ACCESS_LAYER_V1`, `ASSISTED_BUDGET_AGENT_V1`).
+
+### B. Esquema + RLS (migraciones `20260612090000` + `20260612090100`, LOCAL)
+- `price_monitor_targets` (UNIQUE org+recurso+URL; cadencia CHECK; URL CHECK http(s); índice parcial de vencidas; DELETE denegado — pausar = enabled=false).
+- `price_monitor_runs` tenant-scoped (UNIQUE org+idempotency_key; counters JSONB; initiated_by; error_summary).
+- `price_monitor_results` append-only (7 estados; unidad RAW; FK a observación pending).
+- RLS ENABLE+FORCE ×3; SELECT org; INSERT/UPDATE roles admin/gerencia/presupuestos/compras; resultados sin UPDATE/DELETE.
+- **Harness RLS actualizado**: pre-flight 25→28 tablas FORCE + sección [18] con 14 checks nuevos (aislamiento A/B, cross-org WITH CHECK, gate de rol obra, UNIQUE target, CHECK cadencia, DELETE denegado, append-only results, UNIQUE idempotencia). **120/120 PASS** local.
+
+### C. Dominio (`apps/web/server/pricing/monitor/`)
+- `compare.ts` puro (Decimal exacto; moneda normalizada; unidad canónica — m2 vs m² sin warning falso; sin baseline ⇒ propuesta).
+- `check-target.ts` reutiliza ÍNTEGRO el camino seguro 3B (validatePublicUrl + fetchPublicPage + adapters + normalize); mapeo de errores → unreachable/blocked/parse_failed/invalid_response; dedup de pending idéntica; notas con metadatos y marca «Monitor automático».
+- `service.ts`: corrida programada (lock advisory global en conexión reservada, recovery de runs `running` >30min, batch ≤25 orden next_check_at, round-robin por hostname ⇒ concurrencia por dominio = 1, una run idempotente por org `scheduled:<YYYY-MM-DD>`) + corrida manual (rate limit estructural por ventana: org 5min, target 1min; `ManualRunThrottledError`). Fallo ⇒ failures++ y `next_check_at = now + cadence` (retry conservador; nunca deshabilita).
+- `db-stores.ts`: `DbSystemMonitorStore` (cron; lecturas/escrituras de monitor con conexión administrativa documentada; **observaciones SIEMPRE RLS-bound** con claims del usuario habilitador) y `DbViewerMonitorStore` (manual; TODA operación RLS-bound con claims del viewer).
+- `db-repository.ts` (UI vía Supabase SSR + RLS real; guard de rol management|internal), `fixture-repository.ts` (demo read-only), `validation.ts`, `index.ts` (factories por READ_MODEL_SOURCE).
+
+### D. Cron + ejecución manual
+- `apps/web/vercel.json`: cron diario `0 11 * * *` (11:00 UTC ≈ 06:00 Bogotá) → `/api/cron/price-monitor`.
+- `GET /api/cron/price-monitor` (`maxDuration=300`): sin CRON_SECRET ⇒ 500 `cron_not_configured`; Bearer incorrecto/ausente ⇒ 401; comparación tiempo-constante (sha256 + timingSafeEqual); modo fixture ⇒ 503; respuesta SOLO conteos/estados (sin precios, sin URLs, sin secreto). `.env.example` documenta CRON_SECRET (placeholder).
+- Server Actions (`app/(dashboard)/catalog/monitoring/actions.ts`): habilitar fuente (con validación SSRF profunda ANTES de persistir), pausar/reanudar, cadencia, «Revisar ahora»/«Ejecutar revisión ahora» — viewer server-side, roles management|internal, solo modo db.
+
+### E. UNIT_ALIAS_NORMALIZATION_V1
+- `apps/web/server/pricing/units.ts`: m2/M2/m²/metro(s) cuadrado(s)→`m²`; und/unidad/unidades→`und`; dia/día/jornada→`día`. RAW preservado siempre; comparación canónica; sin backfill.
+- Fix real: `server/catalog/import/price-list.ts` usa `unitsEquivalent` ⇒ archivo `m2` vs recurso `m²` ya NO genera warning falso (caso Decorcerámica).
+
+### F. UI
+- Recurso (price-intelligence): sección «Monitoreo automático» — toggle «Monitorear esta fuente», frecuencia 1/7/15/30, estado/última/próxima/fallos, «Revisar ahora», historial breve. Controles solo a roles autorizados (server-side).
+- `/catalog/monitoring`: 6 tarjetas resumen (monitoreadas/activas/pausadas/vencidas/cambios pendientes/con error), última ejecución + «Ejecutar revisión ahora», tabla (recurso/proveedor/URL/frecuencia/última/próxima/estado/acciones), corridas recientes. Lectura para site/client sin botones.
+- Dashboard: bloque 🔒 «Monitoreo automático de precios» con 4 KPIs + acceso rápido «Monitoreo de precios».
+
+### G. Validación (todo PASS)
+- `supabase db reset --local`: 28 migraciones + 5 seeds ✅
+- typecheck 0 · lint 0 ✅
+- Suite completa: **1209/1209 PASS** (42 skipped gated) — +77 nuevos (64 monitor + 13 aliases) ✅
+- build: EXIT 0; rutas `/api/cron/price-monitor` y `/catalog/monitoring` presentes ✅
+- RLS harness: **120/120** (incl. 14 monitor) ✅ · read-model isolation **12/12** ✅
+- Smoke gated BOQ_SMOKE_DB=1: **42/42** (primera corrida tuvo 1 flake de arranque post-reset; re-ejecución limpia) ✅
+- gm:regression **22/22** · gm:import total $372.247.170 intacto ✅
+- redirect tests (15) y SSRF en suite ✅ · `git diff --check` limpio ✅ · validate-claude-agents **214/0/0** ✅
+
+### H. Seguridad verificada
+- CRON_SECRET nunca impreso (test); endpoint protegido (500/401/200/503, tests); roles server-side; organizationId/userId server-side; RLS FORCE ×3 (harness); SSRF/DNS/redirects ≤5 intactos (tests + reuso); sin crawling (1 fetch por target, test); sin headless/anti-bot/login; sin auto-approve (invariante + harness); sin escrituras BOQ/AIU/exports (tests de invariantes); batch acotado; locks; idempotencia.
+
+### I. Riesgos residuales / pendientes de release
+1. `CRON_SECRET` NO configurado (mandato): release requirement.
+2. Root Directory de Vercel no verificable por MCP (teams vacía): `vercel.json` colocado en `apps/web` (asunción estándar); confirmar en panel y mover a raíz si difiere.
+3. `db push` remoto de las 2 migraciones pendiente para release (gate dry-run estricto).
+4. El monitor exige `DATABASE_URL` en runtime de producción (ya existente para read-model).
+5. Email/SMTP diferido (`PRICE_MONITORING_EMAIL_NOTIFICATIONS_V1`).
+
+### Estado al cierre
+- **main intacta = 9f6816f** · producción intacta (`construction-ops-psi.vercel.app`) · sin deploy · sin db push remoto · stashes (2 WIP P1-A) intactos.
+- Rama `feature/price-monitoring-agent-v1` publicada en origin.
+- Siguiente recomendación: revisión visual de la usuaria en `http://localhost:3070` → release controlado (db push gate + CRON_SECRET + verificación Root Directory + merge) → `OPERATIONAL_ACCESS_LAYER_V1` + SMTP + email notifications.
+
+### Agentes activos al cierre
+- Ninguno.
+
 ## 2026-06-11 — CIERRE DE ACEPTACIÓN PROVIDER_PRICE_LIST_MAPPING_UX_FIX_V1
 
 > **Aceptación funcional del hotfix.** Verificación del tag, confirmación de deployment, prueba de aceptación Decorcerámica con fixture real. Sin escrituras en producción; tests puramente de lógica.
