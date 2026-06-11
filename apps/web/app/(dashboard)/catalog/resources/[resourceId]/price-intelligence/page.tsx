@@ -18,9 +18,12 @@ import { resolveAuthMode } from '@/lib/supabase/env';
 import { getObservationRepository, getProviderRepository } from '@/server/pricing';
 import type { ResourcePriceObservationView } from '@/server/pricing';
 import { formatCOP } from '@/lib/utils/format';
+import { getMonitorRepository } from '@/server/pricing/monitor';
+import type { MonitorTargetView, MonitorResultView } from '@/server/pricing/monitor';
 import { ObservationForm } from './_components/observation-form';
 import { ApproveButton, RejectButton } from './_components/observation-review-buttons';
 import { UrlValidationPanel } from './_components/url-validation-panel';
+import { MonitoringSection } from './_components/monitoring-section';
 
 export const dynamic = 'force-dynamic';
 
@@ -67,41 +70,47 @@ export default async function PriceIntelligencePage({ params }: PageProps) {
   let resourceName = '';
   let resourceUnit = '';
   let providers: import('@/server/pricing').ProviderView[] = [];
+  let monitorTargets: MonitorTargetView[] = [];
+  let monitorResultsByTarget: Record<string, MonitorResultView[]> = {};
 
   try {
     const mode = resolveAuthMode();
     const obsRepo = getObservationRepository();
     const provRepo = getProviderRepository();
+    const monitorRepo = getMonitorRepository();
 
+    let effectiveViewer;
     if (mode === 'demo') {
       const viewer = await resolveViewer('demo');
       viewerRole = viewer.role;
-      const demoViewer = {
+      effectiveViewer = {
         userId: viewer.organizationId,
         profileId: viewer.organizationId,
         organizationId: viewer.organizationId,
         role: viewer.role,
       };
-      observations = await obsRepo.listResourcePriceObservations(demoViewer, resourceId);
-      providers = await provRepo.listProviders(demoViewer);
-      const summary = await obsRepo.getResourcePriceIntelligenceSummary(demoViewer, resourceId);
-      if (summary) {
-        resourceCode = summary.resourceCode;
-        resourceName = summary.resourceName;
-        resourceUnit = summary.resourceUnit;
-      }
     } else {
-      const authed = await resolveAuthenticatedViewer();
-      viewerRole = authed.role;
-      observations = await obsRepo.listResourcePriceObservations(authed, resourceId);
-      providers = await provRepo.listProviders(authed);
-      const summary = await obsRepo.getResourcePriceIntelligenceSummary(authed, resourceId);
-      if (summary) {
-        resourceCode = summary.resourceCode;
-        resourceName = summary.resourceName;
-        resourceUnit = summary.resourceUnit;
-      }
+      effectiveViewer = await resolveAuthenticatedViewer();
+      viewerRole = effectiveViewer.role;
     }
+
+    observations = await obsRepo.listResourcePriceObservations(effectiveViewer, resourceId);
+    providers = await provRepo.listProviders(effectiveViewer);
+    const summary = await obsRepo.getResourcePriceIntelligenceSummary(effectiveViewer, resourceId);
+    if (summary) {
+      resourceCode = summary.resourceCode;
+      resourceName = summary.resourceName;
+      resourceUnit = summary.resourceUnit;
+    }
+
+    // Monitoreo automático (Fase 4A): targets + historial breve por target.
+    monitorTargets = await monitorRepo.listTargetsForResource(effectiveViewer, resourceId);
+    const resultLists = await Promise.all(
+      monitorTargets.map((t) => monitorRepo.listRecentResults(effectiveViewer, t.id, 3)),
+    );
+    monitorResultsByTarget = Object.fromEntries(
+      monitorTargets.map((t, i) => [t.id, resultLists[i] ?? []]),
+    );
 
     showInternalFields = INTERNAL_ROLES.includes(viewerRole);
     canCreate = CREATE_ROLES.includes(viewerRole);
@@ -165,6 +174,14 @@ export default async function PriceIntelligencePage({ params }: PageProps) {
           </div>
         </section>
       )}
+
+      {/* Monitoreo automático (Fase 4A) — visible a todos; mutaciones solo roles autorizados */}
+      <MonitoringSection
+        resourceId={resourceId}
+        targets={monitorTargets}
+        resultsByTarget={monitorResultsByTarget}
+        canMutate={canCreate}
+      />
 
       {/* Historial de observaciones */}
       <section aria-label="Historial de observaciones">

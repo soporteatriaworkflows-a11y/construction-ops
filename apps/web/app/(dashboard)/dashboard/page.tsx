@@ -34,6 +34,9 @@ import {
   ArrowRight,
   Package,
   Truck,
+  Radar,
+  AlertTriangle,
+  Clock,
 } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
 import { EmptyState } from '@/components/shared/empty-state';
@@ -44,6 +47,7 @@ import { SavingsSection } from '@/modules/dashboard/savings-section';
 import { getReadModel, resolveSource } from '@/server/read-model';
 import { getEstimatesWriteRepository } from '@/server/estimates';
 import { getObservationRepository } from '@/server/pricing';
+import { getMonitorRepository } from '@/server/pricing/monitor';
 import { resolveViewer } from '@/server/auth/resolve-viewer';
 import { formatCOP, formatDateTime, ESTIMATE_VERSION_STATUS_LABELS } from '@/lib/utils/format';
 import { isCreationModeEnabled } from '../projects/mode-guard';
@@ -184,6 +188,22 @@ export default async function DashboardPage() {
     }
   }
 
+  // 🔒 Monitoreo automático de precios (Fase 4A): KPIs tolerantes a fallo.
+  let monitoringSummary: import('@/server/pricing/monitor').MonitoringSummary | null = null;
+  if (isAuthorizedForSavings) {
+    try {
+      const pricingViewer = {
+        userId: viewer.profileId ?? viewer.organizationId,
+        profileId: viewer.profileId ?? viewer.organizationId,
+        organizationId: viewer.organizationId,
+        role: viewer.role,
+      };
+      monitoringSummary = await getMonitorRepository().getMonitoringSummary(pricingViewer);
+    } catch {
+      monitoringSummary = null;
+    }
+  }
+
   const statusLabel =
     ESTIMATE_VERSION_STATUS_LABELS[summary.estimateStatus] ?? summary.estimateStatus;
 
@@ -283,12 +303,52 @@ export default async function DashboardPage() {
           )}
         </div>
 
+        {/* 🔒 Monitoreo automático de precios (Fase 4A) — solo management/internal */}
+        {isAuthorizedForSavings && monitoringSummary && (
+          <div className="mt-4">
+            <h3 className="mb-3 text-sm font-semibold text-gray-700">Monitoreo automático de precios</h3>
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              <KpiCard
+                title="Fuentes monitoreadas"
+                value={String(monitoringSummary.monitoredCount)}
+                description={`${monitoringSummary.activeCount} activas · ${monitoringSummary.pausedCount} pausadas`}
+                icon={<Radar className="h-4 w-4 text-iconic-primary" />}
+                iconBg="bg-brand-50"
+              />
+              <KpiCard
+                title="Cambios de precio pendientes"
+                value={String(monitoringSummary.pendingChangesCount)}
+                description="Detectados por el monitor, por revisar"
+                valueColor={monitoringSummary.pendingChangesCount > 0 ? 'text-amber-700' : undefined}
+                icon={<TrendingUp className="h-4 w-4 text-amber-700" />}
+                iconBg="bg-amber-50"
+              />
+              <KpiCard
+                title="Fuentes con error"
+                value={String(monitoringSummary.erroredCount)}
+                description="3+ fallos consecutivos"
+                valueColor={monitoringSummary.erroredCount > 0 ? 'text-red-700' : undefined}
+                icon={<AlertTriangle className="h-4 w-4 text-red-700" />}
+                iconBg="bg-red-50"
+              />
+              <KpiCard
+                title="Fuentes vencidas"
+                value={String(monitoringSummary.overdueCount)}
+                description="Pendientes de la próxima revisión"
+                icon={<Clock className="h-4 w-4 text-purple-700" />}
+                iconBg="bg-purple-50"
+              />
+            </div>
+          </div>
+        )}
+
         {/* Accesos rápidos */}
-        <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-5">
           <QuickLink href="/projects" label="Proyectos" icon={<FolderOpen className="h-4 w-4" aria-hidden="true" />} />
           <QuickLink href="/catalog" label="Catálogo" icon={<Package className="h-4 w-4" aria-hidden="true" />} />
           <QuickLink href="/catalog/providers" label="Proveedores" icon={<Truck className="h-4 w-4" aria-hidden="true" />} />
           <QuickLink href="/catalog" label="Inteligencia de precios" icon={<Tags className="h-4 w-4" aria-hidden="true" />} />
+          <QuickLink href="/catalog/monitoring" label="Monitoreo de precios" icon={<Radar className="h-4 w-4" aria-hidden="true" />} />
         </div>
       </section>
 
