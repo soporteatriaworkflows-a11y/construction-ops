@@ -1,7 +1,7 @@
 {
   "$schema": "./entre-patios-first-floor.schema-notes.md",
   "meta": {
-    "fixtureVersion": "2.0.0",
+    "fixtureVersion": "2.1.0",
     "contract": "API_CONTRACTS v1 (2026-05-29, congelado)",
     "source": "COT.ENTRE PATIOS 1 PISO (1).xlsx (golden master, NO versionado)",
     "scope": "PRIMER PISO",
@@ -215,6 +215,24 @@
       "active": true,
       "createdAt": "2026-05-29T00:00:00-05:00",
       "updatedAt": "2026-05-29T00:00:00-05:00"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000081",
+      "organizationId": "00000000-0000-4000-8000-000000000001",
+      "code": "ROL-AY-001",
+      "name": "Ayudante",
+      "baseSalary": "1160000.0000000000",
+      "transportSubsidy": "162000.0000000000",
+      "benefitsPct": "0.4000000000",
+      "socialSecurityPct": "0.2050000000",
+      "payrollTaxPct": "0.0900000000",
+      "uniformCost": "120000.0000000000",
+      "uniformPeriodMonths": "4",
+      "workingDaysMonth": "24",
+      "workingHoursDay": "8",
+      "active": true,
+      "createdAt": "2026-06-11T00:00:00-05:00",
+      "updatedAt": "2026-06-11T00:00:00-05:00"
     }
   ],
   "apuTemplates": [
@@ -228,8 +246,23 @@
       "description": "Suministro e instalación de porcelanato 60x60 incluye pega y emboquillado.",
       "active": true,
       "version": 1,
+      "defaultToolPct": "0",
       "createdAt": "2026-05-29T00:00:00-05:00",
       "updatedAt": "2026-05-29T00:00:00-05:00"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000091",
+      "organizationId": "00000000-0000-4000-8000-000000000001",
+      "code": "APU-MURO-LAD",
+      "name": "Muro en ladrillo común",
+      "unit": "m2",
+      "chapterTemplateId": null,
+      "description": "Mampostería demo con cuadrilla 2 Ayudantes + 1 Oficial y herramienta menor derivada (5% M.O.).",
+      "active": true,
+      "version": 1,
+      "defaultToolPct": "0.05",
+      "createdAt": "2026-06-11T00:00:00-05:00",
+      "updatedAt": "2026-06-11T00:00:00-05:00"
     }
   ],
   "apuComponents": [
@@ -237,6 +270,7 @@
       "id": "00000000-0000-4000-8000-0000000000a0",
       "apuTemplateId": "00000000-0000-4000-8000-000000000090",
       "resourceId": "00000000-0000-4000-8000-000000000041",
+      "laborRoleId": null,
       "componentType": "material",
       "quantity": "1.0500000000",
       "wastePct": "0.0800000000",
@@ -250,6 +284,7 @@
       "id": "00000000-0000-4000-8000-0000000000a1",
       "apuTemplateId": "00000000-0000-4000-8000-000000000090",
       "resourceId": "00000000-0000-4000-8000-000000000042",
+      "laborRoleId": "00000000-0000-4000-8000-000000000080",
       "componentType": "labor",
       "quantity": "0.0500000000",
       "wastePct": "0.0000000000",
@@ -258,6 +293,48 @@
       "totalComponentCost": "6000.0000000000",
       "sortOrder": 1,
       "notes": null
+    },
+    {
+      "id": "00000000-0000-4000-8000-0000000000a2",
+      "apuTemplateId": "00000000-0000-4000-8000-000000000091",
+      "resourceId": "00000000-0000-4000-8000-000000000040",
+      "laborRoleId": null,
+      "componentType": "material",
+      "quantity": "0.3000000000",
+      "wastePct": "0.0500000000",
+      "unitPriceSource": "manual",
+      "unitPriceSnapshot": "28000.0000000000",
+      "totalComponentCost": "8820.0000000000",
+      "sortOrder": 0,
+      "notes": null
+    },
+    {
+      "id": "00000000-0000-4000-8000-0000000000a3",
+      "apuTemplateId": "00000000-0000-4000-8000-000000000091",
+      "resourceId": "00000000-0000-4000-8000-000000000043",
+      "laborRoleId": "00000000-0000-4000-8000-000000000081",
+      "componentType": "labor",
+      "quantity": "0.4000000000",
+      "wastePct": "0.0000000000",
+      "unitPriceSource": "labor_role",
+      "unitPriceSnapshot": "89925.0000000000",
+      "totalComponentCost": "35970.0000000000",
+      "sortOrder": 1,
+      "notes": "Cuadrilla: 2 Ayudantes × 0.2 días/m² (quantity = rendimiento × integrantes)."
+    },
+    {
+      "id": "00000000-0000-4000-8000-0000000000a4",
+      "apuTemplateId": "00000000-0000-4000-8000-000000000091",
+      "resourceId": "00000000-0000-4000-8000-000000000042",
+      "laborRoleId": "00000000-0000-4000-8000-000000000080",
+      "componentType": "labor",
+      "quantity": "0.2000000000",
+      "wastePct": "0.0000000000",
+      "unitPriceSource": "labor_role",
+      "unitPriceSnapshot": "99812.5000000000",
+      "totalComponentCost": "19962.5000000000",
+      "sortOrder": 2,
+      "notes": "Cuadrilla: 1 Oficial × 0.2 días/m²."
     }
   ],
   "estimate": {
