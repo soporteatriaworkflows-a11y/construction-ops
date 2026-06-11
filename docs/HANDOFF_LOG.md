@@ -1,10 +1,99 @@
 # Handoff Log
 
+## 2026-06-11 — CIERRE DE ACEPTACIÓN PROVIDER_PRICE_LIST_MAPPING_UX_FIX_V1
+
+> **Aceptación funcional del hotfix.** Verificación del tag, confirmación de deployment, prueba de aceptación Decorcerámica con fixture real. Sin escrituras en producción; tests puramente de lógica.
+
+### A. Estado inicial auditado
+- `origin/main` = `4b37c5ae18a5c84d7f82d7f81e66df35cd355e63` ✅
+- Árbol: 1 modificación documentación pendiente (HANDOFF_LOG anterior) ✅
+- Stashes: 2 WIP intactos, sin tocar ✅
+- Worktrees: 12 registrados, sin tocar ✅
+
+### B. Tag anotado
+- Objeto: `5d97f3e9c7e5acda178cbc92d8c7c1c434e06ab0`
+- Commit dereferenciado: `4b37c5ae18a5c84d7f82d7f81e66df35cd355e63` ← MATCH ✅
+- Tag publicado en origin: ✅
+
+### C. Deployment productivo
+- Vercel MCP sin acceso a equipo (teams list vacía → no se puede obtener commit hash de deployment)
+- Trazabilidad disponible: push `4ac3d7f → 4b37c5a` a `origin/main` ejecutado 2026-06-10 ~18:00 COL; Vercel configurado en `main` como Production Branch (docs/audits/security-baseline/09_VERCEL_GITHUB_CICD_AUDIT.md)
+- Smoke productivo GET-only (ambas sesiones) → 9/9 PASS HTTP 200 ✅
+- **Confirmación visual del commit en panel Vercel: pendiente manual**
+
+### D. Aceptación Decorcerámica — PASS por criterio
+
+| # | Criterio | Método | Resultado |
+|---|----------|--------|-----------|
+| 1 | Carga correcta del archivo | code-review `price-list-wizard.tsx`: `<input type="file" accept=".xlsx,.xls,.csv">` + `parseCatalogFile` | ✅ PASS |
+| 2 | Detección automática de columnas | PL-16: `suggestMapping(headers, PRICE_LIST_FIELDS)` con `externalSku + observedPrice` → mapping completo | ✅ PASS |
+| 3 | Resumen visible de auto-mapping | code-review: bloque `MappingIndicator` con `hasPrice`/`hasIdentifier`; `aria-label="Resumen de auto-mapeo"` | ✅ PASS |
+| 4 | Diferenciación campos requeridos vs opcionales | code-review: `isPrice → span *`, `isIdentifier → span †`, opcionales sin marcador | ✅ PASS |
+| 5 | Panel avanzado colapsable | code-review: `isAdvancedOpen` state, `aria-expanded`, `aria-controls="advanced-mapping-panel"` | ✅ PASS |
+| 6 | Comportamiento sin observedPrice | PL-3 + PL-17: sin `observedPrice` → error bloqueante + `importable=false` + panel abierto | ✅ PASS |
+| 7 | Comportamiento sin identificador | PL-4 + PL-17: sin ningún identificador → error bloqueante + `importable=false` + panel abierto | ✅ PASS |
+| 8 | Corrección manual del mapping | code-review: `updateMapping()` + botón "Recalcular"; PL-19: mapeo incorrecto → 0 matches, corregido → 1 match | ✅ PASS |
+| 9 | Sin regresiones en catálogo | PL-20/PL-21: catálogo sigue exigiendo `code+name+resourceType+unit`; `buildCatalogImportPreview` funciona | ✅ PASS |
+| 10 | Sin errores inesperados consola/servidor | build EXIT 0, typecheck 0 errores, suite 1132/1132 PASS | ✅ PASS |
+
+**Fixture Decorcerámica (tests `price-list-validation.test.ts`):**
+- SKU 6751 → match tipo `sku`, código `MAT-PORC-DC-001`, genera `matchedRow` ✅
+- SKU 9999 → `matchType: 'none'`, `status: 'unmatched'`, sin `matchedRow` generado ✅
+- Resumen: `matchedCount=1`, `unmatchedCount=1`, `invalidCount=0`, `totalRows=2` ✅
+- Sin errores de `name` ni `resourceType` ✅
+
+### E. Bugs encontrados
+Ninguno. Un timeout flaky en `export-service.test.ts > pdf-client` (5s bajo carga paralela) — pre-existente, no relacionado con el hotfix; se auto-resolvió en segunda ejecución.
+
+### F. Cierre oficial
+**`PROVIDER_PRICE_LIST_MAPPING_UX_FIX_V1` está oficialmente CERRADO.**
+
+---
+
+## 2026-06-10 — RELEASE PROVIDER_PRICE_LIST_MAPPING_UX_FIX_V1 (merge a `main`)
+
+> **Release controlado del hotfix.** Merge `fix/provider-price-list-mapping-ux-v1` → `main` vía rama temporal `release/price-list-mapping-ux-v1`. Sin deploy CLI, sin db push remoto, sin migraciones, sin features nuevas.
+
+### Invariantes del release
+- **origin/main antes:** `4ac3d7f` — **origin/main después:** `4b37c5ae18a5c84d7f82d7f81e66df35cd355e63`
+- **Merge commit:** `4b37c5a` · padres: `4ac3d7f` (main) + `db77765` (hotfix)
+- **Tag anotado publicado:** `provider-price-list-mapping-ux-hotfix-v1` → `5d97f3e9c7e5acda178cbc92d8c7c1c434e06ab0`
+- **Vercel auto-deploy:** disparado por push a `main` (MCP 403 — no verificable programáticamente)
+- **Smoke productivo:** 9/9 PASS (200) en `construction-ops-psi.vercel.app`
+
+### Validación pre-merge (todo PASS)
+- typecheck: 0 errores ✅
+- lint: 0 warnings ✅
+- suite: **1132/1132 PASS** (42 skipped gated) ✅
+- build: EXIT 0, páginas generadas correctamente ✅
+- gm:regression: **22/22 PASS** ✅
+- gm:import: total $372,247,170 intacto ✅
+- git diff --check: limpio ✅
+
+### Smoke rutas productivas
+| Ruta | HTTP | Resultado |
+|------|------|-----------|
+| / | 200 | ✅ |
+| /login | 200 | ✅ |
+| /dashboard | 200 | ✅ |
+| /catalog | 200 | ✅ |
+| /catalog/import | 200 | ✅ |
+| /catalog/providers | 200 | ✅ |
+| /catalog/providers/import | 200 | ✅ |
+| /catalog/resources/new | 200 | ✅ |
+| /projects | 200 | ✅ |
+
+### Pendiente manual
+- Prueba de aceptación Decorcerámica real: cargar lista con SKU 6751 (→ match + observación pending) y SKU 9999 (→ sin asociar). No ejecutada en este release (sin datos dummy remotos).
+- Confirmación visual del hash `4b37c5a` en el panel de Vercel (MCP no disponible).
+
+---
+
 ## 2026-06-10 — HOTFIX PROVIDER_PRICE_LIST_MAPPING_UX_FIX_V1 (rama `fix/provider-price-list-mapping-ux-v1`)
 
 > **Hotfix acotado de UX de mapeo de lista de precios de proveedor.** Base `origin/main = bd97abb`. Sin merge a main, sin deploy, sin db push, sin migración, sin features nuevas.
 
-- **HEAD inicial:** `bd97abb` → **HEAD final:** (commit pendiente de release)
+- **HEAD inicial:** `bd97abb` → **HEAD final:** `db77765` (release completado 2026-06-10)
 - **Archivos modificados:** 4 (price-list-wizard.tsx, catalog-import-wizard.tsx, +2 test files nuevos)
 - **Causa raíz:** El wizard de lista de precios (`/catalog/providers/import`) no diferenciaba visualmente entre campos requeridos vs opcionales, mostraba todos los campos como una tabla plana sin indicadores, y no tenía resumen de auto-detección. Esto generaba confusión donde la usuaria veía el mapeo de catálogo (que SÍ exige name/resourceType) como referencia, y el error del servidor sobre campos faltantes no era lo suficientemente claro en contexto.
 - **Contratos separados confirmados y documentados:**
