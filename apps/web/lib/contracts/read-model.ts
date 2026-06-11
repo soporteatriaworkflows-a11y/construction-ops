@@ -22,6 +22,7 @@
  */
 
 import type {
+  ApuComponentType,
   DecimalString,
   EstimateVersionStatus,
   IsoDate,
@@ -33,6 +34,7 @@ import type {
 } from '@/lib/utils/types';
 
 export type {
+  ApuComponentType,
   DecimalString,
   EstimateVersionStatus,
   IsoDate,
@@ -137,6 +139,51 @@ export interface ApuSummary {
   unit: string;
   unitCost: DecimalString;
   componentCount: number;
+}
+
+/* --- APU detalle (FASE 4B.1 — APU_COST_MODEL_FOUNDATION_V1_CONTRACT §10) --- */
+
+export interface ApuComponentView {
+  id: Uuid;
+  componentType: ApuComponentType;
+  resourceCode?: string;
+  resourceName?: string;
+  // 🔒 omitidos para `client` (información de M.O. interna):
+  /** 🔒 código del rol salarial vinculado (trazabilidad labor_role_id). */
+  laborRoleCode?: string;
+  /** 🔒 nombre del rol salarial vinculado. */
+  laborRoleName?: string;
+  /** Rendimiento/consumo por unidad de actividad del APU. */
+  quantity: DecimalString;
+  /** Desperdicio como fracción (p. ej. "0.08"). */
+  wastePct: DecimalString;
+  unitPriceSnapshot: DecimalString;
+  totalComponentCost: DecimalString;
+  sortOrder: number;
+}
+
+export interface ApuDetail {
+  id: Uuid;
+  code: string;
+  name: string;
+  /** Unidad RAW tal como fue capturada (preservada; nunca se altera). */
+  unit: string;
+  /** Unidad canónica para mostrar/comparar (m2/M2/m² → m²). */
+  unitCanonical: string;
+  version: number;
+  /** Fracción [0,1] de herramienta menor derivada sobre la M.O. */
+  defaultToolPct: DecimalString;
+  components: ApuComponentView[];
+  unitCostMaterials: DecimalString;
+  unitCostLabor: DecimalString;
+  unitCostEquipment: DecimalString;
+  /** Herramienta explícita + derivada (defaultToolPct × unitCostLabor). */
+  unitCostTools: DecimalString;
+  /** Solo la herramienta derivada. */
+  unitCostToolDerived: DecimalString;
+  unitCostSubcontract: DecimalString;
+  unitCostOther: DecimalString;
+  unitCostTotal: DecimalString;
 }
 
 export interface QuantityLineView {
@@ -311,6 +358,8 @@ export interface ReadModelPort {
     estimateVersionId: Uuid,
   ): Promise<{ estimate: EstimateSummary; chapters: ChapterSummary[]; items: BoqItemView[] }>;
   listApus(viewer: ViewerContext): Promise<ApuSummary[]>;
+  /** Detalle de un APU con componentes y desglose por tipo (rol 🔒 proyectado). */
+  getApuDetail(viewer: ViewerContext, apuTemplateId: Uuid): Promise<ApuDetail>;
   listQuantities(viewer: ViewerContext, projectScopeId?: Uuid): Promise<QuantityGroupView[]>;
   listCatalogResources(viewer: ViewerContext): Promise<CatalogResourceView[]>;
   getDashboardSummary(viewer: ViewerContext, projectId: Uuid): Promise<DashboardSummary>;

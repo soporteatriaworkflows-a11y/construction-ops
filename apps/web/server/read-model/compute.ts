@@ -20,8 +20,17 @@ import {
   calculateTotal,
   type IndirectCostRuleInput,
 } from '@/modules/boq';
-import { calculateApuUnitCost, toDecimal, toDecimalString } from '@/modules/apu';
+import {
+  calculateApuUnitCost,
+  calculateApuUnitCostFull,
+  type ApuComponentCostEntry,
+} from '@/modules/apu';
+import { toDecimal, toDecimalString } from '@/modules/apu';
+import { canonicalizeUnit } from '@/server/pricing/units';
 import type {
+  ApuComponentType,
+  ApuComponentView,
+  ApuDetail,
   ChapterDistributionSlice,
   ChapterSummary,
   DashboardSummary,
@@ -310,4 +319,89 @@ export function computeDashboard(
  */
 export function computeApuUnitCost(componentCosts: readonly DecimalString[]): DecimalString {
   return calculateApuUnitCost(componentCosts);
+}
+
+/* ----------------------------------------------------------------------------
+ * APU detalle (FASE 4B.1 — APU_COST_MODEL_FOUNDATION_V1_CONTRACT §10)
+ * ------------------------------------------------------------------------- */
+
+/** Fila mínima de plantilla APU para el detalle. */
+export interface RawApuTemplate {
+  id: Uuid;
+  code: string;
+  name: string;
+  unit: string;
+  version: number;
+  defaultToolPct: DecimalString;
+}
+
+/** Fila mínima de componente APU para el detalle. */
+export interface RawApuComponent {
+  id: Uuid;
+  componentType: ApuComponentType;
+  resourceCode?: string | null;
+  resourceName?: string | null;
+  laborRoleCode?: string | null;
+  laborRoleName?: string | null;
+  quantity: DecimalString;
+  wastePct: DecimalString;
+  unitPriceSnapshot: DecimalString;
+  totalComponentCost: DecimalString;
+  sortOrder: number;
+}
+
+/**
+ * Deriva el `ApuDetail` COMPLETO (con campos 🔒 de rol laboral) a partir de
+ * filas crudas, delegando el costo unitario completo (incluida la herramienta
+ * menor derivada `defaultToolPct × M.O.`) en cost-domain. La proyección por
+ * rol la aplica el repositorio (`projectApuDetailForRole`).
+ *
+ * @param template - Plantilla APU cruda (incluye `defaultToolPct`).
+ * @param components - Componentes crudos (costos calculados server-side).
+ * @returns Detalle completo (sin proyectar por rol).
+ */
+export function computeApuDetail(
+  template: RawApuTemplate,
+  components: readonly RawApuComponent[],
+): ApuDetail {
+  const ordered = [...components].sort((a, b) => a.sortOrder - b.sortOrder);
+
+  const entries: ApuComponentCostEntry[] = ordered.map((c) => ({
+    componentType: c.componentType,
+    totalComponentCost: c.totalComponentCost,
+  }));
+  const breakdown = calculateApuUnitCostFull(entries, template.defaultToolPct);
+
+  const views: ApuComponentView[] = ordered.map((c) => ({
+    id: c.id,
+    componentType: c.componentType,
+    ...(c.resourceCode ? { resourceCode: c.resourceCode } : {}),
+    ...(c.resourceName ? { resourceName: c.resourceName } : {}),
+    ...(c.laborRoleCode ? { laborRoleCode: c.laborRoleCode } : {}),
+    ...(c.laborRoleName ? { laborRoleName: c.laborRoleName } : {}),
+    quantity: c.quantity,
+    wastePct: c.wastePct,
+    unitPriceSnapshot: c.unitPriceSnapshot,
+    totalComponentCost: c.totalComponentCost,
+    sortOrder: c.sortOrder,
+  }));
+
+  return {
+    id: template.id,
+    code: template.code,
+    name: template.name,
+    unit: template.unit,
+    unitCanonical: canonicalizeUnit(template.unit).canonical,
+    version: template.version,
+    defaultToolPct: template.defaultToolPct,
+    components: views,
+    unitCostMaterials: breakdown.materials,
+    unitCostLabor: breakdown.labor,
+    unitCostEquipment: breakdown.equipment,
+    unitCostTools: breakdown.tools,
+    unitCostToolDerived: breakdown.toolDerived,
+    unitCostSubcontract: breakdown.subcontract,
+    unitCostOther: breakdown.other,
+    unitCostTotal: breakdown.total,
+  };
 }

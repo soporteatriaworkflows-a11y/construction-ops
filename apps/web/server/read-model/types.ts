@@ -14,6 +14,8 @@
  */
 
 import type {
+  ApuComponentView,
+  ApuDetail,
   DashboardSummary,
   ProgressEntryView,
   ResourceAssignmentView,
@@ -70,6 +72,40 @@ export function projectDashboardForRole(
     delete projected[field];
   }
   return projected;
+}
+
+/* ----------------------------------------------------------------------------
+ * Proyección por rol — APU (FASE 4B.1 — APU_COST_MODEL_FOUNDATION_V1 §10)
+ *
+ * Campos 🔒 (NUNCA a rol `client`): `laborRoleCode`/`laborRoleName` de cada
+ * componente (la información de costos de mano de obra es interna). La omisión
+ * es REAL (las claves no existen en el objeto), no un `undefined` cosmético.
+ * ------------------------------------------------------------------------- */
+
+/** Campos 🔒 de `ApuComponentView` que sólo ven roles autorizados. */
+export const INTERNAL_APU_COMPONENT_FIELDS = [
+  'laborRoleCode',
+  'laborRoleName',
+] as const satisfies ReadonlyArray<keyof ApuComponentView>;
+
+/**
+ * Proyecta un `ApuDetail` COMPLETO según el rol: para `client` OMITE el rol
+ * salarial de cada componente antes de serializar.
+ *
+ * @param full - Detalle completo calculado server-side.
+ * @param role - Rol del viewer.
+ * @returns Detalle proyectado (sin campos 🔒 para `client`).
+ */
+export function projectApuDetailForRole(full: ApuDetail, role: ViewerRole): ApuDetail {
+  if (role !== 'client') return full;
+  const components: ApuComponentView[] = full.components.map((c) => {
+    const copy: ApuComponentView = { ...c };
+    for (const field of INTERNAL_APU_COMPONENT_FIELDS) {
+      delete copy[field];
+    }
+    return copy;
+  });
+  return { ...full, components };
 }
 
 /* ----------------------------------------------------------------------------
