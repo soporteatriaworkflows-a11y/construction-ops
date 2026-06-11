@@ -174,8 +174,9 @@ async function main(): Promise<void> {
     WHERE n.nspname = 'public' AND c.relkind = 'r'
       AND c.relrowsecurity AND c.relforcerowsecurity`;
   // 20 tablas de Oleada 1 + 4 de planning (Oleada 3B) + 1 resource_price_observations (Fase 3A)
-  // + 3 de price monitoring (Fase 4A: targets/runs/results) = 28.
-  check('Pre-flight: 28 tablas con RLS FORCE', rlsTables === '28', `rlsTables=${rlsTables}`);
+  // + 3 de price monitoring (Fase 4A: targets/runs/results)
+  // + 2 del review center (batches + bulk_actions) = 30.
+  check('Pre-flight: 30 tablas con RLS FORCE', rlsTables === '30', `rlsTables=${rlsTables}`);
 
   const [{ count: taskCount }] = await sql<{ count: string }[]>`
     SELECT count(*)::text AS count FROM schedule_tasks WHERE id = ${TASK_A}`;
@@ -1446,6 +1447,284 @@ async function main(): Promise<void> {
   check('apu: RLS ENABLE+FORCE conservado (apu_templates/apu_components/labor_roles)',
     apuForce.length === 3 && apuForce.every((r) => r.rls && r.force),
     JSON.stringify(apuForce));
+
+  // === 20) PRICE REVIEW CENTER (V1) — batches, bulk actions e import_batch_id ===
+  console.log('\n[20] Review center — lotes, acciones masivas, idempotencia y compat');
+  const DIGEST_64 = 'a'.repeat(64);
+
+  // 20a) Admin A crea batch; imported_by server-side; lo ve.
+  const batchCreate = await asUser(realA, async (q) => {
+    const [b] = await q<{ id: string; organization_id: string; imported_by: string }[]>`
+      INSERT INTO price_observation_batches
+        (organization_id, source_type, digest_sha256, label, imported_by, total_rows)
+      VALUES (${ORG_A}, 'supplier_csv', ${DIGEST_64}, 'Lote harness A', ${USER_A_ADMIN}, 3)
+      RETURNING id, organization_id, imported_by`;
+    const seen = await q<{ id: string }[]>`
+      SELECT id FROM price_observation_batches WHERE id = ${b!.id}`;
+    return { row: b!, visible: seen.length === 1 };
+  });
+  check('review: admin A crea batch en su org', batchCreate.row.organization_id === ORG_A);
+  check('review: imported_by = autor server-side', batchCreate.row.imported_by === USER_A_ADMIN);
+  check('review: el autor ve su batch (SELECT propio)', batchCreate.visible);
+
+  // 20b) B NO ve batches de A (aislamiento) y NO puede crear batch en org A.
+  const BATCH_A_SEED = '00000000-0000-0000-0000-00000000f101';
+  const batchIso = await asUser(
+    claimsB,
+    async (q) => {
+      const aRows = await q<{ id: string }[]>`
+        SELECT id FROM price_observation_batches WHERE organization_id = ${ORG_A}`;
+      let crossBlocked = false;
+      await q.unsafe('SAVEPOINT sp_pob_cross');
+      try {
+        await q`INSERT INTO price_observation_batches
+          (organization_id, source_type, digest_sha256, imported_by, total_rows)
+          VALUES (${ORG_A}, 'manual', ${DIGEST_64}, ${USER_B_ADMIN}, 1)`;
+      } catch {
+        crossBlocked = true;
+        await q.unsafe('ROLLBACK TO SAVEPOINT sp_pob_cross');
+      }
+      return { aRows: aRows.length, crossBlocked };
+    },
+    async (q) => {
+      await q`INSERT INTO price_observation_batches
+        (id, organization_id, source_type, digest_sha256, label, imported_by, total_rows)
+        VALUES (${BATCH_A_SEED}, ${ORG_A}, 'manual', ${DIGEST_64}, 'Lote seed A', ${USER_A_ADMIN}, 1)
+        ON CONFLICT (id) DO NOTHING`;
+    },
+  );
+  check('review: B NO ve batches de A (aislamiento SELECT)', batchIso.aRows === 0, `n=${batchIso.aRows}`);
+  check('review: INSERT de batch cross-org bloqueado (WITH CHECK)', batchIso.crossBlocked);
+
+  // 20c) Rol obra (site) NO crea batches.
+  let batchRoleBlocked = false;
+  await asUser(realAObra, async (q) => {
+    await q.unsafe('SAVEPOINT sp_pob_role');
+    try {
+      await q`INSERT INTO price_observation_batches
+        (organization_id, source_type, digest_sha256, imported_by, total_rows)
+        VALUES (${ORG_A}, 'manual', ${DIGEST_64}, ${USER_A_OBRA}, 1)`;
+    } catch {
+      batchRoleBlocked = true;
+      await q.unsafe('ROLLBACK TO SAVEPOINT sp_pob_role');
+    }
+  });
+  check('review: rol obra NO crea batches (gate de rol)', batchRoleBlocked);
+
+  // 20d) Batch inmutable: UPDATE y DELETE denegados (sin política) incluso para
+  // admin. El batch se siembra en el setup de ESTA transacción (asUser revierte).
+  const seedBatchA = async (q: postgres.ReservedSql): Promise<void> => {
+    await q`INSERT INTO price_observation_batches
+      (id, organization_id, source_type, digest_sha256, label, imported_by, total_rows)
+      VALUES (${BATCH_A_SEED}, ${ORG_A}, 'manual', ${DIGEST_64}, 'Lote seed A', ${USER_A_ADMIN}, 1)
+      ON CONFLICT (id) DO NOTHING`;
+  };
+  const batchImmutable = await asUser(
+    realA,
+    async (q) => {
+      const visible = await q<{ id: string }[]>`
+        SELECT id FROM price_observation_batches WHERE id = ${BATCH_A_SEED}`;
+      const upd = await q`UPDATE price_observation_batches SET label = 'mutado' WHERE id = ${BATCH_A_SEED}`;
+      const del = await q`DELETE FROM price_observation_batches WHERE id = ${BATCH_A_SEED}`;
+      return { exists: visible.length === 1, updates: upd.count, deletes: del.count };
+    },
+    seedBatchA,
+  );
+  check('review: batch seed visible antes de probar inmutabilidad', batchImmutable.exists);
+  check('review: UPDATE de batch denegado (procedencia inmutable)', batchImmutable.updates === 0, `upd=${batchImmutable.updates}`);
+  check('review: DELETE de batch denegado', batchImmutable.deletes === 0, `del=${batchImmutable.deletes}`);
+
+  // 20e) Observación con import_batch_id de la MISMA org: FK válida, insertable.
+  const obsWithBatch = await asUser(
+    realA,
+    async (q) => {
+      const [o] = await q<{ id: string; import_batch_id: string | null }[]>`
+        INSERT INTO resource_price_observations
+          (organization_id, resource_id, observed_price, discount_percent, suggested_net_price,
+           unit, currency, source_type, observed_at, status, created_by, import_batch_id)
+        VALUES (${ORG_A}, ${RES_A}, 50000, 0, 0, 'und', 'COP', 'supplier_csv', now(), 'pending',
+                ${USER_A_ADMIN}, ${BATCH_A_SEED})
+        RETURNING id, import_batch_id`;
+      return o!;
+    },
+    seedBatchA,
+  );
+  check('review: observación vinculada a batch de su org (FK válida)', obsWithBatch.import_batch_id === BATCH_A_SEED);
+
+  // 20f) Observación apuntando a batch de OTRA org bloqueada (trigger same-org).
+  const BATCH_B_SEED = '00000000-0000-0000-0000-00000000f102';
+  let obsCrossBatchBlocked = false;
+  await asUser(
+    realA,
+    async (q) => {
+      await q.unsafe('SAVEPOINT sp_rpo_xbatch');
+      try {
+        await q`INSERT INTO resource_price_observations
+          (organization_id, resource_id, observed_price, discount_percent, suggested_net_price,
+           unit, currency, source_type, observed_at, status, created_by, import_batch_id)
+          VALUES (${ORG_A}, ${RES_A}, 50000, 0, 0, 'und', 'COP', 'supplier_csv', now(), 'pending',
+                  ${USER_A_ADMIN}, ${BATCH_B_SEED})`;
+      } catch {
+        obsCrossBatchBlocked = true;
+        await q.unsafe('ROLLBACK TO SAVEPOINT sp_rpo_xbatch');
+      }
+    },
+    async (q) => {
+      await q`INSERT INTO price_observation_batches
+        (id, organization_id, source_type, digest_sha256, imported_by, total_rows)
+        VALUES (${BATCH_B_SEED}, ${ORG_B}, 'manual', ${DIGEST_64}, ${USER_B_ADMIN}, 1)
+        ON CONFLICT (id) DO NOTHING`;
+    },
+  );
+  check('review: batch de otra org bloqueado (trigger same-org)', obsCrossBatchBlocked);
+
+  // 20g) Compatibilidad retroactiva: observación SIN batch sigue siendo
+  // legible y aprobable (UPDATE de revisión solo toca filas pending).
+  const obsLegacy = await asUser(realA, async (q) => {
+    const [o] = await q<{ id: string }[]>`
+      INSERT INTO resource_price_observations
+        (organization_id, resource_id, observed_price, discount_percent, suggested_net_price,
+         unit, currency, source_type, observed_at, status, created_by)
+      VALUES (${ORG_A}, ${RES_A}, 70000, 0, 0, 'und', 'COP', 'manual', now(), 'pending', ${USER_A_ADMIN})
+      RETURNING id`;
+    const [{ approved }] = await q<{ approved: number }[]>`
+      WITH upd AS (
+        UPDATE resource_price_observations
+        SET status = 'approved', approved_by = ${USER_A_ADMIN}, approved_at = now()
+        WHERE id = ${o!.id} AND status = 'pending'
+        RETURNING 1
+      ) SELECT count(*)::int AS approved FROM upd`;
+    return { approved };
+  });
+  check('review: observación histórica sin batch aprobable (compat)', obsLegacy.approved === 1);
+
+  // 20h) UPDATE masivo solo toca pending: approved NO se sobrescribe.
+  const bulkOnlyPending = await asUser(realA, async (q) => {
+    const [p] = await q<{ id: string }[]>`
+      INSERT INTO resource_price_observations
+        (organization_id, resource_id, observed_price, discount_percent, suggested_net_price,
+         unit, currency, source_type, observed_at, status, created_by)
+      VALUES (${ORG_A}, ${RES_A}, 1000, 0, 0, 'und', 'COP', 'manual', now(), 'pending', ${USER_A_ADMIN})
+      RETURNING id`;
+    const [a] = await q<{ id: string }[]>`
+      INSERT INTO resource_price_observations
+        (organization_id, resource_id, observed_price, discount_percent, suggested_net_price,
+         unit, currency, source_type, observed_at, status, created_by, approved_by, approved_at)
+      VALUES (${ORG_A}, ${RES_A}, 2000, 0, 0, 'und', 'COP', 'manual', now(), 'approved',
+              ${USER_A_ADMIN}, ${USER_A_ADMIN}, now())
+      RETURNING id`;
+    const upd = await q`
+      UPDATE resource_price_observations
+      SET status = 'approved', approved_by = ${USER_A_ADMIN}, approved_at = now()
+      WHERE organization_id = ${ORG_A} AND status = 'pending'
+        AND id IN (${p!.id}, ${a!.id})`;
+    return { updated: upd.count };
+  });
+  check('review: UPDATE masivo solo afecta pending (approved se omite)', bulkOnlyPending.updated === 1, `n=${bulkOnlyPending.updated}`);
+
+  // 20i) Cross-org: A NO puede aprobar observaciones de B (0 filas).
+  const OBS_B_SEED = '00000000-0000-0000-0000-00000000f103';
+  const crossApprove = await asUser(
+    realA,
+    async (q) => {
+      const upd = await q`
+        UPDATE resource_price_observations
+        SET status = 'approved', approved_by = ${USER_A_ADMIN}, approved_at = now()
+        WHERE id = ${OBS_B_SEED} AND status = 'pending'`;
+      return upd.count;
+    },
+    async (q) => {
+      await q`INSERT INTO resources (id, organization_id, code, name, resource_type, unit)
+        VALUES ('00000000-0000-0000-0000-00000000f104', ${ORG_B}, 'RB-001', 'Recurso B', 'material', 'und')
+        ON CONFLICT (id) DO NOTHING`;
+      await q`INSERT INTO resource_price_observations
+        (id, organization_id, resource_id, observed_price, discount_percent, suggested_net_price,
+         unit, currency, source_type, observed_at, status, created_by)
+        VALUES (${OBS_B_SEED}, ${ORG_B}, '00000000-0000-0000-0000-00000000f104', 3000, 0, 0,
+                'und', 'COP', 'manual', now(), 'pending', ${USER_B_ADMIN})
+        ON CONFLICT (id) DO NOTHING`;
+    },
+  );
+  check('review: aprobación masiva cross-org bloqueada (0 filas)', crossApprove === 0, `n=${crossApprove}`);
+
+  // 20j) Bulk action: admin A crea registro auditado; initiated_by server-side.
+  const bulkAction = await asUser(realA, async (q) => {
+    const [r] = await q<{ id: string; organization_id: string; initiated_by: string }[]>`
+      INSERT INTO price_observation_bulk_actions
+        (organization_id, action_type, initiated_by, selected_count, idempotency_key, metadata)
+      VALUES (${ORG_A}, 'approve', ${USER_A_ADMIN}, 5, 'harness-20j', '{"selectedIds":[]}')
+      RETURNING id, organization_id, initiated_by`;
+    const [{ upd }] = await q<{ upd: number }[]>`
+      WITH u AS (
+        UPDATE price_observation_bulk_actions
+        SET succeeded_count = 4, skipped_count = 1
+        WHERE id = ${r!.id} RETURNING 1
+      ) SELECT count(*)::int AS upd FROM u`;
+    const del = await q`DELETE FROM price_observation_bulk_actions WHERE id = ${r!.id}`;
+    return { row: r!, counterUpdated: upd === 1, deletes: del.count };
+  });
+  check('review: bulk action creada con initiated_by server-side', bulkAction.row.initiated_by === USER_A_ADMIN);
+  check('review: contadores de bulk action actualizables por el revisor', bulkAction.counterUpdated);
+  check('review: DELETE de bulk action denegado (auditoría inmutable)', bulkAction.deletes === 0, `del=${bulkAction.deletes}`);
+
+  // 20k) Idempotencia: misma (org, idempotency_key) bloqueada (UNIQUE).
+  let bulkIdemBlocked = false;
+  await asUser(realA, async (q) => {
+    await q`INSERT INTO price_observation_bulk_actions
+      (organization_id, action_type, initiated_by, selected_count, idempotency_key)
+      VALUES (${ORG_A}, 'approve', ${USER_A_ADMIN}, 1, 'harness-20k')`;
+    await q.unsafe('SAVEPOINT sp_poba_idem');
+    try {
+      await q`INSERT INTO price_observation_bulk_actions
+        (organization_id, action_type, initiated_by, selected_count, idempotency_key)
+        VALUES (${ORG_A}, 'reject', ${USER_A_ADMIN}, 1, 'harness-20k')`;
+    } catch {
+      bulkIdemBlocked = true;
+      await q.unsafe('ROLLBACK TO SAVEPOINT sp_poba_idem');
+    }
+  });
+  check('review: idempotency_key duplicada por org bloqueada (UNIQUE)', bulkIdemBlocked);
+
+  // 20l) Rol obra NO crea bulk actions (solo admin/gerencia).
+  let bulkRoleBlocked = false;
+  await asUser(realAObra, async (q) => {
+    await q.unsafe('SAVEPOINT sp_poba_role');
+    try {
+      await q`INSERT INTO price_observation_bulk_actions
+        (organization_id, action_type, initiated_by, selected_count, idempotency_key)
+        VALUES (${ORG_A}, 'approve', ${USER_A_OBRA}, 1, 'harness-20l')`;
+    } catch {
+      bulkRoleBlocked = true;
+      await q.unsafe('ROLLBACK TO SAVEPOINT sp_poba_role');
+    }
+  });
+  check('review: rol obra NO crea bulk actions (solo admin/gerencia)', bulkRoleBlocked);
+
+  // 20m) B NO ve bulk actions de A.
+  const bulkIso = await asUser(
+    claimsB,
+    async (q) => {
+      const rows = await q<{ id: string }[]>`
+        SELECT id FROM price_observation_bulk_actions WHERE organization_id = ${ORG_A}`;
+      return rows.length;
+    },
+    async (q) => {
+      await q`INSERT INTO price_observation_bulk_actions
+        (id, organization_id, action_type, initiated_by, selected_count, idempotency_key)
+        VALUES ('00000000-0000-0000-0000-00000000f105', ${ORG_A}, 'approve', ${USER_A_ADMIN}, 1, 'harness-20m')
+        ON CONFLICT (id) DO NOTHING`;
+    },
+  );
+  check('review: B NO ve bulk actions de A (aislamiento SELECT)', bulkIso === 0, `n=${bulkIso}`);
+
+  // 20n) RLS ENABLE + FORCE conservado en las tablas nuevas.
+  const reviewForce = await sql<{ relname: string; rls: boolean; force: boolean }[]>`
+    SELECT relname, relrowsecurity AS rls, relforcerowsecurity AS force
+    FROM pg_class
+    WHERE relname IN ('price_observation_batches', 'price_observation_bulk_actions')`;
+  check('review: RLS ENABLE+FORCE en batches y bulk_actions',
+    reviewForce.length === 2 && reviewForce.every((r) => r.rls && r.force),
+    JSON.stringify(reviewForce));
 
   // --- Resumen ---
   console.log(`\nRESULTADO RLS RUNTIME: ${pass} PASS / ${fail} FAIL`);
