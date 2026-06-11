@@ -1,5 +1,92 @@
 # Handoff Log
 
+## 2026-06-11 — FASE 4B.1: APU_COST_MODEL_FOUNDATION_V1 (rama `feature/apu-cost-model-foundation-v1`)
+
+> **Fundamento trazable del costo APU: rol laboral → cuadrilla → actividad con herramienta menor derivada.** Base `origin/main = 8a81a98` (price monitoring ya integrado). Worktree dedicado `construction-ops-apu-cost-model-foundation-v1`. **Sin merge a main, sin deploy, sin db push remoto, sin datos dummy remotos, stashes intactos (2 WIP).** Importación del Excel (4B.2), BOQ↔APU linking y cantidades (4B.3) NO iniciadas.
+
+### Commits de la oleada
+- `0a4fbf0` docs(apu): cherry-pick documental de discovery (origen `b75e7a4`)
+- `cb3b176` docs(apu): freeze cost model foundation v1 contract
+- `6433041` feat(db): additive APU foundation migrations, seed and fixture v2.1.0
+- `8bb2117` feat(apu): traceable labor cost domain, ApuDetail read-model and /apu/[id] view
+- `dbf9002` test(apu): foundation domain/read-model tests + RLS harness section 19
+- (este commit) docs de cierre.
+
+### A. Contrato
+- **`docs/APU_COST_MODEL_FOUNDATION_V1_CONTRACT.md`** congelado: alcance/fuera de
+  alcance, modelo laboral (fórmula intacta), trazabilidad `labor_role_id`,
+  cuadrillas sin tabla nueva, herramienta derivada vía `default_tool_pct`,
+  rendimientos/desperdicios sin cambios, unidades canónicas reutilizadas,
+  compatibilidad total con componentes existentes, RLS, migraciones, pruebas,
+  golden master y deudas (ENTRE_PATIOS_APU_IMPORT_V1, BOQ_APU_LINKING_V1,
+  QUANTITY_TAKEOFF_IMPORT_V1, APU_UI_ADVANCED_EDITING_V1).
+
+### B. Esquema + RLS (migraciones `20260613090000` + `20260613090100`, LOCAL)
+- `apu_components.labor_role_id` uuid NULL, FK `labor_roles` ON DELETE SET NULL,
+  índice, **trigger same-org** (cross-org ⇒ 23514). Filas existentes en NULL.
+- `apu_templates.default_tool_pct` numeric(20,10) NOT NULL DEFAULT 0,
+  CHECK rango [0,1]. Sin backfill.
+- RLS sin cambios de políticas (columnas heredan ENABLE+FORCE existente).
+- Seed `0006_demo_apu_foundation.sql`: rol Ayudante (LR-002) + APU-002 cuadrilla
+  demo registrado en `config.toml`.
+- **Harness RLS**: sección [19] con 10 checks nuevos ⇒ **130/130 PASS** local.
+
+### C. Dominio (`apps/web/modules/apu/apu.ts`, aditivo y retrocompatible)
+- `calculateCrewLaborCost(members)` = Σ(cantidad integrantes × costo por rol).
+- `buildCrewLaborComponent({laborRoleId, role, performanceDays, memberCount})`
+  congela `dailyIntegralCost` como snapshot y **falla seguro sin laborRoleId**.
+- `calculateApuUnitCostFull(components, defaultToolPct)`: desglose por tipo +
+  herramienta derivada `pct × Σ labor`; con pct='0' reproduce EXACTO
+  `calculateApuUnitCost`. Filas `tool` explícitas intactas. Decimal en todo;
+  el servidor nunca confía en subtotales del navegador.
+
+### D. Read-model + UI
+- Contrato: `ApuComponentView` + `ApuDetail` (unit RAW + `unitCanonical` vía
+  `canonicalizeUnit` de pricing) + `getApuDetail` en `ReadModelPort`.
+- Implementado en fixture y Drizzle; `computeApuDetail` compartido en
+  `compute.ts`; `ApuNotFoundError` sin fallback; proyección 🔒 rol `client`
+  omite `laborRoleCode/laborRoleName` (backend-first).
+- `listApus` ahora usa el costo COMPLETO (con derivada); APU existentes
+  (pct=0) conservan su valor anterior.
+- UI: nueva página `/apu/[id]` (componentes con tipo/rendimiento/desperdicio/
+  rol/herramienta derivada + desglose por tipo) y link desde las cards de `/apu`.
+
+### E. Fixture v2.1.0 (`scripts/fixtures/entre-patios-first-floor.fixture.json`)
+- +`ROL-AY-001` Ayudante (base 1.160.000 ficticio ⇒ mensual 2.158.200, día
+  89.925, hora 11.240,625 — reproducibles con `calculateLaborCost`).
+- Componente labor existente de APU-PISO-PORC: +`laborRoleId` (Oficial) SIN
+  alterar snapshot/total (68370 intacto).
+- +`APU-MURO-LAD` (m2 ⇒ m²): cuadrilla 2 Ayudantes (qty 0.4) + 1 Oficial
+  (qty 0.2) + material, `defaultToolPct 0.05` ⇒ M.O. 55.932,5, herramienta
+  2.796,625, total 67.549,125.
+
+### F. Validación (todo PASS)
+- typecheck 0, lint 0, **1236 tests** (+27 de esta fase) + 42 gated.
+- build: `ƒ /apu/[id]` nueva; resto de rutas intactas.
+- `supabase db reset --local`: 31 migraciones + 6 seeds sin errores.
+- RLS runtime **130/130**; read-model isolation **12/12**.
+- Smoke gated `BOQ_SMOKE_DB=1`: boq-edit 32/32 + mvp-internal-flow 10/10
+  (1 fallo transitorio PGRST303 por warmup de PostgREST tras reset; re-run verde).
+- gm:regression **22/22** (total ≈ COP 372.247.169,97 intacto);
+  gm:import `--check-fixture` PASS (regresión + privacidad sin fugas).
+- `git diff --check` limpio; validador de agentes 214/0/0.
+
+### G. Riesgos residuales / deudas
+- Filas históricas `unit_price_source='labor_role'` con `labor_role_id NULL`
+  se toleran en lectura (no trazables); se regularizan en 4B.2.
+- Migraciones `20260613*` NO aplicadas a remoto (se aplican en el release).
+- Cuadrillas reutilizables entre APU (`apu_crew_templates`) diferidas.
+
+### Próximo paso
+- Release de la rama (merge + db push remoto + deploy) cuando la usuaria lo
+  autorice; luego **FASE 4B.2 ENTRE_PATIOS_APU_IMPORT_V1** (verificar hoja APU
+  con `gm:dump` antes de escribir el parser).
+
+### Agentes activos al cierre
+- Ninguno.
+
+---
+
 ## 2026-06-11 — FASE 4A: PRICE_MONITORING_AGENT_V1 + UNIT_ALIAS_NORMALIZATION_V1 (rama `feature/price-monitoring-agent-v1`)
 
 > **Agente automático del sistema para monitoreo periódico de precios públicos + normalización semántica de unidades.** Base `origin/main = 9f6816f` (verificado HEAD exacto, sin divergencia). Worktree dedicado `construction-ops-price-monitoring-agent-v1`. **Sin merge a main, sin deploy, sin db push remoto, sin variables remotas, stashes intactos (2 WIP).**

@@ -27,6 +27,7 @@ sql_paths = [
   "./seeds/0003_demo_planning.sql",
   "./seeds/0004_auth_org_b_and_no_membership.sql",
   "./seeds/0005_demo_price_intelligence.sql",
+  "./seeds/0006_demo_apu_foundation.sql",
 ]
 
 [studio]

@@ -35,6 +35,18 @@ export class EstimateVersionNotFoundError extends Error {
   }
 }
 
+/** Plantilla APU inexistente o no visible para la organización del viewer. */
+export class ApuNotFoundError extends Error {
+  readonly code = 'apu_not_found' as const;
+  readonly apuTemplateId: Uuid;
+
+  constructor(apuTemplateId: Uuid, message?: string) {
+    super(message ?? `apu_not_found: ${apuTemplateId}`);
+    this.name = 'ApuNotFoundError';
+    this.apuTemplateId = apuTemplateId;
+  }
+}
+
 /**
  * El selector seleccionó `READ_MODEL_SOURCE=db` pero falta configuración
  * (p. ej. `DATABASE_URL`). NO se hace fallback silencioso a `fixture`: el modo

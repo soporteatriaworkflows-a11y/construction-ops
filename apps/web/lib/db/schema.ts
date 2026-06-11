@@ -370,6 +370,9 @@ export const apuTemplates = pgTable(
     description: text("description"),
     active: boolean("active").notNull().default(true),
     version: integer("version").notNull().default(1),
+    // FASE 4B.1: herramienta menor derivada como FRACCIÓN [0,1] del subtotal
+    // de M.O. del APU (no se almacena como fila de componente).
+    defaultToolPct: money("default_tool_pct").notNull().default("0"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -381,6 +384,10 @@ export const apuTemplates = pgTable(
       t.version,
     ),
     check("apu_templates_version_min", sql`${t.version} >= 1`),
+    check(
+      "apu_templates_tool_pct_range",
+      sql`${t.defaultToolPct} >= 0 AND ${t.defaultToolPct} <= 1`,
+    ),
   ],
 );
 
@@ -394,6 +401,11 @@ export const apuComponents = pgTable(
     resourceId: uuid("resource_id").references(() => resources.id, {
       onDelete: "restrict",
     }),
+    // FASE 4B.1: trazabilidad del componente de M.O. a su rol salarial.
+    // Nullable (retrocompatible); el snapshot congelado sigue siendo la verdad.
+    laborRoleId: uuid("labor_role_id").references(() => laborRoles.id, {
+      onDelete: "set null",
+    }),
     componentType: text("component_type").notNull(),
     quantity: money("quantity").notNull(),
     wastePct: money("waste_pct").notNull().default("0"),
@@ -406,6 +418,7 @@ export const apuComponents = pgTable(
   (t) => [
     index("apu_components_template_sort_idx").on(t.apuTemplateId, t.sortOrder),
     index("apu_components_resource_id_idx").on(t.resourceId),
+    index("apu_components_labor_role_id_idx").on(t.laborRoleId),
     check(
       "apu_components_component_type_valid",
       sql`${t.componentType} IN ('material','labor','equipment','tool','subcontract','other')`,

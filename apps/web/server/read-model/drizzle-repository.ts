@@ -16,6 +16,7 @@
  */
 
 import type {
+  ApuDetail,
   ApuSummary,
   BoqItemView,
   CatalogResourceView,
@@ -37,11 +38,12 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { DrizzleReadRepository, type ReadDb } from '@/server/repositories/read-repository';
 import { withTenantDb, buildRlsClaims } from '@/lib/db/rls';
 import {
-  computeApuUnitCost,
+  computeApuDetail,
   computeDashboard,
   computeEstimate,
   type EstimateComputation,
   type EstimateComputationInput,
+  type RawApuComponent,
   type RawBoqItem,
   type RawChapter,
   type RawIndirectRule,
@@ -52,12 +54,17 @@ import {
   type RawTaskDependency,
 } from './compute-planning';
 import {
+  projectApuDetailForRole,
   projectDashboardForRole,
   projectProgressEntriesForRole,
   projectResourceAssignmentsForRole,
   projectScheduleForRole,
 } from './types';
-import { EstimateVersionNotFoundError, ProjectNotFoundError } from './errors';
+import {
+  ApuNotFoundError,
+  EstimateVersionNotFoundError,
+  ProjectNotFoundError,
+} from './errors';
 
 /** Normaliza un valor de fecha/hora de Drizzle a ISO string. */
 function toIso(value: Date | string): string {
@@ -372,23 +379,97 @@ export class DrizzleReadModelRepository implements ReadModelPort {
     const templates = await this.repo.apuTemplates(viewer.organizationId);
     if (templates.length === 0) return [];
     const components = await this.repo.apuComponentsByTemplates(templates.map((t) => t.id));
-    const byTemplate = new Map<Uuid, string[]>();
+    const byTemplate = new Map<Uuid, RawApuComponent[]>();
     for (const c of components) {
       const bucket = byTemplate.get(c.apuTemplateId) ?? [];
-      bucket.push(c.totalComponentCost);
+      bucket.push({
+        id: c.id,
+        componentType: c.componentType as RawApuComponent['componentType'],
+        quantity: c.quantity,
+        wastePct: c.wastePct,
+        unitPriceSnapshot: c.unitPriceSnapshot,
+        totalComponentCost: c.totalComponentCost,
+        sortOrder: c.sortOrder,
+      });
       byTemplate.set(c.apuTemplateId, bucket);
     }
     return templates.map((t) => {
-      const costs = byTemplate.get(t.id) ?? [];
+      const rows = byTemplate.get(t.id) ?? [];
+      // Costo unitario COMPLETO (incluye herramienta menor derivada). Con
+      // default_tool_pct=0 coincide exactamente con la suma de componentes.
+      const detail = computeApuDetail(
+        {
+          id: t.id,
+          code: t.code,
+          name: t.name,
+          unit: t.unit,
+          version: t.version,
+          defaultToolPct: t.defaultToolPct,
+        },
+        rows,
+      );
       return {
         id: t.id,
         code: t.code,
         name: t.name,
         unit: t.unit,
-        unitCost: computeApuUnitCost(costs),
-        componentCount: costs.length,
+        unitCost: detail.unitCostTotal,
+        componentCount: rows.length,
       };
     });
+    });
+  }
+
+  async getApuDetail(viewer: ViewerContext, apuTemplateId: Uuid): Promise<ApuDetail> {
+    return this.read(viewer, async () => {
+    // Pertenencia: la plantilla debe ser de la organización del viewer (RLS es
+    // la barrera real; el filtro explícito es la segunda barrera).
+    const templates = await this.repo.apuTemplates(viewer.organizationId);
+    const template = templates.find((t) => t.id === apuTemplateId);
+    if (!template) throw new ApuNotFoundError(apuTemplateId);
+
+    const components = await this.repo.apuComponentsByTemplates([template.id]);
+    const resourceIds = components
+      .map((c) => c.resourceId)
+      .filter((id): id is Uuid => id !== null);
+    const laborRoleIds = components
+      .map((c) => c.laborRoleId)
+      .filter((id): id is Uuid => id !== null);
+    const resources = await this.repo.resourcesByIds(resourceIds);
+    const roles = await this.repo.laborRolesByIds(laborRoleIds);
+    const resourceById = new Map(resources.map((r) => [r.id, r]));
+    const roleById = new Map(roles.map((r) => [r.id, r]));
+
+    const rows: RawApuComponent[] = components.map((c) => {
+      const resource = c.resourceId ? resourceById.get(c.resourceId) : undefined;
+      const role = c.laborRoleId ? roleById.get(c.laborRoleId) : undefined;
+      return {
+        id: c.id,
+        componentType: c.componentType as RawApuComponent['componentType'],
+        resourceCode: resource?.code ?? null,
+        resourceName: resource?.name ?? null,
+        laborRoleCode: role?.code ?? null,
+        laborRoleName: role?.name ?? null,
+        quantity: c.quantity,
+        wastePct: c.wastePct,
+        unitPriceSnapshot: c.unitPriceSnapshot,
+        totalComponentCost: c.totalComponentCost,
+        sortOrder: c.sortOrder,
+      };
+    });
+
+    const detail = computeApuDetail(
+      {
+        id: template.id,
+        code: template.code,
+        name: template.name,
+        unit: template.unit,
+        version: template.version,
+        defaultToolPct: template.defaultToolPct,
+      },
+      rows,
+    );
+    return projectApuDetailForRole(detail, viewer.role);
     });
   }
 

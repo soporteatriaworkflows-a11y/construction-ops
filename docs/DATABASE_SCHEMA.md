@@ -371,14 +371,19 @@ necesariamente un rol de fila; se trata en el perfil de exports).
 | description | TEXT | NULL | |
 | active | BOOLEAN | NOT NULL | DEFAULT true |
 | version | INTEGER | NOT NULL | DEFAULT 1 |
+| default_tool_pct | NUMERIC(20,10) | NOT NULL | DEFAULT 0; fracción [0,1] de herramienta menor derivada sobre la M.O. (4B.1, migración 20260613090100) |
 | created_at | TIMESTAMPTZ | NOT NULL | |
 | updated_at | TIMESTAMPTZ | NOT NULL | |
 6-8. PK `id`; FK `organization_id`; ON DELETE org CASCADE.
 9. directo. 10. RLS por organización.
 11. **Índices**: PK; UNIQUE `(organization_id, code, version)`.
-12. **Integridad**: `version >= 1`.
+12. **Integridad**: `version >= 1`; `default_tool_pct >= 0 AND default_tool_pct <= 1`.
 13. **Enums**: —.
 14-15. —. 16. 🔒 INTERNO: —. 17. **Dudas**: `chapter_template_id` (catálogo de capítulos maestro) diferido; nullable en v1.
+18. **Herramienta derivada** (APU_COST_MODEL_FOUNDATION_V1 §6): la herramienta
+menor derivada NO se almacena como fila de `apu_components`; el dominio la
+aplica como `default_tool_pct × Σ(componentes labor)` al final del cálculo
+(`calculateApuUnitCostFull`). Las filas `tool` explícitas siguen la regla canónica.
 
 ### `apu_components`
 1. **Tabla**: `apu_components` 2. **Propósito**: línea de insumo dentro de un APU.
@@ -388,6 +393,7 @@ necesariamente un rol de fila; se trata en el perfil de exports).
 | id | UUID | NOT NULL | PK |
 | apu_template_id | UUID | NOT NULL | FK apu_templates |
 | resource_id | UUID | NULL | FK resources |
+| labor_role_id | UUID | NULL | FK labor_roles; trazabilidad de M.O. (4B.1, migración 20260613090000) |
 | component_type | TEXT | NOT NULL | CHECK |
 | quantity | NUMERIC(20,10) | NOT NULL | rendimiento/consumo |
 | waste_pct | NUMERIC(20,10) | NOT NULL | DEFAULT 0 fracción |
@@ -396,11 +402,16 @@ necesariamente un rol de fila; se trata en el perfil de exports).
 | total_component_cost | NUMERIC(20,10) | NOT NULL | calculado (ver regla) |
 | sort_order | INTEGER | NOT NULL | DEFAULT 0 |
 | notes | TEXT | NULL | |
-6. PK `id`. 7. FK `apu_template_id → apu_templates(id)`, `resource_id → resources(id)`.
-8. **ON DELETE**: apu_template CASCADE; resource RESTRICT.
+6. PK `id`. 7. FK `apu_template_id → apu_templates(id)`, `resource_id → resources(id)`, `labor_role_id → labor_roles(id)`.
+8. **ON DELETE**: apu_template CASCADE; resource RESTRICT; labor_role SET NULL (el snapshot congelado sigue siendo la verdad).
 9. derivado vía `apu_template_id`. 10. RLS por JOIN.
-11. **Índices**: PK; `(apu_template_id, sort_order)`; `(resource_id)`.
-12. **Integridad**: `quantity >= 0`; `waste_pct >= 0`; `unit_price_snapshot >= 0`.
+11. **Índices**: PK; `(apu_template_id, sort_order)`; `(resource_id)`; `(labor_role_id)`.
+12. **Integridad**: `quantity >= 0`; `waste_pct >= 0`; `unit_price_snapshot >= 0`;
+trigger `apu_components_labor_role_same_org` (BEFORE INSERT/UPDATE): el
+`labor_role_id` debe pertenecer a la misma organización que el `apu_template`
+(cross-org rechazado con 23514). Invariante de dominio (no DB, por
+retrocompatibilidad): flujos nuevos con `unit_price_source='labor_role'` DEBEN
+proveer `labor_role_id` (`buildCrewLaborComponent` falla seguro sin él).
 13. **Enums**: `component_type IN ('material','labor','equipment','tool','subcontract','other')`; `unit_price_source IN ('resource','labor_role','manual','supplier_product')`.
 14. **Inmutabilidad**: `unit_price_snapshot` se congela al momento de definir/recalcular el APU.
 15. **Snapshot**: `unit_price_snapshot`.

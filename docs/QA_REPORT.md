@@ -4,6 +4,40 @@ Este documento es propiedad de **agent-qa**. Se actualiza al final de
 
 ---
 
+## APU_COST_MODEL_FOUNDATION_V1 (2026-06-11, rama `feature/apu-cost-model-foundation-v1`)
+
+**Base:** `origin/main = 8a81a98` · **main intacta** · **producción intacta** · **sin db push remoto** (migraciones `20260613*` SOLO locales) · **stashes intactos (2 WIP)**
+
+| Check | Resultado | Detalle |
+|---|---|---|
+| supabase db reset --local | ✅ PASS | 31 migraciones (incl. `20260613090000`/`20260613090100`) + 6 seeds (incl. 0006) sin errores |
+| typecheck | ✅ 0 errores | `tsc --noEmit` sin output |
+| lint | ✅ 0 errores | `eslint .` sin output |
+| tests relacionados | ✅ 65/65 | labor 10, apu 15, apu-foundation 18 (nuevo), apu-detail 9 (nuevo), fixture-repository 13 |
+| suite completa | ✅ **1236/1236 PASS** | +27 nuevos · 42 gated aparte |
+| build | ✅ PASS | `Compiled successfully` · nueva ruta `ƒ /apu/[id]` · resto intacto |
+| RLS harness | ✅ **130/130 PASS** | +10 checks sección [19] APU foundation (nullable, FK, cross-org, trigger same-org, CHECK tool_pct, ENABLE+FORCE) |
+| read-model isolation | ✅ 12/12 PASS | withTenantRls + repo real, sin fuga cross-org |
+| gm:regression | ✅ **22/22 PASS** | Golden master Entre Patios intacto: total ≈ COP 372.247.169,97; directos 336.084.479,94 |
+| gm:import | ✅ PASS | `--check-fixture`: regresión 9/9 + cadena recalculada 9/9 + privacidad sin fugas (fixture v2.1.0) |
+| MVP smoke gated | ✅ 42/42 | `BOQ_SMOKE_DB=1`: boq-edit 32/32 + mvp-internal-flow 10/10 (1 fallo transitorio PGRST303 por warmup PostgREST tras db reset; re-run verde, no atribuible a la rama) |
+| git diff --check | ✅ Limpio | Solo advertencias CRLF (Windows, esperadas) |
+| validate-claude-agents | ✅ 214/0/0 | 11 agentes válidos |
+
+**Confirmaciones funcionales de la fase:**
+- `labor_role_id`: FK nullable retrocompatible + índice + trigger same-org (cross-org ⇒ 23514) ✅
+- Oficial: mensual 2.395.500 / día 99.812,5 / hora 12.476,5625 (derivados, no almacenados) ✅
+- Ayudante: mensual 2.158.200 / día 89.925 / hora 11.240,625 ✅
+- Cuadrilla 2 Ayudantes + 1 Oficial: Σ = 34.957,8125/hora; componentes qty 0.4 + 0.2 (rendimiento × integrantes) ✅
+- `default_tool_pct`: DEFAULT 0, CHECK [0,1]; fuera de rango rechazado en DB y dominio ✅
+- Herramienta derivada: 0.05 × 55.932,5 = 2.796,625; NO es fila de componente; tool explícita coexiste ✅
+- Rendimientos (`quantity`) y desperdicios (`waste_pct`, fórmula `qty×(1+waste)×price`) sin cambios ✅
+- Aliases de unidades reutilizados (m2 ≡ m² sin diferencia semántica; raw preservado) ✅
+- Compatibilidad retroactiva: APU-PISO-PORC 68.370 intacto; `calculateApuUnitCostFull(pct=0)` ≡ `calculateApuUnitCost` ✅
+- Privacidad: rol `client` no recibe `laborRoleCode/laborRoleName` (proyección backend-first) ✅
+
+---
+
 ## PROVIDER_PRICE_LIST_MAPPING_UX_FIX_V1 (2026-06-10, rama `fix/provider-price-list-mapping-ux-v1`)
 
 **Base:** `origin/main = bd97abb` · **main intacta** · **producción intacta** · **sin db push remoto** · **sin migración**

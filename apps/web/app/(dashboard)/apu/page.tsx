@@ -6,7 +6,8 @@
  * NO importa @/lib/utils/mocks. NO calcula totales financieros.
  * unitCost llega pre-calculado como DecimalString desde el read-model.
  */
-import { Calculator } from 'lucide-react';
+import Link from 'next/link';
+import { Calculator, ChevronRight } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
 import { EmptyState } from '@/components/shared/empty-state';
 import {
@@ -98,6 +99,15 @@ export default async function ApuPage() {
                       / {apu.unit}
                     </span>
                   </span>
+                </div>
+                <div className="mt-3 text-right">
+                  <Link
+                    href={`/apu/${apu.id}`}
+                    className="inline-flex items-center gap-1 text-sm font-medium text-blue-700 hover:text-blue-900"
+                  >
+                    Ver desglose de componentes
+                    <ChevronRight className="h-4 w-4" />
+                  </Link>
                 </div>
               </CardContent>
             </Card>

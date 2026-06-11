@@ -18,6 +18,7 @@
 
 import fixtureJson from '../../../../scripts/fixtures/entre-patios-first-floor.fixture.json';
 import type {
+  ApuDetail,
   ApuSummary,
   BoqItemView,
   CatalogResourceView,
@@ -37,7 +38,7 @@ import type {
   ViewerContext,
 } from '@/lib/contracts/read-model';
 import {
-  computeApuUnitCost,
+  computeApuDetail,
   computeDashboard,
   computeEstimate,
   type EstimateComputation,
@@ -49,12 +50,14 @@ import {
   type RawTaskDependency,
 } from './compute-planning';
 import {
+  projectApuDetailForRole,
   projectDashboardForRole,
   projectProgressEntriesForRole,
   projectResourceAssignmentsForRole,
   projectScheduleForRole,
 } from './types';
 import {
+  ApuNotFoundError,
   EstimateVersionNotFoundError,
   ProjectNotFoundError,
 } from './errors';
@@ -109,8 +112,27 @@ interface FixtureShape {
     code: string;
     name: string;
     unit: string;
+    version: number;
+    defaultToolPct: string;
   }[];
-  apuComponents: { apuTemplateId: Uuid; totalComponentCost: string }[];
+  apuComponents: {
+    id: Uuid;
+    apuTemplateId: Uuid;
+    resourceId?: Uuid | null;
+    laborRoleId?: Uuid | null;
+    componentType:
+      | 'material'
+      | 'labor'
+      | 'equipment'
+      | 'tool'
+      | 'subcontract'
+      | 'other';
+    quantity: string;
+    wastePct: string;
+    unitPriceSnapshot: string;
+    totalComponentCost: string;
+    sortOrder: number;
+  }[];
   estimate: { id: Uuid; projectScopeId: Uuid };
   estimateVersion: {
     id: Uuid;
@@ -347,15 +369,68 @@ export class FixtureReadModelRepository implements ReadModelPort {
       const components = fixture.apuComponents.filter(
         (c) => c.apuTemplateId === tpl.id,
       );
+      // Costo unitario COMPLETO (incluye herramienta menor derivada). Con
+      // defaultToolPct=0 coincide exactamente con la suma de componentes.
+      const detail = computeApuDetail(
+        {
+          id: tpl.id,
+          code: tpl.code,
+          name: tpl.name,
+          unit: tpl.unit,
+          version: tpl.version,
+          defaultToolPct: tpl.defaultToolPct,
+        },
+        components,
+      );
       return {
         id: tpl.id,
         code: tpl.code,
         name: tpl.name,
         unit: tpl.unit,
-        unitCost: computeApuUnitCost(components.map((c) => c.totalComponentCost)),
+        unitCost: detail.unitCostTotal,
         componentCount: components.length,
       };
     });
+  }
+
+  async getApuDetail(viewer: ViewerContext, apuTemplateId: Uuid): Promise<ApuDetail> {
+    const tpl = fixture.apuTemplates.find((t) => t.id === apuTemplateId);
+    if (!this.isViewerOrg(viewer) || !tpl) {
+      throw new ApuNotFoundError(apuTemplateId);
+    }
+    const resourceById = new Map(fixture.resources.map((r) => [r.id, r]));
+    const roleById = new Map(fixture.laborRoles.map((r) => [r.id, r]));
+    const components = fixture.apuComponents
+      .filter((c) => c.apuTemplateId === tpl.id)
+      .map((c) => {
+        const resource = c.resourceId ? resourceById.get(c.resourceId) : undefined;
+        const role = c.laborRoleId ? roleById.get(c.laborRoleId) : undefined;
+        return {
+          id: c.id,
+          componentType: c.componentType,
+          resourceCode: resource?.code ?? null,
+          resourceName: resource?.name ?? null,
+          laborRoleCode: role?.code ?? null,
+          laborRoleName: role?.name ?? null,
+          quantity: c.quantity,
+          wastePct: c.wastePct,
+          unitPriceSnapshot: c.unitPriceSnapshot,
+          totalComponentCost: c.totalComponentCost,
+          sortOrder: c.sortOrder,
+        };
+      });
+    const detail = computeApuDetail(
+      {
+        id: tpl.id,
+        code: tpl.code,
+        name: tpl.name,
+        unit: tpl.unit,
+        version: tpl.version,
+        defaultToolPct: tpl.defaultToolPct,
+      },
+      components,
+    );
+    return projectApuDetailForRole(detail, viewer.role);
   }
 
   async listQuantities(
