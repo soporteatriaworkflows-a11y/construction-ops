@@ -123,6 +123,9 @@ export default async function CatalogPage() {
       <Button asChild size="sm" variant="outline">
         <Link href="/catalog/providers">Gestionar proveedores</Link>
       </Button>
+      <Button asChild size="sm" variant="outline">
+        <Link href="/catalog/prices/review">Revisión de precios</Link>
+      </Button>
     </>
   );
 
