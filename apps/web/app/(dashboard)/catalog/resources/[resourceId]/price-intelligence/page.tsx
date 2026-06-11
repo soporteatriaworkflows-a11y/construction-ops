@@ -185,9 +185,20 @@ export default async function PriceIntelligencePage({ params }: PageProps) {
 
       {/* Historial de observaciones */}
       <section aria-label="Historial de observaciones">
-        <h2 className="mb-3 text-sm font-semibold text-gray-700">
-          Historial ({observations.length})
-        </h2>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold text-gray-700">
+            Historial ({observations.length})
+          </h2>
+          {/* Acceso al Centro de Revisión (revisión masiva) — solo roles con aprobación */}
+          {canApprove && observations.some((o) => o.status === 'pending') && (
+            <Link
+              href="/catalog/prices/review"
+              className="text-xs font-medium text-iconic-primary hover:underline"
+            >
+              Revisar pendientes en bloque →
+            </Link>
+          )}
+        </div>
 
         {observations.length === 0 ? (
           <EmptyState

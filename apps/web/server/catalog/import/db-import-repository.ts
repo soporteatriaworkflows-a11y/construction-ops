@@ -47,6 +47,18 @@ export interface ObservationInsert {
   observedAt: string;
   validUntil: string | null;
   notes: string | null;
+  /** Lote de procedencia (PRICE_OBSERVATION_REVIEW_CENTER_V1); null = sin lote. */
+  importBatchId: string | null;
+}
+
+/** Lote de importación a registrar (procedencia durable + digest persistido). */
+export interface ObservationBatchInsert {
+  sourceType: 'supplier_csv' | 'manual';
+  sourceReference: string | null;
+  digestSha256: string;
+  label: string | null;
+  totalRows: number;
+  metadata: Record<string, unknown>;
 }
 
 export class DbCatalogImportRepository {
@@ -181,6 +193,33 @@ export class DbCatalogImportRepository {
     return { createdByCode, raceSkippedCodes };
   }
 
+  /**
+   * Registra el lote de importación (procedencia + digest SHA-256 persistido).
+   * imported_by = viewer.profileId (server-side); RLS exige misma org y rol.
+   */
+  async createObservationBatch(
+    viewer: AuthenticatedViewer,
+    input: ObservationBatchInsert,
+  ): Promise<string> {
+    const supabase = await this.clientFactory();
+    const { data, error } = await supabase
+      .from('price_observation_batches')
+      .insert({
+        organization_id: viewer.organizationId,
+        source_type: input.sourceType,
+        source_reference: input.sourceReference,
+        digest_sha256: input.digestSha256,
+        label: input.label,
+        imported_by: viewer.profileId,
+        total_rows: input.totalRows,
+        metadata: input.metadata,
+      })
+      .select('id')
+      .single();
+    if (error) throw new Error(`observation_batch_create_failed: ${error.code ?? 'unknown'}`);
+    return (data as { id: string }).id;
+  }
+
   /** Inserta observaciones `pending` por lotes. El trigger DB calcula el neto. */
   async createObservationsBatch(
     viewer: AuthenticatedViewer,
@@ -212,6 +251,7 @@ export class DbCatalogImportRepository {
             status: 'pending',
             notes: o.notes,
             created_by: viewer.profileId,
+            import_batch_id: o.importBatchId,
           })),
         )
         .select('id');

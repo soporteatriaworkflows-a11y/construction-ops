@@ -181,7 +181,22 @@ export async function confirmCatalogImport(
       observedAt: nowIso,
       validUntil: obs.validUntil,
       notes: noteParts.join(' | '),
+      importBatchId: null,
     });
+  }
+
+  // Lote de procedencia (REVIEW_CENTER_V1): un batch por confirmación con
+  // digest persistido. Catálogo revisado manualmente ⇒ source_type 'manual'.
+  if (observations.length > 0) {
+    const batchId = await repo.createObservationBatch(viewer, {
+      sourceType: 'manual',
+      sourceReference: null,
+      digestSha256: parsed.digest,
+      label: `Catálogo: ${file.name}`,
+      totalRows: observations.length,
+      metadata: { fileName: file.name, kind: 'catalog_import' },
+    });
+    for (const o of observations) o.importBatchId = batchId;
   }
   const observationsCreated = await repo.createObservationsBatch(viewer, observations);
 
@@ -302,6 +317,20 @@ export async function confirmProviderPriceList(
   if (!preview.importable) throw new CatalogImportNotImportableError();
 
   const nowIso = new Date().toISOString();
+
+  // Lote de procedencia (REVIEW_CENTER_V1): lista de proveedor ⇒ 'supplier_csv'.
+  let importBatchId: string | null = null;
+  if (matchedRows.length > 0) {
+    importBatchId = await repo.createObservationBatch(viewer, {
+      sourceType: 'supplier_csv',
+      sourceReference: provider.name,
+      digestSha256: parsed.digest,
+      label: `Lista de precios: ${provider.name} — ${file.name}`,
+      totalRows: matchedRows.length,
+      metadata: { fileName: file.name, providerId: provider.id, kind: 'price_list_import' },
+    });
+  }
+
   const observations: ObservationInsert[] = matchedRows.map((m) => ({
     resourceId: m.resourceId,
     supplierId: provider.id,
@@ -316,6 +345,7 @@ export async function confirmProviderPriceList(
     notes: m.notes
       ? `${m.notes} | Lista de precios: ${provider.name}`
       : `Lista de precios: ${provider.name}`,
+    importBatchId,
   }));
   const observationsCreated = await repo.createObservationsBatch(viewer, observations);
 

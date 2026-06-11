@@ -37,6 +37,7 @@ import {
   Radar,
   AlertTriangle,
   Clock,
+  ClipboardCheck,
 } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
 import { EmptyState } from '@/components/shared/empty-state';
@@ -293,13 +294,19 @@ export default async function DashboardPage() {
             iconBg="bg-purple-50"
           />
           {isAuthorizedForSavings && (
-            <KpiCard
-              title="Precios por revisar"
-              value={pendingPriceCount === null ? '—' : String(pendingPriceCount)}
-              description="Observaciones pendientes de aprobación"
-              icon={<Tags className="h-4 w-4 text-amber-700" />}
-              iconBg="bg-amber-50"
-            />
+            <Link
+              href="/catalog/prices/review"
+              aria-label="Abrir el centro de revisión de precios"
+              className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iconic-primary"
+            >
+              <KpiCard
+                title="Precios por revisar"
+                value={pendingPriceCount === null ? '—' : String(pendingPriceCount)}
+                description="Observaciones pendientes — abrir revisión masiva"
+                icon={<Tags className="h-4 w-4 text-amber-700" />}
+                iconBg="bg-amber-50"
+              />
+            </Link>
           )}
         </div>
 
@@ -343,12 +350,13 @@ export default async function DashboardPage() {
         )}
 
         {/* Accesos rápidos */}
-        <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-6">
           <QuickLink href="/projects" label="Proyectos" icon={<FolderOpen className="h-4 w-4" aria-hidden="true" />} />
           <QuickLink href="/catalog" label="Catálogo" icon={<Package className="h-4 w-4" aria-hidden="true" />} />
           <QuickLink href="/catalog/providers" label="Proveedores" icon={<Truck className="h-4 w-4" aria-hidden="true" />} />
           <QuickLink href="/catalog" label="Inteligencia de precios" icon={<Tags className="h-4 w-4" aria-hidden="true" />} />
           <QuickLink href="/catalog/monitoring" label="Monitoreo de precios" icon={<Radar className="h-4 w-4" aria-hidden="true" />} />
+          <QuickLink href="/catalog/prices/review" label="Revisión de precios" icon={<ClipboardCheck className="h-4 w-4" aria-hidden="true" />} />
         </div>
       </section>
 

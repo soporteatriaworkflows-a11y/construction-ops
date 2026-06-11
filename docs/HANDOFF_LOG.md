@@ -4319,3 +4319,66 @@ Resultado global: PASS (exit code 0)
 
 ### Agentes activos al cierre
 - Ninguno.
+
+---
+
+## 2026-06-11 — PRICE_OBSERVATION_REVIEW_CENTER_V1 + BULK_APPROVAL_BY_IMPORT_BATCH_V1 (orchestrator)
+
+### Estado
+- Rama `feature/price-observation-review-center-v1` (base verificada
+  `origin/main = 9e03553`; árbol limpio; 2 stashes intactos; producción
+  intacta). **Sin merge a main; sin deploy; sin db push remoto; sin datos
+  dummy remotos.**
+- **FASE 0 (inspección)**: digest SHA-256 existía pero era transitorio
+  (preview→confirm); NO existía `import_batch_id`; aprobación solo individual
+  (3A); idempotencia estructural ya probada en monitor runs. Diseño aditivo y
+  claro ⇒ continuación automática.
+
+### Entregable
+- **Migraciones aditivas SOLO locales** `20260614090000` + `20260614090100`:
+  `price_observation_batches` (procedencia durable, digest persistido,
+  inmutable: sin UPDATE/DELETE), `resource_price_observations.import_batch_id`
+  (nullable + FK + índice parcial + trigger same-org; compat retroactiva),
+  `price_observation_bulk_actions` (auditoría actor/lote/IDs/conteos +
+  `UNIQUE (org, idempotency_key)`). RLS ENABLE+FORCE; FORCE count 28→**30**.
+- **Dominio** `apps/web/server/pricing/review/` (types/errors/validation/
+  service/db-repository/fixture-repository/index): bulk approve/reject solo
+  `pending`, selección explícita, máx **500** filas/acción, chunks de **100**
+  con filtro `status='pending'` por statement, idempotencia en dos capas,
+  rechazo con motivo obligatorio, CSV sanitizado, org SIEMPRE server-side,
+  roles app management|internal (DB: admin/gerencia, paridad 3A).
+- **Importación con lote**: `confirmCatalogImport` (batch `manual`) y
+  `confirmProviderPriceList` (batch `supplier_csv`) crean batch por
+  confirmación y etiquetan observaciones (`createObservationBatch` +
+  `ObservationInsert.importBatchId`).
+- **UI** `/catalog/prices/review` («Revisión de precios», request-time):
+  resumen (pendientes/advertencias/proveedores/lotes/monitor), tabla con
+  checkbox + filtros (lote/monitor/proveedor/fuente/advertencias/fecha/
+  recurso/seleccionadas), seleccionar válidas/desmarcar, modal obligatorio con
+  texto del mandato (clave de idempotencia `crypto.randomUUID()` al abrirlo),
+  resultado (aprobadas/omitidas/errores) + CSV. Privacidad backend-first:
+  site/client ⇒ «Acceso restringido» sin datos 🔒. Accesos: dashboard (KPI
+  enlazado + QuickLink), catálogo (botón), price-intelligence (enlace con
+  pendientes). Política D: monitor JAMÁS auto-approve (badge + advertencia).
+- **Contrato congelado** `docs/PRICE_OBSERVATION_REVIEW_CENTER_V1_CONTRACT.md`.
+  Actualizados DECISIONS / QA_REPORT / DATABASE_SCHEMA / INTEGRATION_REQUESTS.
+
+### Validación (todo PASS)
+- `supabase db reset --local` 33 migraciones + 6 seeds · typecheck 0 · lint 0
+  · **1302 tests** (+56: dominio 21, seguridad/UI 22, RLS estático 13) · build
+  (ruta `ƒ /catalog/prices/review`) · **RLS runtime 151/151** (+18 sección
+  [20]) · isolation 12/12 · gm 22/22 · gm:import $372.247.170 · smoke gated
+  **42/42** (1 PGRST303 transitorio por warmup, re-run verde — patrón conocido)
+  · redirects 15/15 · diff --check limpio · validador 214/0/0.
+- Ajustes mínimos a tests existentes (documentados): allowlist de tablas en
+  `import-service.test.ts` (+`price_observation_batches`) y regex del KPI
+  enlazado en `workspace-route-config.test.ts`. Sin cambios de invariantes.
+
+### Próximo paso
+- Revisión visual de la usuaria en `http://localhost:3090` + release
+  controlado (`db push --dry-run` ⇒ exactamente 2 migraciones nuevas).
+- Siguiente slice recomendado: **ENTRE_PATIOS_APU_IMPORT_V1 +
+  BOQ_APU_LINKING_V1** (NO iniciado por mandato).
+
+### Agentes activos al cierre
+- Ninguno.

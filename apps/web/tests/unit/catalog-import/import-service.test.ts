@@ -368,7 +368,13 @@ describe('confirmProviderPriceList — matching y observaciones (T28–T36)', ()
     const preview = await previewProviderPriceList(VIEWER, 'prov-1', file, null, { repository });
     await confirmProviderPriceList(VIEWER, 'prov-1', file, null, preview.digest, { repository });
 
-    const allowed = new Set(['resources', 'suppliers', 'resource_price_observations']);
+    // REVIEW_CENTER_V1: la importación registra además el lote de procedencia.
+    const allowed = new Set([
+      'resources',
+      'suppliers',
+      'resource_price_observations',
+      'price_observation_batches',
+    ]);
     for (const t of state.tablesTouched) {
       expect(allowed.has(t)).toBe(true);
     }

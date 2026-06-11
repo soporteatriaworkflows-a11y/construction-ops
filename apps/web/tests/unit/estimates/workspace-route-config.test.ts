@@ -174,7 +174,11 @@ describe('Dashboard operativo (G)', () => {
   });
 
   it('🔒 precios por revisar SOLO para roles autorizados', () => {
-    expect(source).toMatch(/isAuthorizedForSavings\s*&&\s*\(\s*<KpiCard[\s\S]*Precios por revisar/);
+    // REVIEW_CENTER_V1: el KPI va enlazado al centro de revisión, siempre
+    // detrás del guard de roles autorizados.
+    expect(source).toMatch(
+      /isAuthorizedForSavings\s*&&\s*\(\s*<Link[\s\S]{0,400}?<KpiCard[\s\S]*?Precios por revisar/,
+    );
     expect(source).toMatch(/countPendingResourcePriceObservations\(/);
   });
 
