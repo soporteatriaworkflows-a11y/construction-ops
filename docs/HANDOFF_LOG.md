@@ -1,5 +1,80 @@
 # Handoff Log
 
+## 2026-06-11 — RELEASE: PRICE_OBSERVATION_REVIEW_CENTER_V1 + BULK_APPROVAL_BY_IMPORT_BATCH_V1
+
+> **Release controlado ejecutado por agent-orchestrator.** Rama `feature/price-observation-review-center-v1` (HEAD `6554516`) integrada a `main` mediante rama temporal `release/price-review-center-v1-merge`. **DB push remoto aplicado (2 migraciones). Main publicado. Producción activa. Tag creado.**
+
+### A. Invariantes Git
+- main inicial: `9e03553` → main final: `b974065`
+- Feature HEAD: `6554516` (publicada en origin)
+- Merge commit: `b974065` (`merge(release): price observation review center and bulk baseline approval v1`)
+- Tag: `price-observation-review-center-release-v1` (anotado, publicado)
+- Stashes: 2 WIP intactos en `integration/wave-4e2a-manual-boq-editing`
+- No se tocaron otros worktrees
+
+### B. DB Push Remoto
+- Dry-run inicial: exactamente 2 migraciones pendientes confirmadas
+- `20260614090000_price_observation_batches_bulk_actions.sql` — APLICADA
+- `20260614090100_rls_price_observation_batches_bulk_actions.sql` — APLICADA
+- Dry-run final: "Remote database is up to date" (33/33 Local=Remote)
+- db lint: "No schema errors found"
+- Seed 0006 NO aplicado. Sin --include-seed. Sin --include-all. Sin db reset remoto.
+- Sin DROP, DELETE, TRUNCATE, backfill destructivo.
+
+### C. Validaciones post-merge
+- typecheck: 0 errores
+- lint: 0 warnings
+- diff --check: limpio
+- validate-claude-agents: 214/0/0
+- suite completa: 1302/1302 PASS (42 skipped gates)
+  - Nota: 1 test PDF flaky por contención de workers — pasa en aislamiento (11/11); no relacionado con review center; archivo no modificado en la feature
+- build: OK, ruta `/catalog/prices/review` incluida
+- golden master: 22/22
+- read-model isolation (unit): 51/51
+- regression + RLS-static: 87/87
+- smoke gated: 42/42 (mvp 10/10 + boq-edit 32/32)
+- redirects: 15/15
+- RLS harness: 151/151
+
+### D. Deploy y Smoke productivo GET-only
+- Deploy: automático vía push a main (Vercel Git integration)
+- Hash de deployment Vercel: pendiente confirmación visual (MCP Vercel requiere OAuth — no bloqueante)
+- Smoke GET 11 rutas: 200 (`/`, `/login`, `/dashboard`, `/catalog`, `/catalog/prices/review`, `/catalog/import`, `/catalog/providers`, `/catalog/providers/import`, `/catalog/monitoring`, `/apu`, `/projects`)
+- Cron `/api/cron/price-monitor` sin Bearer: 401 ✓
+- Sin 500s. Sin escrituras remotas. Sin crawling. Sin secrets expuestos.
+
+### E. Notas de infraestructura
+- supabase CLI en este worktree: requiere copiar `.temp/` (pooler-url, project-ref, linked-project.json) desde worktree con link previo — auth token en Windows Credential Manager
+- `scripts/rls-runtime/read-model-isolation.ts`: falla preexistente de path alias `@/server/repositories/read-repository`; cubierto por 51 unit tests
+
+### F. Confirmaciones
+- Sin deploy CLI
+- Sin promote
+- Sin alias manual
+- Sin cambios de variables de entorno
+- Sin seeds remotos
+- Sin db reset remoto
+- Sin DROP/DELETE activos
+- Sin datos dummy remotos
+- Sin exportaciones
+- Sin crawling
+- Sin secretos expuestos
+- Sin merge a otros worktrees
+
+### G. Rollback
+- App: revertir main a `9e03553` con `git push origin 9e03553:main` (si necesario)
+- DB: migraciones aditivas (nullable import_batch_id); sin rollback automático destructivo
+
+### H. Pendientes no bloqueantes
+- Confirmación visual hash Vercel en producción
+- Prueba manual autenticada: aprobar baseline del lote Entre Patios desde `/catalog/prices/review`
+- Paginación server-side > 1000 filas (deuda documentada)
+- ENTRE_PATIOS_APU_IMPORT_V1 (no iniciado)
+- BOQ_APU_LINKING_V1 (no iniciado)
+- QUANTITY_TAKEOFF_IMPORT_V1 (no iniciado)
+
+---
+
 ## 2026-06-11 — FASE 4B.1: APU_COST_MODEL_FOUNDATION_V1 (rama `feature/apu-cost-model-foundation-v1`)
 
 > **Fundamento trazable del costo APU: rol laboral → cuadrilla → actividad con herramienta menor derivada.** Base `origin/main = 8a81a98` (price monitoring ya integrado). Worktree dedicado `construction-ops-apu-cost-model-foundation-v1`. **Sin merge a main, sin deploy, sin db push remoto, sin datos dummy remotos, stashes intactos (2 WIP).** Importación del Excel (4B.2), BOQ↔APU linking y cantidades (4B.3) NO iniciadas.
