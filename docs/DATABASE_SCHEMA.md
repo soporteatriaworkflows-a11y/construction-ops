@@ -710,3 +710,46 @@ Reglas: el monitor NUNCA aprueba (toda observación nace `pending` vía el
 invariante de Fase 3A); el cron escribe observaciones SIEMPRE RLS-bound con
 claims del usuario que habilitó el target (contrato §4.5); las corridas
 manuales son 100% RLS-bound con el viewer.
+
+---
+
+## Price Review Center — entidades congeladas v1 (REVIEW_CENTER_V1)
+
+Esquema del Centro de Revisión de Precios y la aprobación masiva por lote.
+Contrato: `docs/PRICE_OBSERVATION_REVIEW_CENTER_V1_CONTRACT.md §4-§5`.
+Migraciones aditivas `20260614090000` + `20260614090100` (**solo locales**,
+pendientes de `db push` remoto en el release). Total tablas FORCE: **30**.
+
+- **`price_observation_batches`**: procedencia durable de cada importación
+  confirmada. `organization_id` directo + RLS ENABLE+FORCE; `source_type`
+  (mismo CHECK de 7 valores que `resource_price_observations`);
+  `digest_sha256 CHECK hex(64)` — el digest preview→confirm, antes
+  transitorio, ahora persistido; `imported_by` FK `profiles` (RESTRICT);
+  `total_rows` (hecho inmutable; los conteos pending/approved/rejected se
+  calculan en lectura, no se almacenan); `metadata` JSONB. **SIN política
+  UPDATE ni DELETE** ⇒ procedencia inmutable. INSERT solo
+  `admin/gerencia/presupuestos/compras` con `imported_by = _auth_uid()`.
+- **`resource_price_observations.import_batch_id`** (columna nueva): uuid
+  **nullable**, FK al batch (`ON DELETE SET NULL`) + índice parcial. NULL =
+  observación histórica/manual/monitor (compat retroactiva total). Trigger
+  `rpo_batch_same_org`: el lote referenciado debe ser de la misma
+  organización (cross-org ⇒ excepción).
+- **`price_observation_bulk_actions`**: auditoría e idempotencia de la
+  aprobación/rechazo masivo. `action_type IN ('approve','reject')`;
+  `import_batch_id` nullable (NULL si la selección mezcla lotes);
+  `initiated_by` FK `profiles` (RESTRICT); `selected/succeeded/skipped_count`;
+  **UNIQUE (organization_id, idempotency_key)** (patrón monitor runs);
+  `metadata` JSONB (`selectedIds`, `succeededIds`, `skipped[]`). INSERT/UPDATE
+  solo `admin/gerencia` (paridad con `rpo_update_review_only`); **SIN DELETE**
+  ⇒ auditoría inmutable.
+
+Reglas: la importación NUNCA aprueba (toda observación nace `pending`);
+la aprobación masiva exige selección explícita + confirmación + clave de
+idempotencia; el UPDATE masivo filtra `status='pending'` en cada statement
+(las revisadas jamás se sobrescriben); máximo 500 filas por acción
+(`MAX_BULK_ROWS`), chunks de 100 (`BULK_UPDATE_CHUNK`); nada se borra
+físicamente.
+
+| Fecha | Cambio | Migración | Autor |
+|-------|--------|-----------|-------|
+| 2026-06-11 | **Price Review Center V1** — `price_observation_batches`, `price_observation_bulk_actions`, `resource_price_observations.import_batch_id` (FORCE count 28→30) | `20260614090000` + `20260614090100` | orchestrator |

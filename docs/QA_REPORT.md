@@ -4,6 +4,37 @@ Este documento es propiedad de **agent-qa**. Se actualiza al final de
 
 ---
 
+## PRICE_OBSERVATION_REVIEW_CENTER_V1 + BULK_APPROVAL_BY_IMPORT_BATCH_V1 (2026-06-11, rama `feature/price-observation-review-center-v1`)
+
+**Base:** `origin/main = 9e03553` · **main intacta** · **producción intacta** · **sin db push remoto** (migraciones `20260614*` SOLO locales) · **stashes intactos (2 WIP)**
+
+| Check | Resultado | Detalle |
+|---|---|---|
+| supabase db reset --local | ✅ PASS | 33 migraciones (incl. `20260614090000`/`20260614090100`) + 6 seeds sin errores |
+| typecheck | ✅ 0 errores | `tsc --noEmit` sin output |
+| lint | ✅ 0 errores | `eslint .` sin output |
+| tests relacionados | ✅ 21 dominio + 22 seguridad/UI + 13 RLS estático | `pricing/review/service` (T7-T22), `pricing/review/security-and-ui` (T23-T40), `regression/review-center-rls-static` (T1-T6 + aditividad) |
+| suite completa | ✅ **1302/1302 PASS** | +56 nuevos · 42 gated aparte · redirects 15/15 incluidos |
+| build | ✅ PASS | Nueva ruta `ƒ /catalog/prices/review` · Proxy presente · resto intacto |
+| RLS harness | ✅ **151/151 PASS** | +18 checks sección [20] review center (batch tenant-scoped/inmutable, FK + trigger same-org, bulk action auditada, idempotencia UNIQUE, rol obra bloqueado, cross-org 0 filas, compat histórica, FORCE 30/30) |
+| read-model isolation | ✅ 12/12 PASS | Sin fuga cross-org |
+| gm:regression | ✅ **22/22 PASS** | Golden master Entre Patios intacto: total ≈ COP 372.247.170 |
+| gm:import | ✅ PASS | Regresión 9/9 + cadena recalculada + privacidad sin fugas |
+| MVP smoke gated | ✅ 42/42 | `BOQ_SMOKE_DB=1`: boq-edit 32/32 + mvp-internal-flow 10/10 (1 fallo transitorio PGRST303 por warmup PostgREST tras db reset; re-run verde — mismo patrón documentado en 4B.1, no atribuible a la rama) |
+| git diff --check | ✅ Limpio | Sin whitespace errors |
+| validate-claude-agents | ✅ 214/0/0 | 11 agentes válidos |
+
+**Confirmaciones funcionales de la fase:**
+- Solo `pending` aprobable; approved/rejected ⇒ skip con motivo; carrera ⇒ `update_failed` (jamás sobrescritura) ✅
+- Idempotencia en dos capas: `UNIQUE (org, idempotency_key)` + filtro `status='pending'` por statement ✅
+- Auditoría completa: actor, lote, IDs, conteos, resultado en `price_observation_bulk_actions` ✅
+- Importación catálogo/lista crea batch con digest SHA-256 persistido y etiqueta observaciones ✅
+- Monitor: jamás auto-approve; badge + advertencia `monitor_origin`; selección consciente ✅
+- Privacidad: site/client no reciben campos 🔒 (página restringida server-side) ✅
+- BOQ/AIU/exports/monitor intactos (source-scan + suites de regresión) ✅
+
+---
+
 ## APU_COST_MODEL_FOUNDATION_V1 (2026-06-11, rama `feature/apu-cost-model-foundation-v1`)
 
 **Base:** `origin/main = 8a81a98` · **main intacta** · **producción intacta** · **sin db push remoto** (migraciones `20260613*` SOLO locales) · **stashes intactos (2 WIP)**
