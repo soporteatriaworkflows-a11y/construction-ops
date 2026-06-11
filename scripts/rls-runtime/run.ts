@@ -173,8 +173,9 @@ async function main(): Promise<void> {
     FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
     WHERE n.nspname = 'public' AND c.relkind = 'r'
       AND c.relrowsecurity AND c.relforcerowsecurity`;
-  // 20 tablas de Oleada 1 + 4 de planning (Oleada 3B) + 1 resource_price_observations (Fase 3A) = 25.
-  check('Pre-flight: 25 tablas con RLS FORCE', rlsTables === '25', `rlsTables=${rlsTables}`);
+  // 20 tablas de Oleada 1 + 4 de planning (Oleada 3B) + 1 resource_price_observations (Fase 3A)
+  // + 3 de price monitoring (Fase 4A: targets/runs/results) = 28.
+  check('Pre-flight: 28 tablas con RLS FORCE', rlsTables === '28', `rlsTables=${rlsTables}`);
 
   const [{ count: taskCount }] = await sql<{ count: string }[]>`
     SELECT count(*)::text AS count FROM schedule_tasks WHERE id = ${TASK_A}`;
@@ -1173,6 +1174,153 @@ async function main(): Promise<void> {
     },
   );
   check('boq-manual: versión emitida ⇒ INSERT de capítulo bloqueado (read-only)', boqLockedBlocked);
+
+  // === 18) PRICE MONITORING (Fase 4A) — targets/runs/results ===
+  console.log('\n[18] Price monitoring — aislamiento, roles, unicidad y append-only');
+  const RES_A = '00000000-0000-0000-0000-0000000000e1'; // Cemento gris (seed 0002)
+  const MON_URL = 'https://proveedor-demo.example.test/producto-1';
+
+  // 18a) Admin de A crea target en su org; created_by derivado; lo ve.
+  const monCreate = await asUser(realA, async (q) => {
+    const [row] = await q<{ id: string; organization_id: string; created_by: string }[]>`
+      INSERT INTO price_monitor_targets (organization_id, resource_id, source_url, cadence_days, created_by)
+      VALUES (${ORG_A}, ${RES_A}, ${MON_URL}, 7, ${USER_A_ADMIN})
+      RETURNING id, organization_id, created_by`;
+    const seen = await q<{ id: string }[]>`
+      SELECT id FROM price_monitor_targets WHERE id = ${row!.id}`;
+    return { row: row!, visible: seen.length === 1 };
+  });
+  check('monitor: admin A crea target en su org', monCreate.row.organization_id === ORG_A);
+  check('monitor: created_by = autor server-side', monCreate.row.created_by === USER_A_ADMIN);
+  check('monitor: el autor ve su target (SELECT propio)', monCreate.visible);
+
+  // 18b) B no ve targets de A (aislamiento SELECT) — target sembrado como su.
+  const monIso = await asUser(
+    claimsB,
+    async (q) => {
+      const rows = await q<{ id: string }[]>`
+        SELECT id FROM price_monitor_targets WHERE organization_id = ${ORG_A}`;
+      const all = await q<{ id: string }[]>`SELECT id FROM price_monitor_targets`;
+      return { aRows: rows.length, total: all.length };
+    },
+    async (q) => {
+      await q`INSERT INTO price_monitor_targets (id, organization_id, resource_id, source_url, cadence_days, created_by)
+        VALUES ('00000000-0000-0000-0000-00000000f001', ${ORG_A}, ${RES_A}, ${MON_URL}, 7, ${USER_A_ADMIN})
+        ON CONFLICT (id) DO NOTHING`;
+    },
+  );
+  check('monitor: B NO ve targets de A (aislamiento SELECT)', monIso.aRows === 0 && monIso.total === 0, JSON.stringify(monIso));
+
+  // 18c) B no puede insertar target en org A (WITH CHECK cross-org).
+  let monCrossBlocked = false;
+  await asUser(claimsB, async (q) => {
+    await q.unsafe('SAVEPOINT sp_mon_cross');
+    try {
+      await q`INSERT INTO price_monitor_targets (organization_id, resource_id, source_url, cadence_days, created_by)
+        VALUES (${ORG_A}, ${RES_A}, 'https://otro.example.test/p', 7, ${USER_B_ADMIN})`;
+    } catch {
+      monCrossBlocked = true;
+      await q.unsafe('ROLLBACK TO SAVEPOINT sp_mon_cross');
+    }
+  });
+  check('monitor: INSERT cross-org bloqueado (WITH CHECK)', monCrossBlocked);
+
+  // 18d) Rol obra (site) NO puede crear targets (gate de rol).
+  let monRoleBlocked = false;
+  await asUser(realAObra, async (q) => {
+    await q.unsafe('SAVEPOINT sp_mon_role');
+    try {
+      await q`INSERT INTO price_monitor_targets (organization_id, resource_id, source_url, cadence_days, created_by)
+        VALUES (${ORG_A}, ${RES_A}, 'https://obra.example.test/p', 7, ${USER_A_OBRA})`;
+    } catch {
+      monRoleBlocked = true;
+      await q.unsafe('ROLLBACK TO SAVEPOINT sp_mon_role');
+    }
+  });
+  check('monitor: rol obra NO crea targets (solo admin/gerencia/presupuestos/compras)', monRoleBlocked);
+
+  // 18e) Unicidad org+recurso+URL.
+  let monDupBlocked = false;
+  await asUser(realA, async (q) => {
+    await q`INSERT INTO price_monitor_targets (organization_id, resource_id, source_url, cadence_days, created_by)
+      VALUES (${ORG_A}, ${RES_A}, ${MON_URL}, 7, ${USER_A_ADMIN})`;
+    await q.unsafe('SAVEPOINT sp_mon_dup');
+    try {
+      await q`INSERT INTO price_monitor_targets (organization_id, resource_id, source_url, cadence_days, created_by)
+        VALUES (${ORG_A}, ${RES_A}, ${MON_URL}, 30, ${USER_A_ADMIN})`;
+    } catch {
+      monDupBlocked = true;
+      await q.unsafe('ROLLBACK TO SAVEPOINT sp_mon_dup');
+    }
+  });
+  check('monitor: target duplicado (org+recurso+URL) bloqueado (UNIQUE)', monDupBlocked);
+
+  // 18f) Cadencia inválida bloqueada por CHECK.
+  let monCadenceBlocked = false;
+  await asUser(realA, async (q) => {
+    await q.unsafe('SAVEPOINT sp_mon_cad');
+    try {
+      await q`INSERT INTO price_monitor_targets (organization_id, resource_id, source_url, cadence_days, created_by)
+        VALUES (${ORG_A}, ${RES_A}, 'https://cad.example.test/p', 3, ${USER_A_ADMIN})`;
+    } catch {
+      monCadenceBlocked = true;
+      await q.unsafe('ROLLBACK TO SAVEPOINT sp_mon_cad');
+    }
+  });
+  check('monitor: cadence_days fuera de {1,7,15,30} bloqueada (CHECK)', monCadenceBlocked);
+
+  // 18g) DELETE de target denegado incluso para admin (pausar = enabled=false).
+  const monDelete = await asUser(realA, async (q) => {
+    const [t] = await q<{ id: string }[]>`
+      INSERT INTO price_monitor_targets (organization_id, resource_id, source_url, cadence_days, created_by)
+      VALUES (${ORG_A}, ${RES_A}, 'https://del.example.test/p', 7, ${USER_A_ADMIN})
+      RETURNING id`;
+    const del = await q`DELETE FROM price_monitor_targets WHERE id = ${t!.id}`;
+    const [{ upd }] = await q<{ upd: number }[]>`
+      UPDATE price_monitor_targets SET enabled = false, updated_at = now()
+      WHERE id = ${t!.id} RETURNING 1 AS upd`;
+    return { deleted: del.count, paused: upd === 1 };
+  });
+  check('monitor: DELETE de target denegado (0 filas)', monDelete.deleted === 0, `del=${monDelete.deleted}`);
+  check('monitor: pausar vía UPDATE enabled=false permitido', monDelete.paused);
+
+  // 18h) Runs y results tenant-scoped; results append-only (sin UPDATE).
+  const monRun = await asUser(realA, async (q) => {
+    const [t] = await q<{ id: string }[]>`
+      INSERT INTO price_monitor_targets (organization_id, resource_id, source_url, cadence_days, created_by)
+      VALUES (${ORG_A}, ${RES_A}, 'https://run.example.test/p', 7, ${USER_A_ADMIN})
+      RETURNING id`;
+    const [r] = await q<{ id: string }[]>`
+      INSERT INTO price_monitor_runs (organization_id, trigger_type, status, initiated_by, idempotency_key)
+      VALUES (${ORG_A}, 'manual', 'running', ${USER_A_ADMIN}, 'manual:harness-18h')
+      RETURNING id`;
+    const [res] = await q<{ id: string }[]>`
+      INSERT INTO price_monitor_results (organization_id, run_id, target_id, status, detected_price, currency, unit, checked_at)
+      VALUES (${ORG_A}, ${r!.id}, ${t!.id}, 'unchanged', 100, 'COP', 'm2', now())
+      RETURNING id`;
+    const updRes = await q`UPDATE price_monitor_results SET status = 'changed' WHERE id = ${res!.id}`;
+    const delRun = await q`DELETE FROM price_monitor_runs WHERE id = ${r!.id}`;
+    return { created: !!res?.id, resultUpdates: updRes.count, runDeletes: delRun.count };
+  });
+  check('monitor: run+result manual creados RLS-bound', monRun.created);
+  check('monitor: results append-only (UPDATE denegado)', monRun.resultUpdates === 0, `upd=${monRun.resultUpdates}`);
+  check('monitor: DELETE de run denegado', monRun.runDeletes === 0, `del=${monRun.runDeletes}`);
+
+  // 18i) Idempotencia: misma (org, idempotency_key) bloqueada (UNIQUE).
+  let monIdemBlocked = false;
+  await asUser(realA, async (q) => {
+    await q`INSERT INTO price_monitor_runs (organization_id, trigger_type, status, idempotency_key)
+      VALUES (${ORG_A}, 'scheduled', 'running', 'scheduled:2026-06-12')`;
+    await q.unsafe('SAVEPOINT sp_mon_idem');
+    try {
+      await q`INSERT INTO price_monitor_runs (organization_id, trigger_type, status, idempotency_key)
+        VALUES (${ORG_A}, 'scheduled', 'running', 'scheduled:2026-06-12')`;
+    } catch {
+      monIdemBlocked = true;
+      await q.unsafe('ROLLBACK TO SAVEPOINT sp_mon_idem');
+    }
+  });
+  check('monitor: idempotency_key duplicada por org bloqueada (UNIQUE)', monIdemBlocked);
 
   // --- Resumen ---
   console.log(`\nRESULTADO RLS RUNTIME: ${pass} PASS / ${fail} FAIL`);
