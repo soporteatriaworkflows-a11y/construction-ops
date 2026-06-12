@@ -54,7 +54,7 @@ fuera de A–I). Cota dura de lectura: 5000 filas.
 pertenece a la lista blanca congelada:
 
 ```
-m², m2, m³, m3, m, ml, kg, un, und, jn, día, dia, mes, viaje, vje, glb, gl, z1…
+m², m2, m³, m3, m, ml, kg, un, und, jn, día, dia, mes, viaje, vje, glb, gl
 ```
 
 (formalmente: alias reconocidos por `canonicalizeUnit` extendida §2.2 más el
