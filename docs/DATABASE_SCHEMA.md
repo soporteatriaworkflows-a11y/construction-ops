@@ -753,3 +753,55 @@ físicamente.
 | Fecha | Cambio | Migración | Autor |
 |-------|--------|-----------|-------|
 | 2026-06-11 | **Price Review Center V1** — `price_observation_batches`, `price_observation_bulk_actions`, `resource_price_observations.import_batch_id` (FORCE count 28→30) | `20260614090000` + `20260614090100` | orchestrator |
+
+---
+
+## ENTRE_PATIOS_APU_IMPORT_V1 + BOQ_APU_LINKING_V1 (FASE 4B.2, 2026-06-11)
+
+Migraciones aditivas `20260615090000_apu_import_batches.sql` +
+`20260615090100_rls_apu_import_batches.sql` (SOLO locales en esta oleada;
+sin db push remoto). Contrato: `docs/ENTRE_PATIOS_APU_IMPORT_V1_CONTRACT.md`.
+
+- **`apu_import_batches`** (tabla nueva, RLS ENABLE+FORCE; FORCE count
+  30→31): procedencia durable e idempotencia del importador de la hoja APU.
+  `organization_id` FK directo; `digest_sha256 CHECK hex(64)` con
+  **UNIQUE (organization_id, digest_sha256)** (idempotencia estructural:
+  un workbook se importa una sola vez por org); `source_filename`,
+  `source_sheet`, `imported_by` FK `profiles` (RESTRICT), `imported_at`,
+  `status ('completed')`, conteos (`total/imported_activities`,
+  `total/imported_components`, `linked_boq_items`, `skipped_existing`,
+  `unresolved_count`, `warning_count`, CHECK no-negativos), `metadata` JSONB.
+  SELECT miembros de la org; INSERT solo `admin/gerencia` con
+  `imported_by = app._auth_uid()`; **SIN UPDATE ni DELETE** ⇒ inmutable
+  (los conteos definitivos se escriben en el INSERT, al final de la RPC).
+- **`apu_templates`** (columnas nuevas, todas NULL ⇒ retrocompatibles):
+  `import_batch_id` FK al batch (`ON DELETE SET NULL`, índice parcial,
+  trigger controlado `apu_template_import_batch_same_org` — cross-org ⇒
+  excepción 23514), `source_sheet`, `source_row`, `source_occurrence_index`.
+  Los códigos visibles de la hoja son REPETIBLES: el código persistido es
+  `visible` (1ª ocurrencia) o `visible#N` (ocurrencias ≥2); la procedencia
+  exacta vive en `source_row`/`source_occurrence_index`.
+- **`apu_components`** (columnas nuevas, NULL): `source_row`,
+  `source_occurrence_index`, `raw_code`, `raw_unit` (valores crudos de la
+  hoja SIEMPRE preservados; las fórmulas del Excel jamás se persisten).
+- **RPC `public.import_apu_batch(p_batch, p_templates, p_version_id,
+  p_links)`** — patrón `import_boq_into_version`: SECURITY INVOKER (la RLS
+  aplica a cada escritura), deny-by-default sin sesión/membresía, REVOKE
+  PUBLIC/anon + GRANT authenticated. Idempotencia por (org, digest) ⇒
+  `{duplicate:true}` sin escribir; templates existentes (org, code,
+  version=1) ⇒ skip (JAMÁS update); `total_component_cost` RECALCULADO en
+  SQL `round(qty×(1+waste)×price,10)` (nunca del cliente); linking BOQ solo
+  sobre ítems de la versión objetivo EDITABLE con `apu_template_id IS NULL`
+  y `archived_at IS NULL` (jamás reemplaza; cantidades/subtotal/AIU
+  intactos); transacción atómica (orden: templates → links → batch con
+  conteos finales → estampado de `import_batch_id`).
+
+Reglas: el importador NUNCA aprueba precios ni toca
+`resource_price_observations`; la herramienta menor derivada se congela en
+`apu_templates.default_tool_pct` por template (20/25/30/35% en el workbook
+real) y NO crea filas; las cuadrillas se expanden a una fila labor por rol
+con `labor_role_id` obligatorio (4B.1 §4–§5).
+
+| Fecha | Cambio | Migración | Autor |
+|-------|--------|-----------|-------|
+| 2026-06-11 | **ENTRE_PATIOS_APU_IMPORT_V1** — `apu_import_batches`, provenance en `apu_templates`/`apu_components`, RPC `import_apu_batch` (FORCE count 30→31) | `20260615090000` + `20260615090100` | orchestrator |
