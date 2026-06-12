@@ -6,10 +6,12 @@
  * NO importa @/lib/utils/mocks. NO recalcula cantidades en el frontend.
  * calculatedQuantity llega pre-calculado desde el read-model.
  */
-import { Hash } from 'lucide-react';
+import Link from 'next/link';
+import { FileSpreadsheet, Hash } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
@@ -19,6 +21,7 @@ import {
 import { formatNumber, CALCULATION_MODE_LABELS } from '@/lib/utils/format';
 import { getReadModel } from '@/server/read-model';
 import { resolveViewer } from '@/server/auth/resolve-viewer';
+import { isCreationModeEnabled } from '@/app/(dashboard)/projects/mode-guard';
 import type { ViewerContext } from '@/lib/contracts/read-model';
 
 // Render request-time: viewer real por modo (db=autenticado, fixture=demo).
@@ -34,8 +37,11 @@ export default async function QuantitiesPage() {
   let loadError: string | null = null;
 
   let viewer: ViewerContext | null = null;
+  let canImport = false;
   try {
     viewer = await resolveViewer();
+    canImport =
+      isCreationModeEnabled() && ['management', 'internal'].includes(viewer.role);
     const projects = await rm.listProjects(viewer);
     if (projects.length > 0) {
       const first = projects[0]!;
@@ -80,6 +86,15 @@ export default async function QuantitiesPage() {
     );
   }
 
+  const importCta = canImport ? (
+    <Button size="sm" asChild>
+      <Link href="/quantities/import">
+        <FileSpreadsheet className="mr-1 h-4 w-4" aria-hidden="true" />
+        Importar memorias
+      </Link>
+    </Button>
+  ) : undefined;
+
   return (
     <div>
       <PageHeader
@@ -89,13 +104,21 @@ export default async function QuantitiesPage() {
             ? `${projectName} / ${scopeName}`
             : 'Despieces geométricos vinculados a alcances del proyecto'
         }
+        actions={importCta}
       />
 
       {groups.length === 0 ? (
         <EmptyState
           icon={Hash}
           title="Sin grupos de cantidades"
-          description="Las cantidades se registran al importar o crear un presupuesto vinculado a un alcance del proyecto."
+          description="Las cantidades se registran al importar las memorias del workbook o al crear un presupuesto vinculado a un alcance del proyecto."
+          action={
+            canImport ? (
+              <Button size="sm" asChild>
+                <Link href="/quantities/import">Importar memorias</Link>
+              </Button>
+            ) : undefined
+          }
         />
       ) : (
         <div className="space-y-6">
