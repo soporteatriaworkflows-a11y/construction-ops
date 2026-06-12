@@ -4,6 +4,33 @@ Este documento es propiedad de **agent-qa**. Se actualiza al final de
 
 ---
 
+## ENTRE_PATIOS_APU_IMPORT_V1 + BOQ_APU_LINKING_V1 (2026-06-11, rama `feature/entre-patios-apu-import-v1`)
+
+**Base:** `origin/main = bfc254b` · **main intacta** · **producción intacta** · **sin db push remoto** (migraciones `20260615*` SOLO locales) · **stashes intactos (2 WIP)** · **sin escrituras remotas**
+
+| Check | Resultado | Detalle |
+|---|---|---|
+| supabase db reset --local | ✅ | 35 migraciones + 6 seeds; `20260615090000`+`090100` aplicadas limpias |
+| typecheck | ✅ 0 errores | incluye dominio `server/apu-import` + wizard `/apu/import` |
+| lint | ✅ 0 warnings | flat config ESLint 9 |
+| suite completa | ✅ **1353/1353 PASS** | +51 nuevos (parser 13, matching 11, preview/confirm 11, linking 8, RLS estático 8) · 42 gated aparte |
+| build | ✅ | ruta `ƒ /apu/import` incluida; Proxy presente |
+| RLS runtime harness | ✅ **173/173** | +22 sección [21]: batch inmutable, imported_by identidad real, rol obra denegado, aislamiento A/B, UNIQUE org+digest, trigger same-org, RPC atómica (recalc SQL, duplicate, skip, no_session), linking (vincula 1, no reemplaza, BOQ qty/subtotal intactos, version_locked), FORCE 30→31 |
+| read-model isolation | ✅ 12/12 | runtime script + 51 unit en suite |
+| golden master | ✅ 22/22 | total 372.247.169,978 intacto |
+| gm:import | ✅ | $372.247.170 reproducido (diff ≤ 1.3e-10) |
+| smoke gated (BOQ_SMOKE_DB=1) | ✅ 42/42 | mvp 10/10 + boq-edit 32/32 (en aislamiento; contención de workers conocida al correr juntos) |
+| redirects R01–R15 | ✅ 15/15 | en suite |
+| git diff --check | ✅ | limpio |
+| validate-claude-agents | ✅ 214/0/0 | |
+| **dry-run contra workbook REAL (local)** | ✅ | hoja APU detectada (466 filas): **54 actividades, 217 componentes, 0 errores, 0 deltas de costo > 0.01 COP**; roles exactos (Ayudante 16.016,814 / Oficial 20.807,439); códigos repetidos MAM-01×5, DOT-01×6, MAM-02×2, PISOS-01×2; tool pct 0.35×33 / 0.3×8 / 0.25×6 / 0.2×6 / 0×1; **linking contra fixture real: 51 linkable / 3 unresolved / 0 ambiguous** |
+
+Mandato de pruebas 1–47 cubierto: parser (1–10) `tests/unit/apu-import/parser.test.ts`; matching (11–20) `matching.test.ts`; preview (21–25) e import (26–36) `preview-confirm.test.ts`; BOQ linking (37–42) `linking.test.ts`; RLS (43–47) `tests/regression/rls-apu-import.test.ts` (estático) + sección [21] del harness (runtime). Regresión (48–55): catálogo bulk, review center, price monitor, APU foundation, `/apu`, golden master, gm:import y smoke — todo en verde en la suite completa.
+
+Invariantes verificados: el importador NUNCA aprueba precios (33), NUNCA cambia cantidades/subtotales BOQ (34, harness: qty 10 y subtotal 1000 intactos tras linking), NUNCA toca AIU (35) ni exports históricos (36); templates existentes jamás se sobrescriben (32); ambiguos jamás se vinculan (39); vínculos existentes jamás se reemplazan (41); fórmulas del Excel jamás se evalúan ni persisten (6).
+
+---
+
 ## PRICE_OBSERVATION_REVIEW_CENTER_V1 + BULK_APPROVAL_BY_IMPORT_BATCH_V1 (2026-06-11, rama `feature/price-observation-review-center-v1`)
 
 **Base:** `origin/main = 9e03553` · **main intacta** · **producción intacta** · **sin db push remoto** (migraciones `20260614*` SOLO locales) · **stashes intactos (2 WIP)**

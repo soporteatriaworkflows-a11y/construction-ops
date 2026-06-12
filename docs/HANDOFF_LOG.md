@@ -1,5 +1,79 @@
 # Handoff Log
 
+## 2026-06-11 — FASE 4B.2: ENTRE_PATIOS_APU_IMPORT_V1 + BOQ_APU_LINKING_V1 (orchestrator)
+
+### Estado
+- Rama `feature/entre-patios-apu-import-v1` (base verificada
+  `origin/main = bfc254b`; árbol limpio; 2 stashes intactos; producción
+  intacta). **Sin merge a main; sin deploy; sin db push remoto; sin
+  escrituras remotas; sin datos dummy remotos.**
+- Workbook real localizado: `private/COT.ENTRE PATIOS 1 PISO (1).xlsx`
+  (copiado del worktree principal a `private/` gitignored; SHA-256
+  `203F63C8…64C2`). Leído SOLO en modo local; jamás versionado.
+
+### FASE 0–1 (precheck + inspección)
+- origin/main NO avanzó. Catálogo baseline en fixtures; APU Foundation
+  (4B.1) integrada (labor_role_id + default_tool_pct).
+- Hoja APU real mapeada: A1:K466; salarios filas 10–31 (Ayudante factor
+  1.6, Oficial 2.3 sobre SMLV; prestaciones/SS/parafiscales aplicados al
+  SMLV); header ID/DESCRIPCION/UND fila 34; 54 actividades (36–466);
+  códigos visibles REPETIDOS (MAM-01×5, DOT-01×6, MAM-02×2, PISOS-01×2);
+  herramienta menor `=G·pct%` con pct VARIABLE (35/30/25/20%); descripciones
+  por fórmula a COTIZACION FULL (se usa el caché); insumos referencian
+  LISTADO MATERIALES; bloque final 1.114 = alquiler de equipos.
+
+### Entregable
+- **Contrato congelado** `docs/ENTRE_PATIOS_APU_IMPORT_V1_CONTRACT.md`
+  (gramática de la hoja, derivación salarial exacta, occurrence index,
+  matching, herramienta derivada por template, idempotencia, linking,
+  RLS, deudas).
+- **Migraciones aditivas SOLO locales** `20260615090000` + `20260615090100`:
+  `apu_import_batches` (UNIQUE org+digest; inmutable: sin UPDATE/DELETE;
+  INSERT solo admin/gerencia con imported_by = identidad real), provenance
+  en `apu_templates` (import_batch_id + trigger same-org, source_sheet/row/
+  occurrence) y `apu_components` (source_row/occurrence, raw_code,
+  raw_unit), y **RPC atómica `import_apu_batch`** (SECURITY INVOKER patrón
+  import_boq_into_version: idempotencia por digest, skip de códigos
+  existentes, `total_component_cost` recalculado en SQL, linking guardado
+  `apu_template_id IS NULL AND archived_at IS NULL`, versión editable;
+  orden templates→links→batch para conteos definitivos con batch inmutable;
+  status SIN `FOR UPDATE` — lección 4E.3A).
+- **Dominio** `apps/web/server/apu-import/` (sheet-model, parse-workbook,
+  parse-apu-sheet, salary, matching, preview, service, db-repository):
+  parser PURO sobre valores cacheados (cellFormula solo como metadato;
+  jamás se evalúa ni persiste); derivación salarial reproduce el Excel
+  EXACTO (hora Ayudante 16.016,814 / Oficial 20.807,439 / cuadrilla 2A+1O
+  52.841,0671); cuadrillas → una fila labor por rol (4B.1 §5) con
+  labor_role_id obligatorio; matching exacto code/ref/sku, descripción
+  SOLO sugerencia con acepte explícito re-validado; recalculo Decimal
+  (Excel = evidencia, Δ>0.01 ⇒ advertencia).
+- **UI** `/apu/import` (wizard 2 pasos: workbook + versión BOQ opcional →
+  preview con resumen/roles/filtros/detalle/aceptes → confirmación
+  idempotente → reporte + CSV sanitizado) + CTA «Importar APU» en `/apu`.
+- **Dry-run contra el workbook REAL** (`scripts/excel-import/apu-dry-run.ts`,
+  local): 54 actividades, 217 componentes, 0 errores, **0 deltas > 0.01**;
+  linking contra fixture real: **51 linkable / 3 unresolved / 0 ambiguous**.
+
+### Validación (todo PASS)
+- db reset local 35 migraciones + 6 seeds · typecheck 0 · lint 0 ·
+  **1353 tests** (+51) · build (ruta `ƒ /apu/import`) · **RLS runtime
+  173/173** (+22 sección [21]; FORCE 30→31) · isolation 12/12 · gm 22/22 ·
+  gm:import $372.247.170 · smoke gated 42/42 (en aislamiento; contención
+  de workers conocida al correr juntos) · redirects 15/15 · diff --check
+  limpio · validador 214/0/0.
+
+### Próximo paso
+- Revisión visual de la usuaria en `http://localhost:3100` (importar el
+  workbook real con su sesión productiva tras release) + release controlado
+  (`db push --dry-run` ⇒ exactamente 2 migraciones nuevas `20260615*`).
+- Siguiente slice recomendado: **QUANTITY_TAKEOFF_IMPORT_V1** (FASE 4B.3,
+  NO iniciada por mandato).
+
+### Agentes activos al cierre
+- Ninguno.
+
+---
+
 ## 2026-06-11 — RELEASE: PRICE_OBSERVATION_REVIEW_CENTER_V1 + BULK_APPROVAL_BY_IMPORT_BATCH_V1
 
 > **Release controlado ejecutado por agent-orchestrator.** Rama `feature/price-observation-review-center-v1` (HEAD `6554516`) integrada a `main` mediante rama temporal `release/price-review-center-v1-merge`. **DB push remoto aplicado (2 migraciones). Main publicado. Producción activa. Tag creado.**
