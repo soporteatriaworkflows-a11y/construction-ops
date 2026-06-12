@@ -84,11 +84,12 @@ export function matchTakeoffGroup(
     const exactPool = index.byExactKey.get(`${codeKey}|${descKey}`) ?? [];
     if (exactPool.length > 0) {
       if (input.unit === null) {
-        // Sin unidad confiable ⇒ jamás exacto (§2.1/§6.3).
+        // Sin unidad confiable ⇒ jamás exacto (§2.1/§6.3). Las sugerencias
+        // NUNCA portan boqItemId: solo se vincula lo exacto.
         const first = exactPool[0]!;
         return {
           status: 'suggested',
-          boqItemId: first.id,
+          boqItemId: null,
           boqItemCode: first.code,
           boqItemDescription: first.description,
         };
@@ -120,11 +121,11 @@ export function matchTakeoffGroup(
           boqItemDescription: candidate.description,
         };
       }
-      // Código+descripción coinciden pero la unidad no ⇒ sugerencia.
+      // Código+descripción coinciden pero la unidad no ⇒ sugerencia (sin id).
       const first = exactPool[0]!;
       return {
         status: 'suggested',
-        boqItemId: first.id,
+        boqItemId: null,
         boqItemCode: first.code,
         boqItemDescription: first.description,
       };
@@ -138,7 +139,7 @@ export function matchTakeoffGroup(
     if (first) {
       return {
         status: 'suggested',
-        boqItemId: first.id,
+        boqItemId: null,
         boqItemCode: first.code,
         boqItemDescription: first.description,
       };
