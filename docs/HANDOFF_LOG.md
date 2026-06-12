@@ -1,5 +1,30 @@
 # Handoff Log
 
+## 2026-06-12 — RELEASE: ENTRE_PATIOS_APU_IMPORT_V1 + BOQ_APU_LINKING_V1 (orchestrator)
+
+### Estado
+- **RELEASED.** `origin/main = d68d113` (merge commit). Tag `entre-patios-apu-import-release-v1`.
+- 3 migraciones aplicadas remotamente: `20260615090000` (apu_import_batches + provenance + RPC),
+  `20260615090100` (RLS ENABLE+FORCE), `20260615090200` (fix cast uuid[] — lint limpio).
+- Deploy automático Vercel activo: smoke 10/10 sin HTTP 500; `/apu/import` 307 (auth guard ✓); cron 401 ✓.
+- Sin seeds. Sin deploy CLI. Sin importación remota del workbook. Sin escrituras remotas distintas del db push.
+
+### Validación proporcional
+- typecheck 0, lint 0, suite 1353/1353, build ✓ (`ƒ /apu/import`), gm 22/22, gm:import intacto,
+  RLS harness 173/173, diff --check limpio, validador agentes 214/0/0.
+
+### Siguiente acción manual
+- Entrar a `/apu/import` con sesión productiva (rol management/internal).
+- Cargar el workbook real `COT.ENTRE PATIOS 1 PISO (1).xlsx` supervisadamente.
+- Revisar 54 actividades; aceptar sugerencias de materiales explícitamente.
+- Evaluar linking contra ítems BOQ reales (aprox. 51 linkable).
+
+### Próximo slice
+- **QUANTITY_TAKEOFF_IMPORT_V1** (FASE 4B.3) — NO iniciada, pendiente aprobación.
+- Deudas registradas: `BOQ_APU_RELINK_WITH_CONFIRMATION`, `APU_REUSABLE_CREW_TEMPLATES_V1`.
+
+---
+
 ## 2026-06-11 — FASE 4B.2: ENTRE_PATIOS_APU_IMPORT_V1 + BOQ_APU_LINKING_V1 (orchestrator)
 
 ### Estado
