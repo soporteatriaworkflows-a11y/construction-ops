@@ -7,7 +7,7 @@
  * unitCost llega pre-calculado como DecimalString desde el read-model.
  */
 import Link from 'next/link';
-import { Calculator, ChevronRight } from 'lucide-react';
+import { Calculator, ChevronRight, FileSpreadsheet } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
 import { EmptyState } from '@/components/shared/empty-state';
 import {
@@ -17,9 +17,11 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { formatCOP } from '@/lib/utils/format';
 import { getReadModel } from '@/server/read-model';
 import { resolveViewer } from '@/server/auth/resolve-viewer';
+import { isCreationModeEnabled } from '@/app/(dashboard)/projects/mode-guard';
 
 // Render request-time: viewer real por modo (db=autenticado, fixture=demo).
 // En modo `db` consulta la organización real; nunca hornea datos de demostración.
@@ -29,14 +31,26 @@ export default async function ApuPage() {
   const rm = getReadModel();
   let apus: Awaited<ReturnType<typeof rm.listApus>> = [];
   let error: string | null = null;
+  let canImport = false;
 
   try {
     const viewer = await resolveViewer();
+    canImport =
+      isCreationModeEnabled() && ['management', 'internal'].includes(viewer.role);
     apus = await rm.listApus(viewer);
   } catch (e) {
     error = e instanceof Error ? e.message : 'Error al cargar APU';
     apus = [];
   }
+
+  const importCta = canImport ? (
+    <Button size="sm" asChild>
+      <Link href="/apu/import">
+        <FileSpreadsheet className="mr-1 h-4 w-4" aria-hidden="true" />
+        Importar APU
+      </Link>
+    </Button>
+  ) : undefined;
 
   if (error) {
     return (
@@ -58,13 +72,25 @@ export default async function ApuPage() {
       <PageHeader
         title="Análisis de Precios Unitarios (APU)"
         description="Catálogo de plantillas APU reutilizables por proyecto"
+        actions={importCta}
       />
 
       {apus.length === 0 ? (
         <EmptyState
           icon={Calculator}
           title="Sin plantillas APU"
-          description="Las plantillas APU se crean desde el proceso de importacion del presupuesto. Si ya importaste un presupuesto, revisa la seccion Proyectos."
+          description={
+            canImport
+              ? 'Importa la hoja APU del workbook del proyecto para crear las plantillas con sus componentes, cuadrillas y herramienta menor.'
+              : 'Las plantillas APU se crean desde el proceso de importacion del presupuesto. Si ya importaste un presupuesto, revisa la seccion Proyectos.'
+          }
+          action={
+            canImport ? (
+              <Button size="sm" asChild>
+                <Link href="/apu/import">Importar APU</Link>
+              </Button>
+            ) : undefined
+          }
         />
       ) : (
         <div className="space-y-4">
