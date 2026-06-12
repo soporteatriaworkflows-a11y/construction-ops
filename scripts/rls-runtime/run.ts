@@ -1915,7 +1915,7 @@ async function main(): Promise<void> {
     const [{ res }] = await q<{ res: { duplicate: boolean; batchId: string; importedActivities: number; importedComponents: number; skippedExisting: number } }[]>`
       SELECT public.import_apu_batch(${sql.json(apuRpcBatch)}, ${sql.json(apuRpcTemplates)}, NULL, '[]'::jsonb) AS res`;
     const comp = await q<{ total: string; raw_code: string | null; raw_unit: string | null; source_row: number | null }[]>`
-      SELECT total_component_cost AS total, raw_code, raw_unit, source_row
+      SELECT c.total_component_cost AS total, c.raw_code, c.raw_unit, c.source_row
       FROM apu_components c JOIN apu_templates t ON t.id = c.apu_template_id
       WHERE t.organization_id = ${ORG_A} AND t.code = 'HARN-APU-01' AND c.sort_order = 0`;
     const [tpl] = await q<{ default_tool_pct: string; import_batch_id: string | null; source_row: number | null }[]>`
