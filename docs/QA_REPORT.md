@@ -4,6 +4,33 @@ Este documento es propiedad de **agent-qa**. Se actualiza al final de
 
 ---
 
+## QUANTITY_TAKEOFF_IMPORT_V1 (2026-06-12, rama `feature/quantity-takeoff-import-v1`)
+
+**Base:** `origin/main = daa4dd9` · **main intacta** · **producción intacta** · **sin db push remoto** (migraciones `20260616*` SOLO locales) · **sin escrituras remotas** · sesión de RECUPERACIÓN tras apagado inesperado (estado en disco preservado; nada descartado)
+
+| Check | Resultado | Detalle |
+|---|---|---|
+| supabase db reset --local | ✅ | 36 migraciones + 6 seeds; `20260616090000`+`090100` aplicadas limpias (Docker re-arrancado tras el apagado) |
+| typecheck | ✅ 0 errores | incluye dominio `server/quantity-import` + wizard `/quantities/import` |
+| lint | ✅ 0 warnings | flat config ESLint 9 |
+| tests quantity-import | ✅ 59/59 | parser 37, matching 10, preview/confirm 12 (hojas 100% sintéticas) |
+| suite completa | ✅ **1412 PASS / 42 gated** | +59 nuevos; 1 flaky conocido (PDF magic bajo contención de workers) verde en re-run y en aislamiento 11/11 |
+| build | ✅ | rutas `ƒ /quantities` + `ƒ /quantities/import`; Proxy presente |
+| RLS runtime harness | ✅ **194/194** | +21 sección [22]: batch inmutable, imported_by identidad real, rol obra denegado, aislamiento A/B, UNIQUE org+digest (mismo digest en otra org permitido), líneas inmutables, triggers same-org, RPC atómica (duplicate idempotente, vincula SOLO exactos, vínculo existente NO se reemplaza, BOQ quantity/subtotal intactos, version_locked), FORCE 31→34 |
+| read-model isolation | ✅ 12/12 | runtime script |
+| golden master | ✅ 22/22 | total 372.247.169,978 intacto |
+| gm:import | ✅ | $372.247.170 reproducido (diff ≤ 1.9e-8) |
+| smoke gated (BOQ_SMOKE_DB=1) | ✅ 42/42 | 1 transitorio post-`db reset` en el 1er run (patrón warmup conocido); re-run único verde |
+| redirects R01–R15 | ✅ 15/15 | en suite |
+| git diff --check | ✅ | limpio |
+| validate-claude-agents | ✅ 214/0/0 | |
+
+Recuperación tras apagado: la sección [22] del harness y los tests unitarios estaban escritos en disco sin commitear; se preservaron íntegros. Defectos locales corregidos sin ampliar alcance: (1) `matchTakeoffGroup` devolvía `boqItemId` en sugerencias (ahora siempre `null`: solo lo exacto porta id, §6); (2) setup del harness [22] sin `chapters` (NOT NULL en `boq_items.chapter_id`); (3) test documental de alias de unidades actualizado por la extensión aditiva m³/un/jn (§2.2).
+
+Invariantes verificados: `boq_items` byte a byte intacto tras importar y vincular (harness: quantity 10 / subtotal 1000); vínculos BOQ SOLO exactos y no ambiguos; sugerencias jamás se vinculan ni portan id; vínculos existentes jamás se reemplazan; digest repetido ⇒ no-op informativo; versiones emitidas ⇒ `version_locked`; fórmulas del Excel jamás se evalúan (texto = metadato/provenance); CSV final sanitizado (anti formula-injection); APU/AIU/precios/exports intactos; `quantity_groups`/`quantity_lines` legacy sin escrituras.
+
+---
+
 ## ENTRE_PATIOS_APU_IMPORT_V1 + BOQ_APU_LINKING_V1 (2026-06-11, rama `feature/entre-patios-apu-import-v1`)
 
 **Base:** `origin/main = bfc254b` · **main intacta** · **producción intacta** · **sin db push remoto** (migraciones `20260615*` SOLO locales) · **stashes intactos (2 WIP)** · **sin escrituras remotas**

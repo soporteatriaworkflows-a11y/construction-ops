@@ -3,6 +3,8 @@
 **Fase:** 4B.3
 **Rama:** `feature/quantity-takeoff-import-v1` (base `origin/main = daa4dd9`)
 **Estado:** CONGELADO — cualquier cambio requiere decisión del orquestador.
+**Implementación:** ✅ COMPLETA (2026-06-12, con recuperación tras apagado).
+Validación íntegra en `docs/QA_REPORT.md` (sección QUANTITY_TAKEOFF_IMPORT_V1).
 **Propiedad:** agent-orchestrator (autorado directo en esta oleada).
 **Patrón base:** `ENTRE_PATIOS_APU_IMPORT_V1` (digest + dos pasos + RPC atómica
 RLS-bound + batch inmutable).
