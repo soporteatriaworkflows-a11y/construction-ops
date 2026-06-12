@@ -1,4 +1,4 @@
-/**
+﻿/**
  * RLS RUNTIME TEST — Construction Ops (Oleada 1.5)
  * Owner: agent-orchestrator (validación de integración; no implementa dominio).
  *
@@ -175,8 +175,9 @@ async function main(): Promise<void> {
       AND c.relrowsecurity AND c.relforcerowsecurity`;
   // 20 tablas de Oleada 1 + 4 de planning (Oleada 3B) + 1 resource_price_observations (Fase 3A)
   // + 3 de price monitoring (Fase 4A: targets/runs/results)
-  // + 2 del review center (batches + bulk_actions) = 30.
-  check('Pre-flight: 30 tablas con RLS FORCE', rlsTables === '30', `rlsTables=${rlsTables}`);
+  // + 2 del review center (batches + bulk_actions)
+  // + 1 apu_import_batches (FASE 4B.2) = 31.
+  check('Pre-flight: 31 tablas con RLS FORCE', rlsTables === '31', `rlsTables=${rlsTables}`);
 
   const [{ count: taskCount }] = await sql<{ count: string }[]>`
     SELECT count(*)::text AS count FROM schedule_tasks WHERE id = ${TASK_A}`;
@@ -1725,6 +1726,300 @@ async function main(): Promise<void> {
   check('review: RLS ENABLE+FORCE en batches y bulk_actions',
     reviewForce.length === 2 && reviewForce.every((r) => r.rls && r.force),
     JSON.stringify(reviewForce));
+
+  // ===========================================================================
+  // 21) ENTRE_PATIOS_APU_IMPORT_V1 — apu_import_batches + RPC import_apu_batch.
+  // ===========================================================================
+  console.log('\n=== 21) APU import batches (ENTRE_PATIOS_APU_IMPORT_V1) ===');
+
+  const DIGEST_A = 'a'.repeat(64);
+  const DIGEST_B = 'b'.repeat(64);
+  const DIGEST_C = 'c'.repeat(64);
+  const DIGEST_D = 'd'.repeat(64);
+  const DIGEST_E = 'e'.repeat(64);
+
+  // 21a) Batch tenant-scoped: admin A crea con imported_by = identidad real.
+  const apuBatch = await asUser(realA, async (q) => {
+    const [row] = await q<{ id: string; organization_id: string; imported_by: string }[]>`
+      INSERT INTO apu_import_batches
+        (organization_id, digest_sha256, source_filename, source_sheet, imported_by)
+      VALUES (${ORG_A}, ${DIGEST_A}, 'harness.xlsx', 'APU', ${USER_A_ADMIN})
+      RETURNING id, organization_id, imported_by`;
+    // 21d) Inmutable: UPDATE/DELETE sin política ⇒ 0 filas.
+    const upd = await q`UPDATE apu_import_batches SET warning_count = 99 WHERE id = ${row!.id}`;
+    const del = await q`DELETE FROM apu_import_batches WHERE id = ${row!.id}`;
+    // imported_by ajeno ⇒ WITH CHECK bloquea.
+    let spoofBlocked = false;
+    await q.unsafe('SAVEPOINT sp_aib_spoof');
+    try {
+      await q`INSERT INTO apu_import_batches
+        (organization_id, digest_sha256, source_filename, source_sheet, imported_by)
+        VALUES (${ORG_A}, ${DIGEST_B}, 'harness.xlsx', 'APU', ${USER_B_ADMIN})`;
+    } catch {
+      spoofBlocked = true;
+      await q.unsafe('ROLLBACK TO SAVEPOINT sp_aib_spoof');
+    }
+    return { row: row!, upd: upd.count, del: del.count, spoofBlocked };
+  });
+  check('apu-import: admin A crea batch con imported_by = identidad real', apuBatch.row.imported_by === USER_A_ADMIN);
+  check('apu-import: batch INMUTABLE (UPDATE denegado, 0 filas)', apuBatch.upd === 0, `upd=${apuBatch.upd}`);
+  check('apu-import: batch INMUTABLE (DELETE denegado, 0 filas)', apuBatch.del === 0, `del=${apuBatch.del}`);
+  check('apu-import: imported_by ajeno bloqueado (WITH CHECK)', apuBatch.spoofBlocked);
+
+  // 21b) Rol obra NO crea batches (solo admin/gerencia).
+  let apuRoleBlocked = false;
+  await asUser(realAObra, async (q) => {
+    await q.unsafe('SAVEPOINT sp_aib_role');
+    try {
+      await q`INSERT INTO apu_import_batches
+        (organization_id, digest_sha256, source_filename, source_sheet, imported_by)
+        VALUES (${ORG_A}, ${DIGEST_B}, 'harness.xlsx', 'APU', ${USER_A_OBRA})`;
+    } catch {
+      apuRoleBlocked = true;
+      await q.unsafe('ROLLBACK TO SAVEPOINT sp_aib_role');
+    }
+  });
+  check('apu-import: rol obra NO crea batches (solo admin/gerencia)', apuRoleBlocked);
+
+  // 21c) B NO ve batches de A (aislamiento SELECT).
+  const APU_BATCH_A_SEED = '00000000-0000-0000-0000-00000000f201';
+  const apuIso = await asUser(
+    claimsB,
+    async (q) => {
+      const rows = await q<{ id: string }[]>`
+        SELECT id FROM apu_import_batches WHERE organization_id = ${ORG_A}`;
+      return rows.length;
+    },
+    async (q) => {
+      await q`INSERT INTO apu_import_batches
+        (id, organization_id, digest_sha256, source_filename, source_sheet, imported_by)
+        VALUES (${APU_BATCH_A_SEED}, ${ORG_A}, ${DIGEST_C}, 'harness.xlsx', 'APU', ${USER_A_ADMIN})
+        ON CONFLICT (id) DO NOTHING`;
+    },
+  );
+  check('apu-import: B NO ve batches de A (aislamiento SELECT)', apuIso === 0, `n=${apuIso}`);
+
+  // 21e) Idempotencia estructural: digest duplicado por org bloqueado (UNIQUE);
+  //      el MISMO digest en otra org SÍ es válido.
+  const apuIdem = await asUser(realA, async (q) => {
+    await q`INSERT INTO apu_import_batches
+      (organization_id, digest_sha256, source_filename, source_sheet, imported_by)
+      VALUES (${ORG_A}, ${DIGEST_D}, 'harness.xlsx', 'APU', ${USER_A_ADMIN})`;
+    let blocked = false;
+    await q.unsafe('SAVEPOINT sp_aib_idem');
+    try {
+      await q`INSERT INTO apu_import_batches
+        (organization_id, digest_sha256, source_filename, source_sheet, imported_by)
+        VALUES (${ORG_A}, ${DIGEST_D}, 'otro.xlsx', 'APU', ${USER_A_ADMIN})`;
+    } catch {
+      blocked = true;
+      await q.unsafe('ROLLBACK TO SAVEPOINT sp_aib_idem');
+    }
+    return blocked;
+  });
+  check('apu-import: digest duplicado por org bloqueado (UNIQUE org+digest)', apuIdem);
+  const apuIdemOtherOrg = await asUser(claimsB, async (q) => {
+    const [row] = await q<{ id: string }[]>`
+      INSERT INTO apu_import_batches
+        (organization_id, digest_sha256, source_filename, source_sheet, imported_by)
+      VALUES (${ORG_B}, ${DIGEST_C}, 'harness-b.xlsx', 'APU', ${USER_B_ADMIN})
+      RETURNING id`;
+    return row !== undefined;
+  }, async (q) => {
+    await q`INSERT INTO apu_import_batches
+      (id, organization_id, digest_sha256, source_filename, source_sheet, imported_by)
+      VALUES (${APU_BATCH_A_SEED}, ${ORG_A}, ${DIGEST_C}, 'harness.xlsx', 'APU', ${USER_A_ADMIN})
+      ON CONFLICT (id) DO NOTHING`;
+  });
+  check('apu-import: mismo digest en OTRA org permitido (aislamiento real)', apuIdemOtherOrg);
+
+  // 21f) Trigger same-org: template de A NO puede referenciar batch de B.
+  let apuCrossBatchBlocked = false;
+  await asUser(
+    realA,
+    async (q) => {
+      await q.unsafe('SAVEPOINT sp_aib_cross');
+      try {
+        await q`INSERT INTO apu_templates
+          (organization_id, code, name, unit, import_batch_id)
+          VALUES (${ORG_A}, 'HARN-X1', 'Cross batch', 'm2', '00000000-0000-0000-0000-00000000f202')`;
+      } catch {
+        apuCrossBatchBlocked = true;
+        await q.unsafe('ROLLBACK TO SAVEPOINT sp_aib_cross');
+      }
+    },
+    async (q) => {
+      await q`INSERT INTO apu_import_batches
+        (id, organization_id, digest_sha256, source_filename, source_sheet, imported_by)
+        VALUES ('00000000-0000-0000-0000-00000000f202', ${ORG_B}, ${DIGEST_E}, 'b.xlsx', 'APU', ${USER_B_ADMIN})
+        ON CONFLICT (id) DO NOTHING`;
+    },
+  );
+  check('apu-import: trigger same-org bloquea batch de otra org en apu_templates', apuCrossBatchBlocked);
+
+  // 21g) RPC import_apu_batch: atómica, recalcula server-side, idempotente.
+  const apuRpcBatch = {
+    digestSha256: 'f'.repeat(64),
+    sourceFilename: 'harness.xlsx',
+    sourceSheet: 'APU',
+    totalActivities: 1,
+    totalComponents: 2,
+    unresolvedCount: 0,
+    warningCount: 0,
+    metadata: { kind: 'harness' },
+  };
+  const apuRpcTemplates = [
+    {
+      code: 'HARN-APU-01',
+      name: 'Actividad harness',
+      unit: 'm2',
+      description: null,
+      defaultToolPct: '0.35',
+      sourceRow: 36,
+      sourceOccurrenceIndex: 1,
+      components: [
+        {
+          componentType: 'material',
+          resourceId: null,
+          laborRoleId: null,
+          quantity: '0.1',
+          wastePct: '0.1',
+          unitPriceSource: 'manual',
+          unitPriceSnapshot: '31827',
+          sortOrder: 0,
+          notes: null,
+          sourceRow: 37,
+          sourceOccurrenceIndex: 1,
+          rawCode: 'Insumo',
+          rawUnit: 'Un',
+        },
+        {
+          componentType: 'tool',
+          resourceId: null,
+          laborRoleId: null,
+          quantity: '1',
+          wastePct: '0',
+          unitPriceSource: 'manual',
+          unitPriceSnapshot: '100',
+          sortOrder: 1,
+          notes: null,
+          sourceRow: 38,
+          sourceOccurrenceIndex: 1,
+          rawCode: 'Herramienta',
+          rawUnit: 'Gbl',
+        },
+      ],
+    },
+  ];
+  const apuRpc = await asUser(realA, async (q) => {
+    const [{ res }] = await q<{ res: { duplicate: boolean; batchId: string; importedActivities: number; importedComponents: number; skippedExisting: number } }[]>`
+      SELECT public.import_apu_batch(${sql.json(apuRpcBatch)}, ${sql.json(apuRpcTemplates)}, NULL, '[]'::jsonb) AS res`;
+    const comp = await q<{ total: string; raw_code: string | null; raw_unit: string | null; source_row: number | null }[]>`
+      SELECT total_component_cost AS total, raw_code, raw_unit, source_row
+      FROM apu_components c JOIN apu_templates t ON t.id = c.apu_template_id
+      WHERE t.organization_id = ${ORG_A} AND t.code = 'HARN-APU-01' AND c.sort_order = 0`;
+    const [tpl] = await q<{ default_tool_pct: string; import_batch_id: string | null; source_row: number | null }[]>`
+      SELECT default_tool_pct, import_batch_id, source_row
+      FROM apu_templates WHERE organization_id = ${ORG_A} AND code = 'HARN-APU-01'`;
+    // Segunda llamada con el MISMO digest ⇒ duplicate, nada nuevo.
+    const [{ res: res2 }] = await q<{ res: { duplicate: boolean; importedActivities: number } }[]>`
+      SELECT public.import_apu_batch(${sql.json(apuRpcBatch)}, ${sql.json(apuRpcTemplates)}, NULL, '[]'::jsonb) AS res`;
+    // Tercera llamada: digest distinto pero MISMO code ⇒ skipped_existing (no sobrescribe).
+    const batch3 = { ...apuRpcBatch, digestSha256: '9'.repeat(64) };
+    const [{ res: res3 }] = await q<{ res: { duplicate: boolean; importedActivities: number; skippedExisting: number } }[]>`
+      SELECT public.import_apu_batch(${sql.json(batch3)}, ${sql.json(apuRpcTemplates)}, NULL, '[]'::jsonb) AS res`;
+    const [{ n: tplCount }] = await q<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM apu_templates WHERE organization_id = ${ORG_A} AND code = 'HARN-APU-01'`;
+    return { res, res2, res3, comp: comp[0]!, tpl: tpl!, tplCount };
+  });
+  check('apu-import RPC: crea batch + template + componentes', !apuRpc.res.duplicate && apuRpc.res.importedActivities === 1 && apuRpc.res.importedComponents === 2, JSON.stringify(apuRpc.res));
+  check('apu-import RPC: total recalculado server-side (0.1×1.1×31827 = 3500.97)', Number(apuRpc.comp.total) === 3500.97, `total=${apuRpc.comp.total}`);
+  check('apu-import RPC: raw values + source_row preservados', apuRpc.comp.raw_code === 'Insumo' && apuRpc.comp.raw_unit === 'Un' && apuRpc.comp.source_row === 37, JSON.stringify(apuRpc.comp));
+  check('apu-import RPC: default_tool_pct + provenance en template', Number(apuRpc.tpl.default_tool_pct) === 0.35 && apuRpc.tpl.import_batch_id !== null && apuRpc.tpl.source_row === 36, JSON.stringify(apuRpc.tpl));
+  check('apu-import RPC: mismo digest ⇒ duplicate (idempotente, sin re-importar)', apuRpc.res2.duplicate === true && apuRpc.res2.importedActivities === 1);
+  check('apu-import RPC: código existente ⇒ skipped (no sobrescribe)', apuRpc.res3.duplicate === false && apuRpc.res3.importedActivities === 0 && apuRpc.res3.skippedExisting === 1, JSON.stringify(apuRpc.res3));
+  check('apu-import RPC: una sola plantilla con ese código (sin duplicados)', apuRpc.tplCount === 1, `n=${apuRpc.tplCount}`);
+
+  // 21h) RPC sin sesión ⇒ abortada (no_session).
+  let apuRpcNoSession = false;
+  try {
+    await asUser(noSession, async (q) => {
+      await q`SELECT public.import_apu_batch(${sql.json(apuRpcBatch)}, '[]'::jsonb, NULL, '[]'::jsonb)`;
+    });
+  } catch {
+    apuRpcNoSession = true;
+  }
+  check('apu-import RPC: sin sesión ⇒ abortada (no_session)', apuRpcNoSession);
+
+  // 21i) Linking BOQ: exacto vincula una vez; existente NO se reemplaza;
+  //      versión emitida ⇒ version_locked.
+  const apuLink = await asUser(realA, async (q) => {
+    const [{ id: estId }] = await q<{ id: string }[]>`
+      SELECT id FROM public.create_estimate_with_initial_version(${SCOPE_A}, 'APULNK', 'ApuLink', NULL)`;
+    const [{ vid }] = await q<{ vid: string }[]>`
+      SELECT id AS vid FROM estimate_versions WHERE estimate_id = ${estId} ORDER BY version_number DESC LIMIT 1`;
+    const [{ chid }] = await q<{ chid: string }[]>`
+      INSERT INTO chapters (estimate_version_id, code, name, sort_order)
+      VALUES (${vid}, 'C1', 'Cap', 0) RETURNING id AS chid`;
+    const [{ bid }] = await q<{ bid: string }[]>`
+      INSERT INTO boq_items (estimate_version_id, chapter_id, code, description_snapshot, unit_snapshot,
+        quantity_snapshot, unit_price_snapshot, subtotal, sort_order)
+      VALUES (${vid}, ${chid}, '1.01', 'Demolición harness', 'M²', 10, 100, 0, 0)
+      RETURNING id AS bid`;
+
+    const linkBatch = { ...apuRpcBatch, digestSha256: '8'.repeat(64) };
+    const linkTemplates = [{ ...apuRpcTemplates[0]!, code: 'HARN-APU-LNK' }];
+    const links = [{ templateCode: 'HARN-APU-LNK', boqItemId: bid }];
+    const [{ res }] = await q<{ res: { linkedBoqItems: number } }[]>`
+      SELECT public.import_apu_batch(${sql.json(linkBatch)}, ${sql.json(linkTemplates)}, ${vid}, ${sql.json(links)}) AS res`;
+    const [item] = await q<{ apu_template_id: string | null; quantity_snapshot: string; subtotal: string }[]>`
+      SELECT apu_template_id, quantity_snapshot, subtotal FROM boq_items WHERE id = ${bid}`;
+
+    // Re-link con OTRA plantilla ⇒ apu_template_id existente NO se reemplaza.
+    const linkBatch2 = { ...apuRpcBatch, digestSha256: '7'.repeat(64) };
+    const linkTemplates2 = [{ ...apuRpcTemplates[0]!, code: 'HARN-APU-LNK2' }];
+    const links2 = [{ templateCode: 'HARN-APU-LNK2', boqItemId: bid }];
+    const [{ res: res2 }] = await q<{ res: { linkedBoqItems: number } }[]>`
+      SELECT public.import_apu_batch(${sql.json(linkBatch2)}, ${sql.json(linkTemplates2)}, ${vid}, ${sql.json(links2)}) AS res`;
+    const [itemAfter] = await q<{ apu_template_id: string | null }[]>`
+      SELECT apu_template_id FROM boq_items WHERE id = ${bid}`;
+    return { res, res2, item: item!, itemAfter: itemAfter!, vid, bid };
+  });
+  check('apu-import linking: exacto y único vincula (1 ítem)', apuLink.res.linkedBoqItems === 1, JSON.stringify(apuLink.res));
+  check('apu-import linking: cantidades/subtotal del BOQ intactos', Number(apuLink.item.quantity_snapshot) === 10 && Number(apuLink.item.subtotal) === 1000, JSON.stringify(apuLink.item));
+  check('apu-import linking: vínculo existente NO se reemplaza (0 filas)', apuLink.res2.linkedBoqItems === 0 && apuLink.itemAfter.apu_template_id === apuLink.item.apu_template_id);
+
+  // Versión emitida ⇒ version_locked (sin importar nada).
+  let apuLinkLocked = false;
+  try {
+    await asUser(
+      realA,
+      async (q) => {
+        const linkBatch = { ...apuRpcBatch, digestSha256: '6'.repeat(64) };
+        await q`SELECT public.import_apu_batch(${sql.json(linkBatch)}, '[]'::jsonb, '00000000-0000-0000-0000-00000000f203', '[]'::jsonb)`;
+      },
+      async (q) => {
+        await q`INSERT INTO estimates (id, project_scope_id, code, name, status)
+                VALUES ('00000000-0000-0000-0000-00000000f204', ${SCOPE_A}, 'APULCK', 'ApuLock', 'active')
+                ON CONFLICT (id) DO NOTHING`;
+        await q`INSERT INTO estimate_versions (id, estimate_id, version_number, status)
+                VALUES ('00000000-0000-0000-0000-00000000f203', '00000000-0000-0000-0000-00000000f204', 1, 'issued')
+                ON CONFLICT (id) DO NOTHING`;
+      },
+    );
+  } catch {
+    apuLinkLocked = true;
+  }
+  check('apu-import linking: versión emitida ⇒ version_locked (abortada)', apuLinkLocked);
+
+  // 21j) RLS ENABLE + FORCE en la tabla nueva.
+  const apuImportForce = await sql<{ relname: string; rls: boolean; force: boolean }[]>`
+    SELECT relname, relrowsecurity AS rls, relforcerowsecurity AS force
+    FROM pg_class
+    WHERE relname = 'apu_import_batches'`;
+  check('apu-import: RLS ENABLE+FORCE en apu_import_batches',
+    apuImportForce.length === 1 && apuImportForce.every((r) => r.rls && r.force),
+    JSON.stringify(apuImportForce));
 
   // --- Resumen ---
   console.log(`\nRESULTADO RLS RUNTIME: ${pass} PASS / ${fail} FAIL`);
