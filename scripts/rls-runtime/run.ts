@@ -2262,8 +2262,11 @@ async function main(): Promise<void> {
     await q`INSERT INTO estimate_versions (id, estimate_id, version_number, status)
             VALUES ('00000000-0000-0000-0000-00000000f306', '00000000-0000-0000-0000-00000000f307', 1, 'draft')
             ON CONFLICT (id) DO NOTHING`;
-    await q`INSERT INTO boq_items (id, estimate_version_id, code, description_snapshot, unit_snapshot, quantity_snapshot, unit_price_snapshot, subtotal, sort_order)
-            VALUES ('00000000-0000-0000-0000-00000000f308', '00000000-0000-0000-0000-00000000f306', '1.01', 'Demolicion harness', 'm²', 10, 100, 1000, 0)
+    await q`INSERT INTO chapters (id, estimate_version_id, code, name, sort_order)
+            VALUES ('00000000-0000-0000-0000-00000000f30b', '00000000-0000-0000-0000-00000000f306', 'C1', 'Cap', 0)
+            ON CONFLICT (id) DO NOTHING`;
+    await q`INSERT INTO boq_items (id, estimate_version_id, chapter_id, code, description_snapshot, unit_snapshot, quantity_snapshot, unit_price_snapshot, subtotal, sort_order)
+            VALUES ('00000000-0000-0000-0000-00000000f308', '00000000-0000-0000-0000-00000000f306', '00000000-0000-0000-0000-00000000f30b', '1.01', 'Demolicion harness', 'm²', 10, 100, 1000, 0)
             ON CONFLICT (id) DO NOTHING`;
   });
   check('qty-import RPC: crea batch + grupo + línea (atómica)', !qtyRpc.res.duplicate && qtyRpc.res.groupsCreated === 1 && qtyRpc.res.linesCreated === 1, JSON.stringify(qtyRpc.res));
