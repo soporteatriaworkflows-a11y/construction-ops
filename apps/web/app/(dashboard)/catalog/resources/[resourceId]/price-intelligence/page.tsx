@@ -8,8 +8,10 @@
  *  - Botones aprobar/rechazar solo a admin/gerencia.
  */
 import Link from 'next/link';
-import { ArrowLeft, TrendingDown, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { ArrowLeft, TrendingDown, Clock, CheckCircle, XCircle, Calculator } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
+import { Button } from '@/components/ui/button';
+import { isCreationModeEnabled } from '@/app/(dashboard)/projects/mode-guard';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Badge } from '@/components/ui/badge';
 import { resolveViewer } from '@/server/auth/resolve-viewer';
@@ -134,6 +136,10 @@ export default async function PriceIntelligencePage({ params }: PageProps) {
     ? `${resourceCode} — ${resourceName}`
     : 'Inteligencia de precios';
 
+  // CTA: iniciar un APU a partir de este recurso (no crea nada automáticamente;
+  // preselecciona el material en el constructor). Solo roles internos + modo db.
+  const canBuildApu = canCreate && isCreationModeEnabled();
+
   return (
     <div>
       <PageHeader
@@ -144,6 +150,16 @@ export default async function PriceIntelligencePage({ params }: PageProps) {
             <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
             Catálogo
           </Link>
+        }
+        actions={
+          canBuildApu ? (
+            <Button size="sm" variant="outline" asChild>
+              <Link href={`/apu/new?resourceId=${encodeURIComponent(resourceId)}`}>
+                <Calculator className="mr-1 h-4 w-4" aria-hidden="true" />
+                Crear APU usando este recurso
+              </Link>
+            </Button>
+          ) : undefined
         }
       />
 

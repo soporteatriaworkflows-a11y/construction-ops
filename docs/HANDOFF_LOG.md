@@ -1,5 +1,63 @@
 # Handoff Log
 
+## 2026-06-13 — APU_MANUAL_BUILDER_V1 + BOQ_ADD_FROM_APU_V1 (orchestrator)
+
+### Estado
+- Rama `feature/apu-manual-builder-boq-add-v1` (base `origin/main = 56b7c0a`,
+  confirmada por `git fetch`; sin divergencia). **Sin merge a main; sin deploy;
+  sin db push remoto; sin escrituras remotas; sin datos dummy remotos.**
+- HEAD de la rama: `90ed0f7` (+ esta entrada de docs).
+- Stashes intactos (2, de `integration/wave-4e2a`, ajenos a esta rama).
+
+### Entregable
+- **Contrato congelado** `docs/APU_MANUAL_BUILDER_AND_BOQ_ADD_V1_CONTRACT.md`.
+- **Migración aditiva SOLO local** `20260618090000_apu_manual_builder.sql`:
+  `apu_templates += origin_type (CHECK manual|workbook_import, default
+  workbook_import) + created_by`; tabla nueva `apu_manual_actions` (RLS
+  ENABLE+FORCE, append-only, idempotencia `UNIQUE (org, idempotency_key)`);
+  RPC `create_manual_apu` y `add_apu_to_boq` (SECURITY INVOKER, org/actor
+  server-side, precio de material re-resuelto en SQL desde la última observación
+  aprobada, total recalculado en SQL, issued guard `estimate_version_locked`,
+  idempotentes). FORCE count 35→36.
+- **Dominio server-side** `apps/web/server/apu-builder/` + tipos
+  `apps/web/lib/apu-builder/`: compone `modules/apu` (sin redefinir fórmulas);
+  material = precio aprobado server-side, M.O. = costo diario integral del
+  dominio, herramienta menor derivada. `previewManualApu` PURO.
+- **UI** `/apu/new` (formulario materiales + M.O. + resumen estimado en vivo) +
+  CTA «Nuevo APU» en `/apu` + CTA «Crear APU usando este recurso» en la
+  inteligencia de precios del recurso (preselección `?resourceId=`). Todo
+  gated a management/internal + modo creación (oculto/explicado en demo/fixture).
+- **BOQ add**: `AddApuPanel` en el workspace de versión EDITABLE (capítulo + APU
+  activo + cantidad → RPC `add_apu_to_boq`; snapshot inicial del costo unitario;
+  cambios futuros del APU no mutan ítems emitidos).
+- **Tests**: `tests/unit/apu-builder/builder.test.ts` (13) + harness RLS sección
+  [24] (19 checks).
+
+### Decisión Fase 7 (edición)
+- Edición avanzada de APU manual **diferida** a `APU_ADVANCED_EDITOR_V2`
+  (creación manual sólida; la reconciliación ya cubre cambios de recurso en
+  importados; editar introduce riesgo sobre snapshots BOQ). Sin botones rotos.
+
+### Validación (todo PASS, local)
+- `supabase db reset --local` (37 migraciones + 6 seeds, `20260618090000` limpia)
+  · typecheck 0 · lint 0 · **suite 1465 passed / 0 fail** (+13) · build
+  (`ƒ /apu/new`) · **RLS runtime 233/0** (+19 sección [24], FORCE 35→36) ·
+  read-model isolation 12/0 · gm:regression 22/22 · gm:import PASS
+  (hoja Excel omitida: `private/` no versionado) · `git diff --check` limpio ·
+  validate-claude-agents 214/0/0.
+
+### Próximo paso
+- Revisión visual en `http://localhost:3130`: crear un APU manual desde `/apu/new`
+  y agregar una actividad al BOQ de una versión editable. Luego release controlado
+  (`db push --dry-run` ⇒ exactamente 1 migración nueva `20260618090000`).
+- Deudas registradas: `APU_EXPORTS_V1`, `BUDGET_EXPORT_WITH_APU_ANNEX_V1`,
+  `APU_ADVANCED_EDITOR_V2` (INTEGRATION_REQUESTS).
+
+### Agentes activos al cierre
+- Ninguno.
+
+---
+
 ## 2026-06-13 — RELEASE: APU_COMPONENT_RESOURCE_RECONCILIATION_V1 + APU_LIBRARY_OPERATIONAL_UX_V1 (orchestrator, release controlado)
 
 ### Estado

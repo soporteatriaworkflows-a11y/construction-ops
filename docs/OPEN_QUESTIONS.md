@@ -169,7 +169,16 @@ _Sin blockers activos._
     aprobación? (relacionado con Q11; el umbral disparará doble aprobación
     futura — pendiente de valor concreto).
 13. ¿Despliegue final: Vercel + Railway, o solo Vercel?
-15. **PRÓXIMOS SLICES IDENTIFICADOS (2026-06-13)** — Tras el release de
+15. ✅ **IMPLEMENTADOS (2026-06-13)** en `feature/apu-manual-builder-boq-add-v1`
+    (base `origin/main = 56b7c0a`; sin merge, sin deploy, sin db push remoto):
+    `APU_MANUAL_BUILDER_V1` (creación manual de APU en `/apu/new` + CTAs en `/apu`
+    y price-intelligence) y `BOQ_ADD_FROM_APU_V1` (alta de actividad APU al BOQ
+    editable desde el workspace, RPC `add_apu_to_boq` con snapshot server-side +
+    issued guard + idempotencia). Migración aditiva `20260618090000`. Pendiente:
+    revisión visual + release controlado. La edición avanzada se difirió como
+    `APU_ADVANCED_EDITOR_V2`. Texto histórico del slice:
+
+    **PRÓXIMOS SLICES IDENTIFICADOS (2026-06-13)** — Tras el release de
     `APU_COMPONENT_RESOURCE_RECONCILIATION_V1 + APU_LIBRARY_OPERATIONAL_UX_V1`,
     la revisión del preview de Vercel confirmó que el flujo de creación manual
     de APU NO existe (ni debe existir en esta rama). Los dos slices siguientes

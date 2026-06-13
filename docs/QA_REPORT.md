@@ -4,6 +4,29 @@ Este documento es propiedad de **agent-qa**. Se actualiza al final de
 
 ---
 
+## APU_MANUAL_BUILDER_V1 + BOQ_ADD_FROM_APU_V1 (2026-06-13, rama `feature/apu-manual-builder-boq-add-v1`)
+
+**Base:** `origin/main = 56b7c0a` · **main intacta** · **producción intacta** · **sin db push remoto** (migración `20260618090000` SOLO local) · **sin escrituras remotas**
+
+| Check | Resultado | Detalle |
+|---|---|---|
+| supabase db reset --local | ✅ | 37 migraciones + 6 seeds; `20260618090000` aplicada limpia |
+| typecheck | ✅ 0 | dominio `server/apu-builder` + UI `/apu/new` + workspace BOQ-add |
+| lint | ✅ 0 | flat config ESLint 9 (corregido set-state-in-effect en AddApuPanel) |
+| tests apu-builder | ✅ 13/13 | composición de costos, Decimal, validaciones, precio server-side |
+| suite completa | ✅ 1465 passed / 42 skipped / 0 fail | +13 nuevos |
+| build | ✅ | `ƒ /apu/new` compilada; sin errores |
+| RLS runtime harness | ✅ 233/0 | sección [24] (19 checks): create_manual_apu / add_apu_to_boq, aislamiento, role gate, issued guard, idempotencia, unit-cost RPC == dominio, append-only; FORCE 35→36 |
+| read-model isolation | ✅ 12/0 | sin regresión |
+| gm:regression | ✅ 22/22 | golden master COP intacto |
+| gm:import | ✅ | fixture canónico (hoja Excel omitida: `private/` no versionado) |
+| git diff --check | ✅ limpio | sin marcadores ni whitespace roto |
+| validate-claude-agents | ✅ 214/0/0 | |
+
+**Invariantes verificados:** precio de material y costo de M.O. SIEMPRE server-side (navegador nunca los dicta); `total_component_cost` y costo unitario recalculados server-side; snapshot BOQ inicial inmutable; versiones emitidas bloqueadas (RPC + RLS `estimate_version_locked`); cross-org bloqueado; `apu_manual_actions` append-only; sin DROP/DELETE/TRUNCATE; APU importados, reconciliación, quantities, catálogo, AIU y exports intactos.
+
+---
+
 ## QUANTITY_TAKEOFF_IMPORT_V1 (2026-06-12, rama `feature/quantity-takeoff-import-v1`)
 
 **Base:** `origin/main = daa4dd9` · **main intacta** · **producción intacta** · **sin db push remoto** (migraciones `20260616*` SOLO locales) · **sin escrituras remotas** · sesión de RECUPERACIÓN tras apagado inesperado (estado en disco preservado; nada descartado)

@@ -24,8 +24,11 @@ import {
 import type { WorkspaceChapterData } from '@/lib/estimates/workspace-view';
 import { isVersionEditable } from '@/lib/estimates/workspace-view';
 import { isCreationModeEnabled } from '../../../../../../mode-guard';
+import { listApusForBoqAdd, type ApuAddOption } from '@/server/apu-builder';
+import type { AuthenticatedViewer } from '@/server/auth/types';
 import { formatVersionLabel } from '../../../estimate-format';
 import { BoqWorkspace } from './boq-workspace';
+import { AddApuPanel } from './add-apu-panel';
 import { CommercialSimulator } from './commercial-simulator';
 
 export const dynamic = 'force-dynamic';
@@ -99,6 +102,16 @@ export default async function BoqWorkspacePage({ params }: PageProps) {
   const canMutate = canEdit && versionEditable;
   const statusLabel = ESTIMATE_VERSION_STATUS_LABELS[active.status] ?? active.status;
 
+  // BOQ_ADD_FROM_APU_V1: APUs activos para agregar como ítem vinculado.
+  // Solo se ofrece en versiones editables (issued ⇒ bloqueado server-side igual).
+  let apuOptions: ApuAddOption[] = [];
+  if (canMutate) {
+    apuOptions = await listApusForBoqAdd(viewer as AuthenticatedViewer).catch(() => []);
+  }
+  const chapterOptions = chapters
+    .filter((c) => !c.archived)
+    .map((c) => ({ id: c.id, code: c.code, name: c.name }));
+
   return (
     <div>
       <PageHeader
@@ -124,6 +137,20 @@ export default async function BoqWorkspacePage({ params }: PageProps) {
           </Button>
         </span>
       </div>
+
+      {/* BOQ_ADD_FROM_APU_V1 — Agregar actividad desde APU (solo versión editable) */}
+      {canMutate && chapterOptions.length > 0 && (
+        <section aria-label="Agregar actividad desde APU" className="mb-4">
+          <AddApuPanel
+            versionId={active.id}
+            projectId={id}
+            scopeId={scopeId}
+            estimateId={estimateId}
+            chapters={chapterOptions}
+            apus={apuOptions}
+          />
+        </section>
+      )}
 
       {/* A+B+C — Workspace denso con edición rápida y resumen financiero vivo */}
       <section aria-label="BOQ Workspace">
