@@ -4,6 +4,12 @@
 
 _Sin blockers activos._
 
+> **Nota 2026-06-13 (APU_EXPORTS_V1):** la deuda `READ_MODEL_ARCHIVED_AT`
+> (registrada en HANDOFF/INTEGRATION) quedó **RESUELTA** con un fix de mapeo ORM
+> sin migración. No introduce blockers nuevos. La pregunta Q-001 (APU incompleto)
+> sigue abierta y es independiente: el export INCLUYE APU incompletos con
+> advertencia (no los bloquea), consistente con la recomendación vigente.
+
 ---
 
 ## PREGUNTAS ABIERTAS

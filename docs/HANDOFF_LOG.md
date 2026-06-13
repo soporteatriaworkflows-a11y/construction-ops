@@ -1,5 +1,72 @@
 # Handoff Log
 
+## 2026-06-13 — APU_EXPORTS_V1 + BUDGET_EXPORT_WITH_APU_ANNEX_V1 (orchestrator)
+
+### Estado
+- Rama `feature/apu-budget-exports-v1` (base `origin/main = d3c67bd`, confirmada
+  por `git fetch`; **sin divergencia**). HEAD: `77acd03` (+ esta entrada de docs).
+  **Sin merge a main; sin deploy; sin db push remoto; sin escrituras remotas; sin
+  datos dummy remotos.** Stashes intactos (2, ajenos a esta rama).
+
+### Entregable
+- **Contrato congelado** `docs/APU_EXPORTS_AND_BUDGET_APU_ANNEX_V1_CONTRACT.md`
+  (commit `4989eb6`).
+- **Dominio READ-ONLY de selección** `server/estimates/export/apu-annex/selection.ts`:
+  resuelve `BudgetApuExportSelection` reutilizando el `EstimateExportPayload` del
+  presupuesto (snapshots BOQ) + APU EFECTIVAMENTE vinculados por
+  `boq_items.apu_template_id`, **deduplicados**, en **orden BOQ** (primera
+  aparición), con su cálculo actual (read-model `getApuDetail`). Archivados:
+  excluidos en versión editable, incluidos en versión emitida (fidelidad
+  histórica). Incompletos: incluidos con advertencia, sin bloquear. **Deps
+  inyectables** (tests deterministas sin BD). No muta datos.
+- **Nuevo método repo** `getVersionApuTemplateLinks` (interface + db + fixture):
+  filas BOQ→APU de la versión objetivo en orden BOQ, ítems/capítulos activos.
+- **Generadores Excel** (`apu-annex/apu-xlsx.ts`): `generateLinkedApuExcel`
+  (ÍNDICE APU + hoja por APU: encabezado, componentes, resumen por tipo,
+  trazabilidad, BOQ vinculado) y `generatePackageExcel` (hojas presupuesto +
+  hojas APU, reutilizando `addBudgetSheets` extraído de `xlsx.ts` sin alterar el
+  golden master). **Sanitización formula-injection** (`safeCell`) en todo texto.
+- **Generadores PDF** (`apu-annex/apu-pdf.ts`): `generateLinkedApuPdf` (portada +
+  índice + ficha por APU) y `generatePackagePdf` (página de presupuesto +
+  anexos), reutilizando `buildBudgetPage` extraído de `pdf.ts` (salida del
+  presupuesto idéntica). Texto saneado (`cleanText`); sin UUID/origen/secretos.
+- **Route** `GET /api/estimates/export?kind=budget|apu|package` (budget por
+  defecto, intacto). Cross-org ⇒ 404; tamaño > 15 MB ⇒ 413; `no-store`.
+- **UI** menú «Exportar» (6 documentos) con conteos (ítems BOQ, APU vinculados,
+  sin vínculo, archivados incluidos) y advertencias; opciones APU/paquete
+  deshabilitadas sin APU vinculados. Lógica pura testeable en `export-menu-logic.ts`.
+- **Fix acotado `READ_MODEL_ARCHIVED_AT`** (causa raíz: el schema Drizzle
+  `apuTemplates` no mapeaba `archived_at`/`origin_type`/etc., presentes en BD
+  desde `20260618/20260619`). Se sincronizó el mapeo ORM (**sin migración**) y se
+  populó `archivedAt`+`originType` en `listApus` (`ApuSummary`) y `getApuDetail`
+  (`ApuDetail`), drizzle + fixture.
+- **Nombres de archivo**: `apu_vinculados_<codigo>_<version>` y
+  `paquete_presupuesto_apu_<codigo>_<version>` (sanitizados); el presupuesto
+  conserva su patrón previo.
+
+### Validación (todo PASS, local)
+- **Sin migración** ⇒ `db reset` no aplica (solo mapeo ORM contra columnas ya
+  existentes en BD). typecheck 0 · lint 0 · **suite 1517 passed / 42 skipped / 0
+  fail** (+30: dominio 11, Excel 7, PDF 6, UI 6) · build limpio · gm:regression
+  22/22 · gm:import total **$372.247.169,98** intacto · validate-claude-agents
+  214/0/0 · `git diff --check` limpio (solo avisos LF→CRLF).
+- RLS runtime harness **no aplica** (sin migración/RLS nueva); read-model
+  isolation corre dentro de la suite.
+
+### Próximo paso
+- Revisión visual en `http://localhost:3150`: desde un presupuesto con APU
+  vinculados (Entre Patios), descargar los 6 documentos y validar branding,
+  índice, fichas y total. Luego release controlado (sin db push: no hay
+  migración; el fix read-model es solo ORM).
+- Deudas registradas: `OPERATIONAL_ACCESS_LAYER_V1`, `SMTP_CORPORATIVO_V1`,
+  `APU_ADVANCED_EDITOR_V2`, `APU_VERSIONING_V1`, `TRUE_DB_PAGINATION_V1`,
+  `HARDEN_APU_COMPONENTS_FOR_ALL_V1`, `EXPORT_QUANTITIES_ANNEX_V1`.
+
+### Agentes activos al cierre
+- Ninguno.
+
+---
+
 ## 2026-06-13 — APU_MANUAL_BUILDER_VALIDATION_AND_ARCHIVE_HOTFIX_V1 (orchestrator)
 
 ### Estado

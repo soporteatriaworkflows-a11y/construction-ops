@@ -1,5 +1,11 @@
 # Database Schema — Construction Ops
 
+> **Nota 2026-06-13 (APU_EXPORTS_V1):** SIN cambio de esquema de BD. El fix
+> `READ_MODEL_ARCHIVED_AT` solo **sincronizó el mapeo ORM** (`apps/web/lib/db/schema.ts`)
+> de `apu_templates` con columnas que ya existían en la BD desde las migraciones
+> `20260618090000` (`origin_type`, `created_by`) y `20260619090000`
+> (`archived_at`, `archived_by`, `archive_reason`). No hay migración nueva.
+
 > **Contrato congelado v1 — cambios únicamente mediante `docs/INTEGRATION_REQUESTS.md`.**
 >
 > Este documento es propiedad de **agent-orchestrator** y es la fuente
