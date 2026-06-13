@@ -372,6 +372,8 @@ necesariamente un rol de fila; se trata en el perfil de exports).
 | active | BOOLEAN | NOT NULL | DEFAULT true |
 | version | INTEGER | NOT NULL | DEFAULT 1 |
 | default_tool_pct | NUMERIC(20,10) | NOT NULL | DEFAULT 0; fracción [0,1] de herramienta menor derivada sobre la M.O. (4B.1, migración 20260613090100) |
+| origin_type | TEXT | NOT NULL | DEFAULT 'workbook_import'; CHECK in (`manual`,`workbook_import`) — APU_MANUAL_BUILDER_V1, migración 20260618090000 |
+| created_by | UUID | NULL | FK profiles ON DELETE SET NULL; autor del APU manual (NULL en históricos) |
 | created_at | TIMESTAMPTZ | NOT NULL | |
 | updated_at | TIMESTAMPTZ | NOT NULL | |
 6-8. PK `id`; FK `organization_id`; ON DELETE org CASCADE.
@@ -864,3 +866,35 @@ nunca se reconcilia; recurso cross-org bloqueado (dominio + RLS); auditoría
 inmutable. La migración es estrictamente aditiva (sin DROP/DELETE/TRUNCATE).
 
 | 2026-06-13 | **Cierre runtime APU reconciliation** — `db reset --local` aplica `20260617090000` limpio; harness RLS runtime sección [23] (20 checks) **214/0**; FORCE count confirmado 35. Fix: bulk `_reconcile_apu_component_row(p_allow_replace)` ⇒ `skipped_existing` (no sobrescribe asociaciones existentes). | `20260617090000` (sin nueva migración) | orchestrator |
+
+### APU_MANUAL_BUILDER_V1 + BOQ_ADD_FROM_APU_V1 (2026-06-13)
+
+- **`apu_templates`** += `origin_type TEXT NOT NULL DEFAULT 'workbook_import'`
+  (CHECK in `manual`,`workbook_import`) + `created_by UUID NULL` (FK profiles ON
+  DELETE SET NULL). Aditivo; históricos quedan `workbook_import`/`created_by NULL`.
+- **Tabla nueva `apu_manual_actions`** — auditoría durable + idempotencia de
+  creación manual / alta al BOQ. Columnas: `id`, `organization_id` (FK orgs
+  CASCADE), `action_type` (CHECK `create_manual_apu`,`add_apu_to_boq`),
+  `apu_template_id` (FK SET NULL), `boq_item_id` (FK SET NULL), `initiated_by`
+  (FK profiles RESTRICT), `idempotency_key`, `created_at`, `metadata` JSONB.
+  RLS ENABLE+FORCE; SELECT org-scoped; INSERT org+rol `admin/gerencia/presupuestos`
+  + `initiated_by = app._auth_uid()`; **sin UPDATE/DELETE ⇒ append-only**.
+  Índices: `(org, created_at DESC)`, parcial por `apu_template_id`, UNIQUE parcial
+  `(org, idempotency_key)`.
+- **RPC `public.create_manual_apu(p_header, p_components, p_idempotency_key)`**
+  — SECURITY INVOKER; org/created_by server-side; material: precio = última
+  observación APROBADA del recurso re-resuelta EN SQL (sin precio ⇒ error;
+  cross-org ⇒ error); M.O.: snapshot = costo diario integral del dominio;
+  `total_component_cost` recalculado en SQL; idempotente por (org, key).
+- **RPC `public.add_apu_to_boq(p_estimate_version_id, p_chapter_id,
+  p_apu_template_id, p_quantity, p_idempotency_key)`** — SECURITY INVOKER;
+  versión EDITABLE (issued ⇒ `version_locked`); capítulo ∈ versión; APU ∈ org;
+  costo unitario calculado EN SQL (`Σ total + default_tool_pct × Σ total_labor`,
+  reproduce `calculateApuUnitCostFull`); inserta `boq_items` con
+  `apu_template_id` + snapshot; append (nunca sobrescribe); idempotente.
+- Reglas: NUNCA toca catálogo, AIU, quantities ni exports; snapshots emitidos
+  inmutables; aditivo (sin DROP/DELETE/TRUNCATE). FORCE count 35→**36**.
+
+| Fecha | Cambio | Migración | Autor |
+|-------|--------|-----------|-------|
+| 2026-06-13 | **APU_MANUAL_BUILDER_V1 + BOQ_ADD_FROM_APU_V1** — `apu_templates` +origin_type/created_by; tabla `apu_manual_actions` (append-only, RLS ENABLE+FORCE, unique parcial `(org, idempotency_key)`); RPCs SECURITY INVOKER `create_manual_apu` / `add_apu_to_boq` (FORCE count 35→**36**); harness RLS sección [24] (19 checks) **233/0** | `20260618090000` | orchestrator |
