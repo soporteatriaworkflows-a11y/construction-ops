@@ -108,6 +108,7 @@ export interface ReconcileActionResult {
     | 'reconciled'
     | 'replaced'
     | 'already_reconciled'
+    | 'skipped_existing'
     | 'labor_component'
     | 'not_found'
     | 'resource_not_found';

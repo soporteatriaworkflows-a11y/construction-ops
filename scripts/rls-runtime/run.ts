@@ -178,7 +178,8 @@ async function main(): Promise<void> {
   // + 2 del review center (batches + bulk_actions)
   // + 1 apu_import_batches (FASE 4B.2)
   // + 3 quantity takeoff import (FASE 4B.3: batches/groups/lines) = 34.
-  check('Pre-flight: 34 tablas con RLS FORCE', rlsTables === '34', `rlsTables=${rlsTables}`);
+  // 35 tras APU_COMPONENT_RESOURCE_RECONCILIATION_V1 (+apu_component_resource_actions).
+  check('Pre-flight: 35 tablas con RLS FORCE', rlsTables === '35', `rlsTables=${rlsTables}`);
 
   const [{ count: taskCount }] = await sql<{ count: string }[]>`
     SELECT count(*)::text AS count FROM schedule_tasks WHERE id = ${TASK_A}`;
@@ -2307,6 +2308,210 @@ async function main(): Promise<void> {
   check('qty-import: RLS ENABLE+FORCE en las 3 tablas nuevas',
     qtyForce.length === 3 && qtyForce.every((r) => r.rls && r.force),
     JSON.stringify(qtyForce));
+
+  // ===========================================================================
+  // 23) APU_COMPONENT_RESOURCE_RECONCILIATION_V1 — apu_component_resource_actions
+  //     (auditoría append-only) + RPCs reconcile_apu_component /
+  //     reconcile_apu_components_bulk / update_apu_component_reconciliation.
+  // ===========================================================================
+  console.log('\n=== 23) APU component reconciliation (APU_COMPONENT_RESOURCE_RECONCILIATION_V1) ===');
+
+  // RES_A (MAT-001, org A) ya está declarado arriba (sección 21); se reutiliza.
+  const RES_A2 = '00000000-0000-0000-0000-00000000fb05'; // recurso org A (harness)
+  const APU_TPL_A = '00000000-0000-0000-0000-000000000202'; // APU-002 (seed 0006), org A
+  const LABOR_COMP = '00000000-0000-0000-0000-000000000213'; // componente M.O. (seed 0006)
+  const RES_B_REC = '00000000-0000-0000-0000-00000000fb01'; // recurso org B (harness)
+  const COMP_PENDING = '00000000-0000-0000-0000-00000000fb02';
+  const COMP_ASSOC = '00000000-0000-0000-0000-00000000fb03';
+  const AUDIT_A = '00000000-0000-0000-0000-00000000fb04';
+  const RECON_KEY = 'harness-recon-idem-1';
+
+  // Setup (superusuario): recursos auxiliares + un componente pendiente y uno
+  // asociado en APU-002 (org A). Idempotente; vive solo en la transacción.
+  const reconSetup = async (q: postgres.ReservedSql) => {
+    await q`INSERT INTO resources (id, organization_id, code, name, resource_type, unit)
+      VALUES (${RES_A2}, ${ORG_A}, 'MAT-A2-REC', 'Material A2 recon', 'material', 'm2')
+      ON CONFLICT (id) DO NOTHING`;
+    await q`INSERT INTO resources (id, organization_id, code, name, resource_type, unit)
+      VALUES (${RES_B_REC}, ${ORG_B}, 'MAT-B-REC', 'Material B recon', 'material', 'm2')
+      ON CONFLICT (id) DO NOTHING`;
+    await q`INSERT INTO apu_components
+      (id, apu_template_id, resource_id, labor_role_id, component_type, quantity, waste_pct,
+       unit_price_source, unit_price_snapshot, total_component_cost, sort_order, raw_code, raw_unit,
+       notes, reconciliation_state)
+      VALUES (${COMP_PENDING}, ${APU_TPL_A}, NULL, NULL, 'material', 2, 0, 'manual', 100, 200, 20,
+       'RAWX', 'm2', 'Sin asociar al catálogo: "Material pendiente"', 'pending')
+      ON CONFLICT (id) DO NOTHING`;
+    await q`INSERT INTO apu_components
+      (id, apu_template_id, resource_id, labor_role_id, component_type, quantity, waste_pct,
+       unit_price_source, unit_price_snapshot, total_component_cost, sort_order, reconciliation_state)
+      VALUES (${COMP_ASSOC}, ${APU_TPL_A}, ${RES_A}, NULL, 'material', 1, 0, 'resource', 50, 50, 21,
+       'associated')
+      ON CONFLICT (id) DO NOTHING`;
+  };
+
+  // 23a) RLS ENABLE + FORCE en la tabla de auditoría.
+  const recForce = await sql<{ relname: string; rls: boolean; force: boolean }[]>`
+    SELECT relname, relrowsecurity AS rls, relforcerowsecurity AS force
+    FROM pg_class WHERE relname = 'apu_component_resource_actions'`;
+  check('recon: RLS ENABLE+FORCE en apu_component_resource_actions',
+    recForce.length === 1 && recForce.every((r) => r.rls && r.force), JSON.stringify(recForce));
+
+  // 23b) admin A asocia componente pendiente vía RPC; total recalculado;
+  //      idempotencia por (org, key) ⇒ una sola fila de auditoría; org del actor.
+  const recRpc = await asUser(realA, async (q) => {
+    const [r1] = await q<{ res: { status: string; resourceId: string } }[]>`
+      SELECT public.reconcile_apu_component(${COMP_PENDING}, ${RES_A}, true, ${RECON_KEY}) AS res`;
+    const [r2] = await q<{ res: { status: string } }[]>`
+      SELECT public.reconcile_apu_component(${COMP_PENDING}, ${RES_A}, true, ${RECON_KEY}) AS res`;
+    const [comp] = await q<{ resource_id: string; reconciliation_state: string; total_component_cost: string }[]>`
+      SELECT resource_id, reconciliation_state, total_component_cost FROM apu_components WHERE id = ${COMP_PENDING}`;
+    const [{ count }] = await q<{ count: string }[]>`
+      SELECT count(*)::text AS count FROM apu_component_resource_actions WHERE idempotency_key = ${RECON_KEY}`;
+    const [audit] = await q<{ organization_id: string }[]>`
+      SELECT organization_id FROM apu_component_resource_actions WHERE idempotency_key = ${RECON_KEY} LIMIT 1`;
+    return { r1: r1!.res, r2: r2!.res, comp: comp!, count, audit: audit! };
+  }, reconSetup);
+  check('recon: admin A asocia componente pendiente (status reconciled)',
+    recRpc.r1.status === 'reconciled' && recRpc.comp.resource_id === RES_A);
+  check('recon: total recalculado server-side (2×100=200)', Number(recRpc.comp.total_component_cost) === 200);
+  check('recon: idempotencia por key (1 sola fila de auditoría)', recRpc.count === '1', `count=${recRpc.count}`);
+  check('recon: 2ª llamada idempotente devuelve el mismo resultado', recRpc.r2.status === 'reconciled');
+  check('recon: componente reconciliado preserva la organización del actor (A)',
+    recRpc.audit.organization_id === ORG_A);
+
+  // 23c) rol obra (site) bloqueado en la RPC (insufficient_role).
+  let recObraBlocked = false;
+  await asUser(realAObra, async (q) => {
+    await q.unsafe('SAVEPOINT sp_rec_obra');
+    try {
+      await q`SELECT public.reconcile_apu_component(${COMP_PENDING}, ${RES_A}, true, NULL)`;
+    } catch {
+      recObraBlocked = true;
+      await q.unsafe('ROLLBACK TO SAVEPOINT sp_rec_obra');
+    }
+  }, reconSetup);
+  check('recon: rol obra (site) bloqueado en la RPC (insufficient_role)', recObraBlocked);
+
+  // 23d) cross-org: admin A no puede asociar un recurso de org B (resource_not_found).
+  const recCross = await asUser(realA, async (q) => {
+    const [r] = await q<{ res: { status: string } }[]>`
+      SELECT public.reconcile_apu_component(${COMP_PENDING}, ${RES_B_REC}, true, NULL) AS res`;
+    const [comp] = await q<{ resource_id: string | null }[]>`
+      SELECT resource_id FROM apu_components WHERE id = ${COMP_PENDING}`;
+    return { res: r!.res, comp: comp! };
+  }, reconSetup);
+  check('recon: cross-org recurso B bloqueado (resource_not_found, sin asociar)',
+    recCross.res.status === 'resource_not_found' && recCross.comp.resource_id === null);
+
+  // 23e) aislamiento SELECT: B NO ve la auditoría de A.
+  const recIso = await asUser(realB, async (q) => {
+    const rows = await q<{ id: string }[]>`
+      SELECT id FROM apu_component_resource_actions WHERE organization_id = ${ORG_A}`;
+    return rows.length;
+  }, async (q) => {
+    await reconSetup(q);
+    await q`INSERT INTO apu_component_resource_actions
+      (id, organization_id, action_type, apu_component_id, resource_id, initiated_by, metadata)
+      VALUES (${AUDIT_A}, ${ORG_A}, 'associate', ${COMP_PENDING}, ${RES_A}, ${USER_A_ADMIN}, '{}'::jsonb)
+      ON CONFLICT (id) DO NOTHING`;
+  });
+  check('recon: B NO ve auditoría de A (aislamiento SELECT)', recIso === 0, `n=${recIso}`);
+
+  // 23f) auditoría INMUTABLE: UPDATE/DELETE sin política ⇒ 0 filas (no DELETE físico).
+  const recImmutable = await asUser(realA, async (q) => {
+    const upd = await q`UPDATE apu_component_resource_actions SET skipped_count = 99 WHERE id = ${AUDIT_A}`;
+    const del = await q`DELETE FROM apu_component_resource_actions WHERE id = ${AUDIT_A}`;
+    const [{ count }] = await q<{ count: string }[]>`
+      SELECT count(*)::text AS count FROM apu_component_resource_actions WHERE id = ${AUDIT_A}`;
+    return { upd: upd.count, del: del.count, count };
+  }, async (q) => {
+    await reconSetup(q);
+    await q`INSERT INTO apu_component_resource_actions
+      (id, organization_id, action_type, apu_component_id, resource_id, initiated_by, metadata)
+      VALUES (${AUDIT_A}, ${ORG_A}, 'associate', ${COMP_PENDING}, ${RES_A}, ${USER_A_ADMIN}, '{}'::jsonb)
+      ON CONFLICT (id) DO NOTHING`;
+  });
+  check('recon: auditoría INMUTABLE (UPDATE denegado, 0 filas)', recImmutable.upd === 0, `upd=${recImmutable.upd}`);
+  check('recon: auditoría INMUTABLE (DELETE denegado, 0 filas)', recImmutable.del === 0, `del=${recImmutable.del}`);
+  check('recon: sin DELETE físico (fila de auditoría intacta)', recImmutable.count === '1');
+
+  // 23g) INSERT autorizado admin A; rol obra bloqueado (WITH CHECK rol).
+  const recInsert = await asUser(realA, async (q) => {
+    const ins = await q`INSERT INTO apu_component_resource_actions
+      (organization_id, action_type, apu_component_id, resource_id, initiated_by, metadata)
+      VALUES (${ORG_A}, 'associate', ${COMP_PENDING}, ${RES_A}, ${USER_A_ADMIN}, '{}'::jsonb)`;
+    return ins.count;
+  }, reconSetup);
+  check('recon: INSERT auditoría autorizado para admin A', recInsert === 1);
+
+  let recInsObra = false;
+  await asUser(realAObra, async (q) => {
+    await q.unsafe('SAVEPOINT sp_rec_ins_obra');
+    try {
+      await q`INSERT INTO apu_component_resource_actions
+        (organization_id, action_type, initiated_by, metadata)
+        VALUES (${ORG_A}, 'associate', ${USER_A_OBRA}, '{}'::jsonb)`;
+    } catch {
+      recInsObra = true;
+      await q.unsafe('ROLLBACK TO SAVEPOINT sp_rec_ins_obra');
+    }
+  });
+  check('recon: rol obra (site/client) NO inserta auditoría (WITH CHECK rol)', recInsObra);
+
+  // 23h) cross-org INSERT auditoría (org B desde sesión A) bloqueado.
+  let recCrossIns = false;
+  await asUser(realA, async (q) => {
+    await q.unsafe('SAVEPOINT sp_rec_xorg');
+    try {
+      await q`INSERT INTO apu_component_resource_actions
+        (organization_id, action_type, initiated_by, metadata)
+        VALUES (${ORG_B}, 'associate', ${USER_A_ADMIN}, '{}'::jsonb)`;
+    } catch {
+      recCrossIns = true;
+      await q.unsafe('ROLLBACK TO SAVEPOINT sp_rec_xorg');
+    }
+  });
+  check('recon: cross-org INSERT auditoría (org B desde A) bloqueado', recCrossIns);
+
+  // 23i) bulk asocia el pendiente y NO sobrescribe la asociación existente.
+  const recBulk = await asUser(realA, async (q) => {
+    const pairs = [
+      { componentId: COMP_PENDING, resourceId: RES_A },
+      { componentId: COMP_ASSOC, resourceId: RES_A2 }, // ya asociado a RES_A ⇒ skip
+    ];
+    const [r] = await q<{ res: { succeeded: number; skipped: number } }[]>`
+      SELECT public.reconcile_apu_components_bulk(${sql.json(pairs)}, true, NULL) AS res`;
+    const [assoc] = await q<{ resource_id: string }[]>`
+      SELECT resource_id FROM apu_components WHERE id = ${COMP_ASSOC}`;
+    return { res: r!.res, assoc: assoc! };
+  }, reconSetup);
+  check('recon: bulk asocia 1 y NO sobrescribe la existente (skipped_existing)',
+    recBulk.res.succeeded === 1 && recBulk.res.skipped === 1, JSON.stringify(recBulk.res));
+  check('recon: asociación existente preservada (sin reemplazo silencioso)',
+    recBulk.assoc.resource_id === RES_A);
+
+  // 23j) update: clear desasocia (pending); reject ⇒ intentionally_unresolved.
+  const recUpdate = await asUser(realA, async (q) => {
+    await q`SELECT public.update_apu_component_reconciliation(${COMP_ASSOC}, 'clear', NULL)`;
+    const [aClear] = await q<{ resource_id: string | null; reconciliation_state: string }[]>`
+      SELECT resource_id, reconciliation_state FROM apu_components WHERE id = ${COMP_ASSOC}`;
+    await q`SELECT public.update_apu_component_reconciliation(${COMP_PENDING}, 'reject', NULL)`;
+    const [aReject] = await q<{ reconciliation_state: string }[]>`
+      SELECT reconciliation_state FROM apu_components WHERE id = ${COMP_PENDING}`;
+    return { aClear: aClear!, aReject: aReject! };
+  }, reconSetup);
+  check('recon: clear desasocia (resource_id NULL, state pending)',
+    recUpdate.aClear.resource_id === null && recUpdate.aClear.reconciliation_state === 'pending');
+  check('recon: reject ⇒ intentionally_unresolved', recUpdate.aReject.reconciliation_state === 'intentionally_unresolved');
+
+  // 23k) componente de M.O. nunca se reconcilia (labor_component).
+  const recLabor = await asUser(realA, async (q) => {
+    const [r] = await q<{ res: { status: string } }[]>`
+      SELECT public.reconcile_apu_component(${LABOR_COMP}, ${RES_A}, true, NULL) AS res`;
+    return r!.res;
+  });
+  check('recon: componente M.O. no reconciliable (labor_component)', recLabor.status === 'labor_component');
 
   // --- Resumen ---
   console.log(`\nRESULTADO RLS RUNTIME: ${pass} PASS / ${fail} FAIL`);

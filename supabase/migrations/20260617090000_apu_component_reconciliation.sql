@@ -136,7 +136,8 @@ CREATE OR REPLACE FUNCTION public._reconcile_apu_component_row(
   p_resource_id   uuid,
   p_keep_snapshot boolean,
   p_org           uuid,
-  p_uid           uuid
+  p_uid           uuid,
+  p_allow_replace boolean DEFAULT true
 )
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -182,6 +183,16 @@ BEGIN
     RETURN jsonb_build_object(
       'componentId', p_component_id, 'resourceId', p_resource_id,
       'status', 'already_reconciled', 'previousResourceId', v_prev_res
+    );
+  END IF;
+
+  -- No sobrescribir una asociación existente cuando no se permite reemplazo
+  -- (camino bulk, contrato §8: "no sobrescribir asociaciones existentes").
+  -- El reemplazo explícito solo es válido en la acción individual (contrato §10).
+  IF v_prev_res IS NOT NULL AND p_allow_replace = false THEN
+    RETURN jsonb_build_object(
+      'componentId', p_component_id, 'resourceId', v_prev_res,
+      'status', 'skipped_existing', 'previousResourceId', v_prev_res
     );
   END IF;
 
@@ -333,7 +344,7 @@ BEGIN
     v_row := public._reconcile_apu_component_row(
       NULLIF(v_pair->>'componentId','')::uuid,
       NULLIF(v_pair->>'resourceId','')::uuid,
-      p_keep_snapshot, v_org, v_uid
+      p_keep_snapshot, v_org, v_uid, false  -- bulk NO sobrescribe asociaciones.
     );
     IF v_row->>'status' IN ('reconciled', 'replaced', 'already_reconciled') THEN
       v_succeeded := v_succeeded + 1;
@@ -460,7 +471,7 @@ END;
 $$;
 
 -- Permisos: solo authenticated puede ejecutar; anon revocado.
-REVOKE ALL ON FUNCTION public._reconcile_apu_component_row(uuid, uuid, boolean, uuid, uuid) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public._reconcile_apu_component_row(uuid, uuid, boolean, uuid, uuid, boolean) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.reconcile_apu_component(uuid, uuid, boolean, text) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.reconcile_apu_components_bulk(jsonb, boolean, text) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.update_apu_component_reconciliation(uuid, text, text) FROM PUBLIC, anon;
@@ -474,7 +485,7 @@ GRANT EXECUTE ON FUNCTION public.update_apu_component_reconciliation(uuid, text,
 -- DROP FUNCTION IF EXISTS public.update_apu_component_reconciliation(uuid, text, text);
 -- DROP FUNCTION IF EXISTS public.reconcile_apu_components_bulk(jsonb, boolean, text);
 -- DROP FUNCTION IF EXISTS public.reconcile_apu_component(uuid, uuid, boolean, text);
--- DROP FUNCTION IF EXISTS public._reconcile_apu_component_row(uuid, uuid, boolean, uuid, uuid);
+-- DROP FUNCTION IF EXISTS public._reconcile_apu_component_row(uuid, uuid, boolean, uuid, uuid, boolean);
 -- DROP TABLE IF EXISTS apu_component_resource_actions;
 -- DROP INDEX IF EXISTS apu_components_unresolved_idx;
 -- DROP TRIGGER IF EXISTS apu_components_recompute_total ON public.apu_components;
