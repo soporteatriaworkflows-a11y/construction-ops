@@ -179,7 +179,8 @@ async function main(): Promise<void> {
   // + 1 apu_import_batches (FASE 4B.2)
   // + 3 quantity takeoff import (FASE 4B.3: batches/groups/lines) = 34.
   // 35 tras APU_COMPONENT_RESOURCE_RECONCILIATION_V1 (+apu_component_resource_actions).
-  check('Pre-flight: 35 tablas con RLS FORCE', rlsTables === '35', `rlsTables=${rlsTables}`);
+  // 36 tras APU_MANUAL_BUILDER_V1 + BOQ_ADD_FROM_APU_V1 (+apu_manual_actions).
+  check('Pre-flight: 36 tablas con RLS FORCE', rlsTables === '36', `rlsTables=${rlsTables}`);
 
   const [{ count: taskCount }] = await sql<{ count: string }[]>`
     SELECT count(*)::text AS count FROM schedule_tasks WHERE id = ${TASK_A}`;
@@ -2512,6 +2513,284 @@ async function main(): Promise<void> {
     return r!.res;
   });
   check('recon: componente M.O. no reconciliable (labor_component)', recLabor.status === 'labor_component');
+
+  // ===========================================================================
+  // 24) APU manual builder + BOQ add (APU_MANUAL_BUILDER_V1 + BOQ_ADD_FROM_APU_V1)
+  //     RPCs create_manual_apu / add_apu_to_boq (SECURITY INVOKER).
+  // ===========================================================================
+  console.log('\n=== 24) APU manual builder + BOQ add (APU_MANUAL_BUILDER_V1 + BOQ_ADD_FROM_APU_V1) ===');
+
+  const MB_RES = '00000000-0000-0000-0000-00000000fc01'; // material org A con precio aprobado
+  const MB_RES_NOPRICE = '00000000-0000-0000-0000-00000000fc02'; // material org A sin precio
+  const MB_RES_B = '00000000-0000-0000-0000-00000000fc03'; // material org B
+  const MB_ROLE = '00000000-0000-0000-0000-00000000fc04'; // rol M.O. org A
+  const MB_APU_A = '00000000-0000-0000-0000-00000000fc05'; // APU org A (tool 0.1)
+  const MB_APU_B = '00000000-0000-0000-0000-00000000fc06'; // APU org B
+  const MB_EST = '00000000-0000-0000-0000-00000000fc07';
+  const MB_VER_DRAFT = '00000000-0000-0000-0000-00000000fc08';
+  const MB_VER_ISSUED = '00000000-0000-0000-0000-00000000fc09';
+  const MB_CHAP = '00000000-0000-0000-0000-00000000fc0a'; // capítulo en versión draft
+  const MB_CHAP_ISS = '00000000-0000-0000-0000-00000000fc0b'; // capítulo en versión issued
+  const MB_AUDIT_A = '00000000-0000-0000-0000-00000000fc0c';
+  const MB_KEY_CREATE = 'harness-mb-create-1';
+  const MB_KEY_ADD = 'harness-mb-add-1';
+
+  const mbSetup = async (q: postgres.ReservedSql) => {
+    await q`INSERT INTO resources (id, organization_id, code, name, resource_type, unit)
+      VALUES (${MB_RES}, ${ORG_A}, 'MB-MAT-A', 'Material MB A', 'material', 'm2'),
+             (${MB_RES_NOPRICE}, ${ORG_A}, 'MB-MAT-NP', 'Material sin precio', 'material', 'm2'),
+             (${MB_RES_B}, ${ORG_B}, 'MB-MAT-B', 'Material MB B', 'material', 'm2')
+      ON CONFLICT (id) DO NOTHING`;
+    // Observación APROBADA para MB_RES (org A, precio 100) y MB_RES_B (org B, 999).
+    await q`INSERT INTO resource_price_observations
+      (organization_id, resource_id, observed_price, suggested_net_price, unit, source_type,
+       observed_at, status, created_by, approved_by, approved_at)
+      VALUES
+      (${ORG_A}, ${MB_RES}, 100, 100, 'm2', 'manual', now(), 'approved', ${USER_A_ADMIN}, ${USER_A_ADMIN}, now()),
+      (${ORG_B}, ${MB_RES_B}, 999, 999, 'm2', 'manual', now(), 'approved', ${USER_B_ADMIN}, ${USER_B_ADMIN}, now())
+      ON CONFLICT DO NOTHING`;
+    await q`INSERT INTO labor_roles
+      (id, organization_id, code, name, base_salary, working_days_month, working_hours_day)
+      VALUES (${MB_ROLE}, ${ORG_A}, 'MB-OFICIAL', 'Oficial MB', 1000000, 30, 8)
+      ON CONFLICT (id) DO NOTHING`;
+    // APU org A con tool 0.1 y componentes (material total 200 + labor total 1000).
+    await q`INSERT INTO apu_templates (id, organization_id, code, name, unit, default_tool_pct, origin_type, active)
+      VALUES (${MB_APU_A}, ${ORG_A}, 'MB-APU-A', 'Actividad MB A', 'm2', 0.1, 'manual', true)
+      ON CONFLICT (id) DO NOTHING`;
+    await q`INSERT INTO apu_components
+      (apu_template_id, resource_id, labor_role_id, component_type, quantity, waste_pct,
+       unit_price_source, unit_price_snapshot, total_component_cost, sort_order)
+      VALUES
+      (${MB_APU_A}, ${MB_RES}, NULL, 'material', 2, 0, 'resource', 100, 200, 0),
+      (${MB_APU_A}, NULL, ${MB_ROLE}, 'labor', 1, 0, 'labor_role', 1000, 1000, 1)
+      ON CONFLICT DO NOTHING`;
+    await q`INSERT INTO apu_templates (id, organization_id, code, name, unit, origin_type, active)
+      VALUES (${MB_APU_B}, ${ORG_B}, 'MB-APU-B', 'Actividad MB B', 'm2', 'manual', true)
+      ON CONFLICT (id) DO NOTHING`;
+    // Presupuesto + versión draft (editable) + versión issued (bloqueada) + capítulos.
+    await q`INSERT INTO estimates (id, project_scope_id, code, name, status)
+      VALUES (${MB_EST}, ${SCOPE_A}, 'MB-EST', 'Presupuesto MB', 'active')
+      ON CONFLICT (id) DO NOTHING`;
+    await q`INSERT INTO estimate_versions (id, estimate_id, version_number, status)
+      VALUES (${MB_VER_DRAFT}, ${MB_EST}, 1, 'draft'),
+             (${MB_VER_ISSUED}, ${MB_EST}, 2, 'issued')
+      ON CONFLICT (id) DO NOTHING`;
+    await q`INSERT INTO chapters (id, estimate_version_id, code, name, sort_order)
+      VALUES (${MB_CHAP}, ${MB_VER_DRAFT}, '01', 'Capítulo MB', 0),
+             (${MB_CHAP_ISS}, ${MB_VER_ISSUED}, '01', 'Capítulo MB issued', 0)
+      ON CONFLICT (id) DO NOTHING`;
+    // Fila de auditoría persistente (aislamiento cross-org).
+    await q`INSERT INTO apu_manual_actions (id, organization_id, action_type, apu_template_id, initiated_by)
+      VALUES (${MB_AUDIT_A}, ${ORG_A}, 'create_manual_apu', ${MB_APU_A}, ${USER_A_ADMIN})
+      ON CONFLICT (id) DO NOTHING`;
+  };
+
+  // 24a) RLS ENABLE+FORCE en apu_manual_actions.
+  const mbForce = await sql<{ relname: string; rls: boolean; force: boolean }[]>`
+    SELECT relname, relrowsecurity AS rls, relforcerowsecurity AS force
+    FROM pg_class WHERE relname = 'apu_manual_actions'`;
+  check('mb: RLS ENABLE+FORCE en apu_manual_actions',
+    mbForce.length === 1 && mbForce.every((r) => r.rls && r.force), sql.json(mbForce));
+
+  // 24b) create_manual_apu: admin A crea APU manual; precio de material resuelto
+  //      server-side (100) ⇒ total 200; labor total 1000; origen + autoría.
+  const mbCreate = await asUser(realA, async (q) => {
+    const [r] = await q<{ res: { apuTemplateId: string; componentCount: number } }[]>`
+      SELECT public.create_manual_apu(
+        ${sql.json({ code: 'MB-NEW-1', name: 'APU manual nuevo', unit: 'm2', defaultToolPct: 0.05 })},
+        ${sql.json([
+          { componentType: 'material', resourceId: MB_RES, quantity: '2', wastePct: '0' },
+          { componentType: 'labor', laborRoleId: MB_ROLE, quantity: '1', wastePct: '0', unitPriceSnapshot: '1000' },
+        ])},
+        ${MB_KEY_CREATE}
+      ) AS res`;
+    const tplId = r!.res.apuTemplateId;
+    const [tpl] = await q<{ origin_type: string; created_by: string | null }[]>`
+      SELECT origin_type, created_by FROM apu_templates WHERE id = ${tplId}`;
+    const comps = await q<{ component_type: string; total_component_cost: string; unit_price_snapshot: string }[]>`
+      SELECT component_type, total_component_cost, unit_price_snapshot
+      FROM apu_components WHERE apu_template_id = ${tplId} ORDER BY sort_order`;
+    return { res: r!.res, tpl: tpl!, comps };
+  }, mbSetup);
+  const mbMat = mbCreate.comps.find((c) => c.component_type === 'material');
+  check('mb: create_manual_apu crea plantilla con 2 componentes', mbCreate.res.componentCount === 2);
+  check('mb: origin_type=manual + created_by=actor (server-side)',
+    mbCreate.tpl.origin_type === 'manual' && mbCreate.tpl.created_by === USER_A_ADMIN);
+  check('mb: precio de material resuelto server-side (snapshot=100, total=200)',
+    !!mbMat && Number(mbMat.unit_price_snapshot) === 100 && Number(mbMat.total_component_cost) === 200);
+
+  // 24c) create_manual_apu: material sin precio aprobado ⇒ error (no inventa precio).
+  let mbNoPrice = false;
+  await asUser(realA, async (q) => {
+    await q.unsafe('SAVEPOINT sp_mb_np');
+    try {
+      await q`SELECT public.create_manual_apu(
+        ${sql.json({ code: 'MB-NP', name: 'x', unit: 'm2', defaultToolPct: 0 })},
+        ${sql.json([{ componentType: 'material', resourceId: MB_RES_NOPRICE, quantity: '1', wastePct: '0' }])},
+        NULL)`;
+    } catch {
+      mbNoPrice = true;
+      await q.unsafe('ROLLBACK TO SAVEPOINT sp_mb_np');
+    }
+  }, mbSetup);
+  check('mb: material sin precio aprobado bloqueado (resource_no_approved_price)', mbNoPrice);
+
+  // 24d) create_manual_apu: recurso de otra org ⇒ bloqueado (sin precio en la org A).
+  let mbCrossRes = false;
+  await asUser(realA, async (q) => {
+    await q.unsafe('SAVEPOINT sp_mb_xr');
+    try {
+      await q`SELECT public.create_manual_apu(
+        ${sql.json({ code: 'MB-XR', name: 'x', unit: 'm2', defaultToolPct: 0 })},
+        ${sql.json([{ componentType: 'material', resourceId: MB_RES_B, quantity: '1', wastePct: '0' }])},
+        NULL)`;
+    } catch {
+      mbCrossRes = true;
+      await q.unsafe('ROLLBACK TO SAVEPOINT sp_mb_xr');
+    }
+  }, mbSetup);
+  check('mb: recurso cross-org bloqueado en create_manual_apu', mbCrossRes);
+
+  // 24e) create_manual_apu: rol obra (site) bloqueado.
+  let mbCreateObra = false;
+  await asUser(realAObra, async (q) => {
+    await q.unsafe('SAVEPOINT sp_mb_obra');
+    try {
+      await q`SELECT public.create_manual_apu(
+        ${sql.json({ code: 'MB-OB', name: 'x', unit: 'm2', defaultToolPct: 0 })},
+        ${sql.json([{ componentType: 'material', resourceId: MB_RES, quantity: '1', wastePct: '0' }])},
+        NULL)`;
+    } catch {
+      mbCreateObra = true;
+      await q.unsafe('ROLLBACK TO SAVEPOINT sp_mb_obra');
+    }
+  }, mbSetup);
+  check('mb: rol obra (site) bloqueado en create_manual_apu', mbCreateObra);
+
+  // 24f) create_manual_apu: idempotencia por (org, key) ⇒ 1 plantilla, 1 auditoría.
+  const mbIdem = await asUser(realA, async (q) => {
+    const [r1] = await q<{ res: { apuTemplateId: string } }[]>`
+      SELECT public.create_manual_apu(
+        ${sql.json({ code: 'MB-IDEM', name: 'idem', unit: 'm2', defaultToolPct: 0 })},
+        ${sql.json([{ componentType: 'material', resourceId: MB_RES, quantity: '1', wastePct: '0' }])},
+        ${MB_KEY_CREATE + '-x'}) AS res`;
+    const [r2] = await q<{ res: { apuTemplateId: string } }[]>`
+      SELECT public.create_manual_apu(
+        ${sql.json({ code: 'MB-IDEM', name: 'idem', unit: 'm2', defaultToolPct: 0 })},
+        ${sql.json([{ componentType: 'material', resourceId: MB_RES, quantity: '1', wastePct: '0' }])},
+        ${MB_KEY_CREATE + '-x'}) AS res`;
+    const [{ count }] = await q<{ count: string }[]>`
+      SELECT count(*)::text AS count FROM apu_templates WHERE organization_id = ${ORG_A} AND code = 'MB-IDEM'`;
+    return { same: r1!.res.apuTemplateId === r2!.res.apuTemplateId, count };
+  }, mbSetup);
+  check('mb: create idempotente por key (mismo id, 1 sola plantilla)',
+    mbIdem.same && mbIdem.count === '1', `count=${mbIdem.count}`);
+
+  // 24g) add_apu_to_boq: admin A agrega APU a versión editable; snapshot=1300
+  //      (200 + 1000 + 0.1×1000), subtotal=3×1300=3900; apu_template_id asignado.
+  const mbAdd = await asUser(realA, async (q) => {
+    const [r] = await q<{ res: { boqItemId: string; unitPrice: string; subtotal: string } }[]>`
+      SELECT public.add_apu_to_boq(${MB_VER_DRAFT}, ${MB_CHAP}, ${MB_APU_A}, 3, ${MB_KEY_ADD}) AS res`;
+    const [item] = await q<{ apu_template_id: string; unit_price_snapshot: string; subtotal: string }[]>`
+      SELECT apu_template_id, unit_price_snapshot, subtotal FROM boq_items WHERE id = ${r!.res.boqItemId}`;
+    // Costo unitario esperado por la fórmula del dominio (defensa: igualdad SQL).
+    const [{ expected }] = await q<{ expected: string }[]>`
+      SELECT round(
+        COALESCE(SUM(total_component_cost),0)
+        + (SELECT default_tool_pct FROM apu_templates WHERE id = ${MB_APU_A})
+          * COALESCE(SUM(total_component_cost) FILTER (WHERE component_type='labor'),0), 10)::text AS expected
+      FROM apu_components WHERE apu_template_id = ${MB_APU_A}`;
+    return { res: r!.res, item: item!, expected };
+  }, mbSetup);
+  check('mb: add_apu_to_boq crea ítem con apu_template_id', mbAdd.item.apu_template_id === MB_APU_A);
+  check('mb: snapshot unit_price server-side = 1300', Number(mbAdd.item.unit_price_snapshot) === 1300);
+  check('mb: subtotal server-side = 3×1300 = 3900', Number(mbAdd.item.subtotal) === 3900);
+  check('mb: unit_price RPC == fórmula del dominio (defensa en profundidad)',
+    Number(mbAdd.res.unitPrice) === Number(mbAdd.expected));
+
+  // 24h) add_apu_to_boq: versión emitida bloqueada (version_locked).
+  let mbIssued = false;
+  await asUser(realA, async (q) => {
+    await q.unsafe('SAVEPOINT sp_mb_iss');
+    try {
+      await q`SELECT public.add_apu_to_boq(${MB_VER_ISSUED}, ${MB_CHAP_ISS}, ${MB_APU_A}, 1, NULL)`;
+    } catch {
+      mbIssued = true;
+      await q.unsafe('ROLLBACK TO SAVEPOINT sp_mb_iss');
+    }
+  }, mbSetup);
+  check('mb: add_apu_to_boq bloquea versión emitida (version_locked)', mbIssued);
+
+  // 24i) add_apu_to_boq: capítulo de otra versión ⇒ chapter_not_in_version.
+  let mbChapMismatch = false;
+  await asUser(realA, async (q) => {
+    await q.unsafe('SAVEPOINT sp_mb_ch');
+    try {
+      await q`SELECT public.add_apu_to_boq(${MB_VER_DRAFT}, ${MB_CHAP_ISS}, ${MB_APU_A}, 1, NULL)`;
+    } catch {
+      mbChapMismatch = true;
+      await q.unsafe('ROLLBACK TO SAVEPOINT sp_mb_ch');
+    }
+  }, mbSetup);
+  check('mb: capítulo fuera de la versión bloqueado (chapter_not_in_version)', mbChapMismatch);
+
+  // 24j) add_apu_to_boq: APU de otra org ⇒ apu_not_found.
+  let mbCrossApu = false;
+  await asUser(realA, async (q) => {
+    await q.unsafe('SAVEPOINT sp_mb_xa');
+    try {
+      await q`SELECT public.add_apu_to_boq(${MB_VER_DRAFT}, ${MB_CHAP}, ${MB_APU_B}, 1, NULL)`;
+    } catch {
+      mbCrossApu = true;
+      await q.unsafe('ROLLBACK TO SAVEPOINT sp_mb_xa');
+    }
+  }, mbSetup);
+  check('mb: APU cross-org bloqueado en add_apu_to_boq (apu_not_found)', mbCrossApu);
+
+  // 24k) add_apu_to_boq: idempotencia ⇒ un solo ítem BOQ.
+  const mbAddIdem = await asUser(realA, async (q) => {
+    await q`SELECT public.add_apu_to_boq(${MB_VER_DRAFT}, ${MB_CHAP}, ${MB_APU_A}, 5, ${MB_KEY_ADD + '-y'})`;
+    await q`SELECT public.add_apu_to_boq(${MB_VER_DRAFT}, ${MB_CHAP}, ${MB_APU_A}, 5, ${MB_KEY_ADD + '-y'})`;
+    const [{ count }] = await q<{ count: string }[]>`
+      SELECT count(*)::text AS count FROM boq_items
+      WHERE chapter_id = ${MB_CHAP} AND apu_template_id = ${MB_APU_A} AND quantity_snapshot = 5`;
+    return count;
+  }, mbSetup);
+  check('mb: add idempotente por key (1 solo ítem BOQ)', mbAddIdem === '1', `count=${mbAddIdem}`);
+
+  // 24l) add_apu_to_boq: rol obra (site) bloqueado.
+  let mbAddObra = false;
+  await asUser(realAObra, async (q) => {
+    await q.unsafe('SAVEPOINT sp_mb_addob');
+    try {
+      await q`SELECT public.add_apu_to_boq(${MB_VER_DRAFT}, ${MB_CHAP}, ${MB_APU_A}, 1, NULL)`;
+    } catch {
+      mbAddObra = true;
+      await q.unsafe('ROLLBACK TO SAVEPOINT sp_mb_addob');
+    }
+  }, mbSetup);
+  check('mb: rol obra (site) bloqueado en add_apu_to_boq', mbAddObra);
+
+  // 24m) Aislamiento cross-org de apu_manual_actions: B no ve la auditoría de A.
+  const mbIsoB = await asUser(realB, async (q) => {
+    const [{ count }] = await q<{ count: string }[]>`
+      SELECT count(*)::text AS count FROM apu_manual_actions WHERE id = ${MB_AUDIT_A}`;
+    return count;
+  }, mbSetup);
+  const mbIsoA = await asUser(realA, async (q) => {
+    const [{ count }] = await q<{ count: string }[]>`
+      SELECT count(*)::text AS count FROM apu_manual_actions WHERE id = ${MB_AUDIT_A}`;
+    return count;
+  }, mbSetup);
+  check('mb: apu_manual_actions aislada por organización (B no ve, A sí)',
+    mbIsoB === '0' && mbIsoA === '1', `B=${mbIsoB} A=${mbIsoA}`);
+
+  // 24n) apu_manual_actions es append-only: UPDATE no afecta filas (sin policy UPDATE).
+  const mbAppendOnly = await asUser(realA, async (q) => {
+    const res = await q`UPDATE apu_manual_actions SET action_type = 'add_apu_to_boq' WHERE id = ${MB_AUDIT_A}`;
+    return res.count;
+  }, mbSetup);
+  check('mb: apu_manual_actions append-only (UPDATE no afecta filas)', mbAppendOnly === 0, `affected=${mbAppendOnly}`);
 
   // --- Resumen ---
   console.log(`\nRESULTADO RLS RUNTIME: ${pass} PASS / ${fail} FAIL`);
