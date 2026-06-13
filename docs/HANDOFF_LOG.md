@@ -1,5 +1,34 @@
 # Handoff Log
 
+## 2026-06-13 — RELEASE: APU_COMPONENT_RESOURCE_RECONCILIATION_V1 + APU_LIBRARY_OPERATIONAL_UX_V1 (orchestrator, release controlado)
+
+### Estado
+- **RELEASED.** `origin/main = 03c59c1` (merge commit `--no-ff`). Tag `apu-resource-reconciliation-library-ux-release-v1`.
+- 1 migración aplicada remotamente: `20260617090000_apu_component_reconciliation.sql`.
+  - Columnas aditivas `apu_components`: `updated_at`, `reconciliation_state` (CHECK), `reconciled_by`.
+  - Triggers BEFORE UPDATE: `set_updated_at` + `recompute_total` (cierra R-01).
+  - Índice parcial `apu_components_unresolved_idx`.
+  - Tabla nueva `apu_component_resource_actions` (RLS ENABLE+FORCE, auditoría inmutable, idempotencia unique parcial).
+  - 3 RPCs SECURITY INVOKER: `reconcile_apu_component`, `reconcile_apu_components_bulk` (máx 50, `p_allow_replace=false`), `update_apu_component_reconciliation`. Guard: admin/gerencia/presupuestos.
+- Rutas nuevas: `/apu` (biblioteca compacta), `/apu/[id]` (pestañas), `/apu/reconciliation` (centro).
+- Smoke productivo: `/login` 200, rutas protegidas 307 (auth guard), `/api/cron/price-monitor` 401. Sin 500.
+- db lint: 1 warning extra (`v_res` never read — no bloqueante, lógica correcta).
+- Sin seeds remotos. Sin deploy CLI. Sin importación remota. Sin datos dummy. Sin DROP/DELETE/TRUNCATE. Sin variables modificadas. Sin secretos expuestos.
+- `feature/apu-resource-reconciliation-ux-v1` HEAD: `7b2ff26` (rama fuente intacta).
+
+### Validaciones post-merge
+- typecheck 0, lint 0, suite 1494/1494 (incluye smoke gated), build (`/apu`, `/apu/[id]`, `/apu/reconciliation`), gm:regression 22/22, gm:import PASS, RLS runtime 214/0, validate-claude-agents 214/0/0. read-model-isolation: script no committeado (pre-existente, no regresión).
+
+### Riesgos residuales (no bloqueantes)
+- `apu_components_all FOR ALL` sin endurecer (D-REC-6, deuda pre-existente).
+- Paginación server-side render (deuda de optimización a true DB-pagination).
+- Cast `viewer as AuthenticatedViewer` (type safety, no runtime error).
+
+### Siguiente acción manual recomendada
+Revisar `/apu` y `/apu/reconciliation` en producción con sesión real. Probar asociación individual + bulk pequeña con preview. STOP.
+
+---
+
 ## 2026-06-12 — RELEASE: QUANTITY_TAKEOFF_IMPORT_V1 (orchestrator, release controlado tras apagado)
 
 ### Estado
