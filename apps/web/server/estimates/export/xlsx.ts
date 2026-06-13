@@ -74,11 +74,12 @@ function brandHeader(wb: ExcelJS.Workbook, ws: ExcelJS.Worksheet): void {
   ws.getCell('A4').fill = fill(BRAND_ARGB.accent);
 }
 
-export async function generateEstimateExcel(payload: EstimateExportPayload): Promise<Uint8Array> {
-  const wb = new ExcelJS.Workbook();
-  wb.creator = BRAND.name;
-  wb.created = new Date(payload.generatedAt);
-
+/**
+ * Añade las hojas del presupuesto (RESUMEN, PRESUPUESTO, TRAZABILIDAD) al
+ * workbook recibido. Extraído de `generateEstimateExcel` para reutilizarlo en el
+ * paquete completo sin alterar la salida del presupuesto (golden master).
+ */
+export function addBudgetSheets(wb: ExcelJS.Workbook, payload: EstimateExportPayload): void {
   // ----------------------------------------------------------------- RESUMEN
   const resumen = wb.addWorksheet('RESUMEN', { views: [{ showGridLines: false }] });
   resumen.getColumn('A').width = 34;
@@ -242,7 +243,13 @@ export async function generateEstimateExcel(payload: EstimateExportPayload): Pro
     }
   }
   [12, 18, 18, 14, 14].forEach((w, i) => { traza.getColumn(i + 1).width = w; });
+}
 
+export async function generateEstimateExcel(payload: EstimateExportPayload): Promise<Uint8Array> {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = BRAND.name;
+  wb.created = new Date(payload.generatedAt);
+  addBudgetSheets(wb, payload);
   const buf = await wb.xlsx.writeBuffer();
   return new Uint8Array(buf as ArrayBuffer);
 }

@@ -61,6 +61,7 @@ interface FixtureChapter { id: Uuid; estimateVersionId: Uuid; code: string; name
 interface FixtureBoqItem {
   id: Uuid; chapterId: Uuid; code: string; descriptionSnapshot: string; unitSnapshot: string;
   quantitySnapshot: string; unitPriceSnapshot: string; subtotal: string; sortOrder: number;
+  apuTemplateId?: Uuid | null;
 }
 
 interface FixtureShape {
@@ -291,6 +292,36 @@ export class FixtureEstimatesWriteRepository implements EstimatesWriteRepository
       },
       financial,
     };
+  }
+
+  async getVersionApuTemplateLinks(
+    viewer: ViewerContext,
+    estimateId: Uuid,
+    _versionId?: Uuid,
+  ): Promise<import('@/lib/estimates/apu-export-types').VersionApuLinkRow[]> {
+    if (!sameOrg(viewer) || estimateId !== fixture.estimate.id) {
+      throw new EstimateNotFoundError(estimateId);
+    }
+    const chapterById = new Map(fixture.chapters.map((c) => [c.id, c]));
+    const rows = fixture.boqItems
+      .map((it) => {
+        const ch = chapterById.get(it.chapterId);
+        if (!ch) return null;
+        return {
+          chapterCode: ch.code,
+          chapterName: ch.name,
+          chapterSortOrder: ch.sortOrder,
+          itemCode: it.code,
+          itemDescription: it.descriptionSnapshot,
+          itemSortOrder: it.sortOrder,
+          apuTemplateId: it.apuTemplateId ?? null,
+        };
+      })
+      .filter((r): r is NonNullable<typeof r> => r !== null);
+    rows.sort((a, b) =>
+      a.chapterSortOrder - b.chapterSortOrder || a.itemSortOrder - b.itemSortOrder,
+    );
+    return rows;
   }
 
   /* --- Edición manual de BOQ (4E.2A): escritura bloqueada (solo lectura). --- */

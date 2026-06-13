@@ -128,7 +128,12 @@ function pct(human: string): string {
 
 const h = React.createElement;
 
-export async function generateEstimatePdf(payload: EstimateExportPayload): Promise<Uint8Array> {
+/**
+ * Construye la PÁGINA del presupuesto (header + ficha + tabla + resumen
+ * financiero + footer). Extraído de `generateEstimatePdf` para reutilizarlo en
+ * el paquete completo sin alterar la salida del presupuesto.
+ */
+export function buildBudgetPage(payload: EstimateExportPayload): React.ReactElement {
   const fecha = new Date(payload.generatedAt).toLocaleDateString('es-CO');
   const f = payload.financial;
   const logoFull = getLogoDataUri('full');
@@ -232,44 +237,47 @@ export async function generateEstimatePdf(payload: EstimateExportPayload): Promi
     h(Text, { style: styles.footerText }, `Generado: ${fecha}`),
   );
 
+  return h(
+    Page,
+    { size: 'A4', style: styles.page },
+    header,
+    h(View, { style: styles.accentRule, fixed: true }),
+    h(View, { style: styles.navyRule, fixed: true }),
+    metaCard,
+    h(
+      View,
+      { style: styles.section },
+      h(Text, { style: styles.sectionTitle }, 'PRESUPUESTO POR CAPÍTULOS'),
+      itemHeader,
+      ...chapterBlocks,
+    ),
+    h(
+      View,
+      { style: styles.section, wrap: false },
+      h(Text, { style: styles.sectionTitle }, 'RESUMEN FINANCIERO'),
+      subtotalLine('Costos directos', f.directTotal),
+      finLine('Administración', f.administrationAmount, payload.aiu.administrationRate),
+      finLine('Imprevistos', f.contingencyAmount, payload.aiu.contingencyRate),
+      finLine('Utilidad', f.utilityAmount, payload.aiu.utilityRate),
+      finLine('IVA sobre utilidad', f.utilityVatAmount, payload.aiu.utilityVatRate),
+      subtotalLine('Costos indirectos (AIU)', f.indirectTotal),
+      h(
+        View,
+        { style: styles.totRow },
+        h(Text, { style: styles.totLabel }, 'TOTAL GENERAL'),
+        h(Text, { style: styles.totVal }, cop(f.grandTotal)),
+      ),
+    ),
+    footer,
+  );
+}
+
+export async function generateEstimatePdf(payload: EstimateExportPayload): Promise<Uint8Array> {
   const doc = h(
     Document,
     { title: `Presupuesto ${payload.estimate.name}`, author: BRAND.name, creator: 'Construction Ops', producer: 'Construction Ops' },
-    h(
-      Page,
-      { size: 'A4', style: styles.page },
-      header,
-      h(View, { style: styles.accentRule, fixed: true }),
-      h(View, { style: styles.navyRule, fixed: true }),
-      metaCard,
-      h(
-        View,
-        { style: styles.section },
-        h(Text, { style: styles.sectionTitle }, 'PRESUPUESTO POR CAPÍTULOS'),
-        itemHeader,
-        ...chapterBlocks,
-      ),
-      h(
-        View,
-        { style: styles.section, wrap: false },
-        h(Text, { style: styles.sectionTitle }, 'RESUMEN FINANCIERO'),
-        subtotalLine('Costos directos', f.directTotal),
-        finLine('Administración', f.administrationAmount, payload.aiu.administrationRate),
-        finLine('Imprevistos', f.contingencyAmount, payload.aiu.contingencyRate),
-        finLine('Utilidad', f.utilityAmount, payload.aiu.utilityRate),
-        finLine('IVA sobre utilidad', f.utilityVatAmount, payload.aiu.utilityVatRate),
-        subtotalLine('Costos indirectos (AIU)', f.indirectTotal),
-        h(
-          View,
-          { style: styles.totRow },
-          h(Text, { style: styles.totLabel }, 'TOTAL GENERAL'),
-          h(Text, { style: styles.totVal }, cop(f.grandTotal)),
-        ),
-      ),
-      footer,
-    ),
+    buildBudgetPage(payload),
   );
-
   const buf = await renderToBuffer(doc);
   return new Uint8Array(buf);
 }

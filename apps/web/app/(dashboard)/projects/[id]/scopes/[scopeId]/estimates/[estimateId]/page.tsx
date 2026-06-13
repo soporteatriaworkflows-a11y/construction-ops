@@ -48,7 +48,8 @@ import type { AiuRatesView, FinancialSummary } from '@/lib/estimates/aiu-types';
 import { isCreationModeEnabled } from '../../../../../mode-guard';
 import { formatVersionLabel } from '../../estimate-format';
 import { AiuForm } from './aiu-form';
-import { ExportButtons } from './export-buttons';
+import { ExportButtons, type ExportCounts } from './export-buttons';
+import { getBudgetApuExportSelection } from '@/server/estimates/export/apu-annex';
 import { ArchiveControls } from './archive-controls';
 import { VersionPanel } from './version-panel';
 
@@ -142,6 +143,18 @@ export default async function EstimateDetailPage({ params, searchParams }: PageP
     } catch {
       aiu = null;
       financialSummary = null;
+    }
+  }
+
+  // Conteos de la selección de export APU (APU_EXPORTS_V1). Read-only; degrada a
+  // null sin romper la página si la resolución falla (p. ej. modo fixture).
+  let apuExportCounts: ExportCounts | null = null;
+  if (hasContent && active) {
+    try {
+      const selection = await getBudgetApuExportSelection(viewer, estimateId);
+      apuExportCounts = selection.counts;
+    } catch {
+      apuExportCounts = null;
     }
   }
 
@@ -473,7 +486,7 @@ export default async function EstimateDetailPage({ params, searchParams }: PageP
             <span className="font-medium text-gray-700">{formatVersionLabel(active.versionNumber)}</span>
             {' · '}Datos al {formatDateTime(new Date().toISOString())}
           </p>
-          <ExportButtons projectId={id} scopeId={scopeId} estimateId={estimateId} />
+          <ExportButtons projectId={id} scopeId={scopeId} estimateId={estimateId} counts={apuExportCounts} />
         </section>
       )}
 

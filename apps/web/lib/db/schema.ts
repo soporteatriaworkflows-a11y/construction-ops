@@ -378,6 +378,17 @@ export const apuTemplates = pgTable(
     sourceSheet: text("source_sheet"),
     sourceRow: integer("source_row"),
     sourceOccurrenceIndex: integer("source_occurrence_index"),
+    // APU_MANUAL_BUILDER_V1 (mig. 20260618090000): origen + autoría.
+    originType: text("origin_type").notNull().default("workbook_import"),
+    createdBy: uuid("created_by").references(() => profiles.id, {
+      onDelete: "set null",
+    }),
+    // APU_ARCHIVE_HOTFIX_V1 (mig. 20260619090000): archivado soft.
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    archivedBy: uuid("archived_by").references(() => profiles.id, {
+      onDelete: "set null",
+    }),
+    archiveReason: text("archive_reason"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
