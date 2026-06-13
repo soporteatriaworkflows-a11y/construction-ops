@@ -169,6 +169,24 @@ _Sin blockers activos._
     aprobación? (relacionado con Q11; el umbral disparará doble aprobación
     futura — pendiente de valor concreto).
 13. ¿Despliegue final: Vercel + Railway, o solo Vercel?
+15. **PRÓXIMOS SLICES IDENTIFICADOS (2026-06-13)** — Tras el release de
+    `APU_COMPONENT_RESOURCE_RECONCILIATION_V1 + APU_LIBRARY_OPERATIONAL_UX_V1`,
+    la revisión del preview de Vercel confirmó que el flujo de creación manual
+    de APU NO existe (ni debe existir en esta rama). Los dos slices siguientes
+    son:
+    - **`APU_MANUAL_BUILDER_V1`**: crear una plantilla APU directamente desde
+      la UI (sin importar Excel), con formulario de componentes, cálculo de
+      costo unitario, validación de rol management/internal. CTA preparado
+      (actualmente la biblioteca muestra "Sin plantillas APU → Importar APU";
+      agregar "Crear APU" requiere este slice).
+    - **`BOQ_ADD_FROM_APU_V1`**: seleccionar una plantilla APU existente desde
+      el BOQ y crear un ítem de presupuesto vinculado directamente, sin pasar
+      por la importación Excel. Requiere UI en `/budget/[id]` + RPC server-side
+      + auditoría de versión.
+    Ninguno debe iniciarse sin autorización explícita y contrato congelado previo.
+    Relacionado: `APU_EXPORTS_V1`, `APU_UI_ADVANCED_EDITING_V1` (deuda registrada
+    en el contrato `APU_COMPONENT_RESOURCE_RECONCILIATION_AND_LIBRARY_UX_V1_CONTRACT.md §11`).
+
 14. ✅ **RESUELTA (2026-05-30, Q14)** — ¿Canal oficial de Homecenter? → **MVP:
     adaptador genérico de proveedores con implementación Homecenter por archivo
     CSV/Excel**. Preview obligatorio; aprobación humana antes de persistir;
