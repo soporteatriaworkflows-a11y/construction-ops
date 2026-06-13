@@ -373,6 +373,11 @@ export const apuTemplates = pgTable(
     // FASE 4B.1: herramienta menor derivada como FRACCIÓN [0,1] del subtotal
     // de M.O. del APU (no se almacena como fila de componente).
     defaultToolPct: money("default_tool_pct").notNull().default("0"),
+    // ENTRE_PATIOS_APU_IMPORT_V1: procedencia aditiva (NULL en filas previas).
+    importBatchId: uuid("import_batch_id"),
+    sourceSheet: text("source_sheet"),
+    sourceRow: integer("source_row"),
+    sourceOccurrenceIndex: integer("source_occurrence_index"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -414,11 +419,26 @@ export const apuComponents = pgTable(
     totalComponentCost: money("total_component_cost").notNull(),
     sortOrder: integer("sort_order").notNull().default(0),
     notes: text("notes"),
+    // ENTRE_PATIOS_APU_IMPORT_V1: provenance raw del Excel (NULL en filas previas).
+    sourceRow: integer("source_row"),
+    sourceOccurrenceIndex: integer("source_occurrence_index"),
+    rawCode: text("raw_code"),
+    rawUnit: text("raw_unit"),
+    // APU_COMPONENT_RESOURCE_RECONCILIATION_V1: estado operativo + audit (aditivo).
+    reconciliationState: text("reconciliation_state").notNull().default("pending"),
+    reconciledBy: uuid("reconciled_by").references(() => profiles.id, {
+      onDelete: "set null",
+    }),
+    updatedAt: updatedAt(),
   },
   (t) => [
     index("apu_components_template_sort_idx").on(t.apuTemplateId, t.sortOrder),
     index("apu_components_resource_id_idx").on(t.resourceId),
     index("apu_components_labor_role_id_idx").on(t.laborRoleId),
+    check(
+      "apu_components_reconciliation_state_valid",
+      sql`${t.reconciliationState} IN ('pending','associated','intentionally_unresolved')`,
+    ),
     check(
       "apu_components_component_type_valid",
       sql`${t.componentType} IN ('material','labor','equipment','tool','subcontract','other')`,
@@ -430,6 +450,96 @@ export const apuComponents = pgTable(
     check(
       "apu_components_nonneg",
       sql`${t.quantity} >= 0 AND ${t.wastePct} >= 0 AND ${t.unitPriceSnapshot} >= 0`,
+    ),
+  ],
+);
+
+/**
+ * ENTRE_PATIOS_APU_IMPORT_V1: lotes de importación APU (procedencia durable e
+ * idempotencia por digest). Solo lectura desde la app (la RPC import_apu_batch
+ * los escribe; inmutables por RLS).
+ */
+export const apuImportBatches = pgTable(
+  "apu_import_batches",
+  {
+    id: pk(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    digestSha256: text("digest_sha256").notNull(),
+    sourceFilename: text("source_filename").notNull(),
+    sourceSheet: text("source_sheet").notNull(),
+    importedBy: uuid("imported_by")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "restrict" }),
+    importedAt: timestamp("imported_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    status: text("status").notNull().default("completed"),
+    totalActivities: integer("total_activities").notNull().default(0),
+    totalComponents: integer("total_components").notNull().default(0),
+    importedActivities: integer("imported_activities").notNull().default(0),
+    importedComponents: integer("imported_components").notNull().default(0),
+    linkedBoqItems: integer("linked_boq_items").notNull().default(0),
+    skippedExisting: integer("skipped_existing").notNull().default(0),
+    unresolvedCount: integer("unresolved_count").notNull().default(0),
+    warningCount: integer("warning_count").notNull().default(0),
+    metadata: jsonb("metadata").notNull().default({}),
+  },
+  (t) => [
+    uniqueIndex("apu_import_batches_org_digest_uq").on(
+      t.organizationId,
+      t.digestSha256,
+    ),
+    index("apu_import_batches_org_imported_at_idx").on(
+      t.organizationId,
+      t.importedAt,
+    ),
+  ],
+);
+
+/**
+ * APU_COMPONENT_RESOURCE_RECONCILIATION_V1: auditoría durable e idempotencia de
+ * las acciones de reconciliación. Append-only (la RLS no concede UPDATE/DELETE);
+ * las RPCs SECURITY INVOKER la escriben.
+ */
+export const apuComponentResourceActions = pgTable(
+  "apu_component_resource_actions",
+  {
+    id: pk(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    actionType: text("action_type").notNull(),
+    apuComponentId: uuid("apu_component_id").references(() => apuComponents.id, {
+      onDelete: "set null",
+    }),
+    resourceId: uuid("resource_id").references(() => resources.id, {
+      onDelete: "set null",
+    }),
+    previousResourceId: uuid("previous_resource_id"),
+    initiatedBy: uuid("initiated_by")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "restrict" }),
+    createdAt: createdAt(),
+    idempotencyKey: text("idempotency_key"),
+    selectedCount: integer("selected_count"),
+    succeededCount: integer("succeeded_count"),
+    skippedCount: integer("skipped_count"),
+    metadata: jsonb("metadata").notNull().default({}),
+  },
+  (t) => [
+    index("apu_component_resource_actions_org_created_idx").on(
+      t.organizationId,
+      t.createdAt,
+    ),
+    uniqueIndex("apu_component_resource_actions_org_idempotency_uq").on(
+      t.organizationId,
+      t.idempotencyKey,
+    ),
+    check(
+      "apu_component_resource_actions_type_valid",
+      sql`${t.actionType} IN ('associate','reject','clear','leave_pending','bulk_associate')`,
     ),
   ],
 );
