@@ -8,7 +8,7 @@
  * finanzas). Acciones de mutación solo para management/internal.
  */
 import Link from 'next/link';
-import { Calculator, FileSpreadsheet, GitMerge, Link2 } from 'lucide-react';
+import { Calculator, FileSpreadsheet, GitMerge, Link2, Plus } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Badge } from '@/components/ui/badge';
@@ -87,6 +87,14 @@ export default async function ApuPage({ searchParams }: PageProps) {
   const actions = (
     <div className="flex gap-2">
       {canMutate && (
+        <Button size="sm" asChild>
+          <Link href="/apu/new">
+            <Plus className="mr-1 h-4 w-4" aria-hidden="true" />
+            Nuevo APU
+          </Link>
+        </Button>
+      )}
+      {canMutate && (
         <Button size="sm" variant="outline" asChild>
           <Link href="/apu/reconciliation">
             <GitMerge className="mr-1 h-4 w-4" aria-hidden="true" />
@@ -95,7 +103,7 @@ export default async function ApuPage({ searchParams }: PageProps) {
         </Button>
       )}
       {canMutate && (
-        <Button size="sm" asChild>
+        <Button size="sm" variant="outline" asChild>
           <Link href="/apu/import">
             <FileSpreadsheet className="mr-1 h-4 w-4" aria-hidden="true" />
             Importar APU
@@ -128,14 +136,19 @@ export default async function ApuPage({ searchParams }: PageProps) {
           title="Sin plantillas APU"
           description={
             canMutate
-              ? 'Importa la hoja APU del workbook del proyecto para crear las plantillas con sus componentes y cuadrillas.'
+              ? 'Crea un APU manualmente a partir de recursos del catálogo, o importa la hoja APU del workbook del proyecto.'
               : 'Las plantillas APU se crean desde el proceso de importación del presupuesto.'
           }
           action={
             canMutate ? (
-              <Button size="sm" asChild>
-                <Link href="/apu/import">Importar APU</Link>
-              </Button>
+              <div className="flex gap-2">
+                <Button size="sm" asChild>
+                  <Link href="/apu/new">Nuevo APU</Link>
+                </Button>
+                <Button size="sm" variant="outline" asChild>
+                  <Link href="/apu/import">Importar APU</Link>
+                </Button>
+              </div>
             ) : undefined
           }
         />
