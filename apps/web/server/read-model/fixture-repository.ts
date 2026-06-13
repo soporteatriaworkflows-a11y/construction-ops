@@ -389,6 +389,8 @@ export class FixtureReadModelRepository implements ReadModelPort {
         unit: tpl.unit,
         unitCost: detail.unitCostTotal,
         componentCount: components.length,
+        originType: (tpl as { originType?: string }).originType,
+        archivedAt: (tpl as { archivedAt?: string | null }).archivedAt ?? null,
       };
     });
   }
@@ -430,6 +432,10 @@ export class FixtureReadModelRepository implements ReadModelPort {
       },
       components,
     );
+    // READ_MODEL_ARCHIVED_AT: el fixture no porta archivado/origen ⇒ degrada a
+    // activo/undefined sin inventar valor.
+    detail.originType = (tpl as { originType?: string }).originType;
+    detail.archivedAt = (tpl as { archivedAt?: string | null }).archivedAt ?? null;
     return projectApuDetailForRole(detail, viewer.role);
   }
 

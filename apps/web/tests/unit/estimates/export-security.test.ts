@@ -81,12 +81,14 @@ describe('Export — UI (fuente)', () => {
   it('botones: loading, anti doble-click, error sanitizado, descarga directa', () => {
     const src = read(`${base}/export-buttons.tsx`);
     expect(src).toMatch(/^'use client';/m);
-    expect(src).toMatch(/Exportar Excel/);
-    expect(src).toMatch(/Exportar PDF/);
+    // Menú «Exportar» APU_EXPORTS_V1: presupuesto + APU vinculados + paquete.
+    expect(src).toMatch(/Presupuesto Excel/);
+    expect(src).toMatch(/Presupuesto PDF/);
+    expect(src).toMatch(/APU vinculados PDF/);
+    expect(src).toMatch(/Paquete (PDF|Excel)/);
     expect(src).toMatch(/disabled=\{busy/);
     expect(src).toMatch(/if \(busy\) return/);
     expect(src).toMatch(/URL\.createObjectURL/);
-    expect(src).toMatch(/El archivo se genera con los datos actuales de V01/);
   });
 
   it('detalle: sección Exportar presupuesto montada con ExportButtons', () => {

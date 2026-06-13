@@ -415,6 +415,12 @@ export class DrizzleReadModelRepository implements ReadModelPort {
         unit: t.unit,
         unitCost: detail.unitCostTotal,
         componentCount: rows.length,
+        // READ_MODEL_ARCHIVED_AT: el read-model expone origen + archivado por
+        // plantilla (consumido por la biblioteca APU y la selección de export).
+        originType: (t as { originType?: string }).originType,
+        archivedAt: (t as { archivedAt?: Date | string | null }).archivedAt
+          ? new Date((t as { archivedAt: Date | string }).archivedAt).toISOString()
+          : null,
       };
     });
     });
@@ -469,6 +475,11 @@ export class DrizzleReadModelRepository implements ReadModelPort {
       },
       rows,
     );
+    // READ_MODEL_ARCHIVED_AT: propaga origen + archivado a la ficha del APU.
+    detail.originType = (template as { originType?: string }).originType;
+    detail.archivedAt = (template as { archivedAt?: Date | string | null }).archivedAt
+      ? new Date((template as { archivedAt: Date | string }).archivedAt).toISOString()
+      : null;
     return projectApuDetailForRole(detail, viewer.role);
     });
   }

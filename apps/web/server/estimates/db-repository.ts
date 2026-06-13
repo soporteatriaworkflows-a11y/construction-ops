@@ -630,6 +630,78 @@ export class DbEstimatesWriteRepository implements EstimatesWriteRepository {
     };
   }
 
+  async getVersionApuTemplateLinks(
+    viewer: ViewerContext,
+    estimateId: Uuid,
+    versionId?: Uuid,
+  ): Promise<import('@/lib/estimates/apu-export-types').VersionApuLinkRow[]> {
+    const supabase = await this.clientFactory();
+
+    // Versión objetivo: explícita (snapshot histórico) o la activa. Misma
+    // semántica que getEstimateExportPayload; cross-org ⇒ NotFound vía RLS.
+    let targetId: string;
+    if (versionId) {
+      const { data: vRow, error: vErr } = await supabase
+        .from('estimate_versions')
+        .select('id, estimate_id')
+        .eq('id', versionId)
+        .maybeSingle();
+      if (vErr) throw new Error(`estimate_version_read_failed: ${vErr.code ?? 'unknown'}`);
+      const v = vRow as { id: string; estimate_id: string } | null;
+      if (!v || v.estimate_id !== estimateId) throw new EstimateNotFoundError(estimateId);
+      targetId = v.id;
+    } else {
+      const active = await this.getEstimateActiveVersion(viewer, estimateId);
+      if (!active) throw new EstimateNotFoundError(estimateId);
+      targetId = active.id;
+    }
+
+    // Capítulos ACTIVOS de la versión (orden BOQ).
+    const { data: chData, error: chErr } = await supabase
+      .from('chapters')
+      .select('id, code, name, sort_order, archived_at')
+      .eq('estimate_version_id', targetId)
+      .order('sort_order', { ascending: true });
+    if (chErr) throw new Error(`chapter_list_failed: ${chErr.code ?? 'unknown'}`);
+    const chapters = (chData ?? []) as Array<{
+      id: string; code: string; name: string; sort_order: number; archived_at: string | null;
+    }>;
+    const chapterById = new Map(chapters.filter((c) => !c.archived_at).map((c) => [c.id, c]));
+
+    // Ítems BOQ ACTIVOS con su plantilla APU (orden por ítem).
+    const { data: itData, error: itErr } = await supabase
+      .from('boq_items')
+      .select('chapter_id, code, description_snapshot, sort_order, apu_template_id, archived_at')
+      .eq('estimate_version_id', targetId)
+      .order('sort_order', { ascending: true });
+    if (itErr) throw new Error(`item_list_failed: ${itErr.code ?? 'unknown'}`);
+    const items = (itData ?? []) as Array<{
+      chapter_id: string; code: string; description_snapshot: string;
+      sort_order: number; apu_template_id: string | null; archived_at: string | null;
+    }>;
+
+    const rows: import('@/lib/estimates/apu-export-types').VersionApuLinkRow[] = [];
+    for (const it of items) {
+      if (it.archived_at) continue; // ítem archivado fuera de la vista activa
+      const ch = chapterById.get(it.chapter_id);
+      if (!ch) continue; // capítulo archivado/inexistente ⇒ ítem excluido
+      rows.push({
+        chapterCode: ch.code,
+        chapterName: ch.name,
+        chapterSortOrder: ch.sort_order,
+        itemCode: it.code,
+        itemDescription: it.description_snapshot,
+        itemSortOrder: it.sort_order,
+        apuTemplateId: it.apu_template_id,
+      });
+    }
+    // Orden BOQ determinístico: capítulo, luego ítem.
+    rows.sort((a, b) =>
+      a.chapterSortOrder - b.chapterSortOrder || a.itemSortOrder - b.itemSortOrder,
+    );
+    return rows;
+  }
+
   /* ----------------------------------------------------------------------
    * Edición manual de BOQ (Oleada 4E.2A).
    * Versión activa + editabilidad derivadas server-side; subtotal forzado por

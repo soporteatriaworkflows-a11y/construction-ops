@@ -4,6 +4,47 @@ Este documento es propiedad de **agent-qa**. Se actualiza al final de
 
 ---
 
+## APU_EXPORTS_V1 + BUDGET_EXPORT_WITH_APU_ANNEX_V1 (2026-06-13, rama `feature/apu-budget-exports-v1`)
+
+**Base:** `origin/main = d3c67bd` · **main intacta** · **producción intacta** · **SIN migración** (fix read-model = solo mapeo ORM) · **sin db push remoto** · **sin escrituras remotas**
+
+| Check | Resultado | Detalle |
+|---|---|---|
+| typecheck | ✅ 0 | `tsc --noEmit` |
+| lint | ✅ 0 | `eslint .` |
+| suite | ✅ 1517 / 0 / 42 skip | +30 (dominio 11, Excel 7, PDF 6, UI 6) |
+| build | ✅ | Next 16, ruta export dinámica intacta |
+| gm:regression | ✅ 22/22 | golden master del presupuesto intacto |
+| gm:import | ✅ | total **$372.247.169,98** (sin cambio) |
+| validate-claude-agents | ✅ 214 / 0 / 0 | — |
+| git diff --check | ✅ | solo avisos LF→CRLF |
+| RLS runtime | n/a | sin migración/RLS nueva |
+| read-model isolation | ✅ | dentro de la suite |
+
+**Cobertura por casos del mandato (1–41):**
+- Dominio (1–11): versión por org, cross-org bloqueado, solo BOQ de la versión,
+  solo APU vinculados, dedupe, orden BOQ, exclusión de no-usados, sin-APU,
+  archivado (editable excluye / emitida incluye), incompleto con advertencia, no
+  muta datos. **11/11.**
+- Excel (12–18): presupuesto intacto, índice APU, componentes, paquete BOQ+APU,
+  formula injection saneada, nombres de hoja/archivo seguros. **7/7.**
+- PDF (19–23): presupuesto intacto, índice, fichas, paquete BOQ+anexos, texto
+  saneado. **6/6.**
+- UI (24–29): menú 6 documentos, opciones APU deshabilitadas/ habilitadas,
+  conteos, advertencias, counts nulos sin estado roto. Lógica pura (entorno de
+  test `node`, sin DOM). **6/6.**
+- Regresión (30–41): manual builder, archive hotfix, add-APU-to-BOQ, APU import,
+  reconciliation, quantities, catálogo, price review, monitor, golden master,
+  gm:import, smoke — **todas verdes dentro de la suite 1517/0**.
+
+**Seguridad/privacidad:** `organizationId`/`userId` server-side; cross-org ⇒ 404
+(RLS); `getApuDetail` omite `laborRoleCode`/`laborRoleName` (🔒) para rol
+`client`; sin descuentos internos/precios públicos/proveedor en ningún documento;
+sin HTML arbitrario; formula-injection escapada en Excel; texto saneado en PDF;
+read-only total (sin INSERT/UPDATE/DELETE; sin escritura remota).
+
+---
+
 ## APU_MANUAL_BUILDER_VALIDATION_AND_ARCHIVE_HOTFIX_V1 (2026-06-13, rama `fix/apu-manual-builder-validation-archive-v1`)
 
 **Base:** `origin/main = 3018f8b` · **main intacta** · **producción intacta** · **sin db push remoto** (migración `20260619090000` SOLO local) · **sin escrituras remotas**

@@ -150,6 +150,18 @@ export interface EstimatesWriteRepository {
     versionId?: Uuid,
   ): Promise<import('@/lib/estimates/export-types').EstimateExportPayload>;
 
+  /**
+   * Vínculos BOQ → APU de la versión objetivo (APU_EXPORTS_V1). Devuelve una
+   * fila por ítem BOQ ACTIVO (con `apuTemplateId` o `null`), en orden BOQ
+   * (capítulo `sort_order`, luego ítem `sort_order`). RLS ⇒ cross-org/inexistente
+   * `EstimateNotFoundError`. Sin `versionId` ⇒ versión activa.
+   */
+  getVersionApuTemplateLinks(
+    viewer: ViewerContext,
+    estimateId: Uuid,
+    versionId?: Uuid,
+  ): Promise<import('@/lib/estimates/apu-export-types').VersionApuLinkRow[]>;
+
   /* --- Edición manual de BOQ (Oleada 4E.2A) --- */
   /** Crea un capítulo manual en la versión activa (sort_order append). */
   createEstimateChapter(

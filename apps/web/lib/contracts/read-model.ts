@@ -139,6 +139,10 @@ export interface ApuSummary {
   unit: string;
   unitCost: DecimalString;
   componentCount: number;
+  /** Origen del APU: 'manual' | 'workbook_import'. Nullable por compat retroactiva. */
+  originType?: string;
+  /** Fecha de archivo ISO si está archivado; null/undefined si activo (READ_MODEL_ARCHIVED_AT). */
+  archivedAt?: string | null;
 }
 
 /* --- APU detalle (FASE 4B.1 — APU_COST_MODEL_FOUNDATION_V1_CONTRACT §10) --- */
