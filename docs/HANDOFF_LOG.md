@@ -1,5 +1,26 @@
 # Handoff Log
 
+## 2026-06-12 — RELEASE: QUANTITY_TAKEOFF_IMPORT_V1 (orchestrator, release controlado tras apagado)
+
+### Estado
+- **RELEASED.** `origin/main = 81d5bf0` (merge commit). Tag `quantity-takeoff-import-release-v1`.
+- 2 migraciones aplicadas remotamente: `20260616090000` (3 tablas + RPC `import_quantity_takeoff_batch`), `20260616090100` (RLS ENABLE+FORCE en las 3 tablas).
+- Deploy automático Vercel activo post-push: smoke 11/11 sin HTTP 500; `/quantities/import` 200; `/apu/import` 200; `/catalog/prices/review` 200; cron 401.
+- Sin seeds. Sin deploy CLI. Sin importación remota automática. Sin datos dummy. Sin secretos expuestos. Sin DROP/DELETE/TRUNCATE. Sin variables modificadas.
+
+### Validación proporcional
+- typecheck 0, lint 0, **1412 tests** PASS, build ✓ (`ƒ /quantities/import`), gm:regression 22/22, RLS estático 96/96, read-model 51/51, gm COP 372.247.170 intacto, validate-claude-agents 214/0/0.
+
+### Siguiente acción manual
+- Ingresar a `/quantities/import` con sesión productiva (rol admin/gerencia).
+- Cargar workbook real `CANTIDADES 1 PISO` supervisadamente.
+- Revisar preview de grupos y líneas antes de confirmar.
+
+### Rollback
+- No se ejecutó rollback. Migraciones aditivas; sin datos producción afectados.
+
+---
+
 ## 2026-06-12 — FASE 4B.3: QUANTITY_TAKEOFF_IMPORT_V1 (orchestrator, con recuperación tras apagado)
 
 ### Estado
