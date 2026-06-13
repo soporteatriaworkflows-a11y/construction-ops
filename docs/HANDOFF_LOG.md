@@ -4690,3 +4690,32 @@ gated. La cobertura SQL equivalente corre estática en CI (`rls-apu-reconciliati
 
 ### Agentes activos al cierre
 - Ninguno.
+
+---
+
+## Sesión 2026-06-13 (cont.) — Cierre local con Docker arriba
+
+**Agente:** agent-orchestrator. **Rama:** `feature/apu-resource-reconciliation-ux-v1`.
+
+Docker/Supabase local disponibles ⇒ se ejecutaron los gates antes diferidos:
+
+- **`supabase db reset --local`**: 30 migraciones + 6 seeds aplicados; `20260617090000` aplica limpio (validación empírica). Sin conexión remota.
+- **Fix acotado (contrato §8):** la asociación masiva NO sobrescribe asociaciones
+  existentes — `_reconcile_apu_component_row` gana `p_allow_replace`; bulk pasa
+  `false` ⇒ `skipped_existing`. Individual conserva el reemplazo explícito (§10).
+- **Harness RLS runtime `scripts/rls-runtime/run.ts`:** nueva **sección [23]** (20 checks:
+  ENABLE+FORCE, aislamiento A/B, SELECT org-scoped, INSERT admin/gerencia, obra
+  bloqueado, cross-org, auditoría inmutable, idempotency_key, total recalculado,
+  bulk no sobrescribe, sin DELETE físico, M.O. no reconciliable). Pre-flight FORCE 34→35.
+  **Resultado 214 PASS / 0 FAIL** (baseline 194).
+
+### Gauntlet local completo (todo verde)
+typecheck ✅ · lint ✅ · suite 1452/0 ✅ · build ✅ · RLS harness 214/0 ✅ ·
+read-model isolation 12/0 ✅ · gm:regression 22/22 ✅ · gm:import PASS (cadena
+financiera exacta) ✅ · smoke gated (MVP+BOQ) 42/42 en DB limpia ✅ · redirects
+(suite unitaria) ✅ · diff limpio · validate-claude-agents 214/0/0 ✅. Sin PGRST303.
+
+### Próximo paso
+- Revisión visual de la usuaria en `http://localhost:3120`.
+- Release controlado: `db push --dry-run` ⇒ **exactamente 1 migración** (`20260617090000`).
+- NO merge, NO deploy, NO db push remoto en este ciclo. **STOP.**

@@ -1612,3 +1612,18 @@ idempotencia real, FORCE), `read-model-isolation`, `gm:import`, MVP smoke gated.
 
 **Recomendación:** rama lista para revisión visual local (`:3120`). NO merge / NO deploy /
 NO db push remoto en este ciclo (mandato). Producción y main intactas.
+
+---
+
+## QA — Cierre runtime (Docker arriba) APU reconciliation (2026-06-13)
+
+Gates antes diferidos, ahora ejecutados y verdes:
+- `supabase db reset --local`: `20260617090000` aplica limpio; 6 seeds OK.
+- **RLS harness runtime 214 PASS / 0 FAIL** (baseline 194; +20 sección [23]).
+- read-model isolation 12/0 · gm:import PASS (AIU/IVA/total/valor m² exactos) ·
+  gm:regression 22/22 · smoke gated MVP+BOQ 42/42 (DB limpia) · suite 1452/0 ·
+  build · diff limpio · agents 214/0/0. Sin PGRST303.
+
+Fix de QA: bulk no sobrescribe asociaciones existentes (`skipped_existing`),
+verificado en harness [23i]. Recomendación: rama lista para revisión visual y
+release controlado (1 migración). NO merge/deploy/db push remoto este ciclo.

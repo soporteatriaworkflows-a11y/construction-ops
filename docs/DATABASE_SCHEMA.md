@@ -862,3 +862,5 @@ Reglas: la reconciliación NUNCA toca `boq_items`, AIU, precios, snapshots ni
 exports históricos; `total_component_cost` SIEMPRE recalculado server-side; M.O.
 nunca se reconcilia; recurso cross-org bloqueado (dominio + RLS); auditoría
 inmutable. La migración es estrictamente aditiva (sin DROP/DELETE/TRUNCATE).
+
+| 2026-06-13 | **Cierre runtime APU reconciliation** — `db reset --local` aplica `20260617090000` limpio; harness RLS runtime sección [23] (20 checks) **214/0**; FORCE count confirmado 35. Fix: bulk `_reconcile_apu_component_row(p_allow_replace)` ⇒ `skipped_existing` (no sobrescribe asociaciones existentes). | `20260617090000` (sin nueva migración) | orchestrator |

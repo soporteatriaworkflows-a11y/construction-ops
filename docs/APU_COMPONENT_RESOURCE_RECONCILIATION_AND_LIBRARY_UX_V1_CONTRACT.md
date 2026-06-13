@@ -142,6 +142,12 @@ Guard común: `no_session`/`no_membership` (42501); rol
 (42501). Verifica componente no-labor, recurso same-org, recálculo server-side,
 audit row, `updated_at`/`reconciled_by`. Idempotencia por `(org, idempotency_key)`.
 
+**Reemplazo vs skip (§8/§10):** el helper `_reconcile_apu_component_row` recibe
+`p_allow_replace`. La acción **individual** pasa `true` (reemplazo explícito válido,
+§10). La acción **masiva** pasa `false` ⇒ un componente ya asociado se devuelve como
+`skipped_existing` (no se sobrescribe silenciosamente, §8). Verificado en el harness
+RLS runtime sección [23].
+
 ---
 
 ## 7. Matching de reconciliación (FASE 3)

@@ -211,3 +211,8 @@ Decisiones abiertas:
 - **D-REC-8 — Paginación server-side por render** (slice en el Server Component): la
   lista completa se carga pero solo se renderiza/serializa la página. True DB-pagination
   diferida como optimización.
+
+- **D-REC-9 (2026-06-13) — Bulk no sobrescribe asociaciones existentes.** La RPC
+  masiva pasa `p_allow_replace=false` ⇒ `skipped_existing` para componentes ya
+  asociados (contrato §8). La acción individual conserva el reemplazo explícito
+  (§10). Verificado en harness RLS runtime [23i].
