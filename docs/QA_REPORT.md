@@ -4,6 +4,33 @@ Este documento es propiedad de **agent-qa**. Se actualiza al final de
 
 ---
 
+## APU_MANUAL_BUILDER_VALIDATION_AND_ARCHIVE_HOTFIX_V1 (2026-06-13, rama `fix/apu-manual-builder-validation-archive-v1`)
+
+**Base:** `origin/main = 3018f8b` · **main intacta** · **producción intacta** · **sin db push remoto** (migración `20260619090000` SOLO local) · **sin escrituras remotas**
+
+| Check | Resultado | Detalle |
+|---|---|---|
+| typecheck | ✅ 0 | dominio `server/apu-builder` + UI archive/copy/validation |
+| lint | ✅ 0 | flat config ESLint 9 |
+| tests apu-builder (nuevo) | ✅ 35/35 | 13 originales + 12 validación > 0 + 6 archive + 4 loadApuForCopy |
+| suite completa | ✅ 1487 passed / 42 skipped / 0 fail | +22 tests vs 1465 previos |
+| build | ✅ | `/apu`, `/apu/[id]`, `/apu/new` sin errores; `archive-apu-button.tsx` compilado |
+| RLS runtime harness | 🔵 PENDIENTE LOCAL | `supabase start` necesario; sección [24b] (8 checks): archive_apu_template + guards add_apu_to_boq/create_manual_apu; total esperado 241/0 |
+| golden master | ✅ 22/22 | sin regresión financiera |
+| read-model isolation | 🔵 PENDIENTE LOCAL | requiere supabase local |
+
+**Brechas corregidas:**
+1. Cantidad material = 0 rechazada (service + SQL)
+2. rendimiento/integrantes = 0 rechazados (service + SQL)  
+3. wastePct ≥ 1 (100%) rechazada (service, `exclusiveMax`)
+4. `performanceDays` inicializado en `''` no `'0'` (bug crítico)
+5. Preview server-side antes de persistir
+6. Archivado soft (migración aditiva + RPC + UI)
+7. Duplicar para corregir (`copyFrom` + precarga)
+8. Banners/badges estado en `/apu/[id]` y `/apu`
+
+---
+
 ## APU_MANUAL_BUILDER_V1 + BOQ_ADD_FROM_APU_V1 (2026-06-13, rama `feature/apu-manual-builder-boq-add-v1`)
 
 **Base:** `origin/main = 56b7c0a` · **main intacta** · **producción intacta** · **sin db push remoto** (migración `20260618090000` SOLO local) · **sin escrituras remotas**

@@ -9,10 +9,11 @@
  */
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, GitMerge, Wrench } from 'lucide-react';
+import { ArrowLeft, Copy, GitMerge, Wrench } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { ArchiveApuButton } from '../_components/archive-apu-button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatCOP, formatDateTime, formatNumber, formatPct } from '@/lib/utils/format';
 import { getReadModel } from '@/server/read-model';
@@ -112,13 +113,33 @@ export default async function ApuDetailPage({ params, searchParams }: PageProps)
     (r) => r.state !== 'associated' && r.state !== 'intentionally_unresolved',
   ).length;
 
-  const reconcileCta = canMutate ? (
-    <Button size="sm" asChild>
-      <Link href={`/apu/reconciliation?apu=${detail.id}`}>
-        <GitMerge className="mr-1 h-4 w-4" />
-        Reconciliar recursos{pendingCount > 0 ? ` (${pendingCount})` : ''}
-      </Link>
-    </Button>
+  const isIncomplete =
+    detail.components.length > 0 &&
+    detail.components.some((c) => c.totalComponentCost === '0');
+  const isArchived = Boolean(detail.archivedAt);
+  const isManual = detail.originType === 'manual';
+  const hasBoqLinks = boqLinks.length > 0;
+
+  const actionButtons = canMutate ? (
+    <div className="flex flex-wrap gap-2">
+      {!isArchived && (
+        <Button size="sm" asChild>
+          <Link href={`/apu/reconciliation?apu=${detail.id}`}>
+            <GitMerge className="mr-1 h-4 w-4" />
+            Reconciliar recursos{pendingCount > 0 ? ` (${pendingCount})` : ''}
+          </Link>
+        </Button>
+      )}
+      <Button size="sm" variant="outline" asChild>
+        <Link href={`/apu/new?copyFrom=${detail.id}`}>
+          <Copy className="mr-1 h-4 w-4" />
+          Duplicar para corregir
+        </Link>
+      </Button>
+      {isManual && !isArchived && !hasBoqLinks && (
+        <ArchiveApuButton apuTemplateId={detail.id} />
+      )}
+    </div>
   ) : undefined;
 
   return (
@@ -130,8 +151,32 @@ export default async function ApuDetailPage({ params, searchParams }: PageProps)
         </Link>
       </div>
 
-      <PageHeader title={detail.name} description={`Análisis de precio unitario por ${detail.unitCanonical}`} actions={reconcileCta} />
+      <PageHeader title={detail.name} description={`Análisis de precio unitario por ${detail.unitCanonical}`} actions={actionButtons} />
 
+      {isArchived && (
+        <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="status">
+          <strong>APU archivado.</strong> Este APU no puede agregarse a presupuestos.
+          {canMutate && (
+            <span className="ml-2">
+              <Link href={`/apu/new?copyFrom=${detail.id}`} className="font-medium underline hover:text-red-900">
+                Duplicar para corregir
+              </Link>
+            </span>
+          )}
+        </div>
+      )}
+      {!isArchived && isIncomplete && (
+        <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800" role="alert">
+          <strong>APU incompleto:</strong> uno o más componentes tienen valor cero. Revisa los componentes antes de usar este APU en un presupuesto.
+          {canMutate && (
+            <span className="ml-2">
+              <Link href={`/apu/new?copyFrom=${detail.id}`} className="font-medium underline hover:text-amber-900">
+                Duplicar para corregir
+              </Link>
+            </span>
+          )}
+        </div>
+      )}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <span className="font-mono text-xs rounded bg-gray-100 px-2 py-0.5 text-gray-600">{detail.code}</span>
         <Badge variant="secondary">v{detail.version}</Badge>
@@ -139,6 +184,16 @@ export default async function ApuDetailPage({ params, searchParams }: PageProps)
           Unidad: {detail.unitCanonical}
           {detail.unit !== detail.unitCanonical ? ` (${detail.unit})` : ''}
         </Badge>
+        {isArchived && (
+          <Badge variant="secondary" className="bg-red-100 text-red-700">
+            Archivado
+          </Badge>
+        )}
+        {!isArchived && isIncomplete && (
+          <Badge variant="secondary" className="bg-amber-100 text-amber-700">
+            Incompleto
+          </Badge>
+        )}
         {pendingCount > 0 && (
           <Badge variant="secondary" className="bg-amber-100 text-amber-700">
             {pendingCount} componente{pendingCount !== 1 ? 's' : ''} por asociar

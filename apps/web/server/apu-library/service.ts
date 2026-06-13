@@ -12,6 +12,7 @@ import type { AuthenticatedViewer } from '@/server/auth/types';
 import { getReadModel } from '@/server/read-model';
 import { getReconciliationData } from '@/server/apu-reconciliation';
 import { DbApuReconciliationRepository } from '@/server/apu-reconciliation';
+import { toDecimal } from '@/modules/apu/decimal';
 import type { Uuid } from '@/lib/utils/types';
 import type {
   ApuLibraryItem,
@@ -108,6 +109,12 @@ export async function getApuLibrary(
   const allItems: ApuLibraryItem[] = apus.map((a) => {
     const status = statusByTemplate.get(a.id) ?? emptyStatus();
     const batchId = batchByTemplate.get(a.id) ?? null;
+    // `archivedAt` viaja en el read-model cuando éste lo expone; hoy `ApuSummary`
+    // no lo trae, así que degrada a `null` (activo) sin inventar valor.
+    const archivedAt = (a as { archivedAt?: string | null }).archivedAt ?? null;
+    // Incompleto si el costo unitario es cero (no hay precio aprobado o sin
+    // componentes con costo). Comparación con Decimal, sin float.
+    const isIncomplete = toDecimal(a.unitCost ?? '0').isZero();
     return {
       id: a.id,
       code: a.code,
@@ -119,6 +126,8 @@ export async function getApuLibrary(
       origin: batchId ? batchName.get(batchId) ?? 'Importado' : 'Manual',
       importBatchId: batchId,
       resourceStatus: status,
+      archivedAt,
+      isIncomplete,
     };
   });
 
@@ -154,6 +163,16 @@ export async function getApuLibrary(
         i.name.toLowerCase().includes(q) ||
         matchingTemplateIds.has(i.id),
     );
+  }
+
+  // Visibilidad de archivados. Por defecto sólo activos (archived_at IS NULL).
+  // `filter='archived'` muestra exclusivamente archivados; `showArchived=true`
+  // los incluye junto a los activos. Depende de que el read-model exponga
+  // `archivedAt` por plantilla para tener efecto real.
+  if (params.filter === 'archived') {
+    filtered = filtered.filter((i) => i.archivedAt != null);
+  } else if (!params.showArchived) {
+    filtered = filtered.filter((i) => i.archivedAt == null);
   }
 
   // Filtro por estado.

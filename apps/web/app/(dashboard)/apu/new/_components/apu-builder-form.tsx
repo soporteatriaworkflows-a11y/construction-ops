@@ -16,7 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { formatCOP } from '@/lib/utils/format';
-import type { ApuBuilderData, ManualApuInput } from '@/lib/apu-builder/types';
+import type { ApuBuilderData, CopyFromApuData, ManualApuInput } from '@/lib/apu-builder/types';
 import { createManualApuAction, type CreateManualApuActionResult } from '../actions';
 
 interface MaterialRow {
@@ -42,9 +42,11 @@ function num(v: string): number {
 export function ApuBuilderForm({
   data,
   preselectedResourceId,
+  copyFromData,
 }: {
   data: ApuBuilderData;
   preselectedResourceId: string | null;
+  copyFromData?: CopyFromApuData | null;
 }) {
   const [state, formAction, isPending] = useActionState(createManualApuAction, INITIAL);
 
@@ -53,17 +55,43 @@ export function ApuBuilderForm({
       ? preselectedResourceId
       : data.materials[0]?.id ?? '';
 
-  const [code, setCode] = useState('');
-  const [name, setName] = useState('');
-  const [unit, setUnit] = useState('');
-  const [toolPct, setToolPct] = useState('0'); // porcentaje sobre M.O.
-  const [description, setDescription] = useState('');
+  // Inicializa desde copyFromData si se está duplicando, o desde cero.
+  const [code, setCode] = useState(
+    copyFromData ? copyFromData.header.code + '-COPIA' : '',
+  );
+  const [name, setName] = useState(copyFromData ? copyFromData.header.name : '');
+  const [unit, setUnit] = useState(copyFromData ? copyFromData.header.unit : '');
+  // toolPct: fracción [0,1] → porcentaje para la UI
+  const [toolPct, setToolPct] = useState(
+    copyFromData
+      ? String(Number(copyFromData.header.defaultToolPct) * 100)
+      : '0',
+  );
+  const [description, setDescription] = useState(
+    copyFromData ? (copyFromData.header.description ?? '') : '',
+  );
   const [materials, setMaterials] = useState<MaterialRow[]>(
-    preselectedResourceId
-      ? [{ resourceId: firstResource, quantity: '1', wastePct: '0', notes: '' }]
+    copyFromData
+      ? copyFromData.materials.map((m) => ({
+          resourceId: m.resourceId,
+          quantity: m.quantity,
+          wastePct: String(Number(m.wastePct) * 100),
+          notes: m.notes ?? '',
+        }))
+      : preselectedResourceId
+        ? [{ resourceId: firstResource, quantity: '1', wastePct: '0', notes: '' }]
+        : [],
+  );
+  const [labor, setLabor] = useState<LaborRow[]>(
+    copyFromData
+      ? copyFromData.labor.map((l) => ({
+          laborRoleId: l.laborRoleId,
+          performanceDays: l.performanceDays,
+          memberCount: l.memberCount,
+          notes: l.notes ?? '',
+        }))
       : [],
   );
-  const [labor, setLabor] = useState<LaborRow[]>([]);
 
   const materialById = useMemo(
     () => new Map(data.materials.map((m) => [m.id, m])),
@@ -126,12 +154,40 @@ export function ApuBuilderForm({
   };
 
   const hasComponents = materials.length > 0 || labor.length > 0;
+  const allMaterialsValid = materials.every((m) => {
+    const q = Number.parseFloat(m.quantity);
+    return Number.isFinite(q) && q > 0;
+  });
+  const allLaborValid = labor.every((l) => {
+    const d = Number.parseFloat(l.performanceDays);
+    const c = Number.parseFloat(l.memberCount);
+    return Number.isFinite(d) && d > 0 && Number.isFinite(c) && c > 0;
+  });
   const canSubmit =
-    !isPending && code.trim() !== '' && name.trim() !== '' && unit.trim() !== '' && hasComponents;
+    !isPending &&
+    code.trim() !== '' &&
+    name.trim() !== '' &&
+    unit.trim() !== '' &&
+    hasComponents &&
+    allMaterialsValid &&
+    allLaborValid &&
+    !preview.missingPrice;
+
+  const submitLabel = copyFromData ? 'Crear APU (copia corregida)' : 'Crear APU';
 
   return (
     <form action={formAction} noValidate aria-label="Constructor de APU">
       <input type="hidden" name="payload" value={JSON.stringify(payload)} />
+
+      {copyFromData && (
+        <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+          <strong>Duplicando para corregir:</strong> valores precargados de «{copyFromData.originName}».
+          {copyFromData.isArchived && ' (APU origen archivado)'}
+          {' '}Revisa y ajusta antes de guardar.
+          Los precios se recalcularán server-side.
+          {copyFromData.labor.length > 0 && ' Para M.O., el rendimiento se precargó como días totales con 1 integrante — ajusta si es necesario.'}
+        </div>
+      )}
 
       {state?.error && (
         <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
@@ -200,6 +256,12 @@ export function ApuBuilderForm({
                     <div className="space-y-1">
                       <Label htmlFor={`matq-${i}`} className="text-xs">Cantidad</Label>
                       <Input id={`matq-${i}`} type="number" min="0" step="any" value={m.quantity} disabled={isPending} onChange={(e) => updateRow(setMaterials, i, { quantity: e.target.value })} />
+                      <p className="text-xs text-gray-400">Debe ser mayor que cero.</p>
+                      {!noPrice && num(m.quantity) <= 0 && (
+                        <p className="mt-0.5 text-xs text-red-600">
+                          La cantidad debe ser mayor que cero.
+                        </p>
+                      )}
                     </div>
                     <div className="space-y-1">
                       <Label htmlFor={`matw-${i}`} className="text-xs">Desp. %</Label>
@@ -259,10 +321,22 @@ export function ApuBuilderForm({
                 <div className="space-y-1">
                   <Label htmlFor={`labd-${i}`} className="text-xs">Rend. (días)</Label>
                   <Input id={`labd-${i}`} type="number" min="0" step="any" value={l.performanceDays} disabled={isPending} onChange={(e) => updateRow(setLabor, i, { performanceDays: e.target.value })} />
+                  <p className="text-xs text-gray-400">Debe ser mayor que cero.</p>
+                  {num(l.performanceDays) <= 0 && (
+                    <p className="mt-0.5 text-xs text-red-600">
+                      El rendimiento debe ser mayor que cero.
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor={`labc-${i}`} className="text-xs">Integrantes</Label>
                   <Input id={`labc-${i}`} type="number" min="0" step="any" value={l.memberCount} disabled={isPending} onChange={(e) => updateRow(setLabor, i, { memberCount: e.target.value })} />
+                  <p className="text-xs text-gray-400">Debe ser mayor que cero.</p>
+                  {num(l.memberCount) <= 0 && (
+                    <p className="mt-0.5 text-xs text-red-600">
+                      El numero de integrantes debe ser mayor que cero.
+                    </p>
+                  )}
                 </div>
                 <Button type="button" variant="ghost" size="sm" disabled={isPending} onClick={() => removeRow(setLabor, i)} aria-label="Quitar rol">
                   <Trash2 className="h-4 w-4 text-red-500" aria-hidden="true" />
@@ -277,7 +351,7 @@ export function ApuBuilderForm({
               onClick={() =>
                 setLabor((rows) => [
                   ...rows,
-                  { laborRoleId: data.laborRoles[0]?.id ?? '', performanceDays: '0', memberCount: '1', notes: '' },
+                  { laborRoleId: data.laborRoles[0]?.id ?? '', performanceDays: '', memberCount: '1', notes: '' },
                 ])
               }
             >

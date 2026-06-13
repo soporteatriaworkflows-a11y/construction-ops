@@ -374,6 +374,9 @@ necesariamente un rol de fila; se trata en el perfil de exports).
 | default_tool_pct | NUMERIC(20,10) | NOT NULL | DEFAULT 0; fracción [0,1] de herramienta menor derivada sobre la M.O. (4B.1, migración 20260613090100) |
 | origin_type | TEXT | NOT NULL | DEFAULT 'workbook_import'; CHECK in (`manual`,`workbook_import`) — APU_MANUAL_BUILDER_V1, migración 20260618090000 |
 | created_by | UUID | NULL | FK profiles ON DELETE SET NULL; autor del APU manual (NULL en históricos) |
+| archived_at | TIMESTAMPTZ | NULL | Timestamp de archivado soft (NULL = activo) — HOTFIX_V1, migración 20260619090000 |
+| archived_by | UUID | NULL | FK profiles ON DELETE SET NULL; actor del archivado |
+| archive_reason | TEXT | NULL | Razón obligatoria del archivado (varchar 200) |
 | created_at | TIMESTAMPTZ | NOT NULL | |
 | updated_at | TIMESTAMPTZ | NOT NULL | |
 6-8. PK `id`; FK `organization_id`; ON DELETE org CASCADE.
@@ -867,6 +870,25 @@ inmutable. La migración es estrictamente aditiva (sin DROP/DELETE/TRUNCATE).
 
 | 2026-06-13 | **Cierre runtime APU reconciliation** — `db reset --local` aplica `20260617090000` limpio; harness RLS runtime sección [23] (20 checks) **214/0**; FORCE count confirmado 35. Fix: bulk `_reconcile_apu_component_row(p_allow_replace)` ⇒ `skipped_existing` (no sobrescribe asociaciones existentes). | `20260617090000` (sin nueva migración) | orchestrator |
 
+### APU_MANUAL_BUILDER_VALIDATION_AND_ARCHIVE_HOTFIX_V1 (2026-06-13)
+
+- **`apu_templates`** += `archived_at TIMESTAMPTZ NULL`, `archived_by UUID NULL`
+  (FK profiles ON DELETE SET NULL), `archive_reason TEXT NULL`. Aditivo; activos
+  tienen `archived_at IS NULL`. Índice parcial `idx_apu_templates_active_non_archived`.
+- **CHECK extendido** `apu_manual_actions_type_valid`: agrega `'archive'` al conjunto
+  (`create_manual_apu`,`add_apu_to_boq`,`archive`). Retrocompatible (DROP + RECREATE).
+- **RPC `public.archive_apu_template(p_apu_template_id, p_reason)`** — SECURITY
+  INVOKER; 7 guards secuenciales: no_session, no_membership, insufficient_role,
+  archive_reason_required, apu_not_found, apu_not_archivable_type (solo `manual`),
+  apu_already_archived, apu_has_boq_items (verificado con count); UPDATE
+  `archived_at/by/reason`; INSERT `apu_manual_actions` ON CONFLICT DO NOTHING
+  (idempotente); retorna JSON `{status: 'archived', ...}`.
+- **`add_apu_to_boq`** actualizado: SELECT `archived_at` antes del INSERT; si
+  `archived_at IS NOT NULL` ⇒ RAISE EXCEPTION `'apu_archived'`.
+- **`create_manual_apu`** endurecido: `IF v_qty <= 0` (antes `v_qty < 0`); rechaza
+  cantidad exactamente cero.
+- FORCE count = **36** (sin cambio; no se añaden nuevas tablas RLS FORCE).
+
 ### APU_MANUAL_BUILDER_V1 + BOQ_ADD_FROM_APU_V1 (2026-06-13)
 
 - **`apu_templates`** += `origin_type TEXT NOT NULL DEFAULT 'workbook_import'`
@@ -897,4 +919,5 @@ inmutable. La migración es estrictamente aditiva (sin DROP/DELETE/TRUNCATE).
 
 | Fecha | Cambio | Migración | Autor |
 |-------|--------|-----------|-------|
+| 2026-06-13 | **APU_MANUAL_BUILDER_VALIDATION_AND_ARCHIVE_HOTFIX_V1** — `apu_templates` +archived_at/archived_by/archive_reason (NULL, retrocompat.); índice parcial `idx_apu_templates_active_non_archived`; CHECK extendido `apu_manual_actions_type_valid` (+ `'archive'`); RPC `archive_apu_template` (SECURITY INVOKER, 7 guards); `add_apu_to_boq` + guard `apu_archived`; `create_manual_apu` endurecido `v_qty <= 0`; FORCE count 36 (sin cambio); harness RLS sección [24b] (8 checks) **241/0** esperado | `20260619090000` | orchestrator |
 | 2026-06-13 | **APU_MANUAL_BUILDER_V1 + BOQ_ADD_FROM_APU_V1** — `apu_templates` +origin_type/created_by; tabla `apu_manual_actions` (append-only, RLS ENABLE+FORCE, unique parcial `(org, idempotency_key)`); RPCs SECURITY INVOKER `create_manual_apu` / `add_apu_to_boq` (FORCE count 35→**36**); harness RLS sección [24] (19 checks) **233/0** | `20260618090000` | orchestrator |

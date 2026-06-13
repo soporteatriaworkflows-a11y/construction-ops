@@ -36,6 +36,7 @@ const FILTERS: { value: ApuLibraryFilter; label: string }[] = [
   { value: 'with_suggestions', label: 'Con sugerencias' },
   { value: 'unresolved', label: 'Sin resolver' },
   { value: 'ambiguous', label: 'Ambiguas' },
+  { value: 'archived', label: 'Archivadas' },
 ];
 
 const SORTS: { value: ApuLibrarySort; label: string }[] = [
@@ -79,6 +80,7 @@ export default async function ApuPage({ searchParams }: PageProps) {
       filter,
       sort,
       origin,
+      showArchived: filter === 'archived',
     });
   } catch (e) {
     error = e instanceof Error ? e.message : 'Error al cargar la biblioteca APU';
@@ -234,6 +236,7 @@ export default async function ApuPage({ searchParams }: PageProps) {
               <th className="px-3 py-2 font-medium text-right">Costo unitario</th>
               <th className="px-3 py-2 font-medium">BOQ</th>
               <th className="px-3 py-2 font-medium">Recursos</th>
+              <th className="px-3 py-2 font-medium">Estado</th>
               <th className="px-3 py-2 font-medium">Origen</th>
               <th className="px-3 py-2 font-medium text-right">Acción</th>
             </tr>
@@ -285,6 +288,15 @@ function ApuRow({ item }: { item: ApuLibraryItem }) {
       </td>
       <td className="px-3 py-2">
         <ApuResourceBadge status={item.resourceStatus} />
+      </td>
+      <td className="px-3 py-2">
+        {item.archivedAt ? (
+          <Badge variant="secondary" className="bg-red-100 text-red-700">Archivado</Badge>
+        ) : item.isIncomplete ? (
+          <Badge variant="secondary" className="bg-amber-100 text-amber-700">Incompleto</Badge>
+        ) : (
+          <span className="text-xs text-gray-400">Activo</span>
+        )}
       </td>
       <td className="px-3 py-2 text-xs text-gray-500">{item.origin}</td>
       <td className="px-3 py-2 text-right">

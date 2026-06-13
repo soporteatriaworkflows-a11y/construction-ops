@@ -1,5 +1,49 @@
 # Handoff Log
 
+## 2026-06-13 — APU_MANUAL_BUILDER_VALIDATION_AND_ARCHIVE_HOTFIX_V1 (orchestrator)
+
+### Estado
+- Rama `fix/apu-manual-builder-validation-archive-v1` (base `origin/main = 3018f8b`).
+  **Sin merge a main; sin deploy; sin db push remoto; sin escrituras remotas; sin datos dummy remotos.**
+- HEAD pendiente de commit (esta entrada cierra la sesión).
+
+### Entregable
+- **Contrato congelado** `docs/APU_MANUAL_BUILDER_VALIDATION_AND_ARCHIVE_HOTFIX_V1_CONTRACT.md`.
+- **Migración aditiva SOLO local** `20260619090000_apu_archive_support.sql`:
+  `apu_templates += archived_at/archived_by/archive_reason`; índice parcial sobre
+  no-archivados; CHECK extendido `apu_manual_actions_type_valid` (+ `'archive'`);
+  RPC `archive_apu_template` (SECURITY INVOKER, 7 guards); `add_apu_to_boq`
+  actualizado con guard `apu_archived`; `create_manual_apu` endurecido
+  `v_qty <= 0` (antes `v_qty < 0`). FORCE count 36 (sin cambio).
+- **Dominio server-side** (`apps/web/server/apu-builder/`): `requireDecimal` amplía
+  `exclusiveMin` + nuevo `exclusiveMax`; 6 call-sites `{ min: 0, exclusiveMin: true }`
+  para cantidad de material + performanceDays + memberCount; `wastePct` ahora
+  `{ min: 0, max: 1, exclusiveMax: true }`; `archiveManualApu` + `loadApuForCopy`
+  en servicio y repositorio; nuevos tipos `CopyFromApuData` + `SerializableManualApuPreview`;
+  nueva clase `ApuArchiveError`.
+- **UI** `/apu/new`: `previewManualApuAction` + `archiveApuAction`; validación por fila
+  (cantidad > 0 en materiales; rendimiento > 0, integrantes > 0 en M.O.); texto de
+  ayuda inline; banner de duplicado-para-corregir (`?copyFrom=`); `performanceDays`
+  inicializado en `''` en lugar de `'0'` (fix bug crítico). `/apu/[id]`: botones
+  Archivar/Duplicar para corregir; banners de archivado/incompleto; badges. `/apu`:
+  columna Estado (Archivado/Incompleto/Activo); filtro `Archivadas`. Nuevo componente
+  `_components/archive-apu-button.tsx`.
+- **Tests**: `tests/unit/apu-builder/builder.test.ts` 13→35 tests (22 nuevos):
+  bloque "validación estricta > 0" (12), bloque "archiveManualApu" (6), bloque
+  "loadApuForCopy" (4). Imports actualizados: `vi`, `archiveManualApu`, `loadApuForCopy`,
+  `ApuArchiveError`, `DbApuBuilderRepository`, `CopyFromApuData`, `AuthenticatedViewer`.
+- **RLS harness** `scripts/rls-runtime/run.ts`: sección [24b] (8 checks: 24o..24u +
+  24s-bis); total 241 checks esperados en local.
+- **Suite completa**: 1487 passed / 42 skipped / 0 fail. Build clean. Typecheck 0.
+  Lint 0. Golden master 22/22.
+
+### Limitación conocida (integración pendiente)
+- `archivedAt` en el listado `/apu` y en `ApuDetail` no se popula hasta que
+  `apps/web/server/read-model/drizzle-repository.ts` exponga `archived_at` de
+  `apu_templates`. Registrado en `docs/INTEGRATION_REQUESTS.md`.
+
+---
+
 ## 2026-06-13 — APU_MANUAL_BUILDER_V1 + BOQ_ADD_FROM_APU_V1 (orchestrator)
 
 ### Estado

@@ -14,8 +14,10 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { DecimalString, Uuid } from '@/lib/utils/types';
 import type { AuthenticatedViewer } from '@/server/auth/types';
 import { calculateLaborCost, type LaborRoleFactors } from '@/modules/apu/labor';
+import { ApuArchiveError } from './errors';
 import type {
   ApuBuilderData,
+  CopyFromApuData,
   LaborRoleOption,
   MaterialOption,
 } from '@/lib/apu-builder/types';
@@ -237,6 +239,95 @@ export class DbApuBuilderRepository {
       unitPrice: r.unitPrice,
       subtotal: r.subtotal,
       status: r.status,
+    };
+  }
+
+  /** Archiva un APU manual via RPC SECURITY INVOKER. */
+  async archiveManualApu(
+    _viewer: AuthenticatedViewer,
+    params: { apuTemplateId: string; reason: string },
+  ): Promise<{ archivedAt: string }> {
+    const supabase = await this.clientFactory();
+    const { data, error } = await supabase.rpc('archive_apu_template', {
+      p_apu_template_id: params.apuTemplateId,
+      p_reason: params.reason,
+    });
+    if (error) {
+      const code = error.code ?? error.message ?? 'archive_failed';
+      throw new ApuArchiveError(code, `archive_apu_template_failed: ${code}`);
+    }
+    const r = data as { archivedAt: string; status: string };
+    return { archivedAt: r.archivedAt };
+  }
+
+  /**
+   * Carga datos de un APU para precargar el formulario de copia.
+   * Lee apu_templates + apu_components (RLS-bound, sin service-role).
+   * Para labor: precarga `performanceDays = quantity` y `memberCount = '1'`
+   * porque el DB almacena days×count como una sola cantidad.
+   */
+  async loadApuForCopy(
+    _viewer: AuthenticatedViewer,
+    apuTemplateId: string,
+  ): Promise<CopyFromApuData | null> {
+    const supabase = await this.clientFactory();
+
+    const { data: tpl, error: tplErr } = await supabase
+      .from('apu_templates')
+      .select('id, code, name, unit, default_tool_pct, description, archived_at')
+      .eq('id', apuTemplateId)
+      .maybeSingle();
+    if (tplErr) throw new Error(`copy_apu_template_read_failed: ${tplErr.code ?? 'unknown'}`);
+    if (!tpl) return null;
+
+    const t = tpl as {
+      id: string; code: string; name: string; unit: string;
+      default_tool_pct: string; description: string | null; archived_at: string | null;
+    };
+
+    const { data: comps, error: compErr } = await supabase
+      .from('apu_components')
+      .select('component_type, resource_id, labor_role_id, quantity, waste_pct, notes')
+      .eq('apu_template_id', apuTemplateId)
+      .order('sort_order', { ascending: true });
+    if (compErr) throw new Error(`copy_apu_components_read_failed: ${compErr.code ?? 'unknown'}`);
+
+    const materials: CopyFromApuData['materials'] = [];
+    const labor: CopyFromApuData['labor'] = [];
+
+    for (const c of (comps ?? []) as {
+      component_type: string; resource_id: string | null;
+      labor_role_id: string | null; quantity: string; waste_pct: string; notes: string | null;
+    }[]) {
+      if (c.component_type === 'material' && c.resource_id) {
+        materials.push({
+          resourceId: c.resource_id,
+          quantity: c.quantity,
+          wastePct: c.waste_pct,
+          notes: c.notes ?? undefined,
+        });
+      } else if (c.component_type === 'labor' && c.labor_role_id) {
+        labor.push({
+          laborRoleId: c.labor_role_id,
+          performanceDays: c.quantity,
+          memberCount: '1',
+          notes: c.notes ?? undefined,
+        });
+      }
+    }
+
+    return {
+      header: {
+        code: t.code,
+        name: t.name,
+        unit: t.unit,
+        defaultToolPct: t.default_tool_pct,
+        description: t.description ?? undefined,
+      },
+      materials,
+      labor,
+      originName: `${t.code} · ${t.name}`,
+      isArchived: t.archived_at !== null,
     };
   }
 }
