@@ -4644,3 +4644,49 @@ Resultado global: PASS (exit code 0)
 
 ### Agentes activos al cierre
 - Ninguno.
+
+---
+
+## Sesión 2026-06-13 — APU_COMPONENT_RESOURCE_RECONCILIATION_V1 + APU_LIBRARY_OPERATIONAL_UX_V1
+
+**Agente:** agent-orchestrator (implementación inline; sin spawn de subagentes).
+**Rama:** `feature/apu-resource-reconciliation-ux-v1` (base `origin/main = f286652`).
+**Auditoría consumida:** `b0c8c65` (cherry-pick `10642b3`) — Discovery + Contract draft.
+
+### Entregado
+- **Contrato congelado:** `docs/APU_COMPONENT_RESOURCE_RECONCILIATION_AND_LIBRARY_UX_V1_CONTRACT.md`.
+- **Migración aditiva** `20260617090000_apu_component_reconciliation.sql`: columnas
+  `apu_components.updated_at/reconciliation_state/reconciled_by`, trigger recompute
+  (cierra R-01), índice parcial, tabla auditoría `apu_component_resource_actions`
+  (RLS ENABLE+FORCE, append-only, idempotencia), 3 RPCs SECURITY INVOKER con guard
+  de rol. Drizzle schema sincronizado (incluye provenance previa faltante).
+- **Dominio puro** `server/apu-reconciliation/`: re-matching (reutiliza
+  `matchMaterialComponent`), estados, parseo de descripción de `notes`, CSV sanitizado.
+- **Servicios:** `apu-reconciliation` (centro + detalle + búsqueda + acciones),
+  `apu-library` (biblioteca compacta; compone read-model + reconciliación).
+- **Server actions** seguras (`apu/reconciliation/actions.ts`): asociar/confirmar/
+  rechazar/dejar-pendiente/limpiar/bulk/buscar, role-guard + idempotencia.
+- **UI:** `/apu` compacta (stats + búsqueda/filtros/orden/paginación server-side),
+  `/apu/[id]` por pestañas (Resumen·Componentes·Vínculo BOQ·Trazabilidad),
+  `/apu/reconciliation` (selección, acciones individuales, modal bulk congelado, CSV).
+- **Tests:** 40 nuevos (15 dominio + 25 estáticos schema/RLS/UX). Suite 1452 ✅,
+  gm:regression 22 ✅.
+
+### Validación local ejecutada
+typecheck ✅ · lint ✅ · vitest full (1452 pass / 0 fail) ✅ · gm:regression (22) ✅ ·
+build ✅ (rutas `/apu`,`/apu/[id]`,`/apu/reconciliation`) · `git diff --check` limpio ·
+validate-claude-agents 214/0/0 ✅.
+
+### NO ejecutado (Docker/Supabase local apagado) — DEFERIDO al release con DB arriba
+`supabase db reset --local`, harness RLS runtime (`scripts/rls-runtime/run.ts` — falta
+sección [23] para la tabla/RPCs nuevas), `read-model-isolation`, `gm:import`, MVP smoke
+gated. La cobertura SQL equivalente corre estática en CI (`rls-apu-reconciliation-static`).
+
+### Próximo paso
+- Con Docker arriba: `db reset --local` + harness RLS (añadir sección [23]) + smoke;
+  luego `db push --dry-run` (esperado: 1 migración nueva `20260617090000`).
+- Revisión visual de la usuaria en `http://localhost:3120`.
+- NO merge, NO deploy, NO db push remoto en esta sesión (por mandato).
+
+### Agentes activos al cierre
+- Ninguno.

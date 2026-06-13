@@ -185,3 +185,29 @@ Decisiones abiertas:
 - [x] **Q11 — Aprobación humana (firma simple vs doble)** — ✅ RESUELTA 2026-05-30 (simple en MVP; doble futura configurable; ver tabla)
 - [ ] Gantt por capítulos o actividades
 - [ ] Ubicación de despliegue (Vercel + Railway o solo Vercel)
+
+---
+
+## APU_COMPONENT_RESOURCE_RECONCILIATION_V1 + APU_LIBRARY_OPERATIONAL_UX_V1 (2026-06-13)
+
+- **D-REC-1 — Sugerencias efímeras (no persistidas).** El re-matching se re-deriva
+  contra el catálogo actual en cada apertura; no se crea tabla de sugerencias. Razón:
+  el catálogo puede crecer entre import y reconciliación; evita migración innecesaria.
+- **D-REC-2 — Sin columna `description`.** La descripción se parsea de `notes`
+  (`Sin asociar al catálogo: "…"`) con fallback a `raw_code`. Backfill diferido
+  (`APU_COMPONENT_DESCRIPTION_BACKFILL`).
+- **D-REC-3 — `rechazar sugerencia` = `intentionally_unresolved`** (action `reject` en
+  auditoría). No se persiste rechazo por recurso específico (deuda `APU_COMPONENT_REJECT_STATUS`).
+- **D-REC-4 — Trigger recompute solo BEFORE UPDATE.** El INSERT ya es correcto vía RPC
+  import/seed (misma fórmula); minimiza superficie de regresión y cierra R-01.
+- **D-REC-5 — Auditoría e idempotencia en tabla nueva** `apu_component_resource_actions`
+  (append-only) en vez de ampliar `notes`. Idempotencia por `(org, idempotency_key)`.
+- **D-REC-6 — No se endurece la policy `apu_components_all FOR ALL`** en esta oleada
+  (cambio potencialmente disruptivo del harness). El trigger recompute + las RPCs
+  role-guarded cubren la invariante; el UPDATE directo vía PostgREST es preexistente y
+  se mantiene como deuda de hardening (no introducida aquí).
+- **D-REC-7 — Política de precio (conservar Excel / usar aprobado)** expuesta en el
+  centro; default = conservar snapshot del Excel (no altera el golden master por defecto).
+- **D-REC-8 — Paginación server-side por render** (slice en el Server Component): la
+  lista completa se carga pero solo se renderiza/serializa la página. True DB-pagination
+  diferida como optimización.

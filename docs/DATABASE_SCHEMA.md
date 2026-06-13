@@ -856,3 +856,9 @@ Excel son EVIDENCIA (el server recalcula con Decimal). FORCE count 31→**34**.
 | Fecha | Cambio | Migración | Autor |
 |-------|--------|-----------|-------|
 | 2026-06-12 | **QUANTITY_TAKEOFF_IMPORT_V1** — `quantity_import_batches`, `quantity_takeoff_groups`, `quantity_takeoff_lines`, RPC `import_quantity_takeoff_batch` (FORCE count 31→34) | `20260616090000` + `20260616090100` | orchestrator |
+| 2026-06-13 | **APU_COMPONENT_RESOURCE_RECONCILIATION_V1** — `apu_components` +`updated_at`/`reconciliation_state`(CHECK)/`reconciled_by`, trigger `apu_components_recompute_total` (BEFORE UPDATE, cierra R-01), trigger `apu_components_set_updated_at`, índice parcial `apu_components_unresolved_idx`; nueva tabla `apu_component_resource_actions` (auditoría append-only, RLS ENABLE+FORCE, unique parcial `(org, idempotency_key)`); RPCs SECURITY INVOKER `reconcile_apu_component` / `reconcile_apu_components_bulk` (máx 50) / `update_apu_component_reconciliation` con guard de rol `admin/gerencia/presupuestos` + idempotencia (FORCE count 34→**35**) | `20260617090000` | orchestrator |
+
+Reglas: la reconciliación NUNCA toca `boq_items`, AIU, precios, snapshots ni
+exports históricos; `total_component_cost` SIEMPRE recalculado server-side; M.O.
+nunca se reconcilia; recurso cross-org bloqueado (dominio + RLS); auditoría
+inmutable. La migración es estrictamente aditiva (sin DROP/DELETE/TRUNCATE).
