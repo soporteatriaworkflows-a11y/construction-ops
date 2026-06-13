@@ -805,3 +805,54 @@ con `labor_role_id` obligatorio (4B.1 §4–§5).
 | Fecha | Cambio | Migración | Autor |
 |-------|--------|-----------|-------|
 | 2026-06-11 | **ENTRE_PATIOS_APU_IMPORT_V1** — `apu_import_batches`, provenance en `apu_templates`/`apu_components`, RPC `import_apu_batch` (FORCE count 30→31) | `20260615090000` + `20260615090100` | orchestrator |
+
+---
+
+## QUANTITY_TAKEOFF_IMPORT_V1 (FASE 4B.3, 2026-06-12)
+
+Migraciones aditivas `20260616090000_quantity_takeoff_import.sql` +
+`20260616090100_rls_quantity_takeoff_import.sql` (SOLO locales en esta
+oleada; sin db push remoto). Contrato:
+`docs/QUANTITY_TAKEOFF_IMPORT_V1_CONTRACT.md`.
+
+- **`quantity_import_batches`** (tabla nueva, RLS ENABLE+FORCE): procedencia
+  durable e idempotencia del importador de memorias de cantidades.
+  `organization_id` FK directo; `digest_sha256 CHECK hex(64)` con
+  **UNIQUE (organization_id, digest_sha256)** (un workbook se importa una
+  sola vez por org); `source_filename`, `source_sheet`, `imported_by` FK
+  `profiles` (RESTRICT), `imported_at`, `status ('completed')`, conteos
+  (`unresolved_count`, `warning_count`, CHECK no-negativos), `metadata`
+  JSONB. SELECT miembros de la org; INSERT solo `admin/gerencia` con
+  `imported_by = app._auth_uid()`; **SIN UPDATE ni DELETE** ⇒ inmutable.
+- **`quantity_takeoff_groups`** (tabla nueva, RLS ENABLE+FORCE): grupo de
+  medición (ítem de la hoja). `import_batch_id` FK batch, `visible_code`,
+  `item_code`, `description`, `unit` (canónica, NULL si D no era unidad),
+  `source_row`/`occurrence_index` (CHECK ≥1), `total_calculated` numeric,
+  **`boq_item_id` FK `boq_items` ON DELETE SET NULL** con **UNIQUE parcial**
+  (un ítem BOQ admite UN solo takeoff group; el vínculo vive AQUÍ, jamás en
+  `boq_items`), `metadata` JSONB (rawUnit, capítulo, excelTotal, fórmula del
+  total, linkStatus, warnings). Trigger same-org contra batch y boq_item.
+- **`quantity_takeoff_lines`** (tabla nueva, RLS ENABLE+FORCE): línea de
+  medición. `group_id` FK CASCADE, `description` (etiqueta D),
+  `formula_type` CHECK en el catálogo congelado §3 (17 tipos + custom),
+  dimensiones `length/width/height/count` numeric NULL, `raw_values` JSONB
+  (valores y TEXTO de fórmulas D..I; jamás se evalúan), `source_row`,
+  `subtotal_calculated`, `sort_order`. Inmutables (sin UPDATE/DELETE).
+  Trigger same-org contra el grupo.
+- **RPC `public.import_quantity_takeoff_batch(p_batch, p_groups,
+  p_version_id)`** — patrón `import_apu_batch`: SECURITY INVOKER (RLS aplica
+  a cada escritura), deny-by-default sin sesión/membresía, REVOKE
+  PUBLIC/anon + GRANT authenticated. Idempotencia por (org, digest) ⇒
+  `{duplicate:true}` sin escribir; versión objetivo debe ser EDITABLE
+  (draft|review; emitida ⇒ `version_locked`); vincula SOLO ítems de la
+  versión objetivo sin takeoff previo (jamás reemplaza vínculos);
+  **`boq_items` NO se muta** (ni quantity_snapshot ni ningún campo);
+  transacción atómica (batch → groups → lines → conteo de vínculos).
+
+Reglas: el importador NUNCA toca APU, AIU, precios ni exports históricos;
+NO escribe en `quantity_groups`/`quantity_lines` legacy; los totales del
+Excel son EVIDENCIA (el server recalcula con Decimal). FORCE count 31→**34**.
+
+| Fecha | Cambio | Migración | Autor |
+|-------|--------|-----------|-------|
+| 2026-06-12 | **QUANTITY_TAKEOFF_IMPORT_V1** — `quantity_import_batches`, `quantity_takeoff_groups`, `quantity_takeoff_lines`, RPC `import_quantity_takeoff_batch` (FORCE count 31→34) | `20260616090000` + `20260616090100` | orchestrator |

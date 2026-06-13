@@ -21,14 +21,23 @@ const UNIT_ALIASES: Record<string, string> = {
   'm²': 'm²',
   'metro cuadrado': 'm²',
   'metros cuadrados': 'm²',
+  // m³ — metro cúbico (extensión aditiva QUANTITY_TAKEOFF_IMPORT_V1 §2.2)
+  'm3': 'm³',
+  'm³': 'm³',
+  'metro cubico': 'm³',
+  'metros cubicos': 'm³',
+  'metro cúbico': 'm³',
+  'metros cúbicos': 'm³',
   // und — unidad
   'und': 'und',
   'unidad': 'und',
   'unidades': 'und',
+  'un': 'und',
   // día — jornada
   'dia': 'día',
   'día': 'día',
   'jornada': 'día',
+  'jn': 'día',
 };
 
 /**
@@ -78,6 +87,7 @@ export function unitsEquivalent(
 /** Aliases documentados (solo lectura; útil para docs y tests). */
 export const UNIT_ALIAS_TABLE: ReadonlyArray<{ canonical: string; aliases: readonly string[] }> = [
   { canonical: 'm²', aliases: ['m2', 'M2', 'm²', 'metro cuadrado', 'metros cuadrados'] },
-  { canonical: 'und', aliases: ['und', 'unidad', 'unidades'] },
-  { canonical: 'día', aliases: ['dia', 'día', 'jornada'] },
+  { canonical: 'm³', aliases: ['m3', 'M3', 'm³', 'metro cubico', 'metros cubicos'] },
+  { canonical: 'und', aliases: ['und', 'unidad', 'unidades', 'un'] },
+  { canonical: 'día', aliases: ['dia', 'día', 'jornada', 'jn'] },
 ];

@@ -1,5 +1,72 @@
 # Handoff Log
 
+## 2026-06-12 — FASE 4B.3: QUANTITY_TAKEOFF_IMPORT_V1 (orchestrator, con recuperación tras apagado)
+
+### Estado
+- Rama `feature/quantity-takeoff-import-v1` (worktree dedicado; base
+  `origin/main = daa4dd9`). **Sin merge a main; sin deploy; sin db push
+  remoto; sin escrituras remotas; sin datos dummy remotos.**
+- **Sesión de recuperación**: apagado inesperado del equipo a mitad de
+  FASE 6. Auditoría R0: 4 commits íntegros en disco (contrato, schema+RLS,
+  parser+matching, wizard UI); sección [22] del harness RLS y 3 archivos de
+  tests unitarios escritos SIN commitear — todo preservado, nada descartado,
+  sin reset/rebase/stash.
+
+### Entregable
+- **Contrato congelado** `docs/QUANTITY_TAKEOFF_IMPORT_V1_CONTRACT.md`
+  (gramática §2, fórmulas geométricas §3, deducciones §4, occurrence §5,
+  matching solo exactos §6, esquema §7, RLS §8, servicio §9, errores §10,
+  idempotencia/provenance §11, UI §12, congelados §13, deudas §14).
+- **Migraciones aditivas SOLO locales** `20260616090000` + `20260616090100`:
+  `quantity_import_batches` (UNIQUE org+digest, inmutable),
+  `quantity_takeoff_groups` (vínculo `boq_item_id` UNIQUE parcial; el
+  vínculo vive aquí — `boq_items` JAMÁS se muta), `quantity_takeoff_lines`
+  (inmutables; raw_values con texto de fórmulas, jamás evaluadas), triggers
+  same-org y **RPC atómica `import_quantity_takeoff_batch`** (SECURITY
+  INVOKER, idempotente por digest, `version_locked` en emitidas, jamás
+  reemplaza vínculos). RLS ENABLE+FORCE; FORCE count 31→**34**.
+- **Dominio** `apps/web/server/quantity-import/` (parse-workbook,
+  parse-takeoff-sheet, matching, preview, service, db-repository, errors):
+  parser PURO sobre valores cacheados; 17 tipos de fórmula geométrica +
+  `custom`; recalculo Decimal (Excel = evidencia); matching §6 SOLO exactos
+  y no ambiguos (sugerencias informativas SIN `boqItemId`); servicio dos
+  pasos (preview/confirm + digest SHA-256) sin persistir archivo; roles
+  management|internal; org/actor SIEMPRE server-side.
+- **UI** `/quantities/import` (wizard: workbook + versión editable opcional
+  → resumen → grupos con líneas desplegables y diferencias vs Excel →
+  vínculos por estado → confirmación → reporte + CSV sanitizado) + CTA
+  «Importar memorias» en `/quantities`.
+- **Tests** `tests/unit/quantity-import/` (59: parser 37, matching 10,
+  preview/confirm 12; hojas 100% sintéticas) + sección [22] del harness.
+
+### Recuperación y defectos locales corregidos (sin ampliar alcance)
+- `matchTakeoffGroup`: sugerencias devolvían `boqItemId` ⇒ ahora SIEMPRE
+  `null` (solo lo exacto porta id; defensa en profundidad §6).
+- Harness [22]: setup sin `chapters` (NOT NULL `boq_items.chapter_id`).
+- Test documental de alias de unidades: tabla extendida aditivamente con
+  m³/un/jn (§2.2).
+
+### Validación (todo PASS)
+- `supabase db reset --local` 36 migraciones + 6 seeds (Docker re-arrancado
+  tras el apagado) · typecheck 0 · lint 0 · **1412 tests** (+59; 1 flaky
+  PDF conocido verde en re-run) · build (`ƒ /quantities/import`) · **RLS
+  runtime 194/194** (+21 sección [22]) · isolation 12/12 · gm 22/22 ·
+  gm:import $372.247.170 · smoke gated **42/42** (1 transitorio post-reset,
+  re-run único verde — patrón warmup conocido) · redirects 15/15 ·
+  diff --check limpio · validador 214/0/0.
+
+### Próximo paso
+- Revisión visual de la usuaria en `http://localhost:3110` (importar la
+  hoja real `CANTIDADES 1 PISO` supervisadamente) + release controlado
+  (`db push --dry-run` ⇒ exactamente 2 migraciones nuevas `20260616*`).
+- Deudas registradas: `QUANTITY_TAKEOFF_APPLY_TO_BOQ_V1`,
+  `QUANTITY_TAKEOFF_MULTI_SHEET_V1` (INTEGRATION_REQUESTS).
+
+### Agentes activos al cierre
+- Ninguno.
+
+---
+
 ## 2026-06-12 — RELEASE: ENTRE_PATIOS_APU_IMPORT_V1 + BOQ_APU_LINKING_V1 (orchestrator)
 
 ### Estado

@@ -176,8 +176,9 @@ async function main(): Promise<void> {
   // 20 tablas de Oleada 1 + 4 de planning (Oleada 3B) + 1 resource_price_observations (Fase 3A)
   // + 3 de price monitoring (Fase 4A: targets/runs/results)
   // + 2 del review center (batches + bulk_actions)
-  // + 1 apu_import_batches (FASE 4B.2) = 31.
-  check('Pre-flight: 31 tablas con RLS FORCE', rlsTables === '31', `rlsTables=${rlsTables}`);
+  // + 1 apu_import_batches (FASE 4B.2)
+  // + 3 quantity takeoff import (FASE 4B.3: batches/groups/lines) = 34.
+  check('Pre-flight: 34 tablas con RLS FORCE', rlsTables === '34', `rlsTables=${rlsTables}`);
 
   const [{ count: taskCount }] = await sql<{ count: string }[]>`
     SELECT count(*)::text AS count FROM schedule_tasks WHERE id = ${TASK_A}`;
@@ -2020,6 +2021,292 @@ async function main(): Promise<void> {
   check('apu-import: RLS ENABLE+FORCE en apu_import_batches',
     apuImportForce.length === 1 && apuImportForce.every((r) => r.rls && r.force),
     JSON.stringify(apuImportForce));
+
+  // ===========================================================================
+  // 22) QUANTITY_TAKEOFF_IMPORT_V1 — quantity_import_batches/takeoff_groups/
+  //     takeoff_lines + RPC import_quantity_takeoff_batch.
+  // ===========================================================================
+  console.log('\n=== 22) Quantity takeoff import (QUANTITY_TAKEOFF_IMPORT_V1) ===');
+
+  const QDIG_A = '1a'.repeat(32);
+  const QDIG_B = '1b'.repeat(32);
+  const QDIG_C = '1c'.repeat(32);
+  const QDIG_D = '1d'.repeat(32);
+  const QDIG_E = '1e'.repeat(32);
+
+  // 22a) Batch tenant-scoped: admin A crea con imported_by = identidad real;
+  //      inmutable (UPDATE/DELETE sin política); imported_by ajeno bloqueado.
+  const qtyBatch = await asUser(realA, async (q) => {
+    const [row] = await q<{ id: string; imported_by: string }[]>`
+      INSERT INTO quantity_import_batches
+        (organization_id, digest_sha256, source_filename, source_sheet, imported_by)
+      VALUES (${ORG_A}, ${QDIG_A}, 'harness.xlsx', 'CANTIDADES 1 PISO', ${USER_A_ADMIN})
+      RETURNING id, imported_by`;
+    const upd = await q`UPDATE quantity_import_batches SET warning_count = 99 WHERE id = ${row!.id}`;
+    const del = await q`DELETE FROM quantity_import_batches WHERE id = ${row!.id}`;
+    let spoofBlocked = false;
+    await q.unsafe('SAVEPOINT sp_qib_spoof');
+    try {
+      await q`INSERT INTO quantity_import_batches
+        (organization_id, digest_sha256, source_filename, source_sheet, imported_by)
+        VALUES (${ORG_A}, ${QDIG_B}, 'harness.xlsx', 'CANTIDADES 1 PISO', ${USER_B_ADMIN})`;
+    } catch {
+      spoofBlocked = true;
+      await q.unsafe('ROLLBACK TO SAVEPOINT sp_qib_spoof');
+    }
+    return { row: row!, upd: upd.count, del: del.count, spoofBlocked };
+  });
+  check('qty-import: admin A crea batch con imported_by = identidad real', qtyBatch.row.imported_by === USER_A_ADMIN);
+  check('qty-import: batch INMUTABLE (UPDATE denegado, 0 filas)', qtyBatch.upd === 0, `upd=${qtyBatch.upd}`);
+  check('qty-import: batch INMUTABLE (DELETE denegado, 0 filas)', qtyBatch.del === 0, `del=${qtyBatch.del}`);
+  check('qty-import: imported_by ajeno bloqueado (WITH CHECK)', qtyBatch.spoofBlocked);
+
+  // 22b) Rol obra NO crea batches ni grupos (solo admin/gerencia).
+  let qtyRoleBlocked = false;
+  let qtyGroupRoleBlocked = false;
+  await asUser(realAObra, async (q) => {
+    await q.unsafe('SAVEPOINT sp_qib_role');
+    try {
+      await q`INSERT INTO quantity_import_batches
+        (organization_id, digest_sha256, source_filename, source_sheet, imported_by)
+        VALUES (${ORG_A}, ${QDIG_B}, 'harness.xlsx', 'CANTIDADES 1 PISO', ${USER_A_OBRA})`;
+    } catch {
+      qtyRoleBlocked = true;
+      await q.unsafe('ROLLBACK TO SAVEPOINT sp_qib_role');
+    }
+    await q.unsafe('SAVEPOINT sp_qtg_role');
+    try {
+      await q`INSERT INTO quantity_takeoff_groups
+        (organization_id, description, source_row)
+        VALUES (${ORG_A}, 'Grupo obra', 10)`;
+    } catch {
+      qtyGroupRoleBlocked = true;
+      await q.unsafe('ROLLBACK TO SAVEPOINT sp_qtg_role');
+    }
+  });
+  check('qty-import: rol obra NO crea batches (solo admin/gerencia)', qtyRoleBlocked);
+  check('qty-import: rol obra NO crea grupos (solo admin/gerencia)', qtyGroupRoleBlocked);
+
+  // 22c) B NO ve batches ni grupos de A (aislamiento SELECT).
+  const QTY_BATCH_A_SEED = '00000000-0000-0000-0000-00000000f301';
+  const qtyIso = await asUser(
+    claimsB,
+    async (q) => {
+      const batches = await q<{ id: string }[]>`
+        SELECT id FROM quantity_import_batches WHERE organization_id = ${ORG_A}`;
+      const groups = await q<{ id: string }[]>`
+        SELECT id FROM quantity_takeoff_groups WHERE organization_id = ${ORG_A}`;
+      const lines = await q<{ id: string }[]>`
+        SELECT id FROM quantity_takeoff_lines WHERE organization_id = ${ORG_A}`;
+      return batches.length + groups.length + lines.length;
+    },
+    async (q) => {
+      await q`INSERT INTO quantity_import_batches
+        (id, organization_id, digest_sha256, source_filename, source_sheet, imported_by)
+        VALUES (${QTY_BATCH_A_SEED}, ${ORG_A}, ${QDIG_C}, 'harness.xlsx', 'CANTIDADES 1 PISO', ${USER_A_ADMIN})
+        ON CONFLICT (id) DO NOTHING`;
+      await q`INSERT INTO quantity_takeoff_groups
+        (id, organization_id, import_batch_id, description, source_row)
+        VALUES ('00000000-0000-0000-0000-00000000f302', ${ORG_A}, ${QTY_BATCH_A_SEED}, 'Grupo harness', 14)
+        ON CONFLICT (id) DO NOTHING`;
+      await q`INSERT INTO quantity_takeoff_lines
+        (id, organization_id, group_id, formula_type, source_row, subtotal_calculated)
+        VALUES ('00000000-0000-0000-0000-00000000f303', ${ORG_A}, '00000000-0000-0000-0000-00000000f302', 'length_height_count', 14, 10.08)
+        ON CONFLICT (id) DO NOTHING`;
+    },
+  );
+  check('qty-import: B NO ve batches/grupos/líneas de A (aislamiento SELECT)', qtyIso === 0, `n=${qtyIso}`);
+
+  // 22d) Líneas INMUTABLES (UPDATE/DELETE sin política ⇒ 0 filas).
+  const qtyLineImmutable = await asUser(realA, async (q) => {
+    const upd = await q`UPDATE quantity_takeoff_lines SET subtotal_calculated = 999
+      WHERE id = '00000000-0000-0000-0000-00000000f303'`;
+    const del = await q`DELETE FROM quantity_takeoff_lines
+      WHERE id = '00000000-0000-0000-0000-00000000f303'`;
+    return { upd: upd.count, del: del.count };
+  });
+  check('qty-import: líneas INMUTABLES (UPDATE denegado, 0 filas)', qtyLineImmutable.upd === 0);
+  check('qty-import: líneas INMUTABLES (DELETE denegado, 0 filas)', qtyLineImmutable.del === 0);
+
+  // 22e) Idempotencia estructural: digest duplicado por org bloqueado (UNIQUE);
+  //      el MISMO digest en otra org SÍ es válido.
+  const qtyIdem = await asUser(realA, async (q) => {
+    await q`INSERT INTO quantity_import_batches
+      (organization_id, digest_sha256, source_filename, source_sheet, imported_by)
+      VALUES (${ORG_A}, ${QDIG_D}, 'harness.xlsx', 'CANTIDADES 1 PISO', ${USER_A_ADMIN})`;
+    let blocked = false;
+    await q.unsafe('SAVEPOINT sp_qib_idem');
+    try {
+      await q`INSERT INTO quantity_import_batches
+        (organization_id, digest_sha256, source_filename, source_sheet, imported_by)
+        VALUES (${ORG_A}, ${QDIG_D}, 'otro.xlsx', 'CANTIDADES 1 PISO', ${USER_A_ADMIN})`;
+    } catch {
+      blocked = true;
+      await q.unsafe('ROLLBACK TO SAVEPOINT sp_qib_idem');
+    }
+    return blocked;
+  });
+  check('qty-import: digest duplicado por org bloqueado (UNIQUE org+digest)', qtyIdem);
+  const qtyIdemOtherOrg = await asUser(claimsB, async (q) => {
+    const [row] = await q<{ id: string }[]>`
+      INSERT INTO quantity_import_batches
+        (organization_id, digest_sha256, source_filename, source_sheet, imported_by)
+      VALUES (${ORG_B}, ${QDIG_C}, 'harness-b.xlsx', 'CANTIDADES 1 PISO', ${USER_B_ADMIN})
+      RETURNING id`;
+    return row !== undefined;
+  });
+  check('qty-import: mismo digest en OTRA org permitido (aislamiento real)', qtyIdemOtherOrg);
+
+  // 22f) Triggers same-org: grupo de A NO referencia batch de B; línea de A
+  //      NO referencia grupo de B.
+  let qtyCrossBatchBlocked = false;
+  let qtyCrossGroupBlocked = false;
+  await asUser(
+    realA,
+    async (q) => {
+      await q.unsafe('SAVEPOINT sp_qtg_cross');
+      try {
+        await q`INSERT INTO quantity_takeoff_groups
+          (organization_id, import_batch_id, description, source_row)
+          VALUES (${ORG_A}, '00000000-0000-0000-0000-00000000f304', 'Cross batch', 10)`;
+      } catch {
+        qtyCrossBatchBlocked = true;
+        await q.unsafe('ROLLBACK TO SAVEPOINT sp_qtg_cross');
+      }
+      await q.unsafe('SAVEPOINT sp_qtl_cross');
+      try {
+        await q`INSERT INTO quantity_takeoff_lines
+          (organization_id, group_id, formula_type, source_row, subtotal_calculated)
+          VALUES (${ORG_A}, '00000000-0000-0000-0000-00000000f305', 'direct', 11, 1)`;
+      } catch {
+        qtyCrossGroupBlocked = true;
+        await q.unsafe('ROLLBACK TO SAVEPOINT sp_qtl_cross');
+      }
+    },
+    async (q) => {
+      await q`INSERT INTO quantity_import_batches
+        (id, organization_id, digest_sha256, source_filename, source_sheet, imported_by)
+        VALUES ('00000000-0000-0000-0000-00000000f304', ${ORG_B}, ${QDIG_E}, 'b.xlsx', 'CANTIDADES 1 PISO', ${USER_B_ADMIN})
+        ON CONFLICT (id) DO NOTHING`;
+      await q`INSERT INTO quantity_takeoff_groups
+        (id, organization_id, description, source_row)
+        VALUES ('00000000-0000-0000-0000-00000000f305', ${ORG_B}, 'Grupo B', 12)
+        ON CONFLICT (id) DO NOTHING`;
+    },
+  );
+  check('qty-import: trigger same-org bloquea batch de otra org en grupos', qtyCrossBatchBlocked);
+  check('qty-import: trigger same-org bloquea grupo de otra org en líneas', qtyCrossGroupBlocked);
+
+  // 22g) RPC import_quantity_takeoff_batch: atómica, idempotente, vincula solo
+  //      exactos sin reemplazar, sin mutar BOQ, y aborta en versión emitida.
+  const qtyRpcBatch = {
+    digestSha256: '2a'.repeat(32),
+    sourceFilename: 'harness.xlsx',
+    sourceSheet: 'CANTIDADES 1 PISO',
+    unresolvedCount: 0,
+    warningCount: 0,
+    metadata: { kind: 'harness' },
+  };
+  const qtyRpcGroups = (boqItemId: string | null) => [
+    {
+      visibleCode: 'P-01',
+      itemCode: '1.01',
+      description: 'Demolicion harness',
+      unit: 'm²',
+      sourceRow: 14,
+      occurrenceIndex: 1,
+      totalCalculated: '10.08',
+      boqItemId,
+      metadata: { linkStatus: boqItemId ? 'linked' : 'not_evaluated' },
+      lines: [
+        {
+          description: null,
+          formulaType: 'length_height_count',
+          length: '4.2',
+          width: null,
+          height: '2.4',
+          count: '1',
+          rawValues: { i: { v: 10.08, f: '(E14*G14)*H14' } },
+          sourceRow: 14,
+          subtotalCalculated: '10.08',
+          sortOrder: 0,
+        },
+      ],
+    },
+  ];
+  const qtyRpc = await asUser(realA, async (q) => {
+    // Versión editable + ítem BOQ propios del harness.
+    const vid = '00000000-0000-0000-0000-00000000f306';
+    const bid = '00000000-0000-0000-0000-00000000f308';
+    const [{ res }] = await q<{ res: { duplicate: boolean; batchId: string; groupsCreated: number; linesCreated: number; linkedBoqItems: number } }[]>`
+      SELECT public.import_quantity_takeoff_batch(${sql.json(qtyRpcBatch)}, ${sql.json(qtyRpcGroups(bid))}, ${vid}) AS res`;
+    const [item] = await q<{ quantity_snapshot: string; subtotal: string }[]>`
+      SELECT quantity_snapshot, subtotal FROM boq_items WHERE id = ${bid}`;
+    const [group] = await q<{ import_batch_id: string | null; boq_item_id: string | null; total_calculated: string }[]>`
+      SELECT import_batch_id, boq_item_id, total_calculated
+      FROM quantity_takeoff_groups
+      WHERE organization_id = ${ORG_A} AND description = 'Demolicion harness'
+      ORDER BY created_at DESC LIMIT 1`;
+    // Mismo digest ⇒ duplicate, nada nuevo.
+    const [{ res: res2 }] = await q<{ res: { duplicate: boolean } }[]>`
+      SELECT public.import_quantity_takeoff_batch(${sql.json(qtyRpcBatch)}, ${sql.json(qtyRpcGroups(bid))}, ${vid}) AS res`;
+    // Digest distinto apuntando al MISMO ítem ⇒ no reemplaza (linked=0).
+    const batch3 = { ...qtyRpcBatch, digestSha256: '2b'.repeat(32) };
+    const [{ res: res3 }] = await q<{ res: { duplicate: boolean; linkedBoqItems: number; groupsCreated: number } }[]>`
+      SELECT public.import_quantity_takeoff_batch(${sql.json(batch3)}, ${sql.json(qtyRpcGroups(bid))}, ${vid}) AS res`;
+    return { res, res2, res3, item: item!, group: group! };
+  }, async (q) => {
+    await q`INSERT INTO estimates (id, project_scope_id, code, name, status)
+            VALUES ('00000000-0000-0000-0000-00000000f307', ${SCOPE_A}, 'QTYHRN', 'QtyHarness', 'active')
+            ON CONFLICT (id) DO NOTHING`;
+    await q`INSERT INTO estimate_versions (id, estimate_id, version_number, status)
+            VALUES ('00000000-0000-0000-0000-00000000f306', '00000000-0000-0000-0000-00000000f307', 1, 'draft')
+            ON CONFLICT (id) DO NOTHING`;
+    await q`INSERT INTO chapters (id, estimate_version_id, code, name, sort_order)
+            VALUES ('00000000-0000-0000-0000-00000000f30b', '00000000-0000-0000-0000-00000000f306', 'C1', 'Cap', 0)
+            ON CONFLICT (id) DO NOTHING`;
+    await q`INSERT INTO boq_items (id, estimate_version_id, chapter_id, code, description_snapshot, unit_snapshot, quantity_snapshot, unit_price_snapshot, subtotal, sort_order)
+            VALUES ('00000000-0000-0000-0000-00000000f308', '00000000-0000-0000-0000-00000000f306', '00000000-0000-0000-0000-00000000f30b', '1.01', 'Demolicion harness', 'm²', 10, 100, 1000, 0)
+            ON CONFLICT (id) DO NOTHING`;
+  });
+  check('qty-import RPC: crea batch + grupo + línea (atómica)', !qtyRpc.res.duplicate && qtyRpc.res.groupsCreated === 1 && qtyRpc.res.linesCreated === 1, JSON.stringify(qtyRpc.res));
+  check('qty-import RPC: vincula SOLO exactos (1 ítem)', qtyRpc.res.linkedBoqItems === 1);
+  check('qty-import RPC: grupo estampado con import_batch_id y vínculo', qtyRpc.group.import_batch_id !== null && qtyRpc.group.boq_item_id !== null);
+  check('qty-import RPC: BOQ intacto (quantity/subtotal sin mutar)', Number(qtyRpc.item.quantity_snapshot) === 10 && Number(qtyRpc.item.subtotal) === 1000, JSON.stringify(qtyRpc.item));
+  check('qty-import RPC: digest repetido ⇒ duplicate (idempotente)', qtyRpc.res2.duplicate === true);
+  check('qty-import RPC: vínculo existente NO se reemplaza (linked=0)', qtyRpc.res3.duplicate === false && qtyRpc.res3.linkedBoqItems === 0 && qtyRpc.res3.groupsCreated === 1, JSON.stringify(qtyRpc.res3));
+
+  // Versión emitida ⇒ version_locked (sin importar nada).
+  let qtyLocked = false;
+  try {
+    await asUser(
+      realA,
+      async (q) => {
+        const lockedBatch = { ...qtyRpcBatch, digestSha256: '2c'.repeat(32) };
+        await q`SELECT public.import_quantity_takeoff_batch(${sql.json(lockedBatch)}, ${sql.json(qtyRpcGroups(null))}, '00000000-0000-0000-0000-00000000f309')`;
+      },
+      async (q) => {
+        await q`INSERT INTO estimates (id, project_scope_id, code, name, status)
+                VALUES ('00000000-0000-0000-0000-00000000f30a', ${SCOPE_A}, 'QTYLCK', 'QtyLock', 'active')
+                ON CONFLICT (id) DO NOTHING`;
+        await q`INSERT INTO estimate_versions (id, estimate_id, version_number, status)
+                VALUES ('00000000-0000-0000-0000-00000000f309', '00000000-0000-0000-0000-00000000f30a', 1, 'issued')
+                ON CONFLICT (id) DO NOTHING`;
+      },
+    );
+  } catch {
+    qtyLocked = true;
+  }
+  check('qty-import RPC: versión emitida ⇒ version_locked (abortada)', qtyLocked);
+
+  // 22h) RLS ENABLE + FORCE en las 3 tablas nuevas.
+  const qtyForce = await sql<{ relname: string; rls: boolean; force: boolean }[]>`
+    SELECT relname, relrowsecurity AS rls, relforcerowsecurity AS force
+    FROM pg_class
+    WHERE relname IN ('quantity_import_batches', 'quantity_takeoff_groups', 'quantity_takeoff_lines')`;
+  check('qty-import: RLS ENABLE+FORCE en las 3 tablas nuevas',
+    qtyForce.length === 3 && qtyForce.every((r) => r.rls && r.force),
+    JSON.stringify(qtyForce));
 
   // --- Resumen ---
   console.log(`\nRESULTADO RLS RUNTIME: ${pass} PASS / ${fail} FAIL`);

@@ -71,9 +71,9 @@ describe('UNIT_ALIAS_NORMALIZATION_V1 — canonicalizeUnit', () => {
     expect(unitsEquivalent('', 'm2')).toBe(false);
   });
 
-  it('UA-extra: la tabla documentada cubre los tres grupos del mandato', () => {
+  it('UA-extra: la tabla documentada cubre los grupos del mandato (+m³ takeoff §2.2)', () => {
     const canonicals = UNIT_ALIAS_TABLE.map((g) => g.canonical);
-    expect(canonicals).toEqual(['m²', 'und', 'día']);
+    expect(canonicals).toEqual(['m²', 'm³', 'und', 'día']);
     for (const group of UNIT_ALIAS_TABLE) {
       for (const alias of group.aliases) {
         expect(canonicalizeUnit(alias).canonical).toBe(group.canonical);
