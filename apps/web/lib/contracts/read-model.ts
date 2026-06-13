@@ -184,6 +184,10 @@ export interface ApuDetail {
   unitCostSubcontract: DecimalString;
   unitCostOther: DecimalString;
   unitCostTotal: DecimalString;
+  /** Origen del APU: 'manual' | 'workbook_import'. Nullable para compatibilidad retroactiva. */
+  originType?: string;
+  /** Fecha de archivo ISO si está archivado; null/undefined si activo. */
+  archivedAt?: string | null;
 }
 
 export interface QuantityLineView {

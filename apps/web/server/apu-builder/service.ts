@@ -20,6 +20,7 @@ import {
 } from '@/modules/apu/apu';
 import type {
   ApuBuilderData,
+  CopyFromApuData,
   CreateManualApuResult,
   ManualApuInput,
   ManualApuPreview,
@@ -28,6 +29,7 @@ import type {
 import { isCreationModeEnabled } from '@/app/(dashboard)/projects/mode-guard';
 import { InsufficientRoleError } from '@/server/pricing/errors';
 import {
+  ApuArchiveError,
   ApuBuilderValidationError,
   ApuBuilderWriteNotSupportedError,
   ResourceWithoutApprovedPriceError,
@@ -42,7 +44,11 @@ function checkRole(viewer: AuthenticatedViewer): void {
   }
 }
 
-function requireDecimal(label: string, value: string, opts: { min?: number; max?: number } = {}): string {
+function requireDecimal(
+  label: string,
+  value: string,
+  opts: { min?: number; max?: number; exclusiveMin?: boolean; exclusiveMax?: boolean } = {},
+): string {
   let d;
   try {
     d = toDecimal(value);
@@ -53,8 +59,14 @@ function requireDecimal(label: string, value: string, opts: { min?: number; max?
   if (opts.min !== undefined && d.lessThan(opts.min)) {
     throw new ApuBuilderValidationError(`${label}: no puede ser menor que ${opts.min}`);
   }
+  if (opts.exclusiveMin && d.equals(opts.min ?? 0)) {
+    throw new ApuBuilderValidationError(`${label}: debe ser mayor que cero`);
+  }
   if (opts.max !== undefined && d.greaterThan(opts.max)) {
     throw new ApuBuilderValidationError(`${label}: no puede ser mayor que ${opts.max}`);
+  }
+  if (opts.exclusiveMax && opts.max !== undefined && d.equals(opts.max)) {
+    throw new ApuBuilderValidationError(`${label}: debe ser menor que ${opts.max}`);
   }
   return d.toFixed();
 }
@@ -78,8 +90,8 @@ export function previewManualApu(input: ManualApuInput, data: ApuBuilderData): M
     const res = materialById.get(m.resourceId);
     if (!res) throw new ApuBuilderValidationError(`Material no disponible: ${m.resourceId}`);
     if (res.approvedPrice === null) throw new ResourceWithoutApprovedPriceError(m.resourceId);
-    const quantity = requireDecimal('cantidad de material', m.quantity, { min: 0 });
-    const wastePct = requireDecimal('desperdicio', m.wastePct, { min: 0 });
+    const quantity = requireDecimal('cantidad de material', m.quantity, { min: 0, exclusiveMin: true });
+    const wastePct = requireDecimal('desperdicio', m.wastePct, { min: 0, max: 1, exclusiveMax: true });
     const totalComponentCost = calculateApuComponentCost({
       componentType: 'material',
       quantity,
@@ -101,8 +113,8 @@ export function previewManualApu(input: ManualApuInput, data: ApuBuilderData): M
   for (const l of input.labor) {
     const role = roleById.get(l.laborRoleId);
     if (!role) throw new ApuBuilderValidationError(`Rol de M.O. no disponible: ${l.laborRoleId}`);
-    const days = requireDecimal('rendimiento (días)', l.performanceDays, { min: 0 });
-    const count = requireDecimal('integrantes', l.memberCount, { min: 0 });
+    const days = requireDecimal('rendimiento (días)', l.performanceDays, { min: 0, exclusiveMin: true });
+    const count = requireDecimal('integrantes', l.memberCount, { min: 0, exclusiveMin: true });
     const quantity = toDecimal(days).times(toDecimal(count)).toFixed();
     const totalComponentCost = calculateApuComponentCost({
       componentType: 'labor',
@@ -160,7 +172,7 @@ function buildPayload(
     components.push({
       componentType: 'material',
       resourceId: m.resourceId,
-      quantity: requireDecimal('cantidad de material', m.quantity, { min: 0 }),
+      quantity: requireDecimal('cantidad de material', m.quantity, { min: 0, exclusiveMin: true }),
       wastePct: requireDecimal('desperdicio', m.wastePct, { min: 0 }),
       notes: m.notes?.trim() || undefined,
     });
@@ -168,8 +180,8 @@ function buildPayload(
   for (const l of input.labor) {
     const role = roleById.get(l.laborRoleId);
     if (!role) throw new ApuBuilderValidationError(`Rol de M.O. no disponible: ${l.laborRoleId}`);
-    const days = requireDecimal('rendimiento (días)', l.performanceDays, { min: 0 });
-    const count = requireDecimal('integrantes', l.memberCount, { min: 0 });
+    const days = requireDecimal('rendimiento (días)', l.performanceDays, { min: 0, exclusiveMin: true });
+    const count = requireDecimal('integrantes', l.memberCount, { min: 0, exclusiveMin: true });
     components.push({
       componentType: 'labor',
       laborRoleId: l.laborRoleId,
@@ -227,4 +239,35 @@ export async function loadApuBuilderData(
 ): Promise<ApuBuilderData> {
   checkRole(viewer);
   return repo.loadBuilderData(viewer);
+}
+
+/**
+ * Archiva (soft) un APU manual de la organización via RPC server-side.
+ * Solo APUs origin_type='manual', sin BOQ vinculado, razón obligatoria.
+ */
+export async function archiveManualApu(
+  viewer: AuthenticatedViewer,
+  params: { apuTemplateId: string; reason: string },
+  opts: { repo?: DbApuBuilderRepository } = {},
+): Promise<{ archivedAt: string }> {
+  checkRole(viewer);
+  const reason = params.reason?.trim() ?? '';
+  if (reason === '') throw new ApuArchiveError('reason_required', 'La razón de archivo es obligatoria');
+  const repo = opts.repo ?? new DbApuBuilderRepository();
+  return repo.archiveManualApu(viewer, { apuTemplateId: params.apuTemplateId, reason });
+}
+
+/**
+ * Carga los datos de un APU para precargar el formulario "Duplicar para
+ * corregir". NO crea ningún registro. Retorna null si el APU no existe
+ * en la organización del viewer.
+ */
+export async function loadApuForCopy(
+  viewer: AuthenticatedViewer,
+  apuTemplateId: string,
+  opts: { repo?: DbApuBuilderRepository } = {},
+): Promise<CopyFromApuData | null> {
+  checkRole(viewer);
+  const repo = opts.repo ?? new DbApuBuilderRepository();
+  return repo.loadApuForCopy(viewer, apuTemplateId);
 }

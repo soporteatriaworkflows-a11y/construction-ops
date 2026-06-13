@@ -39,3 +39,13 @@ export class BoqAddGuardError extends Error {
     this.name = 'BoqAddGuardError';
   }
 }
+
+/** APU no puede ser archivado (tipo incorrecto, ya archivado, o tiene BOQ vinculado). */
+export class ApuArchiveError extends Error {
+  readonly code: string;
+  constructor(code: string, message: string) {
+    super(message);
+    this.code = code;
+    this.name = 'ApuArchiveError';
+  }
+}

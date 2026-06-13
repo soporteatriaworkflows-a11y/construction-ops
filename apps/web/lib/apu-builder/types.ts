@@ -105,3 +105,53 @@ export interface CreateManualApuResult {
   code: string;
   componentCount: number;
 }
+
+/** Datos de un APU origen para precargar el formulario "Duplicar para corregir". */
+export interface CopyFromApuData {
+  header: {
+    code: string;       // código original (el usuario deberá editar)
+    name: string;
+    unit: string;
+    defaultToolPct: string; // fracción [0,1]
+    description?: string;
+  };
+  materials: {
+    resourceId: string;
+    quantity: string;   // cantidad original
+    wastePct: string;   // fracción [0,1]
+    notes?: string;
+  }[];
+  labor: {
+    laborRoleId: string;
+    /**
+     * Para prefill: se usa la cantidad almacenada (days × count) como
+     * performanceDays con memberCount=1. El usuario debe ajustar.
+     */
+    performanceDays: string;
+    memberCount: string;  // siempre '1' en la precarga
+    notes?: string;
+  }[];
+  /** Nombre descriptivo del APU origen (para aviso al usuario). */
+  originName: string;
+  /** Si el APU origen está archivado (para mostrar aviso). */
+  isArchived: boolean;
+}
+
+/** Resultado del preview server-side (serializable para la server action). */
+export interface SerializableManualApuPreview {
+  ok: boolean;
+  error?: string;
+  components?: {
+    kind: 'material' | 'labor';
+    label: string;
+    unit: string;
+    quantity: string;
+    wastePct: string;
+    unitPriceSnapshot: string;
+    totalComponentCost: string;
+  }[];
+  materialsCost?: string;
+  laborCost?: string;
+  toolDerivedCost?: string;
+  unitCostTotal?: string;
+}

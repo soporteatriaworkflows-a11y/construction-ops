@@ -6,6 +6,26 @@ _Sin blockers activos._
 
 ---
 
+## PREGUNTAS ABIERTAS
+
+### Q-001 — APU incompleto: ¿bloquear creación o permitir con advertencia?  🟡 PENDIENTE DECISIÓN
+- **Contexto**: el hotfix `APU_MANUAL_BUILDER_VALIDATION_AND_ARCHIVE_HOTFIX_V1` rechaza
+  cantidad/rendimiento = 0 en el dominio server-side y en SQL. Esto significa que un
+  APU con al menos un componente de $0 **no puede persistirse** (la RPC lanza
+  `invalid_component_amounts`).
+- **Pregunta**: si en el futuro se quiere permitir APUs "incompletos" (ej. actividad
+  sin precio de recurso todavía), ¿se elimina el guard `exclusiveMin` y se usa solo
+  advertencia en la UI? ¿O se mantiene el bloqueo estricto?
+- **Recomendación actual**: mantener el bloqueo estricto (`exclusiveMin: true`);
+  un APU a $0 produce un snapshot BOQ a $0 que contamina el presupuesto
+  silenciosamente. Si se necesitan "borradores", implementar `apu_draft_templates`
+  separado con estado explícito.
+- **Impacto**: cambio en `requireDecimal` en `service.ts` + en la migración SQL
+  (`v_qty <= 0` volvería a `v_qty < 0`). Requiere decisión explícita del usuario.
+- **Responsable**: agent-orchestrator (llevar a usuario antes de APU_ADVANCED_EDITOR_V2).
+
+---
+
 ## DEUDA TÉCNICA (no bloqueante)
 
 ### B-004 — Supabase Realtime unhealthy en Docker Desktop (Windows)  🟡 DEUDA TÉCNICA

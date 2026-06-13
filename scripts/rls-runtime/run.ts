@@ -2792,6 +2792,142 @@ async function main(): Promise<void> {
   }, mbSetup);
   check('mb: apu_manual_actions append-only (UPDATE no afecta filas)', mbAppendOnly === 0, `affected=${mbAppendOnly}`);
 
+  // ===========================================================================
+  // 24b) APU archive support (APU_MANUAL_BUILDER_VALIDATION_AND_ARCHIVE_HOTFIX_V1)
+  //      RPC archive_apu_template + guards en add_apu_to_boq / create_manual_apu.
+  // ===========================================================================
+  console.log('\n=== 24b) APU archive support (archive_apu_template + guards) ===');
+
+  const AR_APU_MANUAL = '00000000-0000-0000-0000-00000000fd01'; // APU org A, origin manual, sin BOQ
+  const AR_APU_IMPORT = '00000000-0000-0000-0000-00000000fd02'; // APU org A, origin workbook_import
+  const AR_APU_ARCHIVED = '00000000-0000-0000-0000-00000000fd03'; // APU org A, manual, ya archivado
+  const AR_APU_FORBOQ = '00000000-0000-0000-0000-00000000fd04'; // APU org A, manual, para add_apu_to_boq
+  const AR_APU_B = '00000000-0000-0000-0000-00000000fd05'; // APU org B, manual
+
+  const arSetup = async (q: postgres.ReservedSql) => {
+    await q`INSERT INTO apu_templates (id, organization_id, code, name, unit, default_tool_pct, origin_type, active)
+      VALUES
+      (${AR_APU_MANUAL}, ${ORG_A}, 'AR-APU-MAN', 'Archivable manual A', 'm2', 0, 'manual', true),
+      (${AR_APU_IMPORT}, ${ORG_A}, 'AR-APU-IMP', 'Importado A', 'm2', 0, 'workbook_import', true),
+      (${AR_APU_ARCHIVED}, ${ORG_A}, 'AR-APU-ARC', 'Ya archivado A', 'm2', 0, 'manual', true),
+      (${AR_APU_FORBOQ}, ${ORG_A}, 'AR-APU-BOQ', 'Para BOQ A', 'm2', 0, 'manual', true),
+      (${AR_APU_B}, ${ORG_B}, 'AR-APU-B', 'Manual B', 'm2', 0, 'manual', true)
+      ON CONFLICT (id) DO NOTHING`;
+    // Marcar AR_APU_ARCHIVED como ya archivado (estado previo).
+    await q`UPDATE apu_templates SET archived_at = now(), archived_by = ${USER_A_ADMIN}, archive_reason = 'seed archivado'
+      WHERE id = ${AR_APU_ARCHIVED} AND archived_at IS NULL`;
+  };
+
+  // 24o) archive_apu_template rechaza sesión nula (no_session/42501).
+  let arNoSession = false;
+  try {
+    await asUser(noSession, async (q) => {
+      await q`SELECT public.archive_apu_template(${AR_APU_MANUAL}, 'motivo')`;
+    }, arSetup);
+  } catch {
+    arNoSession = true;
+  }
+  check('archive: rechaza sesión nula (no_session/42501)', arNoSession);
+
+  // 24p) archive_apu_template rechaza razón vacía (archive_reason_required).
+  let arEmptyReason = false;
+  await asUser(realA, async (q) => {
+    await q.unsafe('SAVEPOINT sp_ar_er');
+    try {
+      await q`SELECT public.archive_apu_template(${AR_APU_MANUAL}, '   ')`;
+    } catch {
+      arEmptyReason = true;
+      await q.unsafe('ROLLBACK TO SAVEPOINT sp_ar_er');
+    }
+  }, arSetup);
+  check('archive: rechaza razón vacía (archive_reason_required)', arEmptyReason);
+
+  // 24q) archive_apu_template rechaza APU de otra organización (apu_not_found).
+  let arCrossOrg = false;
+  await asUser(realA, async (q) => {
+    await q.unsafe('SAVEPOINT sp_ar_xo');
+    try {
+      await q`SELECT public.archive_apu_template(${AR_APU_B}, 'motivo')`;
+    } catch {
+      arCrossOrg = true;
+      await q.unsafe('ROLLBACK TO SAVEPOINT sp_ar_xo');
+    }
+  }, arSetup);
+  check('archive: APU cross-org bloqueado (apu_not_found/no_membership)', arCrossOrg);
+
+  // 24r) archive_apu_template rechaza APU importado (apu_not_archivable_type).
+  let arNotType = false;
+  await asUser(realA, async (q) => {
+    await q.unsafe('SAVEPOINT sp_ar_ty');
+    try {
+      await q`SELECT public.archive_apu_template(${AR_APU_IMPORT}, 'motivo')`;
+    } catch {
+      arNotType = true;
+      await q.unsafe('ROLLBACK TO SAVEPOINT sp_ar_ty');
+    }
+  }, arSetup);
+  check('archive: APU importado no archivable (apu_not_archivable_type)', arNotType);
+
+  // 24s) archive_apu_template rechaza APU ya archivado (apu_already_archived).
+  let arAlready = false;
+  await asUser(realA, async (q) => {
+    await q.unsafe('SAVEPOINT sp_ar_al');
+    try {
+      await q`SELECT public.archive_apu_template(${AR_APU_ARCHIVED}, 'motivo')`;
+    } catch {
+      arAlready = true;
+      await q.unsafe('ROLLBACK TO SAVEPOINT sp_ar_al');
+    }
+  }, arSetup);
+  check('archive: APU ya archivado bloqueado (apu_already_archived)', arAlready);
+
+  // 24s-bis) archive_apu_template feliz: admin A archiva un manual sin BOQ.
+  const arHappy = await asUser(realA, async (q) => {
+    const [r] = await q<{ res: { status: string } }[]>`
+      SELECT public.archive_apu_template(${AR_APU_MANUAL}, 'motivo de archivo') AS res`;
+    const [tpl] = await q<{ archived_at: string | null; archived_by: string | null; archive_reason: string | null }[]>`
+      SELECT archived_at, archived_by, archive_reason FROM apu_templates WHERE id = ${AR_APU_MANUAL}`;
+    return { res: r!.res, tpl: tpl! };
+  }, arSetup);
+  check('archive: feliz ⇒ status=archived + archived_at/by/reason persistidos',
+    arHappy.res.status === 'archived'
+    && arHappy.tpl.archived_at !== null
+    && arHappy.tpl.archived_by === USER_A_ADMIN
+    && arHappy.tpl.archive_reason === 'motivo de archivo');
+
+  // 24t) add_apu_to_boq rechaza APU archivado (apu_archived). Reutiliza la
+  //      versión draft / capítulo del bloque 24; archivamos AR_APU_FORBOQ y
+  //      verificamos que no entra al BOQ.
+  let arAddArchived = false;
+  await asUser(realA, async (q) => {
+    await q`SELECT public.archive_apu_template(${AR_APU_FORBOQ}, 'archivado para test BOQ')`;
+    await q.unsafe('SAVEPOINT sp_ar_boq');
+    try {
+      await q`SELECT public.add_apu_to_boq(${MB_VER_DRAFT}, ${MB_CHAP}, ${AR_APU_FORBOQ}, 1, NULL)`;
+    } catch {
+      arAddArchived = true;
+      await q.unsafe('ROLLBACK TO SAVEPOINT sp_ar_boq');
+    }
+  }, async (q) => { await mbSetup(q); await arSetup(q); });
+  check('archive: add_apu_to_boq bloquea APU archivado (apu_archived)', arAddArchived);
+
+  // 24u) create_manual_apu rechaza componente con cantidad = 0 (endurecido
+  //      v_qty <= 0 ⇒ invalid_component_amounts/P0001).
+  let arZeroQty = false;
+  await asUser(realA, async (q) => {
+    await q.unsafe('SAVEPOINT sp_ar_zq');
+    try {
+      await q`SELECT public.create_manual_apu(
+        ${sql.json({ code: 'AR-ZERO', name: 'cantidad cero', unit: 'm2', defaultToolPct: 0 })},
+        ${sql.json([{ componentType: 'material', resourceId: MB_RES, quantity: '0', wastePct: '0' }])},
+        NULL)`;
+    } catch {
+      arZeroQty = true;
+      await q.unsafe('ROLLBACK TO SAVEPOINT sp_ar_zq');
+    }
+  }, async (q) => { await mbSetup(q); await arSetup(q); });
+  check('archive: create_manual_apu rechaza componente cantidad=0 (invalid_component_amounts)', arZeroQty);
+
   // --- Resumen ---
   console.log(`\nRESULTADO RLS RUNTIME: ${pass} PASS / ${fail} FAIL`);
   if (fail > 0) {

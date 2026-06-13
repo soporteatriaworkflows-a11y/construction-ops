@@ -12,9 +12,9 @@ import { PageHeader } from '@/components/shared/page-header';
 import { Button } from '@/components/ui/button';
 import { resolveViewer } from '@/server/auth/resolve-viewer';
 import { isCreationModeEnabled } from '@/app/(dashboard)/projects/mode-guard';
-import { loadApuBuilderData } from '@/server/apu-builder';
+import { loadApuBuilderData, loadApuForCopy } from '@/server/apu-builder';
 import type { AuthenticatedViewer } from '@/server/auth/types';
-import type { ApuBuilderData } from '@/lib/apu-builder/types';
+import type { ApuBuilderData, CopyFromApuData } from '@/lib/apu-builder/types';
 import { ApuBuilderForm } from './_components/apu-builder-form';
 
 export const dynamic = 'force-dynamic';
@@ -42,6 +42,7 @@ function BackLink() {
 export default async function NewApuPage({ searchParams }: PageProps) {
   const sp = await searchParams;
   const preselectedResourceId = str(sp.resourceId);
+  const copyFromId = str(sp.copyFrom);
 
   let canMutate = false;
   let viewer: AuthenticatedViewer | null = null;
@@ -94,14 +95,34 @@ export default async function NewApuPage({ searchParams }: PageProps) {
     );
   }
 
+  // Carga datos del APU origen para precarga (copyFrom). Null si no existe o falla.
+  let copyFromData: CopyFromApuData | null = null;
+  if (copyFromId) {
+    try {
+      copyFromData = await loadApuForCopy(viewer, copyFromId);
+    } catch {
+      // Si falla la carga, continúa con formulario vacío (no es bloqueante).
+      copyFromData = null;
+    }
+  }
+
+  const pageTitle = copyFromData ? 'Duplicar APU para corregir' : 'Nuevo APU';
+  const pageDescription = copyFromData
+    ? `Copia precargada de «${copyFromData.originName}». Revisa y ajusta antes de guardar.`
+    : 'Construye una actividad a partir de materiales del catálogo y mano de obra.';
+
   return (
     <div>
       <PageHeader
-        title="Nuevo APU"
-        description="Construye una actividad a partir de materiales del catálogo y mano de obra."
+        title={pageTitle}
+        description={pageDescription}
         breadcrumb={<BackLink />}
       />
-      <ApuBuilderForm data={data} preselectedResourceId={preselectedResourceId} />
+      <ApuBuilderForm
+        data={data}
+        preselectedResourceId={preselectedResourceId}
+        copyFromData={copyFromData}
+      />
     </div>
   );
 }

@@ -27,6 +27,10 @@ export interface ApuLibraryItem {
   origin: string; // nombre del lote de importación o 'Manual'
   importBatchId: Uuid | null;
   resourceStatus: ApuResourceStatus;
+  /** Fecha de archivo ISO si el APU está archivado; null/undefined si activo. */
+  archivedAt?: string | null;
+  /** true si unitCost = '0' o hay componente con totalComponentCost=0. */
+  isIncomplete?: boolean;
 }
 
 /** Métricas del encabezado de la biblioteca. */
@@ -46,7 +50,8 @@ export type ApuLibraryFilter =
   | 'complete'
   | 'with_suggestions'
   | 'unresolved'
-  | 'ambiguous';
+  | 'ambiguous'
+  | 'archived';
 
 export type ApuLibrarySort =
   | 'code'
@@ -62,6 +67,12 @@ export interface ApuLibraryParams {
   filter: ApuLibraryFilter;
   sort: ApuLibrarySort;
   origin: string | null; // importBatchId | 'manual' | null
+  /**
+   * Si es true (o filter='archived') incluye APUs archivados. Por defecto
+   * (false) sólo se muestran activos (archived_at IS NULL). El read-model debe
+   * exponer `archivedAt` por plantilla para que el filtro tenga efecto real.
+   */
+  showArchived?: boolean;
 }
 
 export interface ApuLibraryResult {
