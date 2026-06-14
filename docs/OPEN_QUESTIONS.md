@@ -4,6 +4,27 @@
 
 _Sin blockers activos._
 
+> **Nota 2026-06-14 (SCHEDULE_FROM_BOQ_V1 — COMPLETA, Fases 0–8):** la
+> planificación se implementó **extendiendo la fundación 3B** (decisión aprobada).
+> Todas las fases completas, validadas y comiteadas (`c795b9f`→`3214ce6`); **rama
+> publicada `origin/feature/schedule-from-boq-v1`** (sin merge/deploy/db push
+> remoto). Validación: suite 1715/0, RLS harness 258/0, isolation 12/0, gm 22/22,
+> gm:import PASS, smoke 7/7, agents 214/0. **Deuda nueva
+> `SCHEDULE_ROLE_COMPRAS_SEPARATION_V2`:** la UI gatea por ViewerRole (`internal`
+> incluye `compras`) y muestra el CTA "Crear cronograma", pero el RPC lo rechaza
+> con `app.current_role()` (solo admin/gerencia/presupuestos). Separar `compras`
+> a nivel UI requiere un check de `profile.role` server-side; sin contrato no se
+> amplía. **Deudas registradas en esta oleada (no bloquean):**
+> `SCHEDULE_CRITICAL_PATH_V2`, `SCHEDULE_BASELINE_V2`,
+> `SCHEDULE_EXPORT_PDF_EXCEL_V1`, `MS_PROJECT_EXPORT_XML_V1`,
+> `RESOURCE_LEVELING_V2`, `SCHEDULE_COMPARE_WITH_BOQ_V2`, `SCHEDULE_AUDIT_LOG_V2`,
+> `APU_ADVANCED_EDITOR_V2`, `APU_VERSIONING_V1`. **Pregunta abierta para Fase 3:**
+> el encoding APU colapsa `quantity_labor = rendimiento_días × integrantes`, por
+> lo que la duración-calendario exacta no es recuperable sin tamaño de cuadrilla;
+> V1 usa `crew_size` (default 1, editable) y `productivity_source`
+> apu/manual/unknown — sin inventar duración exacta. Confirmar con la usuaria si
+> el default de `crew_size` debe ser configurable por organización/proyecto.
+
 > **Nota 2026-06-14 (DASHBOARD_ACCESS_NAV_AND_PRICING_KPI_HOTFIX_V1):** copy
 > stale "Oleada 3A — modo fixture activo" corregido. Nav "Accesos": la arquitectura
 > ya estaba correcta; si el sidebar sigue sin mostrar "Accesos" en producción

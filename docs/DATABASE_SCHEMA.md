@@ -709,9 +709,36 @@ Reglas: hitos con duración 0; no recalcular presupuesto emitido; avance financi
 derivado server-side (sin float); campos `wbs_code`/`dependency_type`/`lag_days`/
 `external_reference` reservados para export MS Project futuro (no en 3B).
 
+### SCHEDULE_FROM_BOQ_V1 (extensión aditiva, 2026-06-14)
+
+Contrato: `docs/SCHEDULE_FROM_BOQ_V1_CONTRACT.md`. **Decisión: EXTENDER la
+fundación 3B** (no tablas paralelas). Migraciones `20260622090000`/`090100`/`090200`.
+
+- **`planning_schedules`** (NUEVA): contenedor de cronograma derivado de un
+  presupuesto. `organization_id` (RLS **ENABLE+FORCE**), `project_id`,
+  `estimate_version_id` (origen; **nunca se muta** el presupuesto), `name`,
+  `status IN ('draft','baseline','active','archived')`, `start_date` (DATE),
+  `end_date` (DATE, derivada del recálculo), `created_by`, `archived_at`. CHECK
+  `(status='archived') = (archived_at IS NOT NULL)`. RLS: SELECT/INSERT/UPDATE por
+  org + WITH CHECK cruzado (project + estimate_version misma org); **sin DELETE**
+  (archivar≠borrar). FORCE table count 40→**41**.
+- **`schedule_tasks`** += columnas **NULLABLE aditivas**: `schedule_id`
+  (FK `planning_schedules` ON DELETE CASCADE), `boq_item_id` (FK `boq_items` ON
+  DELETE SET NULL), `apu_template_id` (FK `apu_templates` ON DELETE SET NULL),
+  `task_type IN ('chapter','activity','milestone')`, `unit_snapshot`,
+  `quantity_snapshot` NUMERIC(20,10), `productivity_source IN ('apu','manual','unknown')`,
+  `crew_label`, `crew_size` NUMERIC(12,4) CHECK ≥0, `responsible`, `notes`.
+  No se altera ninguna columna/constraint existente.
+- **RPC `create_schedule_from_boq(uuid,uuid,text,date,date,text,jsonb)`**:
+  SECURITY INVOKER, `search_path=public,app`; rol `admin/gerencia/presupuestos`
+  (`app.current_role()`); org/actor server-side; inserta schedule + tareas
+  atómicamente, resuelve `tempId→UUID` (jerarquía) y prefija `wbs_code` con token
+  del schedule para unicidad `(project_id, wbs_code)`. GRANT EXECUTE a `authenticated`.
+
 | Fecha | Cambio | Migración | Autor |
 |-------|--------|-----------|-------|
 | 2026-05-31 | **Planning congelado v1** (`schedule_tasks`, `task_dependencies`, `progress_entries`, `resource_assignments`) — Oleada 3B | (db-rls) | orchestrator |
+| 2026-06-14 | **SCHEDULE_FROM_BOQ_V1**: NUEVA `planning_schedules` + columnas aditivas en `schedule_tasks` + RPC `create_schedule_from_boq` (aditivo; RLS FORCE; 40→41) | `20260622090000`/`090100`/`090200` | orchestrator |
 | 2026-06-01 | **Auth/RLS por identidad (Oleada 4A.1)** — helpers de identidad real (`auth.uid()`→`profiles`) con compat demo; membresía single-org reutilizando `profiles` (sin tablas nuevas). Ver `docs/AUTH_CONTRACT.md` | (db-rls) | orchestrator |
 | 2026-06-01 | **Integración 4A.1** (merge `adeafbe`) — helpers de identidad real integrados; RLS runtime 47/47; reutiliza `profiles`/`organizations` (sin tablas nuevas) | (db-rls) | orchestrator |
 | 2026-06-11 | **Price Monitoring Agent V1 (Fase 4A)** — 3 tablas nuevas con RLS FORCE (ver sección siguiente) | `20260612090000` + `20260612090100` | orchestrator |

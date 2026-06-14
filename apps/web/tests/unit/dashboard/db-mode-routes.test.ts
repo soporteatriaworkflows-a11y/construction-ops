@@ -36,8 +36,10 @@ describe('Rutas hermanas — request-time + viewer real en modo db', () => {
         expect(source).toMatch(/export\s+const\s+dynamic\s*=\s*['"]force-dynamic['"]/);
       });
 
-      it('resuelve el viewer real (resolveViewer), no getDemoViewer', () => {
-        expect(source).toMatch(/await\s+resolveViewer\(\)/);
+      it('resuelve el viewer real (resolveViewer/resolveAuthenticatedViewer), no getDemoViewer', () => {
+        // /planning (SCHEDULE_FROM_BOQ_V1) usa el viewer AUTENTICADO (gestión de
+        // cronogramas requiere identidad real); las demás usan resolveViewer.
+        expect(source).toMatch(/await\s+resolve(Authenticated)?Viewer\(\)/);
         expect(source).not.toMatch(/getDemoViewer/);
       });
 

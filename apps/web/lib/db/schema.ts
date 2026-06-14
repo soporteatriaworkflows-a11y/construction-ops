@@ -798,6 +798,59 @@ export const quantityLines = pgTable(
  * (supabase/migrations/20260531100000_planning_schedule.sql y *_rls_policies_planning.sql).
  * ------------------------------------------------------------------------- */
 
+/**
+ * planning_schedules — contenedor de cronograma derivado de un presupuesto
+ * (SCHEDULE_FROM_BOQ_V1). organization_id DIRECTO (RLS simple). El cronograma
+ * referencia una estimate_version (origen) pero NUNCA la modifica. RLS/trigger
+ * en supabase/migrations/20260622090000_schedule_from_boq.sql y *_rls_*.
+ */
+export const planningSchedules = pgTable(
+  "planning_schedules",
+  {
+    id: pk(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    estimateVersionId: uuid("estimate_version_id")
+      .notNull()
+      .references(() => estimateVersions.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    status: text("status").notNull().default("draft"),
+    startDate: date("start_date").notNull(),
+    endDate: date("end_date"),
+    createdBy: uuid("created_by").references(() => profiles.id, {
+      onDelete: "set null",
+    }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("planning_schedules_organization_id_idx").on(t.organizationId),
+    index("planning_schedules_project_id_idx").on(t.projectId),
+    index("planning_schedules_version_id_idx").on(t.estimateVersionId),
+    index("planning_schedules_project_created_idx").on(
+      t.projectId,
+      t.createdAt,
+    ),
+    check(
+      "planning_schedules_status_valid",
+      sql`${t.status} IN ('draft','baseline','active','archived')`,
+    ),
+    check(
+      "planning_schedules_dates_valid",
+      sql`${t.endDate} IS NULL OR ${t.endDate} >= ${t.startDate}`,
+    ),
+    check(
+      "planning_schedules_archived_coherent",
+      sql`(${t.status} = 'archived') = (${t.archivedAt} IS NOT NULL)`,
+    ),
+  ],
+);
+
 export const scheduleTasks = pgTable(
   "schedule_tasks",
   {
@@ -818,6 +871,25 @@ export const scheduleTasks = pgTable(
       (): AnyPgColumn => scheduleTasks.id,
       { onDelete: "cascade" },
     ),
+    // SCHEDULE_FROM_BOQ_V1 (aditivo, todo NULLABLE): vínculo a cronograma/BOQ/APU,
+    // snapshots, trazabilidad de duración y cuadrilla/responsable.
+    scheduleId: uuid("schedule_id").references(() => planningSchedules.id, {
+      onDelete: "cascade",
+    }),
+    boqItemId: uuid("boq_item_id").references(() => boqItems.id, {
+      onDelete: "set null",
+    }),
+    apuTemplateId: uuid("apu_template_id").references(() => apuTemplates.id, {
+      onDelete: "set null",
+    }),
+    taskType: text("task_type"),
+    unitSnapshot: text("unit_snapshot"),
+    quantitySnapshot: money("quantity_snapshot"),
+    productivitySource: text("productivity_source"),
+    crewLabel: text("crew_label"),
+    crewSize: numeric("crew_size", { precision: 12, scale: 4 }),
+    responsible: text("responsible"),
+    notes: text("notes"),
     wbsCode: text("wbs_code").notNull(),
     name: text("name").notNull(),
     description: text("description"),
@@ -843,6 +915,10 @@ export const scheduleTasks = pgTable(
     index("schedule_tasks_project_scope_id_idx").on(t.projectScopeId),
     index("schedule_tasks_chapter_id_idx").on(t.chapterId),
     index("schedule_tasks_parent_task_id_idx").on(t.parentTaskId),
+    index("schedule_tasks_schedule_id_idx").on(t.scheduleId),
+    index("schedule_tasks_boq_item_id_idx").on(t.boqItemId),
+    index("schedule_tasks_apu_template_id_idx").on(t.apuTemplateId),
+    index("schedule_tasks_schedule_sort_idx").on(t.scheduleId, t.sortOrder),
     index("schedule_tasks_project_sort_idx").on(t.projectId, t.sortOrder),
     index("schedule_tasks_project_start_idx").on(t.projectId, t.plannedStart),
     uniqueIndex("schedule_tasks_project_wbs_uq").on(t.projectId, t.wbsCode),
@@ -858,6 +934,18 @@ export const scheduleTasks = pgTable(
     check(
       "schedule_tasks_status_valid",
       sql`${t.status} IN ('not_started','in_progress','completed','blocked','cancelled')`,
+    ),
+    check(
+      "schedule_tasks_task_type_valid",
+      sql`${t.taskType} IS NULL OR ${t.taskType} IN ('chapter','activity','milestone')`,
+    ),
+    check(
+      "schedule_tasks_productivity_source_valid",
+      sql`${t.productivitySource} IS NULL OR ${t.productivitySource} IN ('apu','manual','unknown')`,
+    ),
+    check(
+      "schedule_tasks_crew_size_nonneg",
+      sql`${t.crewSize} IS NULL OR ${t.crewSize} >= 0`,
     ),
     check(
       "schedule_tasks_milestone_zero_duration",

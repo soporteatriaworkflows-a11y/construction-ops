@@ -4,6 +4,29 @@ Este documento es propiedad de **agent-qa**. Se actualiza al final de
 
 ---
 
+## SCHEDULE_FROM_BOQ_V1 (2026-06-14, rama `feature/schedule-from-boq-v1`)
+
+**Base:** `origin/main = 5c19cb7` · **main intacta** · **producción intacta** · **3 migraciones aditivas SOLO locales** (`20260622090000`/`090100`/`090200`) · **sin db push remoto** · **sin escrituras remotas** · **rama publicada (sin merge/deploy)**
+
+| Check | Resultado |
+|---|---|
+| typecheck (`tsc --noEmit`) | ✅ 0 errores |
+| lint (`eslint .`) | ✅ 0 errores |
+| suite (`vitest run`) | ✅ **1715 passed / 42 skipped / 0 fail** (+48: 22 generador, 13 recalc, 13 servicio) |
+| build (`next build`) | ✅ limpio; rutas `/planning`, `/planning/new`, `/planning/[scheduleId]` dynamic |
+| `supabase db reset` local | ✅ aplica las 3 migraciones nuevas + 6 seeds sin error |
+| RLS runtime harness | ✅ **258 PASS / 0 FAIL** (FORCE 40→41 +`planning_schedules`; +7 checks: insert same-org, cross-org project/version rechazado, SELECT isolation, DELETE denegado, RPC crea schedule+tareas con parent resuelto, RPC rechaza rol no autorizado) |
+| read-model isolation | ✅ 12 / 0 |
+| gm:regression | ✅ 22 / 22 (golden master intacto) |
+| gm:import | ✅ PASS (idempotente; fixture canónico intacto) |
+| smoke local (`localhost:3200`) | ✅ `/planning`, `/planning/new`, `/dashboard`, `/quantities`, `/apu`, `/catalog`, `/login` → 200 (sin 500) |
+| `git diff --check` | ✅ limpio |
+| validate-claude-agents | ✅ 214 / 0 |
+
+**Privacidad/integridad:** RLS ENABLE+FORCE tenant-scoped en `planning_schedules`; WITH CHECK cruzado (project+version misma org); sin DELETE (archivar≠borrar); RPC SECURITY INVOKER con rol `admin/gerencia/presupuestos` server-side; ruta crítica 🔒 oculta a `client`. **No muta BOQ/APU/quantities/precios**; snapshots emitidos intactos.
+
+---
+
 ## DASHBOARD_ACCESS_NAV_AND_PRICING_KPI_HOTFIX_V1 (2026-06-14, rama `fix/dashboard-access-nav-pricing-kpi-v1`)
 
 **Base:** `origin/main = 0d172ea` · **main intacta** · **producción intacta** · **sin migración** · **sin db push remoto** · **sin escrituras remotas**
