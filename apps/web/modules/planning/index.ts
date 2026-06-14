@@ -54,3 +54,21 @@ export type {
   DelayAlert,
   ProgressVarianceStatus,
 } from './view-model';
+export {
+  buildScheduleFromBoqPreview,
+  estimateActivityDuration,
+} from './generator';
+export type {
+  GeneratorChapterInput,
+  GeneratorItemInput,
+  GeneratorOptions,
+  GeneratorInput,
+  GeneratorPreview,
+  GeneratorStats,
+  GeneratorWarning,
+  GeneratorWarningKind,
+  GeneratorTaskType,
+  ProductivitySource,
+  PreviewTask,
+  DurationEstimate,
+} from './generator';
