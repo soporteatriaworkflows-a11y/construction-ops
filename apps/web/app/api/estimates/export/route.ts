@@ -31,6 +31,7 @@ import {
 import { generateApuExport } from '@/server/estimates/export/apu-annex';
 import type { EstimateExportFormat } from '@/lib/estimates/export-types';
 import type { ExportKind } from '@/lib/estimates/apu-export-types';
+import { resolveExportPlan, isExportProfile } from '@/lib/estimates/export-profile';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -54,14 +55,19 @@ export async function GET(request: NextRequest): Promise<Response> {
   const projectId = sp.get('projectId') ?? '';
   const scopeId = sp.get('scopeId') ?? '';
   const kindParam = sp.get('kind') ?? 'budget';
+  // Perfil opcional (CLIENT_EXPORT_PROFILE_V1). Por defecto 'technical' ⇒
+  // comportamiento idéntico al previo (retrocompatible).
+  const profileParam = sp.get('profile') ?? 'technical';
 
   if (!format) return err(400, 'Parámetro "format" requerido.');
   if (!isFormat(format)) return err(400, 'Formato no válido. Use "xlsx" o "pdf".');
   if (!isKind(kindParam)) return err(400, 'Tipo de export no válido.');
+  if (!isExportProfile(profileParam)) return err(400, 'Perfil de export no válido.');
   if (!estimateId) return err(400, 'Parámetro "estimateId" requerido.');
   if (!projectId) return err(400, 'Parámetro "projectId" requerido.');
   if (!scopeId) return err(400, 'Parámetro "scopeId" requerido.');
-  const kind = kindParam;
+  // El perfil cliente jamás incluye fichas APU técnicas (degrada a budget).
+  const { kind } = resolveExportPlan(profileParam, kindParam);
 
   // Viewer requerido (demo → fixture; supabase → sesión válida).
   let viewer;

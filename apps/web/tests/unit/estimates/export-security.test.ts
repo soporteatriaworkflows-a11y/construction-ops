@@ -81,11 +81,12 @@ describe('Export — UI (fuente)', () => {
   it('botones: loading, anti doble-click, error sanitizado, descarga directa', () => {
     const src = read(`${base}/export-buttons.tsx`);
     expect(src).toMatch(/^'use client';/m);
-    // Menú «Exportar» APU_EXPORTS_V1: presupuesto + APU vinculados + paquete.
-    expect(src).toMatch(/Presupuesto Excel/);
-    expect(src).toMatch(/Presupuesto PDF/);
+    // Menú «Exportar» CLIENT_EXPORT_PROFILE_V1: perfil cliente vs técnico.
+    expect(src).toMatch(/PDF cliente/);
+    expect(src).toMatch(/Excel presupuesto/);
+    expect(src).toMatch(/PDF técnico completo/);
+    expect(src).toMatch(/Excel técnico con APU/);
     expect(src).toMatch(/APU vinculados PDF/);
-    expect(src).toMatch(/Paquete (PDF|Excel)/);
     expect(src).toMatch(/disabled=\{busy/);
     expect(src).toMatch(/if \(busy\) return/);
     expect(src).toMatch(/URL\.createObjectURL/);

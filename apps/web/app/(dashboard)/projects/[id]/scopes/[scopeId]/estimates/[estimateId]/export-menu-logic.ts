@@ -54,7 +54,36 @@ export function buildExportQuery(input: {
   estimateId: string;
   projectId: string;
   scopeId: string;
+  /** Perfil opcional (CLIENT_EXPORT_PROFILE_V1). Omitido ⇒ técnico (retrocompat). */
+  profile?: 'client' | 'technical';
 }): string {
-  const { format, kind, estimateId, projectId, scopeId } = input;
-  return new URLSearchParams({ format, estimateId, projectId, scopeId, kind }).toString();
+  const { format, kind, estimateId, projectId, scopeId, profile } = input;
+  const params = new URLSearchParams({ format, estimateId, projectId, scopeId, kind });
+  if (profile) params.set('profile', profile);
+  return params.toString();
+}
+
+/** Opción del menú «Exportar» con etiquetas claras cliente vs técnico. */
+export interface ExportMenuOption {
+  id: string;
+  label: string;
+  format: 'xlsx' | 'pdf';
+  kind: 'budget' | 'apu' | 'package';
+  profile: 'client' | 'technical';
+  /** Requiere ≥1 APU vinculado para habilitarse. */
+  requiresApu: boolean;
+}
+
+/** Catálogo de opciones del menú con nombres no ambiguos (§6.2). */
+export const EXPORT_MENU_OPTIONS: ExportMenuOption[] = [
+  { id: 'pdf-client', label: 'PDF cliente', format: 'pdf', kind: 'budget', profile: 'client', requiresApu: false },
+  { id: 'pdf-technical', label: 'PDF técnico completo', format: 'pdf', kind: 'package', profile: 'technical', requiresApu: true },
+  { id: 'xlsx-budget', label: 'Excel presupuesto', format: 'xlsx', kind: 'budget', profile: 'client', requiresApu: false },
+  { id: 'xlsx-technical', label: 'Excel técnico con APU', format: 'xlsx', kind: 'package', profile: 'technical', requiresApu: true },
+];
+
+/** Opciones habilitadas según disponibilidad de APU vinculados. */
+export function availableExportOptions(counts: ExportCounts | null | undefined): ExportMenuOption[] {
+  const apuOk = apuOptionsEnabled(counts);
+  return EXPORT_MENU_OPTIONS.filter((o) => !o.requiresApu || apuOk);
 }
