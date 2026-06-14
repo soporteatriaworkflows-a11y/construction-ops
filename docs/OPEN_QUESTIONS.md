@@ -253,3 +253,30 @@ _Sin blockers activos._
     aprobadas. Interfaz **sustituible** para soportar luego API oficial / feed
     oficial / cotización empresarial / carga manual / n8n supervisado. Ver
     `docs/DECISIONS.md` y `docs/PRICING_ADAPTER_CONTRACT.md`.
+
+---
+
+## OPERATIONAL_ACCESS_LAYER_V1 + SMTP_CORPORATIVO_V1 (2026-06-14)
+
+> Sin blockers nuevos al cierre. Rama lista para revisión visual + release
+> controlado (2 migraciones aditivas; sin db push remoto este ciclo).
+
+### Deudas registradas (no bloqueantes)
+- **`OPERATIONAL_ACCESS_REMOTE_RLS_VERIFY_V1` (release-crítica)**: en Supabase
+  remoto el migrador podría NO tener BYPASSRLS (ver fix 4B.1). Verificar en
+  staging que las RPCs `SECURITY DEFINER` operan bajo RLS remota — en especial
+  `accept_invitation` (escribe `profiles` para un invitado SIN organización) y el
+  listado por read-model (drizzle). Si falta bypass, conceder/ajustar antes de
+  confiar en el flujo de invitación en producción. Localmente (migrador
+  superusuario) todo pasa.
+- **`ACCESS_DEACTIVATION_V1`**: suspender el acceso de un usuario ACTIVO sin
+  borrarlo (requiere `profiles.status` o tabla de suspensión + ajuste en
+  `resolveAuthenticatedViewer`). Diferido; no hay borrado físico de usuarios.
+- **`ACCESS_AUDIT_VIEWER_V1`**: UI de la bitácora `access_audit_log`.
+- **`EMAIL_DELIVERABILITY_MONITORING_V1`**: monitoreo de entregabilidad SMTP.
+
+### Pregunta abierta
+- Q-ACC-1: ¿el primer admin real de cada organización se crea por seed/manual o
+  se habilita un bootstrap controlado? Hoy ya existe un admin en producción; la
+  cadena de invitaciones parte de él. Recomendación: documentar el bootstrap y no
+  exponer creación de admin fuera de un admin existente (ya garantizado por RPC).
