@@ -72,3 +72,13 @@ export type {
   PreviewTask,
   DurationEstimate,
 } from './generator';
+export {
+  recalculateScheduleDates,
+  dependencyWouldCreateCycle,
+} from './recalc';
+export type {
+  RecalcTaskInput,
+  RecalcDependency,
+  RecalcTaskResult,
+  RecalcResult,
+} from './recalc';

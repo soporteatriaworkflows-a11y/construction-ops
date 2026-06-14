@@ -224,7 +224,9 @@ describe('PLANNING — planning/page.tsx empty state actualizado', () => {
   });
 
   it('planning tiene empty state con mensaje claro para el usuario', () => {
-    expect(planningPageSrc).toContain('Todavía no hay planificación generada');
+    // SCHEDULE_FROM_BOQ_V1 Fase 4: /planning ahora lista cronogramas; el empty
+    // state se muestra cuando no hay ninguno todavía.
+    expect(planningPageSrc).toContain('Todavía no hay cronogramas');
   });
 
   it('planning usa EmptyState component', () => {

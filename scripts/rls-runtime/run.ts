@@ -3129,6 +3129,55 @@ async function main(): Promise<void> {
   );
   check('schedule: DELETE denegado por RLS (archivar≠borrar)', schedDelDenied);
 
+  // S6) RPC create_schedule_from_boq: admin crea cronograma + tareas atómicamente.
+  const rpcTasks = [
+    {
+      tempId: 'chapter:1', parentTempId: null, taskType: 'chapter', wbsCode: '01',
+      name: 'Capítulo 1', plannedStart: '2026-07-01', plannedEnd: '2026-07-05',
+      durationDays: '5', isMilestone: false, sortOrder: 0,
+    },
+    {
+      tempId: 'item:1', parentTempId: 'chapter:1', taskType: 'activity', wbsCode: '01.001',
+      name: 'Actividad 1', unitSnapshot: 'm3', quantitySnapshot: '10',
+      plannedStart: '2026-07-01', plannedEnd: '2026-07-05', durationDays: '5',
+      progressPct: '0', isMilestone: false, productivitySource: 'manual', sortOrder: 1,
+    },
+  ];
+  let schedRpcCreate = false;
+  await asUser(claimsA, async (q) => {
+    const r = await q`
+      SELECT public.create_schedule_from_boq(
+        ${PROJECT_A}, ${VERSION_A}, 'RPC Sched', '2026-07-01'::date, '2026-07-05'::date,
+        'draft', ${sql.json(rpcTasks)}
+      ) AS id`;
+    const sid = (r[0] as { id?: string })?.id;
+    if (sid) {
+      const cnt = await q`SELECT count(*)::int AS c FROM schedule_tasks WHERE schedule_id = ${sid}`;
+      const parent = await q`
+        SELECT count(*)::int AS c FROM schedule_tasks
+        WHERE schedule_id = ${sid} AND task_type = 'activity' AND parent_task_id IS NOT NULL`;
+      schedRpcCreate = (cnt[0] as { c: number }).c === 2 && (parent[0] as { c: number }).c === 1;
+    }
+  });
+  check('schedule: RPC crea cronograma + 2 tareas (parent resuelto)', schedRpcCreate);
+
+  // S7) RPC rechaza rol no autorizado (obra/site) — backend, no solo UI.
+  let schedRpcRole = false;
+  await asUser(claimsAObra, async (q) => {
+    await q.unsafe('SAVEPOINT sp_sched_rpc_role');
+    try {
+      await q`
+        SELECT public.create_schedule_from_boq(
+          ${PROJECT_A}, ${VERSION_A}, 'X', '2026-07-01'::date, NULL::date, 'draft', ${sql.json([])}
+        )`;
+      schedRpcRole = false;
+    } catch {
+      schedRpcRole = true;
+    }
+    await q.unsafe('ROLLBACK TO SAVEPOINT sp_sched_rpc_role');
+  });
+  check('schedule: RPC rechaza rol no autorizado (insufficient_role)', schedRpcRole);
+
   // --- Resumen ---
   console.log(`\nRESULTADO RLS RUNTIME: ${pass} PASS / ${fail} FAIL`);
   if (fail > 0) {
