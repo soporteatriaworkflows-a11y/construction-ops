@@ -181,7 +181,8 @@ async function main(): Promise<void> {
   // 35 tras APU_COMPONENT_RESOURCE_RECONCILIATION_V1 (+apu_component_resource_actions).
   // 36 tras APU_MANUAL_BUILDER_V1 + BOQ_ADD_FROM_APU_V1 (+apu_manual_actions).
   // 38 tras QUANTITY_WORKSPACE_AND_BOQ_SYNC_V1 (+quantity_workspace_groups/lines).
-  check('Pre-flight: 38 tablas con RLS FORCE', rlsTables === '38', `rlsTables=${rlsTables}`);
+  // 40 tras OPERATIONAL_ACCESS_LAYER_V1 (+organization_invitations/access_audit_log).
+  check('Pre-flight: 40 tablas con RLS FORCE', rlsTables === '40', `rlsTables=${rlsTables}`);
 
   const [{ count: taskCount }] = await sql<{ count: string }[]>`
     SELECT count(*)::text AS count FROM schedule_tasks WHERE id = ${TASK_A}`;
@@ -2928,6 +2929,117 @@ async function main(): Promise<void> {
     }
   }, async (q) => { await mbSetup(q); await arSetup(q); });
   check('archive: create_manual_apu rechaza componente cantidad=0 (invalid_component_amounts)', arZeroQty);
+
+  // ==========================================================================
+  // OPERATIONAL_ACCESS_LAYER_V1 — invitaciones, accept, anti-escalamiento.
+  // ==========================================================================
+  const INV_A = 'a0000000-0000-0000-0000-0000000000e1';
+  const INV_B = 'a0000000-0000-0000-0000-0000000000e2';
+  const ACCESS_HASH_A = 'harnesshash0000000000000000000000000000000000a1';
+  const ACCESS_HASH_B = 'harnesshash0000000000000000000000000000000000b2';
+  const claimsAGerencia: Claims = { organization_id: ORG_A, user_role: 'gerencia', sub: USER_A_ADMIN };
+  const claimsAObra: Claims = { organization_id: ORG_A, user_role: 'obra', sub: USER_A_OBRA };
+
+  // Siembra (superusuario): invitación pendiente en A (para accept) y en B (cross-org).
+  const accessSetup = async (q: postgres.ReservedSql): Promise<void> => {
+    await q`INSERT INTO organization_invitations
+      (id, organization_id, email, role, token_hash, status, invited_by, expires_at)
+      VALUES (${INV_A}, ${ORG_A}, 'invitee-harness@test', 'obra', ${ACCESS_HASH_A}, 'pending', ${USER_A_ADMIN}, now() + interval '7 days')
+      ON CONFLICT (id) DO NOTHING`;
+    await q`INSERT INTO organization_invitations
+      (id, organization_id, email, role, token_hash, status, invited_by, expires_at)
+      VALUES (${INV_B}, ${ORG_B}, 'invitee-b@test', 'obra', ${ACCESS_HASH_B}, 'pending', ${USER_B_ADMIN}, now() + interval '7 days')
+      ON CONFLICT (id) DO NOTHING`;
+  };
+
+  // A1) admin A crea invitación.
+  let accCreate = false;
+  await asUser(claimsA, async (q) => {
+    const r = await q`SELECT public.create_invitation('new-harness@test','presupuestos',${ACCESS_HASH_A.replace('a1','c3')},NULL,NULL,168) AS res`;
+    accCreate = (r[0]?.res as { status?: string })?.status === 'pending';
+  });
+  check('access: admin crea invitación (pending)', accCreate);
+
+  // A2) obra (site) NO puede invitar.
+  let accObraBlocked = false;
+  await asUser(claimsAObra, async (q) => {
+    await q.unsafe('SAVEPOINT sp_obra');
+    try {
+      await q`SELECT public.create_invitation('x-harness@test','obra',${ACCESS_HASH_A.replace('a1','d4')},NULL,NULL,168)`;
+    } catch { accObraBlocked = true; await q.unsafe('ROLLBACK TO SAVEPOINT sp_obra'); }
+  });
+  check('access: obra/site NO puede invitar (insufficient_role)', accObraBlocked);
+
+  // A3) gerencia NO puede crear admin.
+  let accGerenciaAdmin = false;
+  await asUser(claimsAGerencia, async (q) => {
+    await q.unsafe('SAVEPOINT sp_ger');
+    try {
+      await q`SELECT public.create_invitation('boss-harness@test','admin',${ACCESS_HASH_A.replace('a1','e5')},NULL,NULL,168)`;
+    } catch { accGerenciaAdmin = true; await q.unsafe('ROLLBACK TO SAVEPOINT sp_ger'); }
+  });
+  check('access: gerencia NO puede crear admin (cannot_grant_admin)', accGerenciaAdmin);
+
+  // A4) cross-org: admin A no puede revocar una invitación de B.
+  let accCrossOrg = false;
+  await asUser(claimsA, async (q) => {
+    await q.unsafe('SAVEPOINT sp_xorg');
+    try {
+      await q`SELECT public.revoke_invitation(${INV_B})`;
+    } catch { accCrossOrg = true; await q.unsafe('ROLLBACK TO SAVEPOINT sp_xorg'); }
+  }, async (q) => { await accessSetup(q); });
+  check('access: cross-org revoke bloqueado (invitation_not_found)', accCrossOrg);
+
+  // A5) invitado (sin org) acepta su invitación y se crea su profile.
+  let accAccept = false;
+  let accProfile = false;
+  await asUser(claimsNoOrg, async (q) => {
+    const r = await q`SELECT public.accept_invitation(${ACCESS_HASH_A},'invitee-harness@test','Invitada Harness') AS res`;
+    accAccept = (r[0]?.res as { status?: string })?.status === 'accepted';
+    const p = await q`SELECT 1 FROM profiles WHERE id = ${USER_NO_PROFILE}`;
+    accProfile = p.length === 1;
+  }, async (q) => { await accessSetup(q); });
+  check('access: aceptar invitación crea/asocia membership', accAccept);
+  check('access: accept marca profile del invitado (accepted_at)', accProfile);
+
+  // A6) doble aceptación rechazada (token un solo uso).
+  let accDouble = false;
+  await asUser(claimsNoOrg, async (q) => {
+    await q`SELECT public.accept_invitation(${ACCESS_HASH_A},'invitee-harness@test',NULL)`;
+    await q.unsafe('SAVEPOINT sp_dbl');
+    try {
+      await q`SELECT public.accept_invitation(${ACCESS_HASH_A},'invitee-harness@test',NULL)`;
+    } catch { accDouble = true; await q.unsafe('ROLLBACK TO SAVEPOINT sp_dbl'); }
+  }, async (q) => { await accessSetup(q); });
+  check('access: invitación usada no se reutiliza (invitation_used)', accDouble);
+
+  // A7) email mismatch bloqueado.
+  let accMismatch = false;
+  await asUser(claimsNoOrg, async (q) => {
+    await q.unsafe('SAVEPOINT sp_mm');
+    try {
+      await q`SELECT public.accept_invitation(${ACCESS_HASH_A},'otro@test',NULL)`;
+    } catch { accMismatch = true; await q.unsafe('ROLLBACK TO SAVEPOINT sp_mm'); }
+  }, async (q) => { await accessSetup(q); });
+  check('access: email mismatch bloqueado (email_mismatch)', accMismatch);
+
+  // A8) nadie cambia su propio rol.
+  let accSelf = false;
+  await asUser(claimsA, async (q) => {
+    await q.unsafe('SAVEPOINT sp_self');
+    try {
+      await q`SELECT public.change_member_role(${USER_A_ADMIN},'gerencia')`;
+    } catch { accSelf = true; await q.unsafe('ROLLBACK TO SAVEPOINT sp_self'); }
+  });
+  check('access: no se puede cambiar el propio rol (cannot_change_self)', accSelf);
+
+  // A9) admin cambia el rol de otro miembro de su org (obra → compras).
+  let accRoleChg = false;
+  await asUser(claimsA, async (q) => {
+    const r = await q`SELECT public.change_member_role(${USER_A_OBRA},'compras') AS res`;
+    accRoleChg = (r[0]?.res as { status?: string })?.status === 'updated';
+  });
+  check('access: admin cambia rol de otro miembro (updated)', accRoleChg);
 
   // --- Resumen ---
   console.log(`\nRESULTADO RLS RUNTIME: ${pass} PASS / ${fail} FAIL`);
