@@ -402,6 +402,14 @@ function weightedProgress(tasks: ScheduleTaskRow[]): DecimalString {
   return (num / den).toFixed(2);
 }
 
+/**
+ * Quita el prefijo técnico del `wbs_code` (token de unicidad por cronograma,
+ * `^[0-9a-f]{6}\.`) para mostrar el código limpio (p. ej. `01.001`).
+ */
+export function displayWbs(wbs: string): string {
+  return wbs.replace(/^[0-9a-f]{6}\./, '');
+}
+
 function toScheduleSummary(
   schedule: ScheduleRow,
   tasks: ScheduleTaskRow[],
@@ -409,7 +417,7 @@ function toScheduleSummary(
 ): ScheduleSummary {
   const taskViews: ScheduleTaskView[] = tasks.map((t) => ({
     id: t.id,
-    wbsCode: t.wbsCode,
+    wbsCode: displayWbs(t.wbsCode),
     name: t.name,
     parentTaskId: t.parentTaskId,
     plannedStart: t.plannedStart,

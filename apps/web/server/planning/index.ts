@@ -11,6 +11,7 @@ export {
   updateScheduleTask,
   addScheduleDependency,
   archiveScheduleForViewer,
+  displayWbs,
 } from './service';
 export type {
   SchedulePreviewParams,

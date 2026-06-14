@@ -12,6 +12,7 @@ import {
   canManageSchedules,
   canUpdateScheduleProgress,
   canViewSchedules,
+  displayWbs,
   SchedulePermissionError,
   type PlanningRepository,
   type GeneratorSourceRow,
@@ -130,6 +131,16 @@ describe('permisos de cronograma', () => {
   });
   it('canViewSchedules: todos', () => {
     expect(canViewSchedules('client')).toBe(true);
+  });
+});
+
+describe('displayWbs', () => {
+  it('quita el prefijo técnico de unicidad (^[0-9a-f]{6}\\.)', () => {
+    expect(displayWbs('ab12cd.01.001')).toBe('01.001');
+    expect(displayWbs('00aa11.02')).toBe('02');
+  });
+  it('deja intacto un wbs sin prefijo', () => {
+    expect(displayWbs('01.001')).toBe('01.001');
   });
 });
 
