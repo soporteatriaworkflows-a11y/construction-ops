@@ -1,5 +1,58 @@
 # Handoff Log
 
+## 2026-06-14 — SCHEDULE_FROM_BOQ_V1 — Fases 0–2 (orchestrator) · CHECKPOINT
+
+### Estado
+- Rama `feature/schedule-from-boq-v1` (base `origin/main = 5c19cb7`, confirmada por
+  `git fetch`; **sin divergencia**). **Sin merge a main; sin deploy; sin db push
+  remoto; sin escrituras remotas; sin datos dummy; sin SMTP; sin correos.**
+  Stashes intactos (2, ajenos). Producción intacta. Main intacta.
+
+### Hallazgo central (Fase 0)
+`/planning` NO era un empty state pendiente: hay una fundación de planning de
+**Oleada 3B real y migrada, solo lectura**. Tablas `schedule_tasks` /
+`task_dependencies` / `progress_entries` / `resource_assignments`
+(`20260531100000` + RLS `100100` FORCE), dominio puro `@/modules/planning`
+(CPM/grafo/fechas/Gantt/view-model), read-model `getSchedule` (drizzle+fixture)
+y UI lectura. Faltaba: contenedor de cronograma, vínculo presupuesto/BOQ/APU,
+generador y **todo** camino de escritura. **Ninguna condición de STOP de Fase 0
+disparada.**
+
+### Decisión de arquitectura (aprobada por el usuario)
+**EXTENDER 3B, no crear tablas paralelas** (`planning_tasks`/`planning_dependencies`
+duplicarían el dominio y violarían la regla #1). Detalle en `docs/DECISIONS.md`
+(entrada 2026-06-14 SCHEDULE_FROM_BOQ_V1) y contrato congelado.
+
+### Entregable hasta el checkpoint
+- **Fase 1** — `docs/SCHEDULE_FROM_BOQ_V1_CONTRACT.md` congelado. Commit `c795b9f`.
+- **Fase 2** — Migración aditiva `20260622090000_schedule_from_boq.sql`
+  (NUEVA `planning_schedules`: project + estimate_version, status
+  draft/baseline/active/archived, archivar≠borrar; + columnas NULLABLE en
+  `schedule_tasks`: schedule_id/boq_item_id/apu_template_id/task_type/
+  unit_snapshot/quantity_snapshot/productivity_source/crew_label/crew_size/
+  responsible/notes, con CHECK e índices). RLS `20260622090100` ENABLE+FORCE
+  tenant-scoped + WITH CHECK cruzado (project+version misma org); sin DELETE
+  (archivar). Drizzle mirror en `apps/web/lib/db/schema.ts`. **typecheck exit 0.**
+  Commit `7a25b0b`.
+
+### Pendiente (Fases 3–8 + validación + publicación)
+- Fase 3 generador desde BOQ (dominio puro + preview + duración por rendimiento APU).
+- Fase 4 UI `/planning` (lista), `/planning/new` (selector+preview),
+  `/planning/[scheduleId]` (tabla MS Project + Gantt reutilizado).
+- Fase 5 dependencias + recálculo downstream. Fase 6 permisos backend.
+- Fase 7 integración BOQ/APU/quantities (warnings, snapshot, "desactualizado").
+- Fase 8 tests (48 casos del mandato) + validación completa
+  (`supabase db reset` local, suite, build, RLS harness, gm:regression, gm:import,
+  smoke, redirects, diff, validate-agents) + publicar `origin/feature/...`.
+
+### Próximo paso
+Ejecutar Fase 3 (generador) sobre el read-model de estimates/chapters/boq_items +
+rendimiento APU; luego UI. La migración aún **no** se ha aplicado con
+`supabase db reset` local (validación de Fase 8); el typecheck del mirror drizzle
+ya pasa.
+
+---
+
 ## 2026-06-14 — DASHBOARD_ACCESS_NAV_AND_PRICING_KPI_HOTFIX_V1 (orchestrator)
 
 ### Estado
