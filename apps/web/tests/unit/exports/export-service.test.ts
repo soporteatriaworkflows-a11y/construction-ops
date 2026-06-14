@@ -151,6 +151,7 @@ describe('ExportService — xlsx-internal', () => {
 });
 
 describe('ExportService — PDF', () => {
+  // PDF generation compite con apu-export-pdf tests en suite completa; 15 s es seguro.
   it('pdf-client genera un PDF válido (magic %PDF)', async () => {
     const res = await service.generate({
       profile: 'client',
@@ -165,7 +166,7 @@ describe('ExportService — PDF', () => {
     expect(res.sizeBytes).toBeGreaterThan(0);
     const magic = Buffer.from(res.buffer.subarray(0, 5)).toString('latin1');
     expect(magic).toBe('%PDF-');
-  });
+  }, 15_000);
 
   it('pdf-management genera un PDF válido (perfil management)', async () => {
     const res = await service.generate({
