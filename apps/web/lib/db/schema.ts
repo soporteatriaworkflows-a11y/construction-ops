@@ -1146,3 +1146,79 @@ export type ProgressEntry = typeof progressEntries.$inferSelect;
 export type NewProgressEntry = typeof progressEntries.$inferInsert;
 export type ResourceAssignment = typeof resourceAssignments.$inferSelect;
 export type NewResourceAssignment = typeof resourceAssignments.$inferInsert;
+
+/* ----------------------------------------------------------------------------
+ * OPERATIONAL ACCESS (OPERATIONAL_ACCESS_LAYER_V1) — solo lectura para el
+ * read-model. Las ESCRITURAS van por RPCs SECURITY DEFINER (ver
+ * supabase/migrations/20260621090000_operational_access.sql). Estas
+ * definiciones existen para que el read-model (drizzle, conexión privilegiada
+ * + filtro explícito por organización) liste miembros/invitaciones/bitácora.
+ * ------------------------------------------------------------------------- */
+
+export const organizationInvitations = pgTable(
+  "organization_invitations",
+  {
+    id: pk(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    email: text("email").notNull(),
+    fullName: text("full_name"),
+    role: text("role").notNull(),
+    tokenHash: text("token_hash").notNull(),
+    status: text("status").notNull().default("pending"),
+    message: text("message"),
+    invitedBy: uuid("invited_by")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "restrict" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+    acceptedBy: uuid("accepted_by"),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    revokedBy: uuid("revoked_by").references(() => profiles.id, {
+      onDelete: "set null",
+    }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex("org_invitations_token_hash_uq").on(t.tokenHash),
+    index("org_invitations_org_idx").on(t.organizationId, t.status, t.createdAt),
+    check(
+      "org_invitations_role_valid",
+      sql`${t.role} IN ('admin','gerencia','presupuestos','obra','compras','consulta')`,
+    ),
+    check(
+      "org_invitations_status_valid",
+      sql`${t.status} IN ('pending','accepted','revoked','expired')`,
+    ),
+  ],
+);
+
+export const accessAuditLog = pgTable(
+  "access_audit_log",
+  {
+    id: pk(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    actorUserId: uuid("actor_user_id"),
+    action: text("action").notNull(),
+    targetEmail: text("target_email"),
+    targetUserId: uuid("target_user_id"),
+    metadata: jsonb("metadata").notNull().default({}),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("access_audit_log_org_created_idx").on(t.organizationId, t.createdAt),
+    check(
+      "access_audit_action_valid",
+      sql`${t.action} IN ('invite_created','invite_resent','invite_revoked','invite_accepted','role_changed')`,
+    ),
+  ],
+);
+
+export type OrganizationInvitation = typeof organizationInvitations.$inferSelect;
+export type NewOrganizationInvitation = typeof organizationInvitations.$inferInsert;
+export type AccessAuditLogRow = typeof accessAuditLog.$inferSelect;
+export type NewAccessAuditLogRow = typeof accessAuditLog.$inferInsert;
