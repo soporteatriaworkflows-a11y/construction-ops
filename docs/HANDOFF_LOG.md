@@ -1,5 +1,72 @@
 # Handoff Log
 
+## 2026-06-14 — SCHEDULE_FROM_BOQ_V1 — COMPLETA (Fases 0–8) (orchestrator)
+
+### Estado
+- Rama `feature/schedule-from-boq-v1` @ `3214ce6` (base `origin/main = 5c19cb7`,
+  confirmada por `git fetch`; **sin divergencia**). **Sin merge a main; sin deploy;
+  sin db push remoto; sin escrituras remotas; sin SMTP; sin correos; sin chat;
+  sin editor avanzado APU.** Stashes intactos (2, ajenos). Producción intacta.
+  Main intacta. **Rama publicada a `origin/feature/schedule-from-boq-v1`.**
+
+### Entregable (extiende la fundación de planning 3B — una sola fuente de verdad)
+Cronograma tipo MS Project desde un presupuesto. 7 commits sobre la base:
+- **Contrato** `docs/SCHEDULE_FROM_BOQ_V1_CONTRACT.md` (`c795b9f`).
+- **Migración aditiva** `20260622090000` (NUEVA `planning_schedules` +
+  columnas NULLABLE en `schedule_tasks`) + RLS `20260622090100` FORCE
+  tenant-scoped + WITH CHECK cruzado + drizzle mirror (`7a25b0b`).
+- **Generador puro** `modules/planning/generator.ts` (preview read-only +
+  estimador de duración conservador por rendimiento APU) (`939f60e`).
+- **RPC atómica** `20260622090200_create_schedule_from_boq` + `db reset` local +
+  harness RLS extendido (`3ba715a`).
+- **Wiring + UI + recálculo** `server/planning/*`, `modules/planning/recalc.ts`,
+  `app/(dashboard)/planning/{,new,[scheduleId]}` (`ff76230`).
+- **Cierre Fase 6–7**: trazabilidad BOQ/APU + snapshots + warnings + badges de
+  rendimiento en el detalle; `displayWbs` (`3214ce6`).
+
+### Cómo funciona
+`planning_schedules` (project + estimate_version, status draft/baseline/active/
+archived, archivar≠borrar) agrupa `schedule_tasks` (capítulos resumen + ítems BOQ
+como actividades con `boq_item_id`/`apu_template_id`/`quantity_snapshot`/
+`unit_snapshot`/`productivity_source`/`crew_*`/`responsible`). Generación
+read-only + write-on-confirm vía RPC SECURITY INVOKER (org/actor server-side, rol
+admin/gerencia/presupuestos). Duración conservadora: `cantidad × persona·días/u /
+crew_size` cuando el APU tiene rendimiento laboral; si no, mínima + warning
+(`productivity_source` apu/manual/unknown; nunca duración exacta inventada).
+Recálculo FS/SS/FF/SF + lag + anti-ciclo + downstream. Detalle reutiliza los
+componentes 3B (PlanningSummary/ScheduleTable/GanttChart). Ruta crítica 🔒 oculta
+a `client`.
+
+### Validación (todo PASS, local)
+- typecheck 0 · lint 0 · **suite 1715 passed / 42 skipped / 0 fail** (+48 nuevos:
+  22 generador, 13 recalc, 13 servicio) · build limpio (rutas /planning,
+  /planning/new, /planning/[scheduleId] dynamic).
+- `supabase db reset` aplica las 3 migraciones nuevas + seeds limpio.
+- **RLS runtime harness 258 PASS / 0 FAIL** (FORCE 40→41 +planning_schedules;
+  +7 checks: isolation insert/select/delete cross-org + RPC create/role).
+- read-model isolation 12/0 · gm:regression 22/22 · gm:import PASS.
+- smoke local (localhost:3200): /planning, /planning/new, /dashboard, /quantities,
+  /apu, /catalog, /login → 200 (sin 500). `git diff --check` limpio.
+  validate-claude-agents 214/0.
+
+### Deudas registradas
+`SCHEDULE_CRITICAL_PATH_V2`, `SCHEDULE_BASELINE_V2`, `SCHEDULE_EXPORT_PDF_EXCEL_V1`,
+`MS_PROJECT_EXPORT_XML_V1`, `RESOURCE_LEVELING_V2`, `SCHEDULE_COMPARE_WITH_BOQ_V2`,
+`SCHEDULE_AUDIT_LOG_V2`, `SCHEDULE_ROLE_COMPRAS_SEPARATION_V2` (UI muestra CTA a
+`internal`/compras pero el RPC lo rechaza — separar a nivel UI con check de
+profile.role), `APU_ADVANCED_EDITOR_V2`, `APU_VERSIONING_V1`.
+
+### Próximo paso
+1. Revisión visual autenticada: `/planning` (lista vacía→CTA), `/planning/new`
+   (preview con conteos/warnings), crear un cronograma de prueba desde un
+   presupuesto con APU, abrir `/planning/[id]` (tabla + Gantt + trazabilidad +
+   editar avance/duración + agregar dependencia + recálculo de fechas).
+2. Release controlado (autorización aparte): merge a main + `supabase db push` de
+   `20260622090000`/`090100`/`090200` (aditivas; sin DELETE/DROP).
+3. Si se requiere: `SCHEDULE_COMPARE_WITH_BOQ_V2` (estado "desactualizado").
+
+---
+
 ## 2026-06-14 — SCHEDULE_FROM_BOQ_V1 — Fases 0–2 (orchestrator) · CHECKPOINT
 
 ### Estado

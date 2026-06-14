@@ -237,3 +237,25 @@ directo, filtro `app.current_org()`, `WITH CHECK` cruzado (project + estimate
 version de la misma org). Las columnas nuevas de `schedule_tasks` heredan la RLS
 existente (FORCE ya activo). El harness RLS runtime se extiende para cubrir
 `planning_schedules` y el aislamiento cross-org del generador.
+
+---
+
+## 10. Estado de implementación (2026-06-14, `3214ce6`)
+
+**COMPLETO V1.** Todo lo congelado arriba está implementado y validado:
+generador puro + preview + estimador de duración; migración aditiva + RLS FORCE;
+RPC atómica `create_schedule_from_boq`; `server/planning` (permisos + repo
+RLS-bound + servicio); recálculo FS/SS/FF/SF + lag + anti-ciclo + downstream; UI
+`/planning` (lista+CTA), `/planning/new` (preview), `/planning/[id]` (tabla MS
+Project + Gantt 3B + trazabilidad BOQ/APU + warnings + edición). El `wbs_code`
+persiste con un prefijo técnico del cronograma (unicidad por proyecto) y se
+muestra limpio en la UI vía `displayWbs()`. Validación: suite 1715/0, RLS harness
+258/0, isolation 12/0, gm 22/22, gm:import PASS, smoke 7/7, agents 214/0.
+
+**Deuda `SCHEDULE_ROLE_COMPRAS_SEPARATION_V2`:** §6 excluye a `compras` de
+crear/editar y el backend lo cumple (el RPC valida
+`app.current_role() ∈ {admin,gerencia,presupuestos}`). Pero la UI gatea por
+`ViewerRole`, donde `compras` colapsa en `internal`, así que un usuario `compras`
+ve el CTA y recibe el rechazo al enviar. Separarlo a nivel UI requiere exponer
+`profile.role` al gating; se difiere (no se amplía sin contrato). La barrera real
+(backend) ya es correcta.

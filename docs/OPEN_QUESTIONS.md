@@ -4,10 +4,17 @@
 
 _Sin blockers activos._
 
-> **Nota 2026-06-14 (SCHEDULE_FROM_BOQ_V1, Fases 0–2):** la planificación se
-> implementa **extendiendo la fundación 3B** (decisión aprobada). Fases 0–2
-> completas y comiteadas (`c795b9f`, `7a25b0b`); Fases 3–8 + validación + push
-> pendientes. **Deudas registradas en esta oleada (no bloquean):**
+> **Nota 2026-06-14 (SCHEDULE_FROM_BOQ_V1 — COMPLETA, Fases 0–8):** la
+> planificación se implementó **extendiendo la fundación 3B** (decisión aprobada).
+> Todas las fases completas, validadas y comiteadas (`c795b9f`→`3214ce6`); **rama
+> publicada `origin/feature/schedule-from-boq-v1`** (sin merge/deploy/db push
+> remoto). Validación: suite 1715/0, RLS harness 258/0, isolation 12/0, gm 22/22,
+> gm:import PASS, smoke 7/7, agents 214/0. **Deuda nueva
+> `SCHEDULE_ROLE_COMPRAS_SEPARATION_V2`:** la UI gatea por ViewerRole (`internal`
+> incluye `compras`) y muestra el CTA "Crear cronograma", pero el RPC lo rechaza
+> con `app.current_role()` (solo admin/gerencia/presupuestos). Separar `compras`
+> a nivel UI requiere un check de `profile.role` server-side; sin contrato no se
+> amplía. **Deudas registradas en esta oleada (no bloquean):**
 > `SCHEDULE_CRITICAL_PATH_V2`, `SCHEDULE_BASELINE_V2`,
 > `SCHEDULE_EXPORT_PDF_EXCEL_V1`, `MS_PROJECT_EXPORT_XML_V1`,
 > `RESOURCE_LEVELING_V2`, `SCHEDULE_COMPARE_WITH_BOQ_V2`, `SCHEDULE_AUDIT_LOG_V2`,
