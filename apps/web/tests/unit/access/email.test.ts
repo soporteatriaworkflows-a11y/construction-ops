@@ -146,7 +146,7 @@ describe('resolveEmailProvider / readSmtpConfigFromEnv', () => {
     expect(readSmtpConfigFromEnv(env)?.secure).toBe(true); // 465 ⇒ secure
   });
   it('SMTP incompleto ⇒ null config', () => {
-    expect(readSmtpConfigFromEnv({ SMTP_HOST: 'h' } as NodeJS.ProcessEnv)).toBeNull();
+    expect(readSmtpConfigFromEnv({ SMTP_HOST: 'h' } as unknown as NodeJS.ProcessEnv)).toBeNull();
   });
 });
 
