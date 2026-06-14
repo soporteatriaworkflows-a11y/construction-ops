@@ -33,6 +33,7 @@ import type {
   ScheduleTaskStatus,
   Uuid,
   ViewerContext,
+  WorkspaceGroupView,
 } from '@/lib/contracts/read-model';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { DrizzleReadRepository, type ReadDb } from '@/server/repositories/read-repository';
@@ -522,6 +523,56 @@ export class DrizzleReadModelRepository implements ReadModelPort {
           id: l.id,
           description: l.description ?? '',
           calculatedQuantity: l.calculatedQuantity,
+        })),
+    }));
+    });
+  }
+
+  async listWorkspaceGroups(
+    viewer: ViewerContext,
+    projectScopeId?: Uuid,
+  ): Promise<WorkspaceGroupView[]> {
+    return this.read(viewer, async () => {
+    const projects = await this.repo.projects(viewer.organizationId);
+    const scopes = await this.repo.scopesByProjects(projects.map((p) => p.id));
+    const allowedScopeIds = new Set(scopes.map((s) => s.id));
+    const scopeIds = projectScopeId
+      ? allowedScopeIds.has(projectScopeId)
+        ? [projectScopeId]
+        : []
+      : [...allowedScopeIds];
+    if (scopeIds.length === 0) return [];
+
+    const groups = await this.repo.workspaceGroupsByScopes(scopeIds);
+    const lines = await this.repo.workspaceLinesByGroups(groups.map((g) => g.id));
+    const linesByGroup = new Map<Uuid, typeof lines>();
+    for (const l of lines) {
+      const bucket = linesByGroup.get(l.groupId) ?? [];
+      bucket.push(l);
+      linesByGroup.set(l.groupId, bucket);
+    }
+    return groups.map((g) => ({
+      id: g.id,
+      code: g.code,
+      name: g.name,
+      floor: g.floor ?? null,
+      module: g.module ?? null,
+      space: g.space ?? null,
+      element: g.element ?? null,
+      resultUnit: g.resultUnit,
+      templateKind: g.templateKind,
+      totalNet: String(g.totalNet),
+      lines: (linesByGroup.get(g.id) ?? [])
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+        .map((l) => ({
+          id: l.id,
+          description: l.description ?? '',
+          formulaType: l.formulaType,
+          resultUnit: l.resultUnit ?? g.resultUnit,
+          resultGross: String(l.resultGross),
+          resultNet: String(l.resultNet),
+          apuTemplateId: l.apuTemplateId ?? null,
+          boqItemId: l.boqItemId ?? null,
         })),
     }));
     });
