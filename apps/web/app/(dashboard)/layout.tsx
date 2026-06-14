@@ -8,6 +8,7 @@ import { readModelModeLabel } from '@/lib/utils/mode-label';
 import { getActiveWorkspace } from '@/lib/branding/workspace';
 import { WorkspaceBrand } from '@/components/shared/workspace-brand';
 import { SidebarNav } from '@/components/shared/sidebar-nav';
+import { resolveAccessActor, canManageAccess } from '@/server/access';
 
 /**
  * Render REQUEST-TIME de todo el segmento autenticado. La app va detrás de auth
@@ -16,9 +17,20 @@ import { SidebarNav } from '@/components/shared/sidebar-nav';
  */
 export const dynamic = 'force-dynamic';
 
-export default function DashboardLayout({ children }: { children: ReactNode }) {
+/** ¿El viewer puede gestionar accesos? (server-side; deny-by-default). */
+async function resolveCanManageAccess(): Promise<boolean> {
+  try {
+    const actor = await resolveAccessActor();
+    return canManageAccess(actor.profileRole);
+  } catch {
+    return false;
+  }
+}
+
+export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const mode = readModelModeLabel();
   const ws = getActiveWorkspace();
+  const showAccess = await resolveCanManageAccess();
   return (
     <div className="flex min-h-screen bg-iconic-gray">
       {/* Sidebar — estructura azul noche ICONIC */}
@@ -29,7 +41,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </div>
 
         {/* Navegación con estado activo */}
-        <SidebarNav />
+        <SidebarNav canManageAccess={showAccess} />
 
         {/* Footer — workspace + etiqueta de modo (request-time) */}
         <div className="space-y-0.5 border-t border-white/10 px-4 py-3">

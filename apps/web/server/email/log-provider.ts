@@ -19,7 +19,6 @@ export class LogEmailProvider implements EmailProvider {
   async send(message: EmailMessage): Promise<EmailSendResult> {
     this.outbox.push(message);
     // Solo metadatos no sensibles. NO se loguea el cuerpo (contiene el token).
-    // eslint-disable-next-line no-console
     console.info(
       `[email:log] kind=${message.kind} to=${message.to} subject="${message.subject}" (no enviado: proveedor de desarrollo)`,
     );

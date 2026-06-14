@@ -11,6 +11,9 @@ export const PUBLIC_ROUTES = [
   '/forgot-password',
   '/reset-password',
   '/auth/callback',
+  // Aceptación de invitación: el invitado puede no tener sesión todavía
+  // (define su contraseña aquí). NUNCA expone datos protegidos por sí sola.
+  '/invite',
 ] as const;
 
 /** Rutas protegidas (AUTH_RUNTIME_CONTRACT §5). */
@@ -22,6 +25,7 @@ export const PROTECTED_ROUTES = [
   '/catalog',
   '/quantities',
   '/planning',
+  '/settings',
   '/api/exports',
 ] as const;
 
