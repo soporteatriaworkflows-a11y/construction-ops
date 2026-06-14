@@ -1,5 +1,60 @@
 # Handoff Log
 
+## 2026-06-14 — QUANTITY_IMPORT_PERSISTENCE_HOTFIX_V1 (orchestrator)
+
+### Estado
+- Rama `fix/quantity-import-persistence-v1` (base `origin/main = 06bfb10`,
+  confirmada). HEAD: `75da170`. **Publicada en origin. Sin merge a main;
+  sin deploy; sin db push remoto; sin escrituras remotas.** Stashes intactos
+  (2, ajenos a esta rama). Producción intacta. Main intacta.
+
+### Causa raíz
+Dos causas independientes combinadas:
+1. **Visibilidad**: `/quantities` llama `rm.listQuantities` que lee
+   `quantity_groups` (legacy, `project_scope_id`). La importación escribe en
+   `quantity_takeoff_groups` (sin `project_scope_id`; solo `organization_id`).
+   Familias de tablas distintas → los grupos importados nunca aparecían.
+2. **Cache**: `confirmQuantityImportAction` no llamaba `revalidatePath`. Next.js
+   16 cachea la página → aunque se corrigiera el punto 1, la pantalla mostraba
+   el estado anterior.
+
+### Correcciones
+- **`lib/quantity-import/types.ts`**: nuevo `ImportedBatchSummary`.
+- **`server/quantity-import/db-repository.ts`**: `listImportedBatches` (Supabase
+  RLS-bound; lee `quantity_import_batches` + `quantity_takeoff_groups` +
+  líneas; graceful empty si error RLS).
+- **`server/quantity-import/service.ts`**: `listQuantityImportBatches`
+  (management|internal, db mode only).
+- **`server/quantity-import/index.ts`**: exports actualizados.
+- **`app/(dashboard)/quantities/import/actions.ts`**: `revalidatePath('/quantities')`
+  + `revalidatePath('/quantities/import')` tras éxito.
+- **`app/(dashboard)/quantities/page.tsx`**: sección "Memorias importadas"
+  (tabla de grupos por lote: descripción, líneas, total, unidad, estado BOQ).
+- **`app/(dashboard)/quantities/import/_components/quantity-import-wizard.tsx`**:
+  botón → "Ver memorias importadas" → `/quantities#imported-batches`.
+- **Contrato**: `docs/QUANTITY_IMPORT_PERSISTENCE_HOTFIX_V1_CONTRACT.md`.
+- **Sin migración** (tablas `quantity_import_batches`, `quantity_takeoff_groups`,
+  `quantity_takeoff_lines` existen en producción desde release
+  `quantity-takeoff-import-release-v1`; migraciones `20260616090000` + `20260616090100`).
+
+### Validación (todo PASS, local)
+- tsc 0 · lint 0 · **suite 1575 passed / 42 skipped / 0 fail** (+10 tests
+  nuevos `persistence.test.ts`) · build limpio (rutas quantities presentes)
+  · gm:regression 22/22 · regresión RLS 121/0 · `git diff --check` limpio.
+
+### Próximo paso
+- Release controlado: merge a main + deploy con revisión visual en producción.
+  Verificar que la sección "Memorias importadas" muestra los lotes existentes
+  en la BD de producción (ya persistidos).
+- Deuda registrada: `QUANTITY_IMPORT_BATCH_DETAIL_V1` (vista de detalle por
+  lote con filtro/búsqueda; hoy se muestran todos los grupos de cada lote en
+  la misma tarjeta).
+
+### Agentes activos al cierre
+- Ninguno.
+
+---
+
 ## 2026-06-13 — QUANTITY_WORKSPACE_AND_BOQ_SYNC_V1 + CATALOG_PRICE_VISIBILITY_V1 + CLIENT_EXPORT_PROFILE_V1 (orchestrator)
 
 ### Estado

@@ -4,6 +4,13 @@
 
 _Sin blockers activos._
 
+> **Nota 2026-06-14 (QUANTITY_IMPORT_PERSISTENCE_HOTFIX_V1):** blocker
+> "importación no guarda nada" resuelto. Los datos sí se persistían en
+> `quantity_takeoff_groups`; el problema era de visibilidad (familia de tablas
+> distinta a la que leía `/quantities`) + falta de `revalidatePath`.
+> **Nuevo blocker resuelto en esta sesión; sin blockers activos al cierre.**
+> Deuda registrada: `QUANTITY_IMPORT_BATCH_DETAIL_V1` (vista detalle por lote).
+
 > **Nota 2026-06-13 (QUANTITY_WORKSPACE_AND_BOQ_SYNC_V1):** sin blockers nuevos.
 > Deudas registradas en esta oleada (no bloquean): `SCHEDULE_FROM_BOQ_V1`
 > (cronograma desde BOQ: capítulos/ítems/cantidades/rendimientos APU/cuadrillas/

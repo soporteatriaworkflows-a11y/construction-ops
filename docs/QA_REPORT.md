@@ -4,6 +4,34 @@ Este documento es propiedad de **agent-qa**. Se actualiza al final de
 
 ---
 
+## QUANTITY_IMPORT_PERSISTENCE_HOTFIX_V1 (2026-06-14, rama `fix/quantity-import-persistence-v1`)
+
+**Base:** `origin/main = 06bfb10` · **main intacta** · **producción intacta** · **sin migración** (tablas existen desde 20260616*) · **sin db push remoto** · **sin escrituras remotas**
+
+| Check | Resultado |
+|---|---|
+| TypeScript | ✅ 0 errores |
+| ESLint | ✅ 0 warnings |
+| Suite completa | ✅ **1575 passed / 42 skipped / 0 fail** (+10 tests nuevos) |
+| gm:regression | ✅ 22/22 |
+| Regresión RLS | ✅ 121/0 |
+| Build | ✅ Limpio (rutas quantities presentes) |
+| git diff --check | ✅ Limpio |
+
+**Tests nuevos (persistence.test.ts):**
+- 10 tests cubriendo: persistencia grupos/líneas, conteos reales,
+  0 filas → no éxito, listado de lotes, modo demo rechazado, rol site rechazado,
+  no sync BOQ, idempotencia duplicada.
+
+**Causa raíz:** `/quantities` leía `quantity_groups` (scope-linked) pero los
+datos importados estaban en `quantity_takeoff_groups` (org-linked). Familia
+distinta → nunca visibles. Más falta de `revalidatePath`.
+
+**Sin regresión:** todos los tests anteriores (1565) siguen pasando;
+gm:regression intacto; exports/APU/catálogo sin cambios.
+
+---
+
 ## QUANTITY_WORKSPACE_AND_BOQ_SYNC_V1 + CATALOG_PRICE_VISIBILITY_V1 + CLIENT_EXPORT_PROFILE_V1 (2026-06-13, rama `feature/quantity-workspace-boq-sync-v1`)
 
 **Base:** `origin/main = 4e1817e` · **main intacta** · **producción intacta** · **2 migraciones aditivas SOLO locales** (`20260620090000` + RLS `20260620090100`) · **sin db push remoto** · **sin escrituras remotas**
