@@ -31,6 +31,23 @@ const RESOURCE_TYPE_ORDER = [
   'other',
 ] as const;
 
+const PRICE_STATUS_LABELS: Record<'approved' | 'pending' | 'rejected' | 'none', string> = {
+  approved: 'Aprobado',
+  pending: 'Pendiente',
+  rejected: 'Rechazado',
+  none: 'Sin precio',
+};
+
+const PRICE_STATUS_VARIANT: Record<
+  'approved' | 'pending' | 'rejected' | 'none',
+  'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning'
+> = {
+  approved: 'success',
+  pending: 'warning',
+  rejected: 'destructive',
+  none: 'outline',
+};
+
 const RESOURCE_TYPE_VARIANT: Record<
   string,
   'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning'
@@ -223,47 +240,97 @@ export default async function CatalogPage() {
                         <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">
                           Unidad
                         </th>
-                        {/* budgetReferencePrice es cliente-safe — se muestra si disponible */}
+                        <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">
+                          Estado
+                        </th>
                         <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
-                          P. Referencia
+                          Precio
+                        </th>
+                        <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                          Proveedor / fecha
+                        </th>
+                        <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
+                          Precios
                         </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {group.map((resource) => (
-                        <tr
-                          key={resource.id}
-                          className="hover:bg-gray-50 transition-colors"
-                        >
-                          {/* Código enlazado a Price Intelligence */}
-                          <td className="px-4 py-2.5">
-                            <Link
-                              href={`/catalog/resources/${resource.id}/price-intelligence`}
-                              className="font-mono text-xs text-blue-600 hover:text-blue-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
-                            >
-                              {resource.code}
-                            </Link>
-                          </td>
-                          <td className="px-4 py-2.5 font-medium text-gray-900">
-                            <Link
-                              href={`/catalog/resources/${resource.id}/price-intelligence`}
-                              className="hover:text-blue-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
-                            >
-                              {resource.name}
-                            </Link>
-                          </td>
-                          <td className="px-4 py-2.5 text-center text-gray-600">
-                            {resource.unit}
-                          </td>
-                          <td className="px-4 py-2.5 text-right tabular-nums text-gray-600">
-                            {resource.budgetReferencePrice ? (
-                              formatCOP(resource.budgetReferencePrice)
-                            ) : (
-                              <span className="text-gray-300 text-xs">—</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
+                      {group.map((resource) => {
+                        const status = resource.priceStatus ?? 'none';
+                        return (
+                          <tr
+                            key={resource.id}
+                            className="hover:bg-gray-50 transition-colors"
+                          >
+                            {/* Código enlazado a Price Intelligence */}
+                            <td className="px-4 py-2.5">
+                              <Link
+                                href={`/catalog/resources/${resource.id}/price-intelligence`}
+                                className="font-mono text-xs text-blue-600 hover:text-blue-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+                              >
+                                {resource.code}
+                              </Link>
+                            </td>
+                            <td className="px-4 py-2.5 font-medium text-gray-900">
+                              <Link
+                                href={`/catalog/resources/${resource.id}/price-intelligence`}
+                                className="hover:text-blue-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+                              >
+                                {resource.name}
+                              </Link>
+                            </td>
+                            <td className="px-4 py-2.5 text-center text-gray-600">
+                              {resource.unit}
+                            </td>
+                            <td className="px-4 py-2.5 text-center">
+                              <Badge variant={PRICE_STATUS_VARIANT[status]}>
+                                {PRICE_STATUS_LABELS[status]}
+                              </Badge>
+                            </td>
+                            <td className="px-4 py-2.5 text-right tabular-nums">
+                              {status === 'approved' && resource.approvedPrice ? (
+                                <span className="font-medium text-gray-900">
+                                  {formatCOP(resource.approvedPrice)}
+                                </span>
+                              ) : status === 'pending' && resource.pendingPrice ? (
+                                <span
+                                  className="text-amber-700"
+                                  title="Precio pendiente de aprobación"
+                                >
+                                  {formatCOP(resource.pendingPrice)}
+                                  <span className="ml-1 text-[10px] uppercase">pend.</span>
+                                </span>
+                              ) : (
+                                <span className="text-gray-300 text-xs">Sin precio aprobado</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-2.5 text-xs text-gray-500">
+                              {resource.supplierName ? (
+                                <span>{resource.supplierName}</span>
+                              ) : (
+                                <span className="text-gray-300">—</span>
+                              )}
+                              {resource.priceDate && (
+                                <span className="ml-1 text-gray-400">
+                                  · {resource.priceDate.slice(0, 10)}
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-2.5 text-right">
+                              <Link
+                                href={`/catalog/resources/${resource.id}/price-intelligence`}
+                                className="text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                              >
+                                {status === 'none'
+                                  ? 'Agregar precio'
+                                  : status === 'pending'
+                                    ? 'Revisar precios'
+                                    : 'Ver observaciones'}
+                              </Link>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

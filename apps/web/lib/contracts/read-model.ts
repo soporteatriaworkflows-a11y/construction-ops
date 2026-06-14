@@ -214,6 +214,16 @@ export interface CatalogResourceView {
   unit: string;
   /** ✅ precio presupuestado (no público). Omitido si no hay precio aprobado. */
   budgetReferencePrice?: DecimalString;
+  /** Estado de precio para visibilidad de catálogo (CATALOG_PRICE_VISIBILITY_V1). */
+  priceStatus?: 'approved' | 'pending' | 'rejected' | 'none';
+  /** ✅ último precio aprobado (= budgetReferencePrice). */
+  approvedPrice?: DecimalString;
+  /** Último precio pendiente (si no hay aprobado). No es un descuento. */
+  pendingPrice?: DecimalString;
+  /** Proveedor del precio mostrado. Solo roles internos (management/internal). */
+  supplierName?: string;
+  /** Fecha ISO de la observación mostrada. */
+  priceDate?: string;
 }
 
 export interface ChapterDistributionSlice {
