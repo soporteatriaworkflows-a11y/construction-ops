@@ -265,6 +265,16 @@ const LINK_STATUS_LABELS: Record<TakeoffLinkStatus, string> = {
   not_evaluated: 'Sin evaluar',
 };
 
+/** Lista los lotes de memorias importadas de la org (para /quantities). */
+export async function listQuantityImportBatches(
+  viewer: AuthenticatedViewer,
+  deps?: QuantityImportDeps,
+): Promise<import('@/lib/quantity-import/types').ImportedBatchSummary[]> {
+  checkRole(viewer);
+  assertDbMode();
+  return getRepo(deps).listImportedBatches(viewer);
+}
+
 /** Reporte CSV sanitizado (sin fórmulas ejecutables; ver lib/catalog-import). */
 export function buildQuantityReportCsv(
   rows: ReadonlyArray<QuantityImportReportRow>,
