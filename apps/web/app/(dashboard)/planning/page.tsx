@@ -69,7 +69,7 @@ export default async function PlanningPage() {
         <EmptyState
           icon={CalendarRange}
           title="Todavía no hay planificación generada"
-          description="Primero sincroniza cantidades y presupuesto (capítulos e ítems BOQ) o crea una planificación desde el BOQ. La generación automática del cronograma a partir del presupuesto (rendimientos APU, cuadrillas, duraciones y ruta crítica) está documentada como SCHEDULE_FROM_BOQ_V1 y se implementará en una oleada posterior."
+          description="Crea una planificación desde un presupuesto para estimar duraciones, dependencias y recursos de obra."
         />
       </div>
     );

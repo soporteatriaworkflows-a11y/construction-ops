@@ -4,6 +4,45 @@ Este documento es propiedad de **agent-qa**. Se actualiza al final de
 
 ---
 
+## DASHBOARD_ACCESS_NAV_AND_PRICING_KPI_HOTFIX_V1 (2026-06-14, rama `fix/dashboard-access-nav-pricing-kpi-v1`)
+
+**Base:** `origin/main = 0d172ea` · **main intacta** · **producción intacta** · **sin migración** · **sin db push remoto** · **sin escrituras remotas**
+
+| Check | Resultado |
+|---|---|
+| TypeScript | ✅ 0 errores |
+| ESLint | ✅ 0 warnings |
+| Suite completa | ✅ **1667 passed / 42 skipped / 0 fail** (+36 tests nuevos) |
+| gm:regression | ✅ 22/22 |
+| Build | ✅ Limpio (`/settings/access` y `/planning` dinámicas) |
+| git diff --check | ✅ Limpio |
+
+**Tests nuevos (`tests/unit/nav/sidebar-access.test.ts`):**
+- canManageAccess: admin ✅, gerencia ✅, obra ❌, consulta ❌, null ❌
+- sidebar-nav: ACCESS_ITEM href='/settings/access', label='Accesos', conditional logic
+- layout: resolveCanManageAccess(), canManageAccess prop pasado a SidebarNav, force-dynamic
+- /settings/access: guard backend canManageAccess, Unauthorized, force-dynamic
+- dashboard page: no "fixture activo", no "Oleada 3A"
+- savings-section: no "fixture activo", no "modo fixture", no "Oleada 3A", copy nuevo, role="status"
+- planning: no "SCHEDULE_FROM_BOQ_V1" en UI, EmptyState, force-dynamic
+- isProfileRole: 6 roles válidos, inválidos rechazados
+
+**Archivos modificados (3):**
+- `modules/dashboard/savings-section.tsx`: estado vacío y comentario JSDoc
+- `app/(dashboard)/dashboard/page.tsx`: comentario JSDoc  
+- `app/(dashboard)/planning/page.tsx`: empty state simplificado
+
+**Archivo nuevo:**
+- `tests/unit/nav/sidebar-access.test.ts` (36 tests)
+- `docs/DASHBOARD_ACCESS_NAV_AND_PRICING_KPI_HOTFIX_V1_CONTRACT.md`
+
+**Sin regresión:** todos los tests anteriores (1631) siguen pasando;
+golden master intacto.
+
+---
+
+---
+
 ## QUANTITY_IMPORT_PERSISTENCE_HOTFIX_V1 (2026-06-14, rama `fix/quantity-import-persistence-v1`)
 
 **Base:** `origin/main = 06bfb10` · **main intacta** · **producción intacta** · **sin migración** (tablas existen desde 20260616*) · **sin db push remoto** · **sin escrituras remotas**
