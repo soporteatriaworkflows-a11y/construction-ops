@@ -180,7 +180,8 @@ async function main(): Promise<void> {
   // + 3 quantity takeoff import (FASE 4B.3: batches/groups/lines) = 34.
   // 35 tras APU_COMPONENT_RESOURCE_RECONCILIATION_V1 (+apu_component_resource_actions).
   // 36 tras APU_MANUAL_BUILDER_V1 + BOQ_ADD_FROM_APU_V1 (+apu_manual_actions).
-  check('Pre-flight: 36 tablas con RLS FORCE', rlsTables === '36', `rlsTables=${rlsTables}`);
+  // 38 tras QUANTITY_WORKSPACE_AND_BOQ_SYNC_V1 (+quantity_workspace_groups/lines).
+  check('Pre-flight: 38 tablas con RLS FORCE', rlsTables === '38', `rlsTables=${rlsTables}`);
 
   const [{ count: taskCount }] = await sql<{ count: string }[]>`
     SELECT count(*)::text AS count FROM schedule_tasks WHERE id = ${TASK_A}`;
