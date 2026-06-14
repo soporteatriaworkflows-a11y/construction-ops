@@ -33,6 +33,7 @@ export type { ExportCounts } from './export-menu-logic';
 
 type Format = 'xlsx' | 'pdf';
 type Kind = 'budget' | 'apu' | 'package';
+type Profile = 'client' | 'technical';
 
 interface ExportButtonsProps {
   projectId: string;
@@ -48,13 +49,13 @@ export function ExportButtons({ projectId, scopeId, estimateId, counts }: Export
   const hasApu = apuOptionsEnabled(counts);
   const warnings = exportWarnings(counts);
 
-  async function download(format: Format, kind: Kind) {
-    const token = `${kind}:${format}`;
+  async function download(format: Format, kind: Kind, profile: Profile = 'technical') {
+    const token = `${profile}:${kind}:${format}`;
     if (busy) return; // anti doble-click
     setBusy(token);
     setError(null);
     try {
-      const query = buildExportQuery({ format, kind, estimateId, projectId, scopeId });
+      const query = buildExportQuery({ format, kind, estimateId, projectId, scopeId, profile });
       const res = await fetch(`/api/estimates/export?${query}`, { method: 'GET' });
       if (!res.ok) {
         let message = 'No fue posible generar la exportación.';
@@ -87,14 +88,20 @@ export function ExportButtons({ projectId, scopeId, estimateId, counts }: Export
     }
   }
 
-  const btn = (label: string, format: Format, kind: Kind, disabled = false) => {
-    const token = `${kind}:${format}`;
+  const btn = (
+    label: string,
+    format: Format,
+    kind: Kind,
+    profile: Profile = 'technical',
+    disabled = false,
+  ) => {
+    const token = `${profile}:${kind}:${format}`;
     const Icon = format === 'xlsx' ? FileSpreadsheet : FileText;
     return (
       <Button
         size="sm"
         variant="outline"
-        onClick={() => download(format, kind)}
+        onClick={() => download(format, kind, profile)}
         disabled={busy !== null || disabled}
         aria-busy={busy === token}
         title={disabled ? 'Este presupuesto aún no tiene APU vinculados.' : undefined}
@@ -131,27 +138,24 @@ export function ExportButtons({ projectId, scopeId, estimateId, counts }: Export
         </div>
       )}
 
-      {/* Presupuesto */}
-      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Presupuesto</p>
-      <div className="mt-2 flex flex-wrap gap-2">
-        {btn('Presupuesto PDF', 'pdf', 'budget')}
-        {btn('Presupuesto Excel', 'xlsx', 'budget')}
-      </div>
-
-      {/* APU vinculados */}
-      <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-gray-500">APU vinculados</p>
-      <div className="mt-2 flex flex-wrap gap-2">
-        {btn('APU vinculados PDF', 'pdf', 'apu', !hasApu)}
-        {btn('APU vinculados Excel', 'xlsx', 'apu', !hasApu)}
-      </div>
-
-      {/* Paquete completo */}
-      <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-gray-500">
-        Paquete completo (presupuesto + anexos APU)
+      {/* Cliente / comercial — presupuesto legible, sin fichas APU técnicas */}
+      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+        Para cliente / comercial
       </p>
       <div className="mt-2 flex flex-wrap gap-2">
-        {btn('Paquete PDF', 'pdf', 'package', !hasApu)}
-        {btn('Paquete Excel', 'xlsx', 'package', !hasApu)}
+        {btn('PDF cliente', 'pdf', 'budget', 'client')}
+        {btn('Excel presupuesto', 'xlsx', 'budget', 'client')}
+      </div>
+
+      {/* Técnico / interno — presupuesto completo + fichas APU + trazabilidad */}
+      <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-gray-500">
+        Técnico / interno
+      </p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {btn('PDF técnico completo', 'pdf', 'package', 'technical', !hasApu)}
+        {btn('Excel técnico con APU', 'xlsx', 'package', 'technical', !hasApu)}
+        {btn('APU vinculados PDF', 'pdf', 'apu', 'technical', !hasApu)}
+        {btn('APU vinculados Excel', 'xlsx', 'apu', 'technical', !hasApu)}
       </div>
 
       {/* Mensaje sin APU */}

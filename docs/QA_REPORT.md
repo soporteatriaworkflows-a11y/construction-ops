@@ -4,6 +4,33 @@ Este documento es propiedad de **agent-qa**. Se actualiza al final de
 
 ---
 
+## QUANTITY_WORKSPACE_AND_BOQ_SYNC_V1 + CATALOG_PRICE_VISIBILITY_V1 + CLIENT_EXPORT_PROFILE_V1 (2026-06-13, rama `feature/quantity-workspace-boq-sync-v1`)
+
+**Base:** `origin/main = 4e1817e` · **main intacta** · **producción intacta** · **2 migraciones aditivas SOLO locales** (`20260620090000` + RLS `20260620090100`) · **sin db push remoto** · **sin escrituras remotas**
+
+| Check | Resultado | Detalle |
+|---|---|---|
+| `supabase db reset --local` | ✅ | 41 migraciones aplican sin error; seeds OK |
+| typecheck (`tsc --noEmit`) | ✅ 0 | — |
+| lint (`eslint .`) | ✅ 0 | — |
+| Suite completa | ✅ **1565 passed / 42 skipped / 0 fail** | +52 tests: formula 23, sync 9, catalog price 8, export-profile 12 |
+| build (`next build`) | ✅ limpio | rutas `/quantities/workspace`, `/quantities/workspace/[groupId]/sync`, `/quantities/workspace/new` presentes |
+| gm:regression | ✅ 22/22 | totales primer piso intactos |
+| gm:import | ✅ | total **$372.247.169,98** intacto; sin patrones privados |
+| RLS runtime harness | ✅ **241/0** | preflight FORCE 38 (workspace +2); `update_boq_item_quantity` hereda guards de `add_apu_to_boq` |
+| read-model isolation | ✅ 12/0 | sin fuga cross-org |
+| `git diff --check` | ✅ limpio | solo avisos LF→CRLF |
+| validate-claude-agents | ✅ 214/0 | — |
+
+**Tests de aceptación del mandato (cobertura):**
+- Quantities 1–11: área simple/muro con vano/enchape/pintura/perfil/desperdicio, bloqueo de fórmula insegura (sin eval), bloqueo de negativos, cálculo server-side ⇒ `formula.test.ts` (23).
+- BOQ sync 12–20: preview sin escritura, crear/actualizar, bloqueo de versión emitida, preservación de snapshot de precio, antes/después/Δ ⇒ `sync.test.ts` (9) + RPC `update_boq_item_quantity` (preserva `unit_price_snapshot`, no toca APU/catálogo).
+- Catalog 21–25: aprobado/pendiente/sin precio, no autoaprueba, link a revisión ⇒ `price-status.test.ts` (8).
+- Export profile 26–30: cliente sin fichas APU, técnico con APU, endpoints previos intactos, golden master intacto ⇒ `export-profile.test.ts` (12) + exports 244/0.
+- Regresión 31–40: APU builder/archive/exports/BOQ/quantities-import/catalog-import/price-review/gm intactos ⇒ suite completa verde.
+
+---
+
 ## APU_EXPORTS_V1 + BUDGET_EXPORT_WITH_APU_ANNEX_V1 (2026-06-13, rama `feature/apu-budget-exports-v1`)
 
 **Base:** `origin/main = d3c67bd` · **main intacta** · **producción intacta** · **SIN migración** (fix read-model = solo mapeo ORM) · **sin db push remoto** · **sin escrituras remotas**

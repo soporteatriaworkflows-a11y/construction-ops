@@ -36,6 +36,7 @@ import type {
   ScheduleTaskStatus,
   Uuid,
   ViewerContext,
+  WorkspaceGroupView,
 } from '@/lib/contracts/read-model';
 import {
   computeApuDetail,
@@ -458,6 +459,16 @@ export class FixtureReadModelRepository implements ReadModelPort {
             calculatedQuantity: l.calculatedQuantity,
           })),
       }));
+  }
+
+  async listWorkspaceGroups(
+    viewer: ViewerContext,
+    _projectScopeId?: Uuid,
+  ): Promise<WorkspaceGroupView[]> {
+    // El workspace de cantidades es creación manual sobre BD real; en modo
+    // fixture (demo) no hay grupos de workspace persistidos.
+    if (!this.isViewerOrg(viewer)) return [];
+    return [];
   }
 
   async listCatalogResources(viewer: ViewerContext): Promise<CatalogResourceView[]> {

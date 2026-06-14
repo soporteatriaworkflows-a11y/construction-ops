@@ -33,6 +33,7 @@ import type {
   ScheduleTaskStatus,
   Uuid,
   ViewerContext,
+  WorkspaceGroupView,
 } from '@/lib/contracts/read-model';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { DrizzleReadRepository, type ReadDb } from '@/server/repositories/read-repository';
@@ -65,6 +66,11 @@ import {
   EstimateVersionNotFoundError,
   ProjectNotFoundError,
 } from './errors';
+import {
+  resolveCatalogPriceStatus,
+  projectPriceStatusForRole,
+  type PriceObservationRow,
+} from '@/server/catalog/price-status';
 
 /** Normaliza un valor de fecha/hora de Drizzle a ISO string. */
 function toIso(value: Date | string): string {
@@ -522,17 +528,96 @@ export class DrizzleReadModelRepository implements ReadModelPort {
     });
   }
 
+  async listWorkspaceGroups(
+    viewer: ViewerContext,
+    projectScopeId?: Uuid,
+  ): Promise<WorkspaceGroupView[]> {
+    return this.read(viewer, async () => {
+    const projects = await this.repo.projects(viewer.organizationId);
+    const scopes = await this.repo.scopesByProjects(projects.map((p) => p.id));
+    const allowedScopeIds = new Set(scopes.map((s) => s.id));
+    const scopeIds = projectScopeId
+      ? allowedScopeIds.has(projectScopeId)
+        ? [projectScopeId]
+        : []
+      : [...allowedScopeIds];
+    if (scopeIds.length === 0) return [];
+
+    const groups = await this.repo.workspaceGroupsByScopes(scopeIds);
+    const lines = await this.repo.workspaceLinesByGroups(groups.map((g) => g.id));
+    const linesByGroup = new Map<Uuid, typeof lines>();
+    for (const l of lines) {
+      const bucket = linesByGroup.get(l.groupId) ?? [];
+      bucket.push(l);
+      linesByGroup.set(l.groupId, bucket);
+    }
+    return groups.map((g) => ({
+      id: g.id,
+      code: g.code,
+      name: g.name,
+      floor: g.floor ?? null,
+      module: g.module ?? null,
+      space: g.space ?? null,
+      element: g.element ?? null,
+      resultUnit: g.resultUnit,
+      templateKind: g.templateKind,
+      totalNet: String(g.totalNet),
+      lines: (linesByGroup.get(g.id) ?? [])
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+        .map((l) => ({
+          id: l.id,
+          description: l.description ?? '',
+          formulaType: l.formulaType,
+          resultUnit: l.resultUnit ?? g.resultUnit,
+          resultGross: String(l.resultGross),
+          resultNet: String(l.resultNet),
+          apuTemplateId: l.apuTemplateId ?? null,
+          boqItemId: l.boqItemId ?? null,
+        })),
+    }));
+    });
+  }
+
   async listCatalogResources(viewer: ViewerContext): Promise<CatalogResourceView[]> {
     return this.read(viewer, async () => {
-    const resources = await this.repo.resources(viewer.organizationId);
-    return resources.map((r) => ({
-      id: r.id,
-      code: r.code,
-      name: r.name,
-      resourceType: r.resourceType as CatalogResourceView['resourceType'],
-      unit: r.unit,
-      // budgetReferencePrice se resuelve vía PricingReadPort, no aquí.
-    }));
+    const [resources, observations] = await Promise.all([
+      this.repo.resources(viewer.organizationId),
+      this.repo.resourcePriceObservationsByOrg(viewer.organizationId),
+    ]);
+
+    // Agrupa observaciones por recurso (estado resuelto en dominio puro).
+    const obsByResource = new Map<Uuid, PriceObservationRow[]>();
+    for (const o of observations) {
+      const bucket = obsByResource.get(o.resourceId) ?? [];
+      bucket.push({
+        status: o.status as PriceObservationRow['status'],
+        observedPrice: String(o.observedPrice),
+        supplierName: o.supplierName ?? null,
+        effectiveAt: toIso(o.approvedAt ?? o.observedAt),
+      });
+      obsByResource.set(o.resourceId, bucket);
+    }
+
+    return resources.map((r) => {
+      const status = projectPriceStatusForRole(
+        resolveCatalogPriceStatus(obsByResource.get(r.id) ?? []),
+        viewer.role,
+      );
+      return {
+        id: r.id,
+        code: r.code,
+        name: r.name,
+        resourceType: r.resourceType as CatalogResourceView['resourceType'],
+        unit: r.unit,
+        // budgetReferencePrice (cliente-safe) = precio aprobado, si existe.
+        budgetReferencePrice: status.approvedPrice,
+        priceStatus: status.priceStatus,
+        approvedPrice: status.approvedPrice,
+        pendingPrice: status.pendingPrice,
+        supplierName: status.supplierName,
+        priceDate: status.priceDate,
+      };
+    });
     });
   }
 

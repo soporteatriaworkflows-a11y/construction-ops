@@ -68,8 +68,8 @@ export default async function PlanningPage() {
         <PageHeader title="Cronograma de obra" description={projectName} />
         <EmptyState
           icon={CalendarRange}
-          title="Sin cronograma"
-          description="El cronograma se configura desde el modulo de proyectos. Primero crea un proyecto y luego define su planificacion."
+          title="Todavía no hay planificación generada"
+          description="Primero sincroniza cantidades y presupuesto (capítulos e ítems BOQ) o crea una planificación desde el BOQ. La generación automática del cronograma a partir del presupuesto (rendimientos APU, cuadrillas, duraciones y ruta crítica) está documentada como SCHEDULE_FROM_BOQ_V1 y se implementará en una oleada posterior."
         />
       </div>
     );

@@ -86,14 +86,21 @@ export default async function QuantitiesPage() {
     );
   }
 
-  const importCta = canImport ? (
-    <Button size="sm" asChild>
-      <Link href="/quantities/import">
-        <FileSpreadsheet className="mr-1 h-4 w-4" aria-hidden="true" />
-        Importar memorias
-      </Link>
-    </Button>
-  ) : undefined;
+  const importCta = (
+    <div className="flex gap-2">
+      <Button size="sm" variant="outline" asChild>
+        <Link href="/quantities/workspace">Workspace de cantidades</Link>
+      </Button>
+      {canImport ? (
+        <Button size="sm" asChild>
+          <Link href="/quantities/import">
+            <FileSpreadsheet className="mr-1 h-4 w-4" aria-hidden="true" />
+            Importar memorias
+          </Link>
+        </Button>
+      ) : null}
+    </div>
+  );
 
   return (
     <div>

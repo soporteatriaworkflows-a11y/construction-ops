@@ -992,6 +992,109 @@ export const resourceAssignments = pgTable(
 );
 
 /* ----------------------------------------------------------------------------
+ * Price intelligence: observaciones de precio por recurso
+ * (resource_price_observations, migración 20260610090000). Mapeo de solo lo
+ * que el read-model de catálogo necesita (CATALOG_PRICE_VISIBILITY_V1).
+ * ------------------------------------------------------------------------- */
+
+export const resourcePriceObservations = pgTable(
+  "resource_price_observations",
+  {
+    id: pk(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    resourceId: uuid("resource_id")
+      .notNull()
+      .references(() => resources.id, { onDelete: "restrict" }),
+    supplierId: uuid("supplier_id").references(() => suppliers.id, {
+      onDelete: "set null",
+    }),
+    observedPrice: money("observed_price").notNull(),
+    unit: text("unit").notNull(),
+    status: text("status").notNull().default("pending"),
+    observedAt: timestamp("observed_at", { withTimezone: true }).notNull(),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+);
+
+/* ----------------------------------------------------------------------------
+ * Quantity Workspace (QUANTITY_WORKSPACE_AND_BOQ_SYNC_V1, migración
+ * 20260620090000). Cantidades creadas manualmente, editables.
+ * ------------------------------------------------------------------------- */
+
+export const quantityWorkspaceGroups = pgTable(
+  "quantity_workspace_groups",
+  {
+    id: pk(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    projectScopeId: uuid("project_scope_id")
+      .notNull()
+      .references(() => projectScopes.id, { onDelete: "cascade" }),
+    code: text("code").notNull(),
+    name: text("name").notNull(),
+    floor: text("floor"),
+    module: text("module"),
+    space: text("space"),
+    element: text("element"),
+    description: text("description"),
+    resultUnit: text("result_unit").notNull(),
+    templateKind: text("template_kind").notNull().default("generic"),
+    totalNet: money("total_net").notNull().default("0"),
+    createdBy: uuid("created_by").references(() => profiles.id, {
+      onDelete: "set null",
+    }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("quantity_workspace_groups_org_idx").on(t.organizationId),
+    index("quantity_workspace_groups_scope_idx").on(t.projectScopeId),
+  ],
+);
+
+export const quantityWorkspaceLines = pgTable(
+  "quantity_workspace_lines",
+  {
+    id: pk(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    groupId: uuid("group_id")
+      .notNull()
+      .references(() => quantityWorkspaceGroups.id, { onDelete: "cascade" }),
+    description: text("description"),
+    resultUnit: text("result_unit"),
+    formulaType: text("formula_type").notNull(),
+    length: money("length"),
+    width: money("width"),
+    height: money("height"),
+    thickness: money("thickness"),
+    count: money("count"),
+    partialHeight: money("partial_height"),
+    wastePct: money("waste_pct").notNull().default("0"),
+    openingDeduction: money("opening_deduction").notNull().default("0"),
+    resultGross: money("result_gross").notNull().default("0"),
+    resultNet: money("result_net").notNull().default("0"),
+    apuTemplateId: uuid("apu_template_id").references(() => apuTemplates.id, {
+      onDelete: "set null",
+    }),
+    boqItemId: uuid("boq_item_id").references(() => boqItems.id, {
+      onDelete: "set null",
+    }),
+    notes: text("notes"),
+    sortOrder: integer("sort_order").notNull().default(0),
+  },
+  (t) => [
+    index("quantity_workspace_lines_org_idx").on(t.organizationId),
+    index("quantity_workspace_lines_group_sort_idx").on(t.groupId, t.sortOrder),
+  ],
+);
+
+/* ----------------------------------------------------------------------------
  * Tipos inferidos (select / insert) — espejo de las interfaces públicas.
  * ------------------------------------------------------------------------- */
 

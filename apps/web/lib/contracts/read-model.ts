@@ -206,6 +206,33 @@ export interface QuantityGroupView {
   lines: QuantityLineView[];
 }
 
+/** Línea del workspace de cantidades (creación manual, editable). */
+export interface WorkspaceLineView {
+  id: Uuid;
+  description: string;
+  formulaType: string;
+  resultUnit: string;
+  resultGross: DecimalString;
+  resultNet: DecimalString;
+  apuTemplateId: Uuid | null;
+  boqItemId: Uuid | null;
+}
+
+/** Grupo del workspace de cantidades (QUANTITY_WORKSPACE_AND_BOQ_SYNC_V1). */
+export interface WorkspaceGroupView {
+  id: Uuid;
+  code: string;
+  name: string;
+  floor: string | null;
+  module: string | null;
+  space: string | null;
+  element: string | null;
+  resultUnit: string;
+  templateKind: string;
+  totalNet: DecimalString;
+  lines: WorkspaceLineView[];
+}
+
 export interface CatalogResourceView {
   id: Uuid;
   code: string;
@@ -214,6 +241,16 @@ export interface CatalogResourceView {
   unit: string;
   /** ✅ precio presupuestado (no público). Omitido si no hay precio aprobado. */
   budgetReferencePrice?: DecimalString;
+  /** Estado de precio para visibilidad de catálogo (CATALOG_PRICE_VISIBILITY_V1). */
+  priceStatus?: 'approved' | 'pending' | 'rejected' | 'none';
+  /** ✅ último precio aprobado (= budgetReferencePrice). */
+  approvedPrice?: DecimalString;
+  /** Último precio pendiente (si no hay aprobado). No es un descuento. */
+  pendingPrice?: DecimalString;
+  /** Proveedor del precio mostrado. Solo roles internos (management/internal). */
+  supplierName?: string;
+  /** Fecha ISO de la observación mostrada. */
+  priceDate?: string;
 }
 
 export interface ChapterDistributionSlice {
@@ -369,6 +406,7 @@ export interface ReadModelPort {
   /** Detalle de un APU con componentes y desglose por tipo (rol 🔒 proyectado). */
   getApuDetail(viewer: ViewerContext, apuTemplateId: Uuid): Promise<ApuDetail>;
   listQuantities(viewer: ViewerContext, projectScopeId?: Uuid): Promise<QuantityGroupView[]>;
+  listWorkspaceGroups(viewer: ViewerContext, projectScopeId?: Uuid): Promise<WorkspaceGroupView[]>;
   listCatalogResources(viewer: ViewerContext): Promise<CatalogResourceView[]>;
   getDashboardSummary(viewer: ViewerContext, projectId: Uuid): Promise<DashboardSummary>;
 

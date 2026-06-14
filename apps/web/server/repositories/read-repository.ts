@@ -180,6 +180,48 @@ export class DrizzleReadRepository {
       .where(eq(schema.resources.organizationId, organizationId));
   }
 
+  /**
+   * Observaciones de precio (resource_price_observations) de la organización,
+   * con el nombre del proveedor. Para la visibilidad de precios del catálogo
+   * (CATALOG_PRICE_VISIBILITY_V1). Solo lectura; el estado se resuelve en el
+   * dominio puro `server/catalog/price-status`.
+   */
+  async resourcePriceObservationsByOrg(organizationId: Uuid) {
+    return this.db
+      .select({
+        resourceId: schema.resourcePriceObservations.resourceId,
+        observedPrice: schema.resourcePriceObservations.observedPrice,
+        status: schema.resourcePriceObservations.status,
+        observedAt: schema.resourcePriceObservations.observedAt,
+        approvedAt: schema.resourcePriceObservations.approvedAt,
+        supplierName: schema.suppliers.name,
+      })
+      .from(schema.resourcePriceObservations)
+      .leftJoin(
+        schema.suppliers,
+        eq(schema.resourcePriceObservations.supplierId, schema.suppliers.id),
+      )
+      .where(eq(schema.resourcePriceObservations.organizationId, organizationId));
+  }
+
+  /** Grupos del workspace de cantidades por alcances (creación manual). */
+  async workspaceGroupsByScopes(scopeIds: readonly Uuid[]) {
+    if (scopeIds.length === 0) return [];
+    return this.db
+      .select()
+      .from(schema.quantityWorkspaceGroups)
+      .where(inArray(schema.quantityWorkspaceGroups.projectScopeId, [...scopeIds]));
+  }
+
+  /** Líneas del workspace de cantidades por grupos. */
+  async workspaceLinesByGroups(groupIds: readonly Uuid[]) {
+    if (groupIds.length === 0) return [];
+    return this.db
+      .select()
+      .from(schema.quantityWorkspaceLines)
+      .where(inArray(schema.quantityWorkspaceLines.groupId, [...groupIds]));
+  }
+
   /** Grupos de cantidades de un conjunto de alcances. */
   async quantityGroupsByScopes(scopeIds: readonly Uuid[]) {
     if (scopeIds.length === 0) return [];

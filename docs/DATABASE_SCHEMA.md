@@ -1,5 +1,32 @@
 # Database Schema — Construction Ops
 
+> **Nota 2026-06-13 (QUANTITY_WORKSPACE_AND_BOQ_SYNC_V1):** 2 migraciones
+> aditivas SOLO locales. `20260620090000_quantity_workspace.sql`:
+> - **`quantity_workspace_groups`** — workspace editable de cantidades creadas
+>   manualmente. `id`, `organization_id→organizations`, `project_scope_id→
+>   project_scopes (CASCADE)`, `code`, `name`, `floor/module/space/element`
+>   (jerarquía), `description`, `result_unit` (CHECK no vacío), `template_kind`
+>   (`generic|mixed_wall`), `total_net numeric(20,10)` (server-side),
+>   `created_by→profiles`, `created_at/updated_at`. UNIQUE `(project_scope_id, code)`.
+> - **`quantity_workspace_lines`** — líneas de cálculo. `group_id→
+>   quantity_workspace_groups (CASCADE)`, `formula_type` (CHECK: 9 tipos +
+>   `manual_safe`), dimensiones `length/width/height/thickness/count/partial_height`,
+>   `waste_pct` (CHECK 0≤x<1), `opening_deduction` (≥0), `result_gross/result_net`
+>   (≥0, server-side), `apu_template_id→apu_templates (SET NULL)`,
+>   `boq_item_id→boq_items (SET NULL)`, `notes`, `sort_order`.
+> - Triggers same-org (sin SECURITY DEFINER) + `updated_at`. **No toca**
+>   `quantity_takeoff_*` ni `quantity_groups/lines` legacy.
+> - RPC **`update_boq_item_quantity(uuid, numeric, text)`** (SECURITY INVOKER):
+>   actualiza `boq_items.quantity_snapshot` de versión EDITABLE **preservando
+>   `unit_price_snapshot`**, recalcula `subtotal`; guards sesión/membresía/rol/
+>   `estimate_version_locked`; auditoría+idempotencia en `apu_manual_actions`
+>   (`action_type='update_quantity'`, CHECK extendido).
+> - `20260620090100_rls_quantity_workspace.sql`: RLS ENABLE+FORCE; SELECT org;
+>   INSERT/UPDATE/DELETE roles `admin/gerencia/presupuestos`. FORCE count 36→**38**.
+> - Drizzle: `resourcePriceObservations`, `quantityWorkspaceGroups`,
+>   `quantityWorkspaceLines` mapeados en `apps/web/lib/db/schema.ts`. **Sin db
+>   push remoto.**
+
 > **Nota 2026-06-13 (APU_EXPORTS_V1):** SIN cambio de esquema de BD. El fix
 > `READ_MODEL_ARCHIVED_AT` solo **sincronizó el mapeo ORM** (`apps/web/lib/db/schema.ts`)
 > de `apu_templates` con columnas que ya existían en la BD desde las migraciones
