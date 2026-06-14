@@ -4,7 +4,7 @@
  *
  * SOLO para roles `management` o `internal`.
  * Si el componente es renderizado, los datos YA están filtrados por rol (backend-first).
- * Maneja el caso donde los campos opcionales son undefined (modo fixture/demo).
+ * Maneja el caso donde los campos opcionales son undefined (sin precios aprobados aún).
  */
 
 import type { DashboardSummary } from '@/lib/contracts/read-model';
@@ -45,8 +45,15 @@ export function SavingsSection({
           className="rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600"
           role="status"
         >
-          Los datos de ahorro y cobertura de precios estarán disponibles cuando se
-          integre el módulo de pricing (Oleada 3A — modo fixture activo).
+          Estos indicadores se calculan a partir de precios aprobados, observaciones
+          pendientes y cobertura del catálogo.{' '}
+          <a
+            href="/catalog/prices/review"
+            className="font-medium text-iconic-primary underline-offset-2 hover:underline"
+          >
+            Revisar o aprobar precios
+          </a>
+          .
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

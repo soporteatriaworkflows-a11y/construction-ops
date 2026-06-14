@@ -4,6 +4,16 @@
 
 _Sin blockers activos._
 
+> **Nota 2026-06-14 (DASHBOARD_ACCESS_NAV_AND_PRICING_KPI_HOTFIX_V1):** copy
+> stale "Oleada 3A — modo fixture activo" corregido. Nav "Accesos": la arquitectura
+> ya estaba correcta; si el sidebar sigue sin mostrar "Accesos" en producción
+> tras el deploy de este hotfix → revisar logs de Vercel para confirmar si
+> `resolveCanManageAccess()` está lanzando error silente (el catch captura
+> cualquier excepción y retorna false; el guard backend `/settings/access` sigue
+> activo independientemente del sidebar). **Deuda: `SCHEDULE_FROM_BOQ_V1`**
+> (cronograma tipo MS Project desde presupuesto) registrada como siguiente oleada.
+> Sin blockers activos al cierre.
+
 > **Nota 2026-06-14 (QUANTITY_IMPORT_PERSISTENCE_HOTFIX_V1):** blocker
 > "importación no guarda nada" resuelto. Los datos sí se persistían en
 > `quantity_takeoff_groups`; el problema era de visibilidad (familia de tablas

@@ -1,5 +1,5 @@
 /**
- * Dashboard principal — Oleada 3A / endurecido 4B.1.
+ * Dashboard principal — endurecido 4B.1+.
  *
  * Server Component. Propiedad: agent-dashboard.
  *

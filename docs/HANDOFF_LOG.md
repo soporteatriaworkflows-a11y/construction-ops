@@ -1,5 +1,62 @@
 # Handoff Log
 
+## 2026-06-14 — DASHBOARD_ACCESS_NAV_AND_PRICING_KPI_HOTFIX_V1 (orchestrator)
+
+### Estado
+- Rama `fix/dashboard-access-nav-pricing-kpi-v1` (base `origin/main = 0d172ea`).
+  **Sin merge a main; sin deploy; sin db push remoto; sin escrituras remotas;
+  sin SMTP real; sin usuarios nuevos; stashes intactos (2, ajenos);
+  producción intacta; main intacta.**
+
+### Diagnóstico
+
+**Nav/Accesos:** La arquitectura de `sidebar-nav.tsx` + `layout.tsx` ya estaba
+correctamente implementada desde `e34a47a`. El `ACCESS_ITEM` existe, el layout
+resuelve `resolveCanManageAccess()` server-side y pasa `showAccess` al
+`SidebarNav`. El mecanismo silencia errores con `catch { return false }`. El
+riesgo más probable en producción: `getClaims()` falla transitoriamente en cold
+start de Vercel → sidebar sin "Accesos" en ese render. Guard backend SQL y
+`/settings/access` con `canManageAccess()` son el backstop real.
+
+**Dashboard copy stale:** `SavingsSection` tenía literal
+"Oleada 3A — modo fixture activo" en el estado vacío (cuando `projectedSaving`,
+`realizedSaving`, `pricingCoverage` son `undefined`). También había
+referencias en comentarios JSDoc de `savings-section.tsx` y `dashboard/page.tsx`.
+
+### Entregable
+- **Contrato** `docs/DASHBOARD_ACCESS_NAV_AND_PRICING_KPI_HOTFIX_V1_CONTRACT.md`.
+- **Fix copy** `modules/dashboard/savings-section.tsx`: estado vacío reemplazado
+  por copy honesto con link a revisión de precios; comentario JSDoc actualizado.
+- **Fix comment** `app/(dashboard)/dashboard/page.tsx`: referencia "Oleada 3A"
+  removida del comentario JSDoc.
+- **Fix planning empty state** `app/(dashboard)/planning/page.tsx`: descripción
+  simplificada (sin "SCHEDULE_FROM_BOQ_V1" en el UI visible al usuario).
+- **Suite tests** `tests/unit/nav/sidebar-access.test.ts` (nueva):
+  36 tests cubriendo nav visibility (canManageAccess logic), sidebar source
+  structure, layout source, /settings/access guard, dashboard copy, savings-section
+  copy, planning empty state.
+
+### Validación (todo PASS, local)
+- typecheck 0 · lint 0 · **suite 1667 passed / 42 skipped / 0 fail**
+  (+36 nuevos en sidebar-access.test.ts) · build limpio · `git diff --check`
+  limpio · gm:regression 22/22.
+
+### Arquitectura SCHEDULE_FROM_BOQ_V1 documentada
+Registrada en OPEN_QUESTIONS y DECISIONS como siguiente gran oleada:
+cronograma tipo MS Project conectado a presupuesto / BOQ / cantidades / APU /
+rendimientos / cuadrillas / duración automática / dependencias / ruta crítica /
+Gantt / línea base / avance físico.
+
+### Próximo paso
+1. Revisión visual autenticada: `/dashboard` (ver bloque "Ahorro e indicadores
+   internos" actualizado), `/settings/access` (nav "Accesos" visible para admin/
+   gerencia), `/planning` (empty state limpio).
+2. Si el sidebar sigue sin mostrar "Accesos" en producción → revisar logs de
+   Vercel para confirmar si `resolveCanManageAccess()` está lanzando error silente.
+3. Planificar **SCHEDULE_FROM_BOQ_V1** como siguiente oleada mayor.
+
+---
+
 ## 2026-06-14 — OPERATIONAL_ACCESS_LAYER_V1 + SMTP_CORPORATIVO_V1 (orchestrator)
 
 ### Estado
