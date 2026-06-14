@@ -1,5 +1,80 @@
 # Handoff Log
 
+## 2026-06-13 — QUANTITY_WORKSPACE_AND_BOQ_SYNC_V1 + CATALOG_PRICE_VISIBILITY_V1 + CLIENT_EXPORT_PROFILE_V1 (orchestrator)
+
+### Estado
+- Rama `feature/quantity-workspace-boq-sync-v1` (base `origin/main = 4e1817e`,
+  confirmada por `git fetch`; **sin divergencia**). HEAD: `fcb1c25` (+ esta
+  entrada de docs). **Sin merge a main; sin deploy; sin db push remoto; sin
+  escrituras remotas; sin datos dummy remotos.** Stashes intactos (2, ajenos a
+  esta rama). Producción intacta.
+
+### Entregable
+- **Contrato congelado** `docs/QUANTITY_WORKSPACE_AND_BOQ_SYNC_V1_CONTRACT.md`
+  (commit `ff57807`).
+- **Migración aditiva SOLO local** `20260620090000_quantity_workspace.sql` +
+  RLS `20260620090100`: tablas NUEVAS `quantity_workspace_groups` /
+  `quantity_workspace_lines` (editables, jerarquía piso/módulo/espacio/elemento,
+  desperdicio, descuento de vanos, vínculo opcional APU/BOQ), triggers same-org,
+  trigger updated_at, RLS ENABLE+FORCE (SELECT org; INSERT/UPDATE/DELETE roles de
+  presupuesto). **No toca** `quantity_takeoff_*` ni `quantity_groups/lines`
+  legacy. RPC `update_boq_item_quantity` (SECURITY INVOKER): actualiza cantidad
+  de ítem BOQ **editable preservando `unit_price_snapshot`**, recalcula subtotal
+  server-side, auditoría+idempotencia vía `apu_manual_actions`
+  (`action_type='update_quantity'`, CHECK extendido). FORCE count 36→**38**.
+- **Motor de fórmulas PURO** `server/quantity-workspace/formula.ts` (9 tipos:
+  área simple/piso, muro con vano, enchape por altura, pintura/microcemento,
+  perfil lineal, conteo, volumen, **manual seguro sin eval**); plantilla muro
+  mixto `templates.ts` (4 derivadas: board/enchape/perfil/pintura, cada una
+  vinculable a APU/BOQ distinto). **Preview de sync PURO** `sync.ts` (crear/
+  actualizar/bloqueada, antes/después/Δ, advertencias; **versión emitida ⇒
+  blocked**). Servicio + db-repository (RLS-bound, resultado recomputado
+  server-side; el navegador nunca fija el resultado).
+- **read-model** `listWorkspaceGroups` (drizzle + fixture) + `WorkspaceGroupView`.
+- **UI** `/quantities/workspace` (lista grupos + totales + estado de vínculo),
+  `/quantities/workspace/new` (crear grupo: campos jerárquicos + líneas con 9
+  tipos + plantilla muro mixto), `/quantities/workspace/[groupId]/sync` (preview
+  obligatorio + confirmar solo filas no bloqueadas). Enlace desde `/quantities`.
+- **CATALOG_PRICE_VISIBILITY_V1**: dominio puro `server/catalog/price-status.ts`
+  (aprobado/pendiente/rechazado/sin precio + proveedor solo roles internos).
+  `resource_price_observations` mapeado en Drizzle; `listCatalogResources`
+  enriquece `CatalogResourceView` (no autoaprueba, no expone descuentos). UI
+  `/catalog`: columna Estado, precio aprobado/pendiente, proveedor, fecha, CTA por
+  fila. **Causa raíz del "precio vacío"**: el read-model nunca poblaba el precio;
+  ahora sí (read-model fix acotado, sin migración).
+- **CLIENT_EXPORT_PROFILE_V1**: perfil puro `lib/estimates/export-profile.ts`
+  (cliente NUNCA incluye fichas APU; técnico honra kind; retrocompatible). Route
+  `?profile=client|technical` (default technical ⇒ comportamiento previo intacto;
+  **generadores sin cambios, golden master intacto**). UI export relabel: «Para
+  cliente» (PDF cliente, Excel presupuesto) vs «Técnico/interno» (PDF técnico
+  completo, Excel técnico con APU, APU vinculados).
+- **Cronograma**: empty-state honesto en `/planning` + deuda `SCHEDULE_FROM_BOQ_V1`.
+
+### Validación (todo PASS, local)
+- `supabase db reset --local` aplica las 2 migraciones nuevas sin error.
+- typecheck 0 · lint 0 · **suite 1565 passed / 42 skipped / 0 fail** (+ formula 23,
+  sync 9, catalog price 8, export-profile 12) · build limpio (rutas workspace
+  presentes) · gm:regression 22/22 · gm:import total **$372.247.169,98** intacto ·
+  RLS runtime **241/0** (preflight FORCE 38) · read-model isolation **12/0** ·
+  `git diff --check` limpio · validate-claude-agents **214/0**.
+
+### Próximo paso / deudas
+- Release controlado requiere `supabase db push` de `20260620090000` +
+  `20260620090100` (2 migraciones aditivas; sin DELETE/DROP). Revisión visual en
+  `http://localhost:3160`: crear grupo de cantidades (incl. muro mixto), enviarlo
+  al presupuesto con preview, ver catálogo con estados de precio, descargar PDF
+  cliente vs técnico.
+- Deudas registradas: `SCHEDULE_FROM_BOQ_V1`, `OPERATIONAL_ACCESS_LAYER_V1`,
+  `SMTP_CORPORATIVO_V1`, `APU_ADVANCED_EDITOR_V2`, `APU_VERSIONING_V1`,
+  `EXPORT_QUANTITIES_ANNEX_V1`, `TRUE_DB_PAGINATION_V1`, y nueva
+  `QUANTITY_WORKSPACE_RLS_HARNESS_V1` (checks dedicados del workspace en el
+  harness, hoy cubierto por preflight FORCE + paridad con `add_apu_to_boq`).
+
+### Agentes activos al cierre
+- Ninguno.
+
+---
+
 ## 2026-06-13 — APU_EXPORTS_V1 + BUDGET_EXPORT_WITH_APU_ANNEX_V1 (orchestrator)
 
 ### Estado

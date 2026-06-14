@@ -4,6 +4,19 @@
 
 _Sin blockers activos._
 
+> **Nota 2026-06-13 (QUANTITY_WORKSPACE_AND_BOQ_SYNC_V1):** sin blockers nuevos.
+> Deudas registradas en esta oleada (no bloquean): `SCHEDULE_FROM_BOQ_V1`
+> (cronograma desde BOQ: capítulos/ítems/cantidades/rendimientos APU/cuadrillas/
+> duraciones/dependencias/ruta crítica/Gantt — UI ya muestra mensaje honesto),
+> `QUANTITY_WORKSPACE_RLS_HARNESS_V1` (checks dedicados del workspace en el RLS
+> runtime harness; hoy cubierto por preflight FORCE=38 + paridad de guards con
+> `add_apu_to_boq`/`update_boq_item_quantity`), `EXPORT_QUANTITIES_ANNEX_V1`
+> (anexo de cantidades en exports). Preguntas abiertas: ¿el workspace debe
+> permitir editar líneas tras crear el grupo (hoy: crear + borrar grupo; editar
+> línea individual diferido)? ¿el sync debe ofrecer crear ítem sin APU con precio
+> manual autorizado (hoy: requiere APU vinculado)? Recomendación: recoger
+> feedback de la usuaria en revisión visual antes de ampliar alcance.
+
 > **Nota 2026-06-13 (APU_EXPORTS_V1):** la deuda `READ_MODEL_ARCHIVED_AT`
 > (registrada en HANDOFF/INTEGRATION) quedó **RESUELTA** con un fix de mapeo ORM
 > sin migración. No introduce blockers nuevos. La pregunta Q-001 (APU incompleto)
