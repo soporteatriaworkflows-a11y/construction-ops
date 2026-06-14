@@ -16,6 +16,7 @@ import {
   LayoutDashboard,
   Hash,
   CalendarRange,
+  Users,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
@@ -30,12 +31,20 @@ const NAV_ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
   { href: '/planning', label: 'Cronograma', icon: CalendarRange },
 ];
 
-export function SidebarNav() {
+/** Entrada de gestión de accesos: solo visible para roles de gestión. */
+const ACCESS_ITEM = { href: '/settings/access', label: 'Accesos', icon: Users };
+
+/**
+ * @param canManageAccess - resuelto server-side (admin/gerencia). Ocultar el
+ *   botón NO es la única barrera: las acciones server-side revalidan permisos.
+ */
+export function SidebarNav({ canManageAccess = false }: { canManageAccess?: boolean }) {
   const pathname = usePathname();
+  const items = canManageAccess ? [...NAV_ITEMS, ACCESS_ITEM] : NAV_ITEMS;
   return (
     <nav className="flex-1 overflow-y-auto py-4">
       <ul role="list" className="space-y-1 px-3">
-        {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+        {items.map(({ href, label, icon: Icon }) => {
           const active = pathname === href || pathname.startsWith(`${href}/`);
           return (
             <li key={href}>

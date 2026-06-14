@@ -1,5 +1,70 @@
 # Handoff Log
 
+## 2026-06-14 — OPERATIONAL_ACCESS_LAYER_V1 + SMTP_CORPORATIVO_V1 (orchestrator)
+
+### Estado
+- Rama `feature/operational-access-smtp-v1` (base `origin/main = 877c60b`,
+  confirmada por `git fetch`; **sin divergencia**). **Sin merge a main; sin
+  deploy; sin db push remoto; sin escrituras remotas; sin datos dummy remotos;
+  sin correos reales; sin SMTP real; sin cambios de variables remotas.** Stashes
+  intactos (2, ajenos). Producción intacta. Main intacta.
+
+### Entregable
+- **Contrato congelado** `docs/OPERATIONAL_ACCESS_AND_SMTP_V1_CONTRACT.md`.
+- **Migración aditiva SOLO local** `20260621090000_operational_access.sql` + RLS
+  `20260621090100`: tablas NUEVAS `organization_invitations` (token **hasheado**,
+  expiración, estado, autoría, accept/revoke) y `access_audit_log` (append-only;
+  NUNCA tokens/contraseñas). RPCs `SECURITY DEFINER`: `create_invitation`,
+  `resend_invitation`, `revoke_invitation`, `peek_invitation`, `accept_invitation`,
+  `change_member_role` — org/actor/rol **server-side**, anti-escalamiento
+  (no auto-elevación; gerencia ≠ admin; email mismatch). RLS ENABLE+FORCE,
+  SELECT por org; **escrituras solo vía RPC**. No toca `profiles` ni usuarios
+  productivos. FORCE count +2 tablas.
+- **Email transaccional** `server/email`: `EmailProvider`, `LogEmailProvider`
+  (dev/test, **no envía real**), `SmtpEmailProvider` (nodemailer **opcional** vía
+  import dinámico; fallback a Log), plantillas español/ICONIC (invitación, reset,
+  reenvío, revocación), factory + `sendTransactionalEmail`.
+- **Dominio** `server/access`: permisos puros (anti-escalamiento), token sha256,
+  resolución de actor (profiles.role server-side), read-repository (miembros/
+  invitaciones por read-model drizzle + fixtures; el listado NO usa el SELECT
+  recursivo de profiles), servicio (create/resend/revoke/changeRole/accept),
+  errores en español.
+- **UI** `/settings/access` (gated admin/gerencia): invitar (roles permitidos),
+  usuarios activos (cambio de rol en línea), invitaciones (reenviar/revocar,
+  estados Activo/Pendiente/Vencida/Revocada). `/invite/accept` (pública; peek por
+  hash + signUp + RPC accept client-side). Nav lateral con entrada **Accesos**
+  resuelta server-side. `routes.ts`: `/settings` protegida, `/invite` pública.
+- **Recuperación de contraseña**: ya existía (Supabase PKCE: forgot/reset/callback,
+  mensaje neutral, anti open-redirect, link en login). Sin cambios de código;
+  plantilla canónica de reset documentada para el panel de Supabase.
+
+### Validación (todo PASS, local)
+- Migraciones aplican limpio en el Postgres local (psql) y validadas bajo rol
+  `authenticated` end-to-end (create/accept/double-accept/role-change/self-block/
+  audit + guards gerencia-admin/obra-invite).
+- typecheck 0 · lint 0 · **suite 1633 passed / 42 skipped / 0 fail** (+58 nuevos:
+  permissions, token, email, service, read-repository, access-routes, rls-access
+  static) · build limpio · RLS runtime harness extendido (+11 checks de acceso).
+- `git diff --check` limpio.
+
+### Próximo paso / deudas
+- Release controlado (autorización aparte): merge a main + `supabase db push` de
+  `20260621090000` + `20260621090100` (aditivas; sin DELETE/DROP) + configurar
+  SMTP corporativo (panel Supabase Auth + env `SMTP_*` en Vercel) + revisión
+  visual autenticada de `/settings/access` y del flujo de invitación.
+- **Deuda crítica de release** `OPERATIONAL_ACCESS_REMOTE_RLS_VERIFY_V1`: en
+  Supabase remoto el migrador podría NO tener BYPASSRLS (ver fix 4B.1). Verificar
+  en staging que las RPCs `SECURITY DEFINER` (especialmente `accept_invitation`,
+  que escribe `profiles` para un invitado sin org, y el listado por read-model)
+  operan correctamente bajo RLS remota ANTES de confiar en el flujo en producción.
+- Deudas: `ACCESS_DEACTIVATION_V1` (suspender usuario activo sin borrarlo),
+  `EMAIL_DELIVERABILITY_MONITORING_V1`, `ACCESS_AUDIT_VIEWER_V1` (UI de bitácora).
+
+### Agentes activos al cierre
+- Ninguno.
+
+---
+
 ## 2026-06-14 — QUANTITY_IMPORT_PERSISTENCE_HOTFIX_V1 (orchestrator)
 
 ### Estado

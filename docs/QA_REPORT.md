@@ -1773,3 +1773,16 @@ Gates antes diferidos, ahora ejecutados y verdes:
 Fix de QA: bulk no sobrescribe asociaciones existentes (`skipped_existing`),
 verificado en harness [23i]. Recomendación: rama lista para revisión visual y
 release controlado (1 migración). NO merge/deploy/db push remoto este ciclo.
+
+## OPERATIONAL_ACCESS_LAYER_V1 + SMTP_CORPORATIVO_V1 (2026-06-14)
+
+Migraciones `20260621090000` + `20260621090100` aplican limpio en Postgres local
+y validadas bajo rol `authenticated` end-to-end (create→pending, accept→accepted,
+doble-accept→invitation_used, change_role→updated, self-block, email_mismatch,
+gerencia≠admin, obra no invita; bitácora con invite_created/accepted/role_changed).
+Gates locales: typecheck 0 · lint 0 · **suite 1633 passed / 42 skipped / 0 fail**
+(+58 nuevos) · build limpio (rutas `/settings/access` y `/invite/accept` presentes)
+· RLS runtime harness extendido (+11 checks de acceso) · `git diff --check` limpio.
+NO merge/deploy/db push remoto/SMTP real/correos reales este ciclo. Deuda de
+release: `OPERATIONAL_ACCESS_REMOTE_RLS_VERIFY_V1` (verificar SECURITY DEFINER bajo
+RLS remota — especialmente `accept_invitation` — antes de confiar en producción).

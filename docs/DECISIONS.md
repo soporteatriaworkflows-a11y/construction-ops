@@ -226,3 +226,29 @@ Decisiones abiertas:
   masiva pasa `p_allow_replace=false` ⇒ `skipped_existing` para componentes ya
   asociados (contrato §8). La acción individual conserva el reemplazo explícito
   (§10). Verificado en harness RLS runtime [23i].
+
+## OPERATIONAL_ACCESS_LAYER_V1 + SMTP_CORPORATIVO_V1 (2026-06-14)
+
+- **D-ACC-1 — Listado de miembros por read-model, no por RLS.** La política
+  `profiles_self_select` (anti-recursión 4B.1) impide listar la organización vía
+  cliente RLS-bound. El listado de miembros/invitaciones se sirve por el
+  read-model (drizzle privilegiado + filtro explícito por org + fixtures),
+  consistente con el resto de listados. NO se reintroduce un SELECT org-wide
+  recursivo en `profiles`.
+- **D-ACC-2 — Escrituras de acceso por RPC SECURITY DEFINER.** create/resend/
+  revoke/accept/change_role validan org+actor+rol server-side. RLS de las tablas
+  nuevas no expone INSERT/UPDATE/DELETE directos (contrato §8).
+- **D-ACC-3 — Solo `profiles.role` gobierna la gestión, no el ViewerRole.**
+  `admin`/`gerencia` gestionan; gerencia no crea/eleva admin; nadie cambia su
+  propio rol. El gating de UI/acción usa `profiles.role` (ViewerRole 'internal'
+  no distingue admin).
+- **D-ACC-4 — Token hasheado.** Solo se persiste SHA-256 del token; el plano
+  viaja en el enlace de invitación (email/fallback dev). Un solo uso.
+- **D-ACC-5 — Reset de contraseña: reusar Supabase Auth PKCE existente.** No se
+  reinventa criptografía; el SMTP de esos correos se configura en el panel de
+  Supabase. La plantilla canónica vive en `server/email/templates.ts`.
+- **D-ACC-6 — Email transaccional con default no-real.** `LogEmailProvider` en
+  dev/test (no envía); `SmtpEmailProvider` con nodemailer **opcional** (import
+  dinámico) y fallback a Log. Secretos solo en el entorno, nunca en repo/remoto.
+- **D-ACC-7 — Desactivación de usuario activo: diferida** (`ACCESS_DEACTIVATION_V1`).
+  No hay borrado físico de usuarios.
