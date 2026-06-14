@@ -182,7 +182,8 @@ async function main(): Promise<void> {
   // 36 tras APU_MANUAL_BUILDER_V1 + BOQ_ADD_FROM_APU_V1 (+apu_manual_actions).
   // 38 tras QUANTITY_WORKSPACE_AND_BOQ_SYNC_V1 (+quantity_workspace_groups/lines).
   // 40 tras OPERATIONAL_ACCESS_LAYER_V1 (+organization_invitations/access_audit_log).
-  check('Pre-flight: 40 tablas con RLS FORCE', rlsTables === '40', `rlsTables=${rlsTables}`);
+  // 41 tras SCHEDULE_FROM_BOQ_V1 (+planning_schedules).
+  check('Pre-flight: 41 tablas con RLS FORCE', rlsTables === '41', `rlsTables=${rlsTables}`);
 
   const [{ count: taskCount }] = await sql<{ count: string }[]>`
     SELECT count(*)::text AS count FROM schedule_tasks WHERE id = ${TASK_A}`;
@@ -3040,6 +3041,93 @@ async function main(): Promise<void> {
     accRoleChg = (r[0]?.res as { status?: string })?.status === 'updated';
   });
   check('access: admin cambia rol de otro miembro (updated)', accRoleChg);
+
+  // ===========================================================================
+  // SCHEDULE_FROM_BOQ_V1 — aislamiento tenant de planning_schedules.
+  // ===========================================================================
+  await setupOrgB(); // idempotente; garantiza ORG_B/USER_B_ADMIN/PROJECT_B.
+  const SCHED_A = '0e000000-0000-0000-0000-000000000001';
+  const RANDOM_VERSION = '0e000000-0000-0000-0000-0000000000ff';
+
+  // S1) admin same-org crea un cronograma (feliz).
+  let schedInsert = false;
+  await asUser(claimsA, async (q) => {
+    const r = await q`
+      INSERT INTO planning_schedules
+        (organization_id, project_id, estimate_version_id, name, status, start_date, created_by)
+      VALUES (${ORG_A}, ${PROJECT_A}, ${VERSION_A}, 'Cronograma A', 'draft', '2026-07-01', ${USER_A_ADMIN})
+      RETURNING id`;
+    schedInsert = r.length === 1;
+  });
+  check('schedule: admin same-org crea planning_schedule', schedInsert);
+
+  // S2) cross-org: org A intenta colgar el cronograma de un proyecto de org B.
+  let schedCrossProj = false;
+  await asUser(claimsA, async (q) => {
+    await q.unsafe('SAVEPOINT sp_sched_xproj');
+    try {
+      await q`
+        INSERT INTO planning_schedules
+          (organization_id, project_id, estimate_version_id, name, status, start_date)
+        VALUES (${ORG_A}, ${PROJECT_B}, ${VERSION_A}, 'x', 'draft', '2026-07-01')`;
+      schedCrossProj = false; // no debió permitirse
+    } catch {
+      schedCrossProj = true;
+    }
+    await q.unsafe('ROLLBACK TO SAVEPOINT sp_sched_xproj');
+  });
+  check('schedule: cross-org project_id rechazado (WITH CHECK)', schedCrossProj);
+
+  // S3) versión de presupuesto inexistente/ajena ⇒ rechazada (EXISTS de versión).
+  let schedBadVersion = false;
+  await asUser(claimsA, async (q) => {
+    await q.unsafe('SAVEPOINT sp_sched_ver');
+    try {
+      await q`
+        INSERT INTO planning_schedules
+          (organization_id, project_id, estimate_version_id, name, status, start_date)
+        VALUES (${ORG_A}, ${PROJECT_A}, ${RANDOM_VERSION}, 'x', 'draft', '2026-07-01')`;
+      schedBadVersion = false;
+    } catch {
+      schedBadVersion = true;
+    }
+    await q.unsafe('ROLLBACK TO SAVEPOINT sp_sched_ver');
+  });
+  check('schedule: estimate_version ajena/inexistente rechazada (WITH CHECK)', schedBadVersion);
+
+  // S4) SELECT isolation: org B no ve el cronograma de org A (sembrado en setup).
+  let schedSelIso = false;
+  await asUser(
+    claimsB,
+    async (q) => {
+      const r = await q`SELECT id FROM planning_schedules WHERE id = ${SCHED_A}`;
+      schedSelIso = r.length === 0;
+    },
+    async (sup) => {
+      await sup`
+        INSERT INTO planning_schedules
+          (id, organization_id, project_id, estimate_version_id, name, status, start_date)
+        VALUES (${SCHED_A}, ${ORG_A}, ${PROJECT_A}, ${VERSION_A}, 'Cronograma A', 'draft', '2026-07-01')`;
+    },
+  );
+  check('schedule: org B NO ve cronograma de org A (SELECT isolation)', schedSelIso);
+
+  // S5) DELETE denegado por RLS (sin política DELETE ⇒ 0 filas afectadas; archivar≠borrar).
+  let schedDelDenied = false;
+  await asUser(
+    claimsA,
+    async (q) => {
+      const r = await q`DELETE FROM planning_schedules WHERE id = ${SCHED_A}`;
+      schedDelDenied = r.count === 0;
+    },
+    async (sup) => {
+      await sup`
+        INSERT INTO planning_schedules
+          (id, organization_id, project_id, estimate_version_id, name, status, start_date)
+        VALUES (${SCHED_A}, ${ORG_A}, ${PROJECT_A}, ${VERSION_A}, 'Cronograma A', 'draft', '2026-07-01')`;
+    },
+  );
+  check('schedule: DELETE denegado por RLS (archivar≠borrar)', schedDelDenied);
 
   // --- Resumen ---
   console.log(`\nRESULTADO RLS RUNTIME: ${pass} PASS / ${fail} FAIL`);
