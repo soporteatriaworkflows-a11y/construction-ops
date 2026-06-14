@@ -5,6 +5,10 @@
  * Consume el read-model canónico (@/server/read-model) en lugar de mocks estáticos.
  * NO importa @/lib/utils/mocks. NO recalcula cantidades en el frontend.
  * calculatedQuantity llega pre-calculado desde el read-model.
+ *
+ * QUANTITY_IMPORT_PERSISTENCE_HOTFIX_V1:
+ * Añade sección "Memorias importadas" leyendo quantity_import_batches +
+ * quantity_takeoff_groups vía listQuantityImportBatches (RLS-bound, solo db).
  */
 import Link from 'next/link';
 import { FileSpreadsheet, Hash } from 'lucide-react';
@@ -18,10 +22,12 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { formatNumber, CALCULATION_MODE_LABELS } from '@/lib/utils/format';
+import { formatNumber } from '@/lib/utils/format';
 import { getReadModel } from '@/server/read-model';
-import { resolveViewer } from '@/server/auth/resolve-viewer';
+import { resolveViewer, resolveAuthenticatedViewer } from '@/server/auth/resolve-viewer';
 import { isCreationModeEnabled } from '@/app/(dashboard)/projects/mode-guard';
+import { listQuantityImportBatches } from '@/server/quantity-import';
+import type { ImportedBatchSummary } from '@/lib/quantity-import/types';
 import type { ViewerContext } from '@/lib/contracts/read-model';
 
 // Render request-time: viewer real por modo (db=autenticado, fixture=demo).
@@ -68,6 +74,18 @@ export default async function QuantitiesPage() {
       groups = await rm.listQuantities(viewer, scopeId);
     } catch (e) {
       loadError = e instanceof Error ? e.message : 'Error al cargar cantidades';
+    }
+  }
+
+  // Lotes de memorias importadas (solo modo db, roles con permiso de importación).
+  // Usa resolveAuthenticatedViewer para obtener el AuthenticatedViewer completo.
+  let importedBatches: ImportedBatchSummary[] = [];
+  if (canImport && !loadError) {
+    try {
+      const authedViewer = await resolveAuthenticatedViewer();
+      importedBatches = await listQuantityImportBatches(authedViewer);
+    } catch {
+      // Lectura opcional — no bloquea la página
     }
   }
 
@@ -199,6 +217,74 @@ export default async function QuantitiesPage() {
           })}
         </div>
       )}
+
+      {importedBatches.length > 0 ? (
+        <div id="imported-batches" className="mt-8 space-y-4">
+          <h2 className="text-base font-semibold text-gray-900">
+            Memorias importadas ({importedBatches.length}{' '}
+            {importedBatches.length === 1 ? 'lote' : 'lotes'})
+          </h2>
+          {importedBatches.map((batch) => (
+            <Card key={batch.batchId}>
+              <CardHeader className="pb-2">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <CardTitle className="text-sm font-medium">
+                      {batch.sourceFilename}
+                    </CardTitle>
+                    <p className="text-xs text-gray-500">
+                      {new Date(batch.importedAt).toLocaleDateString('es-CO')} &middot;{' '}
+                      {batch.groupsCount} grupos &middot; {batch.linesCount} líneas
+                      {batch.linkedBoqItems > 0
+                        ? ` · ${batch.linkedBoqItems} vinculados al presupuesto`
+                        : ''}
+                    </p>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-xs text-gray-500">
+                      <th className="pb-2 font-medium">Descripción</th>
+                      <th className="pb-2 text-right font-medium">Líneas</th>
+                      <th className="pb-2 text-right font-medium">Total</th>
+                      <th className="pb-2 font-medium">Unidad</th>
+                      <th className="pb-2 font-medium">BOQ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {batch.groups.map((g) => (
+                      <tr key={g.id} className="border-b last:border-0">
+                        <td className="py-1.5 pr-3">{g.description}</td>
+                        <td className="py-1.5 pr-3 text-right tabular-nums">
+                          {g.lineCount}
+                        </td>
+                        <td className="py-1.5 pr-3 text-right tabular-nums font-medium">
+                          {formatNumber(g.totalCalculated, 4)}
+                          {g.unit ? ` ${g.unit}` : ''}
+                        </td>
+                        <td className="py-1.5 pr-3 text-xs text-gray-500">
+                          {g.unit ?? '—'}
+                        </td>
+                        <td className="py-1.5">
+                          {g.boqItemId ? (
+                            <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800">
+                              Vinculado
+                            </span>
+                          ) : (
+                            <span className="text-xs text-gray-300">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

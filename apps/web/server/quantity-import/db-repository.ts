@@ -193,4 +193,78 @@ export class DbQuantityImportRepository {
     if (error) throw new Error(`quantity_import_rpc_failed: ${error.code ?? error.message}`);
     return data as QuantityBatchRpcResult;
   }
+
+  /** Lee los lotes importados de la org con sus grupos (para /quantities). */
+  async listImportedBatches(
+    _viewer: AuthenticatedViewer,
+  ): Promise<import('@/lib/quantity-import/types').ImportedBatchSummary[]> {
+    const supabase = await this.clientFactory();
+
+    // Batches más recientes primero, máx 50.
+    const { data: batches, error: batchErr } = await supabase
+      .from('quantity_import_batches')
+      .select('id, source_filename, source_sheet, imported_at, total_groups, total_lines, linked_boq_items')
+      .order('imported_at', { ascending: false })
+      .limit(50);
+    if (batchErr || !batches) return [];
+
+    const results: import('@/lib/quantity-import/types').ImportedBatchSummary[] = [];
+    for (const batch of batches as Array<{
+      id: string;
+      source_filename: string;
+      source_sheet: string;
+      imported_at: string;
+      total_groups: number;
+      total_lines: number;
+      linked_boq_items: number;
+    }>) {
+      const { data: groups, error: groupErr } = await supabase
+        .from('quantity_takeoff_groups')
+        .select('id, description, unit, total_calculated, boq_item_id')
+        .eq('import_batch_id', batch.id)
+        .order('source_row', { ascending: true })
+        .limit(500);
+      if (groupErr) continue;
+
+      const groupRows = (groups ?? []) as Array<{
+        id: string;
+        description: string;
+        unit: string | null;
+        total_calculated: string;
+        boq_item_id: string | null;
+      }>;
+
+      // Conteo de líneas por grupo en una sola consulta.
+      const groupIds = groupRows.map((g) => g.id);
+      const lineCounts = new Map<string, number>();
+      if (groupIds.length > 0) {
+        const { data: lineData } = await supabase
+          .from('quantity_takeoff_lines')
+          .select('group_id')
+          .in('group_id', groupIds);
+        for (const row of (lineData ?? []) as Array<{ group_id: string }>) {
+          lineCounts.set(row.group_id, (lineCounts.get(row.group_id) ?? 0) + 1);
+        }
+      }
+
+      results.push({
+        batchId: batch.id,
+        sourceFilename: batch.source_filename,
+        sourceSheet: batch.source_sheet,
+        importedAt: batch.imported_at,
+        groupsCount: batch.total_groups,
+        linesCount: batch.total_lines,
+        linkedBoqItems: batch.linked_boq_items,
+        groups: groupRows.map((g) => ({
+          id: g.id,
+          description: g.description,
+          unit: g.unit,
+          totalCalculated: g.total_calculated,
+          lineCount: lineCounts.get(g.id) ?? 0,
+          boqItemId: g.boq_item_id,
+        })),
+      });
+    }
+    return results;
+  }
 }

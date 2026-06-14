@@ -12,6 +12,7 @@
  */
 'use server';
 
+import { revalidatePath } from 'next/cache';
 import { resolveAuthenticatedViewer } from '@/server/auth/resolve-viewer';
 import { AuthError } from '@/server/auth/errors';
 import {
@@ -134,6 +135,8 @@ export async function confirmQuantityImportAction(
     const result = await confirmQuantityImport(viewer, formData.get('file'), digest, {
       linkVersionId: parseLinkVersionId(formData.get('linkVersionId')),
     });
+    revalidatePath('/quantities');
+    revalidatePath('/quantities/import');
     return { ok: true, result };
   } catch (e) {
     return { ok: false, error: sanitizeError(e) };

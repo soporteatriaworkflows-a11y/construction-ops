@@ -6,10 +6,12 @@ export {
   previewQuantityImport,
   confirmQuantityImport,
   listQuantityLinkableVersions,
+  listQuantityImportBatches,
   buildQuantityReportCsv,
   type ConfirmQuantityImportOptions,
   type QuantityImportDeps,
 } from './service';
+export type { ImportedBatchSummary } from '@/lib/quantity-import/types';
 export {
   QuantityImportFileError,
   QuantityImportParseError,

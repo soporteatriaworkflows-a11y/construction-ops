@@ -200,3 +200,22 @@ export interface QuantityImportResult {
   rows: QuantityImportReportRow[];
   reportCsv: string;
 }
+
+/** Resumen de un lote importado (para la vista /quantities). */
+export interface ImportedBatchSummary {
+  batchId: Uuid;
+  sourceFilename: string;
+  sourceSheet: string;
+  importedAt: string; // ISO 8601
+  groupsCount: number;
+  linesCount: number;
+  linkedBoqItems: number;
+  groups: Array<{
+    id: Uuid;
+    description: string;
+    unit: string | null;
+    totalCalculated: string;
+    lineCount: number;
+    boqItemId: Uuid | null;
+  }>;
+}

@@ -248,7 +248,7 @@ export function QuantityImportWizard() {
                 Descargar reporte CSV
               </Button>
               <Button size="sm" asChild>
-                <Link href="/quantities">Ver cantidades</Link>
+                <Link href="/quantities#imported-batches">Ver memorias importadas</Link>
               </Button>
             </div>
           </CardContent>
