@@ -4,6 +4,16 @@
 
 _Sin blockers activos._
 
+> **Nota 2026-06-15 (SCHEDULE_PREVIEW_READMODEL_ROOT_CAUSE_V4):** causa raíz REAL
+> del preview "muerto" tras V3 identificada y corregida: `loadGeneratorSource` no
+> coercía `numeric` a `DecimalString`; con `numeric` serializado como número JS por
+> PostgREST, la suma de rendimiento APU (`string.split`) lanzaba `TypeError` no
+> tipado → mensaje genérico. Alineado con el read-model probado (quantity-workspace
+> `String(...)`). Generador endurecido (datos imperfectos → warnings, no excepción)
+> + capítulo sintético "Sin capítulo" + UX de error preciso + código seguro
+> `SCHEDULE_PREVIEW_READMODEL_FAILED`. Sin migración. Sin blockers al cierre.
+> **Pendiente de verificación en producción tras release** (ver abajo).
+
 > **Nota 2026-06-14 (SCHEDULE_PREVIEW_CREATE_PROD_FIX_V2):** 3 causas de fallo
 > silencioso en `/planning/new` resueltas: (1) `mapWriteError` fallthrough → ahora
 > siempre devuelve `ScheduleValidationError`; (2) errores de lectura del repo

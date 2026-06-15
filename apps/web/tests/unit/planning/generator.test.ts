@@ -350,4 +350,152 @@ describe('buildScheduleFromBoqPreview', () => {
     expect(codes).toContain('S1-01');
     expect(codes).toContain('S1-01.001');
   });
+
+  it('expone inputItemCount/inputChapterCount del read-model recibido', () => {
+    const pv = buildScheduleFromBoqPreview({ chapters, items, options: baseOptions() });
+    expect(pv.stats.inputItemCount).toBe(3);
+    expect(pv.stats.inputChapterCount).toBe(2);
+  });
+});
+
+/**
+ * V4 — Blindaje del read-model/generador (SCHEDULE_PREVIEW_READMODEL_ROOT_CAUSE_V4).
+ * Datos imperfectos (cantidad/rendimiento/cuadrilla inválidos, ítems huérfanos)
+ * deben producir preview con warnings, NUNCA una excepción global.
+ */
+describe('buildScheduleFromBoqPreview — datos imperfectos no rompen', () => {
+  const ORPHAN_CH = '00000000-0000-4000-8000-0000000000ff';
+
+  it.each([
+    ['cantidad no finita (Infinity)', 'Infinity' as unknown as string],
+    ['cantidad NaN', 'NaN' as unknown as string],
+    ['cantidad vacía', '' as unknown as string],
+    ['cantidad no numérica', 'abc' as unknown as string],
+    ['cantidad nula', null as unknown as string],
+  ])('no lanza con %s y produce actividad con duración mínima', (_label, q) => {
+    const bad: GeneratorItemInput = {
+      ...ITEM1,
+      quantity: q,
+    };
+    let pv!: ReturnType<typeof buildScheduleFromBoqPreview>;
+    expect(() => {
+      pv = buildScheduleFromBoqPreview({
+        chapters,
+        items: [bad],
+        // filtro OFF: una cantidad inválida NO debe omitir el ítem.
+        options: baseOptions({ onlyPositiveQuantity: false, minDurationDays: 2 }),
+      });
+    }).not.toThrow();
+    const a1 = pv.tasks.find((t) => t.boqItemId === I1)!;
+    expect(a1).toBeDefined();
+    expect(a1.durationDays).toBe(2); // mínima
+  });
+
+  it.each([
+    ['rendimiento Infinity', 'Infinity' as unknown as string],
+    ['rendimiento NaN', 'NaN' as unknown as string],
+    ['rendimiento negativo', '-3'],
+    ['rendimiento no numérico', 'xx' as unknown as string],
+  ])('APU con %s ⇒ no_rendimiento sin lanzar', (_label, pd) => {
+    const bad: GeneratorItemInput = {
+      ...ITEM1,
+      apuLaborPersonDaysPerUnit: pd,
+    };
+    let pv!: ReturnType<typeof buildScheduleFromBoqPreview>;
+    expect(() => {
+      pv = buildScheduleFromBoqPreview({ chapters, items: [bad], options: baseOptions({ minDurationDays: 1 }) });
+    }).not.toThrow();
+    const a1 = pv.tasks.find((t) => t.boqItemId === I1)!;
+    expect(a1.productivitySource).toBe('unknown');
+    expect(a1.warnings.some((w) => w.kind === 'no_rendimiento')).toBe(true);
+  });
+
+  it.each(['0', '-1', 'abc', '' as unknown as string, null as unknown as string])(
+    'cuadrilla inválida (%s) usa 1 sin lanzar y deriva duración por rendimiento',
+    (crew) => {
+      let pv!: ReturnType<typeof buildScheduleFromBoqPreview>;
+      expect(() => {
+        pv = buildScheduleFromBoqPreview({
+          chapters,
+          items: [ITEM1], // 100 × 0.2 = 20 con crew 1
+          options: baseOptions({ defaultCrewSize: crew as string }),
+        });
+      }).not.toThrow();
+      const a1 = pv.tasks.find((t) => t.boqItemId === I1)!;
+      expect(a1.productivitySource).toBe('apu');
+      expect(a1.durationDays).toBe(20);
+      expect(a1.crewSize).toBe('1');
+    },
+  );
+
+  it('ítem con chapterId huérfano se agrupa en "Sin capítulo" (no se descarta)', () => {
+    const orphan: GeneratorItemInput = {
+      ...ITEM3,
+      boqItemId: '00000000-0000-4000-8000-0000000001ff',
+      chapterId: ORPHAN_CH, // no existe en `chapters`
+      code: 'ITM-HUERFANO',
+      description: 'Ítem sin capítulo válido',
+    };
+    const pv = buildScheduleFromBoqPreview({
+      chapters,
+      items: [...items, orphan],
+      options: baseOptions(),
+    });
+    // La actividad existe (NO se perdió).
+    const act = pv.tasks.find((t) => t.boqItemId === orphan.boqItemId);
+    expect(act).toBeDefined();
+    expect(act!.taskType).toBe('activity');
+    // chapterId saneado a null (no rompe FK al persistir).
+    expect(act!.chapterId).toBeNull();
+    // Capítulo sintético "Sin capítulo" presente, también con chapterId null.
+    const syn = pv.tasks.find((t) => t.taskType === 'chapter' && t.name === 'Sin capítulo');
+    expect(syn).toBeDefined();
+    expect(syn!.chapterId).toBeNull();
+    expect(pv.stats.activityCount).toBe(4);
+  });
+
+  it('cantidad 0 con APU usable y filtro OFF ⇒ actividad manual con duración mínima', () => {
+    const zeroQty: GeneratorItemInput = { ...ITEM1, quantity: '0' };
+    const pv = buildScheduleFromBoqPreview({
+      chapters,
+      items: [zeroQty],
+      options: baseOptions({ onlyPositiveQuantity: false, minDurationDays: 1 }),
+    });
+    const a1 = pv.tasks.find((t) => t.boqItemId === I1)!;
+    expect(a1).toBeDefined();
+    expect(a1.durationDays).toBe(1);
+    expect(a1.productivitySource).toBe('apu');
+  });
+
+  it('no muta entradas imperfectas (deepFreeze) — sigue siendo puro', () => {
+    const imperfect = deepFreeze(
+      structuredClone([
+        { ...ITEM1, quantity: 'Infinity' as unknown as string },
+        { ...ITEM2, apuLaborPersonDaysPerUnit: 'NaN' as unknown as string },
+      ]),
+    );
+    expect(() =>
+      buildScheduleFromBoqPreview({
+        chapters: deepFreeze(structuredClone(chapters)),
+        items: imperfect,
+        options: baseOptions({ onlyPositiveQuantity: false }),
+      }),
+    ).not.toThrow();
+  });
+
+  it('duración se acota a un máximo seguro ante cantidad/rendimiento extremos', () => {
+    const huge: GeneratorItemInput = {
+      ...ITEM1,
+      quantity: '1000000000000',
+      apuLaborPersonDaysPerUnit: '1000000000000',
+    };
+    const pv = buildScheduleFromBoqPreview({
+      chapters,
+      items: [huge],
+      options: baseOptions({ defaultCrewSize: '1' }),
+    });
+    const a1 = pv.tasks.find((t) => t.boqItemId === I1)!;
+    expect(a1.durationDays).toBeLessThanOrEqual(36_500);
+    expect(a1.durationDays).toBeGreaterThan(0);
+  });
 });

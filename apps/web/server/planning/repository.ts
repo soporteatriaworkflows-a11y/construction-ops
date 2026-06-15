@@ -10,7 +10,7 @@
 import { createClient } from '@/lib/supabase/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { DecimalString, Uuid } from '@/lib/utils/types';
-import type { PreviewTask } from '@/modules/planning';
+import { type PreviewTask, toNonNegativeDecimalString, addDecimalStrings } from '@/modules/planning';
 
 export interface ProjectVersionOption {
   projectId: Uuid;
@@ -158,13 +158,16 @@ export class PlanningRepository {
     if (cErr) throw new Error(`planning_chapters_read_failed: ${cErr.code ?? 'unknown'}`);
     if (iErr) throw new Error(`planning_boq_read_failed: ${iErr.code ?? 'unknown'}`);
 
+    // `numeric` puede llegar como número JS o string desde PostgREST; los loaders
+    // probados (quantity-workspace) lo coercen con String(...). Aquí lo tipamos
+    // laxo y lo saneamos abajo para que el dominio puro reciba SIEMPRE strings.
     const itemRows = (items ?? []) as {
       id: string;
       chapter_id: string;
       code: string;
-      description_snapshot: string;
-      unit_snapshot: string;
-      quantity_snapshot: string;
+      description_snapshot: string | null;
+      unit_snapshot: string | null;
+      quantity_snapshot: string | number | null;
       apu_template_id: string | null;
     }[];
 
@@ -180,12 +183,12 @@ export class PlanningRepository {
         .eq('component_type', 'labor')
         .in('apu_template_id', apuIds);
       if (compErr) throw new Error(`planning_apu_components_read_failed: ${compErr.code ?? 'unknown'}`);
-      for (const c of (comps ?? []) as { apu_template_id: string; quantity: string }[]) {
+      for (const c of (comps ?? []) as { apu_template_id: string; quantity: string | number | null }[]) {
+        // `quantity` puede llegar como número JS; se coerce a DecimalString seguro
+        // antes de sumar (la suma usa Decimal, no string.split() — V4 root cause).
+        const qty = toNonNegativeDecimalString(c.quantity);
         const prev = apuLaborPersonDays.get(c.apu_template_id);
-        apuLaborPersonDays.set(
-          c.apu_template_id,
-          prev ? addDecimalStrings(prev, c.quantity) : c.quantity,
-        );
+        apuLaborPersonDays.set(c.apu_template_id, prev ? addDecimalStrings(prev, qty) : qty);
       }
     }
 
@@ -201,9 +204,10 @@ export class PlanningRepository {
         boqItemId: r.id,
         chapterId: r.chapter_id,
         code: r.code,
-        description: r.description_snapshot,
-        unit: r.unit_snapshot,
-        quantity: r.quantity_snapshot,
+        description: r.description_snapshot ?? '',
+        unit: r.unit_snapshot ?? '',
+        // numeric → DecimalString seguro (nunca número JS crudo en el dominio puro).
+        quantity: toNonNegativeDecimalString(r.quantity_snapshot),
         apuTemplateId: r.apu_template_id,
       })),
       apuLaborPersonDays,
@@ -400,26 +404,4 @@ function mapTaskRow(r: Record<string, unknown>): ScheduleTaskRow {
     responsible: (r.responsible as string | null) ?? null,
     sortOrder: r.sort_order as number,
   };
-}
-
-/** Suma dos DecimalString con precisión exacta (sin float). */
-function addDecimalStrings(a: string, b: string): string {
-  // Suma entera/decimal simple vía BigInt sobre la parte escalada; rendimiento
-  // por unidad suele tener pocos decimales. Se evita float.
-  return sumDecimal(a, b);
-}
-
-function sumDecimal(a: string, b: string): string {
-  const [ai, af = ''] = a.split('.');
-  const [bi, bf = ''] = b.split('.');
-  const scale = Math.max(af.length, bf.length);
-  const aScaled = BigInt((ai ?? '0') + af.padEnd(scale, '0'));
-  const bScaled = BigInt((bi ?? '0') + bf.padEnd(scale, '0'));
-  const sum = aScaled + bScaled;
-  if (scale === 0) return sum.toString();
-  const neg = sum < 0n;
-  const digits = (neg ? -sum : sum).toString().padStart(scale + 1, '0');
-  const intPart = digits.slice(0, digits.length - scale);
-  const fracPart = digits.slice(digits.length - scale).replace(/0+$/, '');
-  return `${neg ? '-' : ''}${intPart}${fracPart ? '.' + fracPart : ''}`;
 }

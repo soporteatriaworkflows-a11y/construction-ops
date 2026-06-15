@@ -259,3 +259,30 @@ crear/editar y el backend lo cumple (el RPC valida
 ve el CTA y recibe el rechazo al enviar. Separarlo a nivel UI requiere exponer
 `profile.role` al gating; se difiere (no se amplía sin contrato). La barrera real
 (backend) ya es correcta.
+
+---
+
+## Addendum 2026-06-15 — SCHEDULE_PREVIEW_READMODEL_ROOT_CAUSE_V4
+
+**No altera el contrato congelado; endurece su implementación.** El preview era
+frágil ante la serialización de `numeric` por PostgREST (número JS vs string) y
+ante datos imperfectos. Reglas reforzadas (espejo de la implementación):
+
+- **Coerción de read-model:** `loadGeneratorSource` coerce TODO `numeric`
+  (`quantity_snapshot`, `apu_components.quantity`) a `DecimalString` antes de
+  entrar al dominio puro. Mismo patrón que el loader probado `quantity-workspace`.
+- **Generador a prueba de datos imperfectos (preview NUNCA lanza):**
+  cantidad/rendimiento/cuadrilla `null/NaN/Infinity/≤0/no parseable` ⇒ warning o
+  duración mínima, no excepción. Duración acotada a `MAX_ACTIVITY_DURATION_DAYS`
+  (36 500). Ítems con `chapterId` huérfano ⇒ capítulo sintético "Sin capítulo"
+  (chapterId null; **no se descartan** — regla: si existe BOQ item, puede ser
+  actividad).
+- **Stats:** `GeneratorStats.inputItemCount/inputChapterCount` distinguen
+  "versión sin ítems BOQ" de "ítems presentes pero no programables".
+- **UX de error preciso (preview):** sin BOQ / no programables (hint del filtro) /
+  `PlanningError invalid_dates` / código interno seguro
+  `SCHEDULE_PREVIEW_READMODEL_FAILED`.
+
+Sin migración. Sin cambio de RPC ni de esquema. Las primitivas decimales
+`tryDecimal`/`toNonNegativeDecimalString`/`addDecimalStrings` viven en
+`@/modules/planning` (Decimal.js, deterministas, nunca lanzan).

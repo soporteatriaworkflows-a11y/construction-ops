@@ -17,7 +17,7 @@ import {
   ScheduleNotFoundError,
   type SchedulePreviewParams,
 } from '@/server/planning';
-import type { GeneratorPreview } from '@/modules/planning';
+import { PlanningError, type GeneratorPreview } from '@/modules/planning';
 
 export type PreviewActionResult =
   | { ok: true; preview: GeneratorPreview }
@@ -72,6 +72,11 @@ function toSafeErrorMessage(e: unknown, context: 'preview' | 'create'): string {
   if (e instanceof ScheduleValidationError) {
     return e.message;
   }
+  // Error de dominio puro (fechas inválidas en el generador/recálculo).
+  if (e instanceof PlanningError) {
+    if (e.kind === 'invalid_dates') return 'La fecha de inicio no es válida.';
+    return 'No se pudo calcular el cronograma por datos de fechas inconsistentes.';
+  }
   // Errores genéricos de repositorio (planning_*_read_failed) o RPC no reconocido.
   const msg = e instanceof Error ? e.message : String(e);
   if (msg.startsWith('planning_version_read_failed')) {
@@ -90,7 +95,9 @@ function toSafeErrorMessage(e: unknown, context: 'preview' | 'create'): string {
   if (context === 'create') {
     return 'No se pudo crear el cronograma. Código: SCHEDULE_CREATE_VALIDATION.';
   }
-  return 'No se pudo calcular la vista previa. Revisa los datos e inténtalo de nuevo.';
+  // Error interno NO esperado del read-model del preview: código seguro y trazable
+  // (el detalle queda en el log server-side, sin secretos).
+  return 'No se pudo calcular la vista previa. Código: SCHEDULE_PREVIEW_READMODEL_FAILED.';
 }
 
 export async function previewScheduleAction(
@@ -102,12 +109,21 @@ export async function previewScheduleAction(
   try {
     const viewer = await resolveAuthenticatedViewer();
     const preview = await previewScheduleFromBoq(viewer, params);
+    // Versión sin ítems BOQ: causa distinta a "ítems presentes pero no programables".
+    if (preview.stats.inputItemCount === 0) {
+      return {
+        ok: false,
+        error:
+          'La versión de presupuesto seleccionada no tiene ítems (BOQ). ' +
+          'Agrega capítulos e ítems al presupuesto antes de generar un cronograma.',
+      };
+    }
     if (preview.stats.activityCount === 0) {
       return {
         ok: false,
         error:
-          'No se encontraron actividades válidas para generar el cronograma. ' +
-          'Revisa que el presupuesto tenga ítems con cantidad mayor a 0 o desactiva el filtro de cantidad.',
+          'El presupuesto tiene ítems pero ninguno es programable con las opciones actuales. ' +
+          'Revisa que haya ítems con cantidad mayor a 0 o desactiva el filtro “Solo ítems con cantidad mayor a 0”.',
       };
     }
     return { ok: true, preview };
