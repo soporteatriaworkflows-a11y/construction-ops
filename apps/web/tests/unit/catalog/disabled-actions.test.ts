@@ -27,7 +27,12 @@ const emptyStatePath = resolve(
   '../../../components/shared/empty-state.tsx',
 );
 
+// UX_BLOCKERS_V1: las tablas de recursos (con sus enlaces a price-intelligence)
+// se movieron a un componente cliente de búsqueda/filtros; el comportamiento es
+// equivalente. La aserción de price-intelligence apunta ahora al explorador.
+const catalogExplorerPath = resolve(here, '../../../app/(dashboard)/catalog/catalog-explorer.tsx');
 const catalogSrc = readFileSync(catalogPagePath, 'utf8');
+const catalogExplorerSrc = readFileSync(catalogExplorerPath, 'utf8');
 const providersSrc = readFileSync(providersPagePath, 'utf8');
 const actionsSrc = readFileSync(catalogActionsPath, 'utf8');
 const emptyStateSrc = readFileSync(emptyStatePath, 'utf8');
@@ -261,7 +266,7 @@ describe('Branding ICONIC intacto', () => {
 // ──────────────────────────────────────────────────────────────────────────────
 describe('Price Intelligence intacta', () => {
   it('catálogo enlaza a /price-intelligence por recurso', () => {
-    expect(catalogSrc).toMatch(/price-intelligence/);
+    expect(catalogExplorerSrc).toMatch(/price-intelligence/);
   });
 });
 

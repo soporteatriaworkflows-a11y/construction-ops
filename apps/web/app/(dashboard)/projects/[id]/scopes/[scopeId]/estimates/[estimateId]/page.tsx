@@ -9,6 +9,7 @@
  * - Muestra la versión activa (V01), 0 capítulos y 0 ítems, y placeholder honesto
  *   de importación de Excel (siguiente fase).
  */
+import { Suspense } from 'react';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -146,17 +147,11 @@ export default async function EstimateDetailPage({ params, searchParams }: PageP
     }
   }
 
-  // Conteos de la selección de export APU (APU_EXPORTS_V1). Read-only; degrada a
-  // null sin romper la página si la resolución falla (p. ej. modo fixture).
-  let apuExportCounts: ExportCounts | null = null;
-  if (hasContent && active) {
-    try {
-      const selection = await getBudgetApuExportSelection(viewer, estimateId);
-      apuExportCounts = selection.counts;
-    } catch {
-      apuExportCounts = null;
-    }
-  }
+  // PERF (ICONIC_OPS_UX_BLOCKERS_V1): los conteos de export APU se resuelven vía
+  // `getBudgetApuExportSelection`, que hoy hace N+1 (getApuDetail por APU) y bloqueaba
+  // el render del presupuesto ~minutos. Se mueven FUERA de la ruta crítica con
+  // Suspense streaming: la página pinta de inmediato y los conteos llegan después.
+  // NO se modifica el motor de export (apu-annex); solo la estrategia de carga.
 
   return (
     <div>
@@ -486,7 +481,9 @@ export default async function EstimateDetailPage({ params, searchParams }: PageP
             <span className="font-medium text-gray-700">{formatVersionLabel(active.versionNumber)}</span>
             {' · '}Datos al {formatDateTime(new Date().toISOString())}
           </p>
-          <ExportButtons projectId={id} scopeId={scopeId} estimateId={estimateId} counts={apuExportCounts} />
+          <Suspense fallback={<ExportButtons projectId={id} scopeId={scopeId} estimateId={estimateId} counts={null} />}>
+            <ExportButtonsStreamed viewer={viewer} projectId={id} scopeId={scopeId} estimateId={estimateId} />
+          </Suspense>
         </section>
       )}
 
@@ -535,4 +532,30 @@ export default async function EstimateDetailPage({ params, searchParams }: PageP
       </section>
     </div>
   );
+}
+
+/**
+ * Conteos de export resueltos FUERA de la ruta crítica (Suspense streaming). El
+ * cálculo (selección APU) hoy es N+1 y lento; aquí ya no bloquea el render de la
+ * página. Degrada a `counts={null}` si falla (la exportación sigue disponible).
+ * NO modifica el motor de export.
+ */
+async function ExportButtonsStreamed({
+  viewer,
+  projectId,
+  scopeId,
+  estimateId,
+}: {
+  viewer: Awaited<ReturnType<typeof resolveViewer>>;
+  projectId: string;
+  scopeId: string;
+  estimateId: string;
+}) {
+  let counts: ExportCounts | null = null;
+  try {
+    counts = (await getBudgetApuExportSelection(viewer, estimateId)).counts;
+  } catch {
+    counts = null;
+  }
+  return <ExportButtons projectId={projectId} scopeId={scopeId} estimateId={estimateId} counts={counts} />;
 }
