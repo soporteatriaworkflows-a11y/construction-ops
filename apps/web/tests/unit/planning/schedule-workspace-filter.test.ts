@@ -7,6 +7,7 @@ import {
   groupByChapter,
   computeVisibleGroups,
   warningCounts,
+  chapterAggregate,
   matchesLeaf,
   isDelayed,
   SYNTHETIC_CHAPTER,
@@ -121,5 +122,30 @@ describe('warningCounts', () => {
     const counts = warningCounts(ALL);
     expect(counts.noApu).toBe(1); // a2
     expect(counts.noYield).toBe(1); // a3
+  });
+});
+
+describe('chapterAggregate', () => {
+  it('cuenta total, completadas y con advertencias', () => {
+    const ch2Children = groupByChapter(ALL).find((g) => g.id === 'ch2')!.children;
+    const agg = chapterAggregate(ch2Children); // a3 (completed, unknown) + m1 (hito)
+    expect(agg.total).toBe(2);
+    expect(agg.completed).toBe(1);
+    expect(agg.withWarnings).toBe(1); // a3 unknown
+  });
+
+  it('avance ponderado por duración de actividades (excluye hitos)', () => {
+    const children = [
+      task({ id: 'x1', parentTaskId: 'ch1', plannedDurationDays: '10', progressPct: '100' }),
+      task({ id: 'x2', parentTaskId: 'ch1', plannedDurationDays: '10', progressPct: '0' }),
+      task({ id: 'xm', parentTaskId: 'ch1', isMilestone: true, taskType: 'milestone', plannedDurationDays: '0', progressPct: '100' }),
+    ];
+    // (10*100 + 10*0) / 20 = 50
+    expect(chapterAggregate(children).progressPct).toBe(50);
+  });
+
+  it('sin actividades con duración ⇒ avance 0 (no divide por cero)', () => {
+    const agg = chapterAggregate([task({ id: 'mm', isMilestone: true, taskType: 'milestone', plannedDurationDays: '0' })]);
+    expect(agg.progressPct).toBe(0);
   });
 });

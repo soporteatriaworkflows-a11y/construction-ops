@@ -26,6 +26,45 @@ export interface WorkspaceTask {
   productivitySource: string | null;
   apuTemplateId: string | null;
   boqItemId: string | null;
+  /** Campos de detalle (panel maestro-detalle V2; presentación). */
+  chapterName?: string | null;
+  responsible?: string | null;
+  crewLabel?: string | null;
+  crewSize?: string | null;
+  quantitySnapshot?: string | null;
+  unitSnapshot?: string | null;
+}
+
+/** Agregado de un capítulo para la cabecera (solo presentación, no financiero). */
+export interface ChapterAggregate {
+  total: number;
+  completed: number;
+  withWarnings: number;
+  /** Avance ponderado por duración de las actividades (0..100), redondeado. */
+  progressPct: number;
+}
+
+export function chapterAggregate(children: WorkspaceTask[]): ChapterAggregate {
+  let total = 0;
+  let completed = 0;
+  let withWarnings = 0;
+  let num = 0;
+  let den = 0;
+  for (const c of children) {
+    total += 1;
+    if (c.status === 'completed') completed += 1;
+    if (c.productivitySource === 'manual' || c.productivitySource === 'unknown') withWarnings += 1;
+    if (!c.isMilestone) {
+      const dur = Number(c.plannedDurationDays);
+      const prog = Number(c.progressPct);
+      if (Number.isFinite(dur) && dur > 0 && Number.isFinite(prog)) {
+        num += dur * prog;
+        den += dur;
+      }
+    }
+  }
+  const progressPct = den > 0 ? Math.round(num / den) : 0;
+  return { total, completed, withWarnings, progressPct };
 }
 
 export type StatusFilter = 'all' | 'not_started' | 'in_progress' | 'completed' | 'delayed';
