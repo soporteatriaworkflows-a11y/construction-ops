@@ -238,6 +238,89 @@ describe('createScheduleFromBoq', () => {
       createScheduleFromBoq(viewer('internal'), baseParams, repo),
     ).rejects.toBeInstanceOf(SchedulePermissionError);
   });
+
+  it('lanza ScheduleValidationError (no Error genérico) cuando el repo devuelve errorCode PGRST202 (función no encontrada)', async () => {
+    const { repo } = makeRepo({
+      createScheduleFromBoq: vi.fn(async () => ({
+        scheduleId: '',
+        errorCode: 'PGRST202',
+        errorMessage: 'Could not find the function public.create_schedule_from_boq',
+      })) as unknown as PlanningRepository['createScheduleFromBoq'],
+    });
+    const err = await createScheduleFromBoq(viewer('internal'), baseParams, repo).catch((e) => e);
+    expect(err).toBeInstanceOf(ScheduleValidationError);
+    expect(err.message).toContain('SCHEDULE_CREATE_VALIDATION');
+  });
+
+  it('lanza ScheduleValidationError con mensaje específico para invalid_tasks (22000)', async () => {
+    const { repo } = makeRepo({
+      createScheduleFromBoq: vi.fn(async () => ({
+        scheduleId: '',
+        errorCode: '22000',
+        errorMessage: 'invalid_tasks',
+      })) as unknown as PlanningRepository['createScheduleFromBoq'],
+    });
+    const err = await createScheduleFromBoq(viewer('internal'), baseParams, repo).catch((e) => e);
+    expect(err).toBeInstanceOf(ScheduleValidationError);
+    expect(err.message).toContain('tareas válidas');
+  });
+
+  it('lanza ScheduleValidationError con mensaje específico para invalid_start_date (22000)', async () => {
+    const { repo } = makeRepo({
+      createScheduleFromBoq: vi.fn(async () => ({
+        scheduleId: '',
+        errorCode: '22000',
+        errorMessage: 'invalid_start_date',
+      })) as unknown as PlanningRepository['createScheduleFromBoq'],
+    });
+    const err = await createScheduleFromBoq(viewer('internal'), baseParams, repo).catch((e) => e);
+    expect(err).toBeInstanceOf(ScheduleValidationError);
+    expect(err.message).toContain('fecha de inicio');
+  });
+
+  it('lanza ScheduleValidationError con mensaje específico para estimate_version_not_found (42501)', async () => {
+    const { repo } = makeRepo({
+      createScheduleFromBoq: vi.fn(async () => ({
+        scheduleId: '',
+        errorCode: '42501',
+        errorMessage: 'estimate_version_not_found',
+      })) as unknown as PlanningRepository['createScheduleFromBoq'],
+    });
+    const err = await createScheduleFromBoq(viewer('internal'), baseParams, repo).catch((e) => e);
+    // estimate_version_not_found usa errcode 42501 en el RPC → SchedulePermissionError.
+    expect(err).toBeInstanceOf(SchedulePermissionError);
+  });
+
+  it('lanza ScheduleValidationError con ScheduleValidationError para 23514 (check violation)', async () => {
+    const { repo } = makeRepo({
+      createScheduleFromBoq: vi.fn(async () => ({
+        scheduleId: '',
+        errorCode: '23514',
+        errorMessage: 'new row violates row-level security policy',
+      })) as unknown as PlanningRepository['createScheduleFromBoq'],
+    });
+    const err = await createScheduleFromBoq(viewer('internal'), baseParams, repo).catch((e) => e);
+    expect(err).toBeInstanceOf(ScheduleValidationError);
+  });
+});
+
+describe('previewScheduleFromBoq — actividades vacías', () => {
+  it('devuelve preview con stats.activityCount=0 cuando todos los ítems tienen cantidad 0 y onlyPositiveQuantity=true', async () => {
+    const sourceZeroQty: GeneratorSourceRow = {
+      projectId: PROJECT,
+      chapters: [{ id: CH1, code: '01', name: 'Preliminares', sortOrder: 0 }],
+      items: [
+        { boqItemId: I1, chapterId: CH1, code: 'ITM-1', description: 'Sin qty', unit: 'm3', quantity: '0', apuTemplateId: APU1 },
+      ],
+      apuLaborPersonDays: new Map([[APU1, '0.2']]),
+    };
+    const { repo } = makeRepo({
+      loadGeneratorSource: vi.fn(async () => sourceZeroQty) as unknown as PlanningRepository['loadGeneratorSource'],
+    });
+    const preview = await previewScheduleFromBoq(viewer('internal'), { ...baseParams, onlyPositiveQuantity: true }, repo);
+    expect(preview.stats.activityCount).toBe(0);
+    expect(preview.tasks).toHaveLength(0);
+  });
 });
 
 describe('listSchedulesForViewer + getScheduleDetailForViewer', () => {

@@ -55,6 +55,43 @@ function parseParams(formData: FormData): SchedulePreviewParams | null {
   };
 }
 
+/** Convierte cualquier error en un mensaje de usuario seguro con trazabilidad. */
+function toSafeErrorMessage(e: unknown, context: 'preview' | 'create'): string {
+  if (e instanceof SchedulePermissionError) {
+    return 'No tienes permiso para crear cronogramas en esta organización.';
+  }
+  if (e instanceof AuthError) {
+    return e.reason === 'no_session'
+      ? 'Tu sesión expiró. Vuelve a iniciar sesión.'
+      : 'Sin membresía activa para crear cronogramas.';
+  }
+  if (e instanceof ScheduleNotFoundError) {
+    return 'El presupuesto seleccionado no existe o no pertenece al proyecto seleccionado.';
+  }
+  if (e instanceof ScheduleValidationError) {
+    return e.message;
+  }
+  // Errores genéricos de repositorio (planning_*_read_failed) o RPC no reconocido.
+  const msg = e instanceof Error ? e.message : String(e);
+  if (msg.startsWith('planning_version_read_failed')) {
+    return 'No se pudo leer la versión del presupuesto. Verifica que el presupuesto exista y tengas acceso.';
+  }
+  if (msg.startsWith('planning_chapters_read_failed') || msg.startsWith('planning_boq_read_failed')) {
+    return 'No se pudo leer el contenido del presupuesto. Verifica tu conexión o contacta al administrador.';
+  }
+  if (msg.startsWith('planning_apu_components_read_failed')) {
+    return 'No se pudo leer el rendimiento APU del presupuesto. Verifica tu conexión o contacta al administrador.';
+  }
+  if (msg.startsWith('planning_')) {
+    const code = msg.split(':')[1]?.trim() ?? 'unknown';
+    return `No se pudieron leer los datos del presupuesto (${code}).`;
+  }
+  if (context === 'create') {
+    return 'No se pudo crear el cronograma. Código: SCHEDULE_CREATE_VALIDATION.';
+  }
+  return 'No se pudo calcular la vista previa. Revisa los datos e inténtalo de nuevo.';
+}
+
 export async function previewScheduleAction(
   _prev: PreviewActionResult | null,
   formData: FormData,
@@ -64,13 +101,22 @@ export async function previewScheduleAction(
   try {
     const viewer = await resolveAuthenticatedViewer();
     const preview = await previewScheduleFromBoq(viewer, params);
+    if (preview.stats.activityCount === 0) {
+      return {
+        ok: false,
+        error:
+          'No se encontraron actividades válidas para generar el cronograma. ' +
+          'Revisa que el presupuesto tenga ítems con cantidad mayor a 0 o desactiva el filtro de cantidad.',
+      };
+    }
     return { ok: true, preview };
   } catch (e) {
-    if (e instanceof SchedulePermissionError) return { ok: false, error: 'No tienes permiso para crear cronogramas.' };
-    if (e instanceof ScheduleValidationError || e instanceof ScheduleNotFoundError) {
-      return { ok: false, error: e.message };
-    }
-    return { ok: false, error: 'No se pudo calcular la vista previa. Revisa los datos.' };
+    console.error('[planning] previewScheduleAction error', {
+      estimateVersionId: params.estimateVersionId,
+      errorName: e instanceof Error ? e.name : typeof e,
+      errorMessage: e instanceof Error ? e.message : String(e),
+    });
+    return { ok: false, error: toSafeErrorMessage(e, 'preview') };
   }
 }
 
@@ -91,19 +137,7 @@ export async function createScheduleAction(
       errorName: e instanceof Error ? e.name : typeof e,
       errorMessage: e instanceof Error ? e.message : String(e),
     });
-    if (e instanceof SchedulePermissionError) return { error: 'No tienes permiso para crear cronogramas.' };
-    if (e instanceof AuthError) {
-      return {
-        error:
-          e.reason === 'no_session'
-            ? 'Tu sesión expiró. Recarga la página e inicia sesión de nuevo.'
-            : 'Sin membresía activa para crear cronogramas.',
-      };
-    }
-    if (e instanceof ScheduleValidationError || e instanceof ScheduleNotFoundError) {
-      return { error: e.message };
-    }
-    return { error: 'No se pudo crear el cronograma. Inténtalo de nuevo.' };
+    return { error: toSafeErrorMessage(e, 'create') };
   }
   redirect(`/planning/${scheduleId}`);
 }

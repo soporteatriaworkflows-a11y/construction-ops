@@ -4,6 +4,44 @@ Este documento es propiedad de **agent-qa**. Se actualiza al final de
 
 ---
 
+## SCHEDULE_PREVIEW_CREATE_PROD_FIX_V2 (2026-06-14, rama `fix/schedule-preview-create-prod-v2`)
+
+**Base:** `origin/main = 7693313` · **main intacta** · **producción intacta** · **sin migración** · **sin db push remoto** · **sin escrituras remotas**
+
+| Check | Resultado |
+|---|---|
+| typecheck (`tsc --noEmit`) | ✅ 0 errores |
+| lint (`eslint .`) | ✅ 0 errores |
+| Suite completa (`vitest run`) | ✅ **1724 passed / 42 skipped / 0 fail** (+6 nuevos) |
+| gm:regression | ✅ 22/22 |
+| build (`next build`) | ✅ limpio; **sin warning `nodemailer`** |
+| `git diff --check` | ✅ limpio |
+
+**Tests nuevos (6) — `tests/unit/planning/schedule-service.test.ts`:**
+- `PGRST202` → `ScheduleValidationError` (no `Error` genérico); mensaje contiene `SCHEDULE_CREATE_VALIDATION`
+- `22000` + `invalid_tasks` → `ScheduleValidationError`; mensaje contiene "tareas válidas"
+- `22000` + `invalid_start_date` → `ScheduleValidationError`; mensaje contiene "fecha de inicio"
+- `22000` + `estimate_version_not_found` → `ScheduleValidationError`; mensaje contiene "proyecto y la versión"
+- `23514` (check violation) → `ScheduleValidationError`
+- Preview con todos los ítems `cantidad=0` y `onlyPositiveQuantity=true` → `{ activityCount: 0 }`
+
+**Archivos modificados (5, sin migraciones):**
+- `apps/web/server/planning/service.ts` — `mapWriteError` + `mapRpcValidationMessage`
+- `apps/web/app/(dashboard)/planning/new/actions.ts` — `toSafeErrorMessage` + check 0 actividades + console.error
+- `apps/web/app/(dashboard)/planning/new/new-schedule-form.tsx` — deshabilitar botón si `preview` fallido
+- `apps/web/server/email/smtp-provider.ts` — `/* webpackIgnore: true */`
+- `apps/web/next.config.mjs` — `serverExternalPackages: ['nodemailer']`
+
+**Causa raíz cubierta:** `mapWriteError` nunca devuelve `Error` genérico — siempre devuelve
+`SchedulePermissionError` o `ScheduleValidationError`. `toSafeErrorMessage` en actions.ts
+maneja errores tipados Y errores genéricos `planning_*` del repositorio sin exponer códigos
+internos al cliente.
+
+**Sin regresión:** todos los tests anteriores (1718) siguen pasando; golden master intacto;
+planning 68/68; RLS harness sin cambio (FORCE=41; sin migraciones nuevas).
+
+---
+
 ## SCHEDULE_FROM_BOQ_V1 (2026-06-14, rama `feature/schedule-from-boq-v1`)
 
 **Base:** `origin/main = 5c19cb7` · **main intacta** · **producción intacta** · **3 migraciones aditivas SOLO locales** (`20260622090000`/`090100`/`090200`) · **sin db push remoto** · **sin escrituras remotas** · **rama publicada (sin merge/deploy)**

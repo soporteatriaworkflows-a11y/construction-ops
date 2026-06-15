@@ -1,6 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // nodemailer es una dependencia OPCIONAL cargada por import dinámico en
+  // smtp-provider.ts solo cuando EMAIL_PROVIDER=smtp está configurado. Al
+  // marcarlo como externo, Webpack/Turbopack no intenta bundlearlo ni emite
+  // el warning "Module not found: Can't resolve 'nodemailer'" en el build.
+  serverExternalPackages: ['nodemailer'],
   experimental: {
     serverActions: {
       // Importación BOQ (4C.1, ≤3 MB) y de catálogo (CATALOG_BULK_ONBOARDING_V1,

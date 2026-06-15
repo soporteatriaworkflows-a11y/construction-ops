@@ -459,7 +459,27 @@ function mapWriteError(code: string, message?: string): Error {
   // SQLSTATE 22000 (data exception) and 23xxx (integrity constraint) are always
   // validation failures from the RPC or DB constraints — never silent/unknown.
   if (code === '22000' || code.startsWith('23') || msg.includes('invalid_') || msg.includes('not_found')) {
-    return new ScheduleValidationError(`No se pudo completar la operación (${code}).`);
+    const detail = msg && msg !== code ? msg : code;
+    return mapRpcValidationMessage(detail, code);
   }
-  return new Error(`schedule_write_failed: ${code}`);
+  // PostgREST errors (PGRST*) and other unrecognized codes surface as validation
+  // with a safe code for debugging; never swallowed silently.
+  return new ScheduleValidationError(`No se pudo crear el cronograma. Código: SCHEDULE_CREATE_VALIDATION (${code}).`);
+}
+
+/** Convierte el mensaje del RPC en un error de validación con texto útil para el usuario. */
+function mapRpcValidationMessage(msg: string, code: string): ScheduleValidationError {
+  if (msg.includes('invalid_tasks') || msg === 'invalid_tasks') {
+    return new ScheduleValidationError('El cronograma no tiene tareas válidas para crear.');
+  }
+  if (msg.includes('invalid_start_date') || msg === 'invalid_start_date') {
+    return new ScheduleValidationError('La fecha de inicio no es válida.');
+  }
+  if (msg.includes('invalid_project_or_version') || msg.includes('estimate_version_not_found') || msg.includes('project_not_found')) {
+    return new ScheduleValidationError('El proyecto y la versión seleccionados no coinciden o no pertenecen a tu organización.');
+  }
+  if (msg.includes('invalid_schedule_payload') || msg.includes('invalid_status') || msg.includes('invalid_name')) {
+    return new ScheduleValidationError('La información del cronograma está incompleta o no es válida.');
+  }
+  return new ScheduleValidationError(`No se pudo completar la operación. Código: ${code}.`);
 }
