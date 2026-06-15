@@ -41,6 +41,11 @@ const config: Config = {
       borderRadius: {
         DEFAULT: '0.375rem',
       },
+      // Aditivo (no altera utilidades existentes): elevación sutil para superficies
+      // premium del shell (menús/cards). Uso opcional vía `shadow-iconic`.
+      boxShadow: {
+        iconic: '0 1px 2px rgba(2,1,72,0.04), 0 8px 24px -8px rgba(2,1,72,0.12)',
+      },
     },
   },
   plugins: [],

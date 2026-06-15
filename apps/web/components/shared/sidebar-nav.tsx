@@ -38,36 +38,62 @@ const ACCESS_ITEM = { href: '/settings/access', label: 'Accesos', icon: Users };
  * @param canManageAccess - resuelto server-side (admin/gerencia). Ocultar el
  *   botón NO es la única barrera: las acciones server-side revalidan permisos.
  */
+function NavLink({
+  href,
+  label,
+  icon: Icon,
+  active,
+}: {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  active: boolean;
+}) {
+  return (
+    <li>
+      <Link
+        href={href}
+        aria-current={active ? 'page' : undefined}
+        className={cn(
+          'relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iconic-cyan',
+          active
+            ? 'bg-iconic-primary text-white shadow-sm'
+            : 'text-iconic-soft-blue/90 hover:bg-white/10 hover:text-white',
+        )}
+      >
+        {active && (
+          <span className="absolute left-0 top-1/2 h-5 -translate-y-1/2 rounded-r bg-iconic-cyan" style={{ width: 3 }} aria-hidden="true" />
+        )}
+        <Icon className={cn('h-4 w-4 shrink-0', active ? 'text-white' : 'text-iconic-soft-blue')} aria-hidden="true" />
+        {label}
+      </Link>
+    </li>
+  );
+}
+
 export function SidebarNav({ canManageAccess = false }: { canManageAccess?: boolean }) {
   const pathname = usePathname();
-  const items = canManageAccess ? [...NAV_ITEMS, ACCESS_ITEM] : NAV_ITEMS;
+  const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
   return (
     <nav className="flex-1 overflow-y-auto py-4">
-      <ul role="list" className="space-y-1 px-3">
-        {items.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href || pathname.startsWith(`${href}/`);
-          return (
-            <li key={href}>
-              <Link
-                href={href}
-                aria-current={active ? 'page' : undefined}
-                className={cn(
-                  'relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iconic-cyan',
-                  active
-                    ? 'bg-iconic-primary text-white'
-                    : 'text-iconic-soft-blue hover:bg-white/10 hover:text-white',
-                )}
-              >
-                {active && (
-                  <span className="absolute left-0 top-1/2 h-5 -translate-y-1/2 rounded-r bg-iconic-cyan" style={{ width: 3 }} aria-hidden="true" />
-                )}
-                <Icon className={cn('h-4 w-4 shrink-0', active ? 'text-white' : 'text-iconic-soft-blue')} aria-hidden="true" />
-                {label}
-              </Link>
-            </li>
-          );
-        })}
+      <p className="px-5 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-iconic-soft-blue/40">
+        Módulos
+      </p>
+      <ul role="list" className="space-y-0.5 px-3">
+        {NAV_ITEMS.map((it) => (
+          <NavLink key={it.href} {...it} active={isActive(it.href)} />
+        ))}
       </ul>
+      {canManageAccess && (
+        <>
+          <p className="mt-5 px-5 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-iconic-soft-blue/40">
+            Administración
+          </p>
+          <ul role="list" className="space-y-0.5 px-3">
+            <NavLink {...ACCESS_ITEM} active={isActive(ACCESS_ITEM.href)} />
+          </ul>
+        </>
+      )}
     </nav>
   );
 }

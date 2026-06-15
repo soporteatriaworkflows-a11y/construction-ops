@@ -104,8 +104,9 @@ describe('NAV — sidebar-nav.tsx define ACCESS_ITEM y lógica condicional', () 
   });
 
   it('sidebar incluye ACCESS_ITEM solo cuando canManageAccess es true', () => {
-    // La lógica spread: [...NAV_ITEMS, ACCESS_ITEM] condicionado a canManageAccess
-    expect(sidebarNavSrc).toMatch(/canManageAccess\s*\?\s*\[/);
+    // UIX_SHELL_V1: el ACCESS_ITEM se renderiza en la sección "Administración"
+    // condicionada a canManageAccess (`{canManageAccess && ...}`); equivalente.
+    expect(sidebarNavSrc).toMatch(/canManageAccess\s*&&/);
     expect(sidebarNavSrc).toContain('ACCESS_ITEM');
   });
 });
@@ -120,8 +121,11 @@ describe('NAV — layout.tsx resuelve y pasa canManageAccess al SidebarNav', () 
     expect(layoutSrc).toContain('canManageAccess');
   });
 
-  it('7. layout llama resolveCanManageAccess()', () => {
-    expect(layoutSrc).toMatch(/resolveCanManageAccess\(\)/);
+  it('7. layout resuelve el acceso server-side (resolveAccessActor + canManageAccess)', () => {
+    // UIX_SHELL_V1: el helper se renombró a resolveShellActor (resuelve actor +
+    // canManageAccess en una sola lectura); el comportamiento es equivalente.
+    expect(layoutSrc).toContain('resolveAccessActor');
+    expect(layoutSrc).toMatch(/canManageAccess\(/);
   });
 
   it('layout pasa showAccess / canManageAccess al SidebarNav', () => {
