@@ -32,8 +32,9 @@ function parseParams(formData: FormData): SchedulePreviewParams | null {
   const name = formData.get('scheduleName');
   const startDate = formData.get('startDate');
   if (typeof versionId !== 'string' || !versionId) return null;
-  if (typeof name !== 'string' || !name.trim()) return null;
   if (typeof startDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(startDate)) return null;
+  // El nombre NO es obligatorio para la vista previa (read-only). La creación lo
+  // exige aparte (ver createScheduleAction) y el RPC lo revalida (invalid_name).
 
   const bool = (k: string, def: boolean) => {
     const v = formData.get(k);
@@ -44,7 +45,7 @@ function parseParams(formData: FormData): SchedulePreviewParams | null {
   const crewRaw = formData.get('defaultCrewSize');
   return {
     estimateVersionId: versionId,
-    scheduleName: name.trim(),
+    scheduleName: typeof name === 'string' ? name.trim() : '',
     startDate,
     includeChapters: bool('includeChapters', true),
     onlyPositiveQuantity: bool('onlyPositiveQuantity', true),
@@ -97,7 +98,7 @@ export async function previewScheduleAction(
   formData: FormData,
 ): Promise<PreviewActionResult> {
   const params = parseParams(formData);
-  if (!params) return { ok: false, error: 'Completa proyecto, presupuesto, nombre y fecha de inicio.' };
+  if (!params) return { ok: false, error: 'Completa proyecto, presupuesto y fecha de inicio.' };
   try {
     const viewer = await resolveAuthenticatedViewer();
     const preview = await previewScheduleFromBoq(viewer, params);
@@ -125,7 +126,8 @@ export async function createScheduleAction(
   formData: FormData,
 ): Promise<CreateActionResult> {
   const params = parseParams(formData);
-  if (!params) return { error: 'Completa proyecto, presupuesto, nombre y fecha de inicio.' };
+  if (!params) return { error: 'Completa proyecto, presupuesto y fecha de inicio.' };
+  if (!params.scheduleName) return { error: 'Ingresa un nombre para el cronograma.' };
 
   let scheduleId: string;
   try {

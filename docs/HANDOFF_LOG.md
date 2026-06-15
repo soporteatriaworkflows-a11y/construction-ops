@@ -5430,3 +5430,60 @@ de excepción PostgreSQL: 'invalid_tasks', 'invalid_start_date', etc.).
 
 ---
 - NO merge, NO deploy, NO db push remoto en este ciclo. **STOP.**
+
+---
+
+## SCHEDULE_PROD_RUNTIME_ROOT_CAUSE_V3 — Bloqueo de UI en /planning/new (botones deshabilitados)
+
+**Rama:** `fix/schedule-prod-runtime-root-cause-v3` · **Base:** `origin/main = bd2dfcf` · Sin migración.
+
+### Síntoma reportado (producción)
+En `/planning/new` (ENTRE PATIOS → Versión 1 draft) **ambos botones quedan deshabilitados / no
+ejecutan**, sin mensaje que explique por qué. Antes mostraban mensajes; tras V2 el flujo quedó "trabado".
+
+### Causa raíz (capa client confirmada)
+El único gate compartido por ambos botones era `!canSubmit || isPending`, con
+`canSubmit = versionId !== '' && name.trim() !== '' && startDate !== ''`. Dos defectos:
+1. **`versionId === ''` silencioso**: el `<select>` de versión muestra "Versión 1" (primera opción del
+   navegador) aunque el `value` real del estado esté vacío ⇒ `canSubmit=false` ⇒ Vista previa Y Crear
+   deshabilitados, **sin feedback** de qué falta.
+2. **Contrato de botones incorrecto** (introducido/agravado en V2): "Vista previa" exigía nombre, y
+   "Crear" se habilitaba sin un preview válido (`preview===null` no bloqueaba), mientras un preview
+   fallido bloqueaba sin permitir reintentar con claridad.
+
+### Por qué los hotfixes V1/V2 no bastaron
+V1/V2 trabajaron sobre el **mapeo de errores del servidor** (mapWriteError/toSafeErrorMessage) y agregaron
+un bloqueo extra al botón Crear. Nunca corrigieron el **gate de UI** ni dieron feedback de campos
+faltantes, así que un `versionId` vacío (o el requisito de nombre para previsualizar) dejaba la pantalla
+muerta sin explicación.
+
+### Fix mínimo aplicado
+- **`form-gating.ts` (nuevo, puro/testeable):** `deriveFormGating()` + `isValidIsoDate()`. Contrato:
+  - Vista previa: habilitada con **proyecto + versión + fecha válida** (NO requiere nombre ni preview
+    previo; nunca depende de un preview/error anterior → siempre se puede reintentar).
+  - Crear: habilitado **solo** con `previewOk === true` y nombre presente.
+  - Expone `missing[]` y `createHint` para mostrar el motivo del bloqueo.
+- **`new-schedule-form.tsx`:** usa `deriveFormGating`; invalida el preview cuando cambian entradas que
+  afectan el cálculo (versión, fecha, opciones, duración, cuadrilla) — el nombre NO lo invalida; muestra
+  hint de campos faltantes y motivo de Crear deshabilitado; `<option>` placeholder cuando `versionId===''`
+  (evita que un value vacío se disfrace de primera opción).
+- **`actions.ts`:** `parseParams` ya no exige nombre (la vista previa es read-only); `createScheduleAction`
+  valida nombre por separado ("Ingresa un nombre…") y el RPC lo revalida (`invalid_name`).
+
+### Validación (Fase 5)
+- typecheck **exit 0**; lint **exit 0**; build **OK** (`/planning/new` dinámica).
+- Suite completa **1739 passed / 42 skipped / 0 fail** (+16 tests nuevos en `form-gating.test.ts`).
+- `git diff --check` limpio; `validate-claude-agents` **214 PASS / 0 FAIL**.
+
+### Deuda NO cerrada (sigue vigente, no era esta causa)
+- **SCHEDULE_ROLE_COMPRAS_SEPARATION**: un usuario `compras` (ViewerRole='internal') aún podría llegar al
+  RPC y recibir 42501. Esta hipótesis quedó pendiente de evidencia de prod (rol real / datos de la versión)
+  y NO se tocó aquí. Si tras este fix el usuario crea con preview.ok pero el RPC responde "No tienes
+  permiso", confirmar `profiles.role` (read-only SQL) antes de cambiar contrato de permisos.
+
+### Próximo paso (tras release autorizado)
+- Merge + publicar; revisión visual: /planning/new con campos válidos ⇒ Vista previa habilitada; tras
+  preview ok ⇒ Crear habilitada; cambiar opción ⇒ Crear se re-bloquea.
+
+---
+- NO merge, NO deploy, NO db push remoto en este ciclo. **STOP.**

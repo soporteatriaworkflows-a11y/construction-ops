@@ -14,6 +14,7 @@ import {
   createScheduleAction,
   type PreviewActionResult,
 } from './actions';
+import { deriveFormGating } from './form-gating';
 import type { ScheduleCreationProject } from '@/server/planning';
 
 interface Props {
@@ -70,13 +71,25 @@ export function NewScheduleForm({ projects }: Props) {
     [projects, state.projectId],
   );
 
-  const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
+  // Cambios que NO afectan el cálculo (solo el nombre): no invalidan el preview.
+  const setName = (value: string) => {
+    setState((s) => ({ ...s, name: value }));
+    setCreateError(null);
+  };
+
+  // Cambios que SÍ afectan el cronograma generado: invalidan el preview para
+  // forzar re-previsualizar antes de crear (evita crear con datos obsoletos).
+  const set = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setState((s) => ({ ...s, [key]: value }));
+    setPreview(null);
+    setCreateError(null);
+  };
 
   const onProjectChange = (projectId: string) => {
     const p = projects.find((x) => x.projectId === projectId);
     setState((s) => ({ ...s, projectId, versionId: p?.versions[0]?.versionId ?? '' }));
     setPreview(null);
+    setCreateError(null);
   };
 
   const runPreview = () => {
@@ -104,7 +117,14 @@ export function NewScheduleForm({ projects }: Props) {
     );
   }
 
-  const canSubmit = state.versionId !== '' && state.name.trim() !== '' && state.startDate !== '';
+  const gating = deriveFormGating({
+    projectId: state.projectId,
+    versionId: state.versionId,
+    name: state.name,
+    startDate: state.startDate,
+    previewOk: preview === null ? null : preview.ok,
+    isPending,
+  });
 
   return (
     <div className="space-y-6">
@@ -130,11 +150,10 @@ export function NewScheduleForm({ projects }: Props) {
             id="version"
             className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
             value={state.versionId}
-            onChange={(e) => {
-              set('versionId', e.target.value);
-              setPreview(null);
-            }}
+            onChange={(e) => set('versionId', e.target.value)}
           >
+            {/* Placeholder: evita que un value vacío se muestre como la 1.ª opción. */}
+            {state.versionId === '' && <option value="">Selecciona un presupuesto…</option>}
             {versions.map((v) => (
               <option key={v.versionId} value={v.versionId}>
                 Versión {v.versionNumber} ({v.status})
@@ -147,7 +166,7 @@ export function NewScheduleForm({ projects }: Props) {
           <Input
             id="name"
             value={state.name}
-            onChange={(e) => set('name', e.target.value)}
+            onChange={(e) => setName(e.target.value)}
             placeholder="Cronograma base"
           />
         </div>
@@ -191,18 +210,23 @@ export function NewScheduleForm({ projects }: Props) {
         <Checkbox label="Crear hito de cierre por capítulo" checked={state.createChapterMilestones} onChange={(v) => set('createChapterMilestones', v)} />
       </fieldset>
 
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" variant="outline" onClick={runPreview} disabled={!canSubmit || isPending}>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="button" variant="outline" onClick={runPreview} disabled={!gating.canPreview}>
           {isPending ? 'Calculando…' : 'Vista previa'}
         </Button>
-        <Button
-          type="button"
-          onClick={runCreate}
-          disabled={!canSubmit || isPending || (preview !== null && !preview.ok)}
-        >
+        <Button type="button" onClick={runCreate} disabled={!gating.canCreate}>
           Crear cronograma
         </Button>
+        {gating.createHint && !isPending && (
+          <span className="text-xs text-gray-500">{gating.createHint}</span>
+        )}
       </div>
+
+      {!gating.canPreview && gating.missing.length > 0 && !isPending && (
+        <p className="text-xs text-amber-700">
+          Para previsualizar, completa: {gating.missing.join(', ')}.
+        </p>
+      )}
 
       {createError && (
         <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">

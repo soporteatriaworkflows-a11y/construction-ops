@@ -1886,3 +1886,13 @@ Gates locales: typecheck 0 · lint 0 · **suite 1633 passed / 42 skipped / 0 fai
 NO merge/deploy/db push remoto/SMTP real/correos reales este ciclo. Deuda de
 release: `OPERATIONAL_ACCESS_REMOTE_RLS_VERIFY_V1` (verificar SECURITY DEFINER bajo
 RLS remota — especialmente `accept_invitation` — antes de confiar en producción).
+
+### SCHEDULE_PROD_RUNTIME_ROOT_CAUSE_V3 (rama fix/schedule-prod-runtime-root-cause-v3)
+Causa raíz (client): `/planning/new` deshabilitaba ambos botones sin feedback cuando
+`versionId` quedaba vacío (desync del `<select>`) o faltaba el nombre para previsualizar.
+Fix: `form-gating.ts` puro + contrato Vista previa/Crear + hints + invalidación de preview
+al cambiar entradas + placeholder de versión. Gates: typecheck 0 · lint 0 · **suite 1739
+passed / 42 skipped / 0 fail** (+16 en `form-gating.test.ts`) · build OK · diff --check limpio
+· validate-claude-agents 214 PASS/0 FAIL. Sin migración, sin DB. NO merge/deploy/db push.
+Deuda vigente (no era esta causa): `SCHEDULE_ROLE_COMPRAS_SEPARATION` (42501 del RPC para
+rol `compras`) pendiente de evidencia de producción.
