@@ -22,13 +22,9 @@
 
 import Link from 'next/link';
 import {
-  DollarSign,
   TrendingUp,
-  BarChart2,
-  Calendar,
   LayoutDashboard,
   FolderOpen,
-  ClipboardList,
   Send,
   Tags,
   ArrowRight,
@@ -38,11 +34,15 @@ import {
   AlertTriangle,
   Clock,
   ClipboardCheck,
+  CheckCircle2,
+  CalendarRange,
 } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Button } from '@/components/ui/button';
-import { KpiCard, FinancialKpiCard } from '@/modules/dashboard/kpi-card';
+import { KpiCard } from '@/modules/dashboard/kpi-card';
+import { costSplitPct } from '@/modules/dashboard/visual-metrics';
+import { BlueprintBg, CommandStat, Sparkbars, IconPlate } from '@/modules/dashboard/command-center';
 import { ChapterDistributionSection } from '@/modules/dashboard/chapter-distribution-section';
 import { SavingsSection } from '@/modules/dashboard/savings-section';
 import { getReadModel, resolveSource } from '@/server/read-model';
@@ -74,6 +74,58 @@ function QuickLink({ href, label, icon }: { href: string; label: string; icon: R
         <ArrowRight className="h-4 w-4 text-gray-300 transition-transform group-hover:translate-x-0.5 group-hover:text-iconic-primary" aria-hidden="true" />
       </span>
       <span className="text-sm font-medium leading-tight text-iconic-ink">{label}</span>
+    </Link>
+  );
+}
+
+/**
+ * Tarjeta de pendiente/alerta con estado vacío premium. `count`:
+ *  - `null`   → dato no disponible (neutro).
+ *  - `0`      → "todo al día" (verde, sin acción).
+ *  - `> 0`    → requiere acción (tono ámbar/rojo + enlace).
+ */
+function AlertCard({
+  href,
+  label,
+  count,
+  actionLabel,
+  clearLabel,
+  icon,
+  tone = 'amber',
+}: {
+  href: string;
+  label: string;
+  count: number | null;
+  actionLabel: string;
+  clearLabel: string;
+  icon: React.ReactNode;
+  tone?: 'amber' | 'red';
+}) {
+  const actionable = typeof count === 'number' && count > 0;
+  const toneRing = tone === 'red' ? 'border-red-200' : 'border-amber-200';
+  const toneText = tone === 'red' ? 'text-red-700' : 'text-amber-700';
+  const toneBg = tone === 'red' ? 'bg-red-50' : 'bg-amber-50';
+  return (
+    <Link
+      href={href}
+      className={`group flex items-center gap-3 rounded-xl border bg-white p-4 transition-all hover:-translate-y-0.5 hover:shadow-iconic ${actionable ? toneRing : 'border-gray-200'}`}
+    >
+      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${actionable ? toneBg : 'bg-green-50'}`}>
+        {actionable ? <span className={toneText}>{icon}</span> : <CheckCircle2 className="h-5 w-5 text-green-600" aria-hidden="true" />}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</p>
+        {count === null ? (
+          <p className="text-sm font-semibold text-gray-400">—</p>
+        ) : actionable ? (
+          <p className={`text-sm font-semibold ${toneText}`}>
+            <span className="tabular-nums">{count}</span> · {actionLabel}
+          </p>
+        ) : (
+          <p className="text-sm font-semibold text-green-700">{clearLabel}</p>
+        )}
+      </div>
+      <ArrowRight className="h-4 w-4 shrink-0 text-gray-300 transition-transform group-hover:translate-x-0.5 group-hover:text-iconic-primary" aria-hidden="true" />
     </Link>
   );
 }
@@ -212,91 +264,111 @@ export default async function DashboardPage() {
 
   const statusLabel =
     ESTIMATE_VERSION_STATUS_LABELS[summary.estimateStatus] ?? summary.estimateStatus;
+  const split = costSplitPct(summary.directCost, summary.budget);
+  const sparkValues = summary.chapterDistribution.map((s) => Number(s.share)).filter((n) => Number.isFinite(n));
 
   return (
     <div>
-      {/* Hero de marca ICONIC: bloque azul amplio + curva + detalle cian */}
+      {/* ZONA 1 — Centro de mando financiero (bloque navy, blueprint + glow cian) */}
       <section
-        className="relative mb-6 overflow-hidden rounded-2xl px-6 py-7 text-white shadow-sm"
-        style={{ background: 'linear-gradient(120deg, #020148 0%, #013E97 55%, #005DD6 100%)' }}
+        className="relative mb-6 overflow-hidden rounded-2xl border border-white/10 px-6 py-7 text-white"
+        style={{
+          background: 'radial-gradient(120% 140% at 85% 0%, #013E97 0%, #020148 60%)',
+          boxShadow: '0 0 0 1px rgba(0,184,255,0.10), 0 24px 60px -24px rgba(0,93,214,0.55)',
+        }}
       >
-        <svg className="pointer-events-none absolute inset-y-0 right-0 h-full w-1/2 text-white/10" viewBox="0 0 400 200" preserveAspectRatio="none" aria-hidden="true">
-          <path d="M400,0 L400,200 L80,200 C260,140 120,60 400,0 Z" fill="currentColor" />
-        </svg>
-        <div className="relative">
-          <p className="text-xs font-semibold uppercase tracking-wide text-iconic-soft-blue">Dashboard gerencial</p>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight">Resumen financiero del proyecto activo</h1>
-          <p className="mt-1 text-sm text-white/75">
-            Estado del presupuesto: <span className="font-semibold text-white">{statusLabel}</span>
-            {' · '}Actualizado {formatDateTime(summary.lastUpdatedAt)}
-          </p>
-          <span className="mt-4 inline-block h-1 w-14 rounded bg-iconic-cyan" aria-hidden="true" />
+        <BlueprintBg />
+        <div className="relative grid gap-6 lg:grid-cols-[1.4fr_1fr]">
+          {/* Columna izquierda: cifras protagonistas */}
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <IconPlate variant="glow"><LayoutDashboard className="h-5 w-5" aria-hidden="true" /></IconPlate>
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-iconic-cyan">Centro de mando</p>
+                <p className="text-sm text-white/70">Resumen financiero del proyecto activo</p>
+              </div>
+            </div>
+
+            <div className="mt-5 flex flex-wrap items-end gap-x-6 gap-y-3">
+              <div>
+                <p className="text-[11px] font-medium uppercase tracking-wide text-iconic-soft-blue/70">Total presupuesto</p>
+                <p className="text-4xl font-bold leading-none tabular-nums">{formatCOP(summary.budget)}</p>
+              </div>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.06] px-3 py-1 text-xs font-medium text-white ring-1 ring-inset ring-iconic-cyan/30">
+                <span className="h-1.5 w-1.5 rounded-full bg-iconic-cyan" aria-hidden="true" style={{ boxShadow: '0 0 8px 1px rgba(0,184,255,0.8)' }} />
+                {statusLabel}
+              </span>
+            </div>
+
+            {/* Composición directo vs indirecto */}
+            {split.directPct + split.indirectPct > 0 && (
+              <div className="mt-5 max-w-md">
+                <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-white/10 ring-1 ring-inset ring-white/10" aria-hidden="true">
+                  <span className="block h-full bg-gradient-to-r from-iconic-primary to-iconic-cyan" style={{ width: `${split.directPct}%` }} />
+                  <span className="block h-full bg-iconic-soft-blue/40" style={{ width: `${split.indirectPct}%` }} />
+                </div>
+                <div className="mt-2 flex gap-5 text-[11px] text-white/70">
+                  <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-iconic-cyan" aria-hidden="true" />Directos <strong className="font-semibold text-white">{split.directPct}%</strong></span>
+                  <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-iconic-soft-blue/50" aria-hidden="true" />Indirectos AIU <strong className="font-semibold text-white">{split.indirectPct}%</strong></span>
+                </div>
+              </div>
+            )}
+
+            {/* Tiles de dato integrados */}
+            <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <CommandStat label="Costos directos" value={formatCOP(summary.directCost)} accentBar="cyan" />
+              <CommandStat label="Indirectos (AIU)" value={formatCOP(summary.indirectCost)} accentBar="soft" />
+              <CommandStat label="Proyectos" value={String(projectCount)} sub="visibles" />
+              <CommandStat label="Presupuestos activos" value={activeEstimateCount === null ? '—' : String(activeEstimateCount)} sub="vigentes" />
+            </div>
+
+            <div className="mt-5 flex flex-wrap gap-2">
+              <Button asChild size="sm" className="bg-iconic-cyan text-iconic-ink hover:bg-iconic-cyan/85">
+                <Link href={`/projects/${projectId}`}>Ver proyecto</Link>
+              </Button>
+              <Button asChild size="sm" variant="outline" className="border-white/30 bg-white/[0.04] text-white hover:bg-white/10">
+                <Link href="/planning"><CalendarRange className="h-4 w-4" aria-hidden="true" />Cronograma</Link>
+              </Button>
+              <Button asChild size="sm" variant="outline" className="border-white/30 bg-white/[0.04] text-white hover:bg-white/10">
+                <Link href="/catalog"><Package className="h-4 w-4" aria-hidden="true" />Catálogo</Link>
+              </Button>
+            </div>
+          </div>
+
+          {/* Columna derecha: micro-viz distribución por capítulo */}
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-iconic-soft-blue/70">Distribución por capítulo</p>
+              <span className="text-[11px] text-white/50">{sparkValues.length} cap.</span>
+            </div>
+            {sparkValues.length > 0 ? (
+              <>
+                <div className="mt-3 h-24">
+                  <Sparkbars values={sparkValues} />
+                </div>
+                <p className="mt-2 text-[11px] text-white/55">Peso relativo de cada capítulo en el costo directo.</p>
+              </>
+            ) : (
+              <p className="mt-6 text-sm text-white/50">Sin capítulos para graficar todavía.</p>
+            )}
+            <p className="mt-4 border-t border-white/10 pt-3 text-[11px] text-white/45">Actualizado {formatDateTime(summary.lastUpdatedAt)}</p>
+          </div>
         </div>
       </section>
 
       {/* ------------------------------------------------------------------ */}
-      {/* KPIs financieros principales                                         */}
+      {/* ZONA 2 — Operación / estado de módulos                               */}
       {/* ------------------------------------------------------------------ */}
-      <section aria-label="Resumen financiero" className="mt-2">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <KpiCard
-            title="Total presupuesto"
-            value={formatCOP(summary.budget)}
-            description="Costos directos + AIU"
-            valueColor="text-iconic-ink"
-            icon={<DollarSign className="h-4 w-4 text-iconic-primary" />}
-            iconBg="bg-brand-50"
-          />
-          <KpiCard
-            title="Costos directos"
-            value={formatCOP(summary.directCost)}
-            description="Σ capítulos BOQ"
-            icon={<TrendingUp className="h-4 w-4 text-green-700" />}
-            iconBg="bg-green-50"
-          />
-          <KpiCard
-            title="Costos indirectos (AIU)"
-            value={formatCOP(summary.indirectCost)}
-            description="Administración + Imprevistos + Utilidad + IVA"
-            icon={<BarChart2 className="h-4 w-4 text-amber-700" />}
-            iconBg="bg-amber-50"
-          />
-          <KpiCard
-            title="Estado del presupuesto"
-            value={statusLabel}
-            description={`Actualizado: ${formatDateTime(summary.lastUpdatedAt)}`}
-            icon={<Calendar className="h-4 w-4 text-purple-700" />}
-            iconBg="bg-purple-50"
-          />
-        </div>
-      </section>
-
-      {/* ------------------------------------------------------------------ */}
-      {/* Operación (Oleada OPERATIONAL BUDGET UX V1)                          */}
-      {/* ------------------------------------------------------------------ */}
-      <section aria-label="Operación" className="mt-6">
+      <section aria-label="Operación" className="mt-2">
         <h2 className="mb-4 text-base font-semibold text-gray-900">Operación</h2>
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <KpiCard
-            title="Proyectos"
-            value={String(projectCount)}
-            description="Visibles para tu organización"
-            icon={<FolderOpen className="h-4 w-4 text-iconic-primary" />}
-            iconBg="bg-brand-50"
-          />
-          <KpiCard
-            title="Presupuestos activos"
-            value={activeEstimateCount === null ? '—' : String(activeEstimateCount)}
-            description="Presupuestos de trabajo vigentes"
-            icon={<ClipboardList className="h-4 w-4 text-green-700" />}
-            iconBg="bg-green-50"
-          />
           <KpiCard
             title="Versiones emitidas"
             value={issuedVersionCount === null ? '—' : String(issuedVersionCount)}
             description="Snapshots inmutables entregados"
-            icon={<Send className="h-4 w-4 text-purple-700" />}
-            iconBg="bg-purple-50"
+            accent="navy"
+            icon={<Send className="h-4 w-4 text-iconic-ink" />}
+            iconBg="bg-iconic-soft-blue/40"
           />
           {isAuthorizedForSavings && (
             <Link
@@ -308,6 +380,8 @@ export default async function DashboardPage() {
                 title="Precios por revisar"
                 value={pendingPriceCount === null ? '—' : String(pendingPriceCount)}
                 description="Observaciones pendientes — abrir revisión masiva"
+                accent={pendingPriceCount && pendingPriceCount > 0 ? 'amber' : 'green'}
+                valueColor={pendingPriceCount && pendingPriceCount > 0 ? 'text-amber-700' : 'text-iconic-ink'}
                 icon={<Tags className="h-4 w-4 text-amber-700" />}
                 iconBg="bg-amber-50"
               />
@@ -324,6 +398,7 @@ export default async function DashboardPage() {
                 title="Fuentes monitoreadas"
                 value={String(monitoringSummary.monitoredCount)}
                 description={`${monitoringSummary.activeCount} activas · ${monitoringSummary.pausedCount} pausadas`}
+                accent="primary"
                 icon={<Radar className="h-4 w-4 text-iconic-primary" />}
                 iconBg="bg-brand-50"
               />
@@ -331,6 +406,7 @@ export default async function DashboardPage() {
                 title="Cambios de precio pendientes"
                 value={String(monitoringSummary.pendingChangesCount)}
                 description="Detectados por el monitor, por revisar"
+                accent={monitoringSummary.pendingChangesCount > 0 ? 'amber' : 'green'}
                 valueColor={monitoringSummary.pendingChangesCount > 0 ? 'text-amber-700' : undefined}
                 icon={<TrendingUp className="h-4 w-4 text-amber-700" />}
                 iconBg="bg-amber-50"
@@ -339,6 +415,7 @@ export default async function DashboardPage() {
                 title="Fuentes con error"
                 value={String(monitoringSummary.erroredCount)}
                 description="3+ fallos consecutivos"
+                accent={monitoringSummary.erroredCount > 0 ? 'red' : 'green'}
                 valueColor={monitoringSummary.erroredCount > 0 ? 'text-red-700' : undefined}
                 icon={<AlertTriangle className="h-4 w-4 text-red-700" />}
                 iconBg="bg-red-50"
@@ -347,8 +424,9 @@ export default async function DashboardPage() {
                 title="Fuentes vencidas"
                 value={String(monitoringSummary.overdueCount)}
                 description="Pendientes de la próxima revisión"
-                icon={<Clock className="h-4 w-4 text-purple-700" />}
-                iconBg="bg-purple-50"
+                accent="navy"
+                icon={<Clock className="h-4 w-4 text-iconic-ink" />}
+                iconBg="bg-iconic-soft-blue/40"
               />
             </div>
           </div>
@@ -366,30 +444,40 @@ export default async function DashboardPage() {
       </section>
 
       {/* ------------------------------------------------------------------ */}
-      {/* Resumen financiero compacto                                          */}
+      {/* Pendientes y alertas — qué requiere acción (datos ya disponibles)    */}
       {/* ------------------------------------------------------------------ */}
-      <section aria-label="Desglose financiero" className="mt-6">
-        <h2 className="mb-4 text-base font-semibold text-gray-900">
-          Desglose financiero
-        </h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <FinancialKpiCard
-            title="Costos directos"
-            value={formatCOP(summary.directCost)}
-            valueColor="text-gray-900"
-          />
-          <FinancialKpiCard
-            title="Costos indirectos (AIU)"
-            value={formatCOP(summary.indirectCost)}
-            valueColor="text-gray-900"
-          />
-          <FinancialKpiCard
-            title="Total presupuesto"
-            value={formatCOP(summary.budget)}
-            valueColor="text-blue-700"
-          />
-        </div>
-      </section>
+      {isAuthorizedForSavings && (
+        <section aria-label="Pendientes y alertas" className="mt-6">
+          <h2 className="mb-4 text-base font-semibold text-gray-900">Pendientes y alertas</h2>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <AlertCard
+              href="/catalog/prices/review"
+              label="Precios por revisar"
+              count={pendingPriceCount}
+              actionLabel="observaciones por revisar"
+              clearLabel="Sin precios pendientes"
+              icon={<Tags className="h-5 w-5" aria-hidden="true" />}
+            />
+            <AlertCard
+              href="/catalog/monitoring"
+              label="Cambios de precio detectados"
+              count={monitoringSummary ? monitoringSummary.pendingChangesCount : null}
+              actionLabel="cambios por revisar"
+              clearLabel="Sin cambios pendientes"
+              icon={<TrendingUp className="h-5 w-5" aria-hidden="true" />}
+            />
+            <AlertCard
+              href="/catalog/monitoring"
+              label="Fuentes con error"
+              count={monitoringSummary ? monitoringSummary.erroredCount : null}
+              actionLabel="fuentes con fallos"
+              clearLabel="Sin fuentes con error"
+              icon={<AlertTriangle className="h-5 w-5" aria-hidden="true" />}
+              tone="red"
+            />
+          </div>
+        </section>
+      )}
 
       {/* ------------------------------------------------------------------ */}
       {/* Distribución por capítulo (Recharts)                                 */}
