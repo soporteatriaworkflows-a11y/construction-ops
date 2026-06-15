@@ -8,6 +8,8 @@ import { readModelModeLabel } from '@/lib/utils/mode-label';
 import { getActiveWorkspace } from '@/lib/branding/workspace';
 import { WorkspaceBrand } from '@/components/shared/workspace-brand';
 import { SidebarNav } from '@/components/shared/sidebar-nav';
+import { AppTopbar } from '@/components/shared/app-topbar';
+import { ContextualNav } from '@/components/shared/contextual-nav';
 import { resolveAccessActor, canManageAccess } from '@/server/access';
 
 /**
@@ -17,31 +19,40 @@ import { resolveAccessActor, canManageAccess } from '@/server/access';
  */
 export const dynamic = 'force-dynamic';
 
-/** ¿El viewer puede gestionar accesos? (server-side; deny-by-default). */
-async function resolveCanManageAccess(): Promise<boolean> {
+/**
+ * Resuelve el actor (email/rol) y si puede gestionar accesos. SOLO lectura del
+ * resolver server-side existente; degrada a anónimo si falla (deny-by-default).
+ */
+async function resolveShellActor(): Promise<{
+  email: string | null;
+  role: string | null;
+  canManageAccess: boolean;
+}> {
   try {
     const actor = await resolveAccessActor();
-    return canManageAccess(actor.profileRole);
+    return {
+      email: actor.email ?? null,
+      role: actor.profileRole ?? null,
+      canManageAccess: canManageAccess(actor.profileRole),
+    };
   } catch {
-    return false;
+    return { email: null, role: null, canManageAccess: false };
   }
 }
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const mode = readModelModeLabel();
   const ws = getActiveWorkspace();
-  const showAccess = await resolveCanManageAccess();
+  const actor = await resolveShellActor();
   return (
     <div className="flex min-h-screen bg-iconic-gray">
-      {/* Sidebar — estructura azul noche ICONIC */}
+      {/* Rail primario — azul noche ICONIC, refinado */}
       <aside className="flex w-60 shrink-0 flex-col bg-iconic-ink" aria-label="Navegación principal">
-        {/* Identidad del workspace */}
         <div className="flex h-16 items-center border-b border-white/10 px-4">
           <WorkspaceBrand variant="sidebar" />
         </div>
 
-        {/* Navegación con estado activo */}
-        <SidebarNav canManageAccess={showAccess} />
+        <SidebarNav canManageAccess={actor.canManageAccess} />
 
         {/* Footer — workspace + etiqueta de modo (request-time) */}
         <div className="space-y-0.5 border-t border-white/10 px-4 py-3">
@@ -52,14 +63,15 @@ export default async function DashboardLayout({ children }: { children: ReactNod
 
       {/* Contenido principal */}
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* Topbar */}
-        <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-iconic-soft-blue/60 bg-white/85 px-6 backdrop-blur">
-          <div className="flex min-w-0 items-center gap-2">
-            <span className="truncate text-sm font-semibold text-iconic-ink">{ws.productName}</span>
-            <span className="hidden truncate text-xs text-iconic-graphite/50 sm:inline">· {ws.descriptor}</span>
-          </div>
-          <WorkspaceBrand variant="chip" />
-        </header>
+        <AppTopbar
+          email={actor.email}
+          role={actor.role}
+          workspaceName={ws.workspaceName}
+          canManageAccess={actor.canManageAccess}
+        />
+
+        {/* Navegación contextual del módulo activo (solo si aplica) */}
+        <ContextualNav />
 
         <main className="flex-1 overflow-x-hidden" id="main-content" tabIndex={-1}>
           <div className="mx-auto max-w-screen-2xl px-6 py-6">{children}</div>
