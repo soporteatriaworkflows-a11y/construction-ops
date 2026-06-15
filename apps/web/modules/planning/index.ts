@@ -15,6 +15,9 @@ export {
 export {
   toDecimal,
   toDecimalString,
+  tryDecimal,
+  toNonNegativeDecimalString,
+  addDecimalStrings,
   ZERO,
   lt,
   gt,

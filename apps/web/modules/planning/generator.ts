@@ -16,9 +16,19 @@
  *   - `productivity_source` ∈ {apu, manual, unknown}.
  */
 
-import { toDecimal, gt } from './decimal';
+import { tryDecimal, PlanningDecimal } from './decimal';
 import { dayIndexToIsoDate, isoDateToDayIndex } from './date';
 import type { DecimalString, IsoDate, Uuid } from './types';
+
+/**
+ * Cota dura de duración por actividad (días). Datos imperfectos (cantidad o
+ * rendimiento extremos) no deben producir cronogramas absurdos ni desbordes; se
+ * acota a ~100 años. Es un límite de seguridad, no una regla de negocio.
+ */
+const MAX_ACTIVITY_DURATION_DAYS = 36_500;
+
+/** Id sintético del capítulo "Sin capítulo" para ítems huérfanos (defensivo). */
+const SYNTHETIC_CHAPTER_ID = 'sin-capitulo';
 
 /* ----------------------------------------------------------------------------
  * Entradas (DTOs inyectados por la capa server-side; aquí solo datos puros)
@@ -130,6 +140,11 @@ export interface PreviewTask {
 }
 
 export interface GeneratorStats {
+  /** Ítems BOQ recibidos del read-model (antes de filtros). Distingue "versión
+   *  sin ítems" de "versión con ítems pero ninguno programable". */
+  inputItemCount: number;
+  /** Capítulos recibidos del read-model (antes de filtros). */
+  inputChapterCount: number;
   chapterCount: number;
   activityCount: number;
   milestoneCount: number;
@@ -193,12 +208,15 @@ export function estimateActivityDuration(
 ): DurationEstimate {
   const min = normalizedMinDuration(options.minDurationDays);
 
+  // Sin APU vinculado ⇒ duración manual mínima.
   if (item.apuTemplateId === null) {
     return { durationDays: min, productivitySource: 'manual', warning: 'no_apu' };
   }
 
-  const personDays = item.apuLaborPersonDaysPerUnit;
-  if (personDays === null || !gt(personDays, '0')) {
+  // Rendimiento APU: SOLO usable si es un decimal finito > 0. null/NaN/Infinity/
+  // negativo/≤0/no parseable ⇒ sin rendimiento usable (warning, nunca excepción).
+  const personDays = tryDecimal(item.apuLaborPersonDaysPerUnit);
+  if (personDays === null || !personDays.gt(0)) {
     return {
       durationDays: min,
       productivitySource: 'unknown',
@@ -206,14 +224,23 @@ export function estimateActivityDuration(
     };
   }
 
+  // Cantidad: si es inválida/no finita/≤0, no se puede derivar duración real con
+  // el rendimiento ⇒ mínima, pero el APU SÍ existe (source 'apu', sin warning de
+  // rendimiento: el rendimiento es válido, la cantidad es la que no aporta).
+  const quantity = tryDecimal(item.quantity);
+  if (quantity === null || !quantity.gt(0)) {
+    return { durationDays: min, productivitySource: 'apu', warning: null };
+  }
+
   // Crew size válido (> 0); si no, 1.
-  const crew = gt(options.defaultCrewSize, '0') ? options.defaultCrewSize : '1';
-  const raw = toDecimal(item.quantity)
-    .times(toDecimal(personDays))
-    .div(toDecimal(crew));
-  // Días enteros hacia arriba (nunca menos del mínimo, nunca < 1).
+  const crewParsed = tryDecimal(options.defaultCrewSize);
+  const crew = crewParsed !== null && crewParsed.gt(0) ? crewParsed : new PlanningDecimal(1);
+
+  const raw = quantity.times(personDays).div(crew);
+  // Días enteros hacia arriba (nunca menos del mínimo, nunca < 1, acotado).
   const ceil = raw.ceil().toNumber();
-  const durationDays = Math.max(min, Number.isFinite(ceil) && ceil >= 1 ? ceil : min);
+  const safeCeil = Number.isFinite(ceil) && ceil >= 1 ? ceil : min;
+  const durationDays = Math.min(MAX_ACTIVITY_DURATION_DAYS, Math.max(min, safeCeil));
   return { durationDays, productivitySource: 'apu', warning: null };
 }
 
@@ -229,7 +256,14 @@ function inclusiveEnd(start: IsoDate, durationDays: number): IsoDate {
 }
 
 function isPositive(quantity: DecimalString): boolean {
-  return gt(quantity, '0');
+  const d = tryDecimal(quantity);
+  return d !== null && d.gt(0);
+}
+
+/** Tamaño de cuadrilla snapshot saneado: decimal finito > 0, o '1' por defecto. */
+function safeCrewSize(value: DecimalString): DecimalString {
+  const d = tryDecimal(value);
+  return d !== null && d.gt(0) ? d.toFixed() : '1';
 }
 
 /**
@@ -245,17 +279,26 @@ export function buildScheduleFromBoqPreview(input: GeneratorInput): GeneratorPre
   const prefix = options.wbsPrefix ?? '';
   const startDate = options.startDate;
 
-  // Índice de ítems por capítulo, preservando el orden recibido.
+  // Índice de ítems por capítulo, preservando el orden recibido. Los ítems cuyo
+  // chapterId NO está entre los capítulos recibidos NO se descartan: se agrupan
+  // en un capítulo sintético "Sin capítulo" para que SIEMPRE puedan aparecer como
+  // actividad (regla del read-model: si existe BOQ item, debe poder ser actividad).
+  const knownChapterIds = new Set<Uuid>(chapters.map((c) => c.id));
   const itemsByChapter = new Map<Uuid, GeneratorItemInput[]>();
+  let hasOrphanItems = false;
   for (const it of items) {
-    const list = itemsByChapter.get(it.chapterId);
+    const key = knownChapterIds.has(it.chapterId) ? it.chapterId : SYNTHETIC_CHAPTER_ID;
+    if (key === SYNTHETIC_CHAPTER_ID) hasOrphanItems = true;
+    const list = itemsByChapter.get(key);
     if (list) list.push(it);
-    else itemsByChapter.set(it.chapterId, [it]);
+    else itemsByChapter.set(key, [it]);
   }
 
   const tasks: PreviewTask[] = [];
   const warnings: GeneratorWarning[] = [];
   const stats: GeneratorStats = {
+    inputItemCount: items.length,
+    inputChapterCount: chapters.length,
     chapterCount: 0,
     activityCount: 0,
     milestoneCount: 0,
@@ -276,8 +319,18 @@ export function buildScheduleFromBoqPreview(input: GeneratorInput): GeneratorPre
   const orderedChapters = [...chapters].sort(
     (a, b) => a.sortOrder - b.sortOrder || a.code.localeCompare(b.code),
   );
+  // Capítulo sintético al final SOLO si hubo ítems huérfanos (defensivo).
+  if (hasOrphanItems) {
+    orderedChapters.push({
+      id: SYNTHETIC_CHAPTER_ID,
+      code: 'ZZ',
+      name: 'Sin capítulo',
+      sortOrder: Number.MAX_SAFE_INTEGER,
+    });
+  }
 
   for (const chapter of orderedChapters) {
+    const isSyntheticChapter = chapter.id === SYNTHETIC_CHAPTER_ID;
     const chapterItems = itemsByChapter.get(chapter.id) ?? [];
 
     // Resolver actividades incluidas de este capítulo.
@@ -332,7 +385,9 @@ export function buildScheduleFromBoqPreview(input: GeneratorInput): GeneratorPre
         unitSnapshot: item.unit,
         quantitySnapshot: item.quantity,
         boqItemId: item.boqItemId,
-        chapterId: item.chapterId,
+        // Ítem huérfano (capítulo no presente) ⇒ chapterId null para no violar la
+        // FK al persistir; el ítem sigue apareciendo bajo "Sin capítulo".
+        chapterId: isSyntheticChapter ? null : item.chapterId,
         apuTemplateId: item.apuTemplateId,
         durationDays: est.durationDays,
         plannedStart,
@@ -340,12 +395,7 @@ export function buildScheduleFromBoqPreview(input: GeneratorInput): GeneratorPre
         progressPct: '0',
         isMilestone: false,
         productivitySource: est.productivitySource,
-        crewSize:
-          est.productivitySource === 'apu'
-            ? gt(options.defaultCrewSize, '0')
-              ? options.defaultCrewSize
-              : '1'
-            : null,
+        crewSize: est.productivitySource === 'apu' ? safeCrewSize(options.defaultCrewSize) : null,
         sortOrder: 0, // se asigna al aplanar.
         warnings: itemWarnings,
       });
@@ -377,7 +427,7 @@ export function buildScheduleFromBoqPreview(input: GeneratorInput): GeneratorPre
         unitSnapshot: null,
         quantitySnapshot: null,
         boqItemId: null,
-        chapterId: chapter.id,
+        chapterId: isSyntheticChapter ? null : chapter.id,
         apuTemplateId: null,
         durationDays: chapterDuration,
         plannedStart: startDate,
@@ -415,7 +465,7 @@ export function buildScheduleFromBoqPreview(input: GeneratorInput): GeneratorPre
         unitSnapshot: null,
         quantitySnapshot: null,
         boqItemId: null,
-        chapterId: chapter.id,
+        chapterId: isSyntheticChapter ? null : chapter.id,
         apuTemplateId: null,
         durationDays: 0,
         plannedStart: chapterEnd,

@@ -4,6 +4,34 @@ Este documento es propiedad de **agent-qa**. Se actualiza al final de
 
 ---
 
+## SCHEDULE_PREVIEW_READMODEL_ROOT_CAUSE_V4 (2026-06-15, rama `fix/schedule-preview-readmodel-v4`)
+
+**Base:** `origin/main = 6a188d0` · **main intacta** · **producción intacta** · **sin migración** · **sin db push remoto** · **sin escrituras remotas**
+
+**Causa raíz:** `loadGeneratorSource` no coercía `numeric` (`quantity_snapshot`,
+`apu_components.quantity`) a `DecimalString`; con `numeric` serializado como número
+JS, la suma de rendimiento (`string.split`) lanzaba `TypeError` → mensaje genérico
+de preview. Alineado con el read-model probado (quantity-workspace usa `String(...)`).
+
+| Check | Resultado |
+|---|---|
+| typecheck | ✅ 0 errores |
+| lint (eslint) | ✅ 0 |
+| suite completa | ✅ 1766 passed / 42 skipped / 0 fail (+27) |
+| tests nuevos | ✅ decimal-coercion (8) + generador imperfecto/huérfano/cota (18) + input counts (1) |
+| gm:regression | ✅ 22/22 |
+| gm:import | ✅ PASS (read-model BOQ tocado) |
+| build (next) | ✅ exit 0, limpio |
+| git diff --check | ✅ limpio |
+| validate-claude-agents | ✅ 214 / 0 WARN / 0 FAIL |
+| migración | ❌ ninguna (sin cambio de esquema) |
+| RLS harness | ⏭️ no re-ejecutado (sin migraciones) |
+
+**Pendiente:** revisión visual autenticada en producción tras release — `/planning/new`
+ENTRE PATIOS Versión 1 → Vista previa con actividades > 0.
+
+---
+
 ## SCHEDULE_PREVIEW_CREATE_PROD_FIX_V2 (2026-06-14, rama `fix/schedule-preview-create-prod-v2`)
 
 **Base:** `origin/main = 7693313` · **main intacta** · **producción intacta** · **sin migración** · **sin db push remoto** · **sin escrituras remotas**

@@ -59,6 +59,43 @@ export function toDecimalString(value: PlanningDecimalInstance): DecimalString {
   return value.toFixed();
 }
 
+/**
+ * Convierte CUALQUIER entrada (string, number, null) a `Decimal` del dominio SIN
+ * lanzar. Devuelve `null` si el valor es nulo, no numérico o no finito
+ * (NaN/Infinity). Pensado para blindar el read-model: PostgREST puede serializar
+ * `numeric` como número JS o string, y datos imperfectos no deben romper el
+ * preview (ver SCHEDULE_PREVIEW_READMODEL_ROOT_CAUSE_V4).
+ */
+export function tryDecimal(value: unknown): PlanningDecimalInstance | null {
+  if (value === null || value === undefined) return null;
+  try {
+    const d = new PlanningDecimal(value as Decimal.Value);
+    return d.isFinite() ? d : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Coerce cualquier entrada a un `DecimalString` finito y NO negativo. Entradas
+ * nulas/no numéricas/no finitas o negativas devuelven `'0'`. Nunca lanza. Es el
+ * mismo patrón defensivo que los loaders probados (quantity-workspace usa
+ * `String(...)`); aquí se centraliza para que ningún consumidor reciba un número
+ * JS crudo en una API string-only.
+ */
+export function toNonNegativeDecimalString(value: unknown): DecimalString {
+  const d = tryDecimal(value);
+  if (d === null || d.isNegative()) return '0';
+  return d.toFixed();
+}
+
+/** Suma exacta de dos `DecimalString` (sin float). Entradas inválidas → 0. */
+export function addDecimalStrings(a: unknown, b: unknown): DecimalString {
+  const da = tryDecimal(a) ?? new PlanningDecimal(0);
+  const db = tryDecimal(b) ?? new PlanningDecimal(0);
+  return da.plus(db).toFixed();
+}
+
 /** Constante "0" como `DecimalString`. */
 export const ZERO: DecimalString = '0';
 

@@ -1,5 +1,79 @@
 # Handoff Log
 
+## 2026-06-15 — SCHEDULE_PREVIEW_READMODEL_ROOT_CAUSE_V4 — COMPLETA (Fases 0–7) (orchestrator)
+
+### Estado
+- Rama `fix/schedule-preview-readmodel-v4` (base `origin/main = 6a188d0`, confirmada;
+  **sin divergencia**). **Sin merge a main; sin deploy; sin db push remoto; sin
+  escrituras/datos remotos; sin SMTP; sin correos; sin feature nueva.** Stashes
+  intactos (2, ajenos). Producción intacta. Main intacta. Rama lista para publicar.
+
+### Causa raíz REAL (no era el botón ni el mensaje)
+Tras V3 el preview se ejecutaba pero NO construía actividades por una **excepción
+cruda de conversión `numeric→string`**, no por gating de UI:
+- `loadGeneratorSource` (repository) pasaba `boq_items.quantity_snapshot` y
+  `apu_components.quantity` SIN coerción. **PostgREST puede serializar `numeric`
+  como número JS**; la suma de rendimiento APU del repo (`sumDecimal`) hacía
+  `string.split('.')` sobre ese número → `TypeError` (no `planning_*`, no tipado)
+  → `toSafeErrorMessage` caía al **mensaje genérico** "No se pudo calcular la
+  vista previa".
+- Por qué exports/presupuesto SÍ funcionaban: **no leen `quantity` para cálculo**
+  (solo la muestran). El loader probado `quantity-workspace` ya coercía con
+  `String(...)` — planning era el único que omitía la coerción.
+
+### Comparación de read-models (resumen)
+| Loader | Archivo | Lee quantity para cálculo | Coerción numeric | Riesgo |
+|---|---|---|---|---|
+| presupuesto/BOQ | `server/estimates/db-repository.ts` | no (display) | tipa string, sin math | bajo |
+| export APU links | `getActiveVersionApuLinks` | no lee quantity | n/a | bajo |
+| quantities sync | `server/quantity-workspace/db-repository.ts` | sí | **`String(r.quantity_snapshot)`** | bajo (blindado) |
+| **planning preview** | `server/planning/repository.ts` | **sí (duración)** | **NINGUNA (bug)** | **alto → fix** |
+
+Columnas idénticas en todos (`description_snapshot/unit_snapshot/quantity_snapshot/
+apu_template_id`, filtros `estimate_version_id`/`chapter_id`). Todas las columnas
+son `NOT NULL` en el esquema; el fallo NO era null sino **tipo de serialización**.
+
+### Fixes (5 archivos, sin migración)
+**`apps/web/modules/planning/decimal.ts`** — nuevas primitivas que NUNCA lanzan:
+`tryDecimal(unknown)→Decimal|null`, `toNonNegativeDecimalString(unknown)→'0' si
+inválido/negativo`, `addDecimalStrings(a,b)` por Decimal.js (no `.split()`).
+
+**`apps/web/server/planning/repository.ts`** — coerce TODO `numeric` a
+`DecimalString` (`toNonNegativeDecimalString`) en items y componentes labor;
+elimina la suma BigInt frágil. Alinea el read-model con quantity-workspace.
+
+**`apps/web/modules/planning/generator.ts`** — blindaje del generador:
+- cantidad/rendimiento/cuadrilla null/NaN/Infinity/≤0/no parseable → warnings o
+  duración mínima, **nunca excepción**; duración acotada a `MAX_ACTIVITY_DURATION_DAYS`
+  (36 500).
+- ítems con `chapterId` huérfano → capítulo sintético **"Sin capítulo"** (chapterId
+  null para no violar FK; **no se descartan**).
+- `GeneratorStats.inputItemCount/inputChapterCount` (distingue "versión sin ítems"
+  de "ítems no programables").
+
+**`apps/web/app/(dashboard)/planning/new/actions.ts`** — UX de error preciso:
+versión sin BOQ / ítems presentes pero no programables (con hint del filtro) /
+`PlanningError invalid_dates` → "La fecha de inicio no es válida" / fallback interno
+con código seguro **`SCHEDULE_PREVIEW_READMODEL_FAILED`** (+ `console.error` sin secretos).
+
+**`apps/web/modules/planning/index.ts`** — exporta las nuevas primitivas decimales.
+
+### Validación (todo PASS, local)
+- typecheck 0 · lint 0 · **suite 1766 passed / 42 skipped / 0 fail** (+27):
+  +8 `decimal-coercion.test.ts` (reproduce el root cause con número JS), +18
+  generador (datos imperfectos/huérfanos/cota), +1 stats input counts.
+- gm:regression 22/22 · gm:import PASS · build limpio (exit 0) · `git diff --check`
+  limpio · validate-claude-agents 214/0/0.
+- Sin migraciones nuevas ⇒ harness RLS no re-ejecutado (sin cambio de esquema).
+
+### Próximo paso
+1. Revisión visual autenticada `/planning/new` ENTRE PATIOS Versión 1, fecha
+   22/06/2026, cuadrilla 2, "Incluir capítulos" ON: **Vista previa debe mostrar
+   actividades > 0** (antes fallaba). Verificar warnings de ítems sin APU/rendimiento.
+2. Release controlado (autorización aparte): merge a main + deploy (sin db push).
+
+---
+
 ## 2026-06-14 — SCHEDULE_PREVIEW_CREATE_PROD_FIX_V2 — COMPLETA (Fases 0–7) (orchestrator)
 
 ### Estado
