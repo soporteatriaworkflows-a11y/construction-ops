@@ -219,7 +219,7 @@ export class PlanningRepository {
     endDate: string | null;
     status: string;
     tasks: PreviewTask[];
-  }): Promise<{ scheduleId: Uuid; errorCode?: string }> {
+  }): Promise<{ scheduleId: Uuid; errorCode?: string; errorMessage?: string }> {
     const supabase = await this.clientFactory();
     const { data, error } = await supabase.rpc('create_schedule_from_boq', {
       p_project_id: params.projectId,
@@ -231,7 +231,7 @@ export class PlanningRepository {
       p_tasks: params.tasks,
     });
     if (error) {
-      return { scheduleId: '', errorCode: error.code ?? error.message };
+      return { scheduleId: '', errorCode: error.code ?? error.message, errorMessage: error.message };
     }
     return { scheduleId: data as string };
   }

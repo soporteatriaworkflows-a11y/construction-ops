@@ -145,7 +145,7 @@ export async function createScheduleFromBoq(
     status: 'draft',
     tasks: preview.tasks,
   });
-  if (res.errorCode) throw mapWriteError(res.errorCode);
+  if (res.errorCode) throw mapWriteError(res.errorCode, res.errorMessage);
   return res.scheduleId;
 }
 
@@ -451,9 +451,14 @@ function toScheduleSummary(
   };
 }
 
-function mapWriteError(code: string): Error {
-  if (code.includes('insufficient_role') || code === '42501') return new SchedulePermissionError();
-  if (code.includes('invalid_') || code.includes('not_found') || code.startsWith('23')) {
+function mapWriteError(code: string, message?: string): Error {
+  const msg = message ?? '';
+  if (code === '42501' || msg.includes('insufficient_role') || msg.includes('no_membership')) {
+    return new SchedulePermissionError();
+  }
+  // SQLSTATE 22000 (data exception) and 23xxx (integrity constraint) are always
+  // validation failures from the RPC or DB constraints — never silent/unknown.
+  if (code === '22000' || code.startsWith('23') || msg.includes('invalid_') || msg.includes('not_found')) {
     return new ScheduleValidationError(`No se pudo completar la operación (${code}).`);
   }
   return new Error(`schedule_write_failed: ${code}`);

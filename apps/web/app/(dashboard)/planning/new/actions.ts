@@ -8,6 +8,7 @@
 
 import { redirect } from 'next/navigation';
 import { resolveAuthenticatedViewer } from '@/server/auth/resolve-viewer';
+import { AuthError } from '@/server/auth';
 import {
   previewScheduleFromBoq,
   createScheduleFromBoq,
@@ -85,7 +86,20 @@ export async function createScheduleAction(
     const viewer = await resolveAuthenticatedViewer();
     scheduleId = await createScheduleFromBoq(viewer, params);
   } catch (e) {
+    console.error('[planning] createScheduleAction error', {
+      estimateVersionId: params.estimateVersionId,
+      errorName: e instanceof Error ? e.name : typeof e,
+      errorMessage: e instanceof Error ? e.message : String(e),
+    });
     if (e instanceof SchedulePermissionError) return { error: 'No tienes permiso para crear cronogramas.' };
+    if (e instanceof AuthError) {
+      return {
+        error:
+          e.reason === 'no_session'
+            ? 'Tu sesión expiró. Recarga la página e inicia sesión de nuevo.'
+            : 'Sin membresía activa para crear cronogramas.',
+      };
+    }
     if (e instanceof ScheduleValidationError || e instanceof ScheduleNotFoundError) {
       return { error: e.message };
     }

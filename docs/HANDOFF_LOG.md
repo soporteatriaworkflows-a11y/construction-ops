@@ -5288,4 +5288,80 @@ financiera exacta) ✅ · smoke gated (MVP+BOQ) 42/42 en DB limpia ✅ · redire
 ### Próximo paso
 - Revisión visual de la usuaria en `http://localhost:3120`.
 - Release controlado: `db push --dry-run` ⇒ **exactamente 1 migración** (`20260617090000`).
+
+---
+
+## 2026-06-14 — SCHEDULE_CREATE_PROD_FAILURE_HOTFIX_V1 (orchestrator)
+
+### Estado
+- Rama `fix/schedule-create-prod-failure-v1` (base `origin/main = 773ceca`).
+  **Sin merge a main; sin deploy; sin db push remoto; sin escrituras remotas;
+  sin datos dummy remotos; sin SMTP; sin otras features.**
+
+### Síntoma de producción
+`/planning/new` → crear cronograma → error genérico: "No se pudo crear el cronograma. Inténtalo de nuevo."
+Reproducible con: Proyecto ENTRE PATIOS, Versión 1, nombre "ENTRE PATIOS · Cali",
+start_date 2026-06-22, minDuration 1, crewSize 2, includeChapters/onlyPositiveQuantity/includeItemsWithoutApu/
+**createChapterMilestones=true**.
+
+### Diagnóstico (Fases 0–1)
+
+**Bug B (raíz principal):** `mapWriteError(code: string)` en `server/planning/service.ts:454`
+comparaba el código SQLSTATE ('22000') contra patrones de texto diseñados para los mensajes
+de excepción ('invalid_tasks', 'not_found', etc.). El RPC `create_schedule_from_boq` usa
+`RAISE EXCEPTION 'invalid_tasks' USING errcode = '22000'` para TODAS sus validaciones de
+datos; pero el repositorio devuelve `error.code` ('22000'), no `error.message`.
+`'22000'.includes('invalid_')` = `false` → `mapWriteError` retornaba `new Error(...)` genérico
+→ el `catch` en `createScheduleAction` no lo reconocía como ScheduleValidationError
+→ caía al fallback genérico "No se pudo crear el cronograma.".
+
+**Bug A (riesgo secundario):** `AuthError` (de `resolveAuthenticatedViewer`) no estaba en el
+`catch` de `createScheduleAction`. Una sesión expirada también producía el mensaje genérico.
+
+**Sin bug en el generador:** el test `generator.test.ts:320` cubre `createChapterMilestones: true`
+y pasa. Los milestones tienen `durationDays=0, plannedStart=plannedEnd, isMilestone=true` —
+compatible con el constraint `schedule_tasks_milestone_zero_duration`. El error sucedió en
+la capa de mapeo de error, no en la generación de tareas.
+
+### Corrección mínima (Fases 2–4) — 4 archivos
+
+**1. `apps/web/server/planning/repository.ts`** — `createScheduleFromBoq`:
+Agrega `errorMessage?: string` al tipo de retorno; popula con `error.message` (el mensaje
+de excepción PostgreSQL: 'invalid_tasks', 'invalid_start_date', etc.).
+
+**2. `apps/web/server/planning/service.ts`** — `mapWriteError`:
+- Firma: `(code: string, message?: string): Error`.
+- Añade `code === '22000'` al branch de `ScheduleValidationError`
+  (SQLSTATE 22000 = data exception → siempre validación).
+- Añade checks en `message` para `insufficient_role`/`no_membership`.
+- Call: `mapWriteError(res.errorCode, res.errorMessage)`.
+
+**3. `apps/web/app/(dashboard)/planning/new/actions.ts`** — `createScheduleAction`:
+- `import { AuthError } from '@/server/auth'`.
+- `console.error` con `estimateVersionId`, `errorName`, `errorMessage` (sin tokens/org).
+- `instanceof AuthError` → mensaje de sesión expirada o sin membresía.
+
+**4. `apps/web/tests/unit/planning/schedule-service.test.ts`** — 3 tests nuevos:
+- `createChapterMilestones=true` → milestones incluidos con `isMilestone=true, durationDays=0`.
+- `errorCode: '22000'` → lanza `ScheduleValidationError` (regresión del Bug B).
+- `errorCode: '42501'` → lanza `SchedulePermissionError`.
+
+### Validación (Fase 5)
+- **typecheck exit 0** (ningún tipo roto; `errorMessage?: string` compatible con callers existentes).
+- **suite 1718 passed / 42 skipped / 0 fail** (+3 nuevos sobre la base de 1715).
+- Sin migración. Sin db push. Sin cambios al esquema.
+
+### Deudas no abiertas en este hotfix
+- `SCHEDULE_ROLE_COMPRAS_SEPARATION_V2` (existente): la UI permite al rol `compras` (ViewerRole='internal')
+  llegar a `/planning/new`, pero el RPC lo rechazará con '42501'. Ahora producirá "No tienes permiso"
+  (correcto) en lugar del mensaje genérico.
+- El mensaje de `ScheduleValidationError` al usuario sigue siendo `No se pudo completar la
+  operación (22000)`. Mejorar con texto del mensaje RPC queda para `SCHEDULE_UX_ERRORS_V2`.
+
+### Próximo paso (tras release autorizado)
+- Merge a `main` + publicar `fix/schedule-create-prod-failure-v1`.
+- Revisión visual autenticada: crear cronograma ENTRE PATIOS con `createChapterMilestones=true`.
+- Verificar logs Vercel: buscar `[planning] createScheduleAction error` si vuelve a fallar.
+
+---
 - NO merge, NO deploy, NO db push remoto en este ciclo. **STOP.**
