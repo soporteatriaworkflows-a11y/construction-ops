@@ -57,18 +57,23 @@ import { selectActiveProjectId } from './select-active-project';
 /** Render en REQUEST-TIME (ver cabecera). Igual que `/projects` y `/projects/new`. */
 export const dynamic = 'force-dynamic';
 
-/** Acceso rápido del dashboard operativo (navegación, sin datos sensibles). */
+/**
+ * Acceso rápido del dashboard operativo (navegación, sin datos sensibles).
+ * Tile tipo "centro de control": ícono en placa de marca + etiqueta + flecha.
+ */
 function QuickLink({ href, label, icon }: { href: string; label: string; icon: React.ReactNode }) {
   return (
     <Link
       href={href}
-      className="group flex items-center justify-between rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium text-iconic-ink transition-colors hover:border-iconic-primary/40 hover:bg-brand-50"
+      className="group flex flex-col gap-2 rounded-xl border border-gray-200 bg-white p-3 transition-all hover:-translate-y-0.5 hover:border-iconic-primary/40 hover:shadow-iconic"
     >
-      <span className="inline-flex items-center gap-2">
-        <span className="text-iconic-primary">{icon}</span>
-        {label}
+      <span className="flex items-center justify-between">
+        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-50 text-iconic-primary transition-colors group-hover:bg-iconic-primary group-hover:text-white">
+          {icon}
+        </span>
+        <ArrowRight className="h-4 w-4 text-gray-300 transition-transform group-hover:translate-x-0.5 group-hover:text-iconic-primary" aria-hidden="true" />
       </span>
-      <ArrowRight className="h-4 w-4 text-gray-300 transition-transform group-hover:translate-x-0.5 group-hover:text-iconic-primary" aria-hidden="true" />
+      <span className="text-sm font-medium leading-tight text-iconic-ink">{label}</span>
     </Link>
   );
 }

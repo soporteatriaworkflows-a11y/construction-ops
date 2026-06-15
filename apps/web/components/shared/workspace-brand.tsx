@@ -9,20 +9,29 @@ import Image from 'next/image';
 import { cn } from '@/lib/utils/cn';
 import { getActiveWorkspace } from '@/lib/branding/workspace';
 
-/** Avatar/símbolo del workspace (tile blanco con el monograma ICONIC). */
+/**
+ * Avatar/símbolo del workspace (tile blanco con el logo ICONIC). El logo es la
+ * única capa visible: antes había un monograma absoluto DETRÁS de la imagen que
+ * se traslucía por las zonas transparentes del PNG (artefacto sobrepuesto).
+ */
 export function WorkspaceLogo({ size = 28, className }: { size?: number; className?: string }) {
   const ws = getActiveWorkspace();
   return (
     <span
       className={cn(
-        'relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white ring-1 ring-iconic-soft-blue',
+        'inline-flex shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white ring-1 ring-iconic-soft-blue',
         className,
       )}
       style={{ width: size, height: size }}
       aria-hidden="true"
     >
-      <span className="absolute text-[10px] font-bold text-iconic-ink">{ws.initials}</span>
-      <Image src={ws.logoSymbol} alt="" width={size} height={size} className="relative object-contain p-0.5" />
+      <Image
+        src={ws.logoSymbol}
+        alt=""
+        width={size}
+        height={size}
+        className="object-contain p-1"
+      />
     </span>
   );
 }

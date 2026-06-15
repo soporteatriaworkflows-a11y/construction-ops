@@ -46,8 +46,8 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   const actor = await resolveShellActor();
   return (
     <div className="flex min-h-screen bg-iconic-gray">
-      {/* Rail primario — azul noche ICONIC, refinado */}
-      <aside className="flex w-60 shrink-0 flex-col bg-iconic-ink" aria-label="Navegación principal">
+      {/* Rail primario — azul noche ICONIC, refinado. Sticky: acompaña el scroll. */}
+      <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col bg-iconic-ink" aria-label="Navegación principal">
         <div className="flex h-16 items-center border-b border-white/10 px-4">
           <WorkspaceBrand variant="sidebar" />
         </div>
