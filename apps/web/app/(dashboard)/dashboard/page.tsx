@@ -38,11 +38,14 @@ import {
   AlertTriangle,
   Clock,
   ClipboardCheck,
+  CheckCircle2,
+  CalendarRange,
 } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Button } from '@/components/ui/button';
-import { KpiCard, FinancialKpiCard } from '@/modules/dashboard/kpi-card';
+import { KpiCard } from '@/modules/dashboard/kpi-card';
+import { costSplitPct } from '@/modules/dashboard/visual-metrics';
 import { ChapterDistributionSection } from '@/modules/dashboard/chapter-distribution-section';
 import { SavingsSection } from '@/modules/dashboard/savings-section';
 import { getReadModel, resolveSource } from '@/server/read-model';
@@ -74,6 +77,58 @@ function QuickLink({ href, label, icon }: { href: string; label: string; icon: R
         <ArrowRight className="h-4 w-4 text-gray-300 transition-transform group-hover:translate-x-0.5 group-hover:text-iconic-primary" aria-hidden="true" />
       </span>
       <span className="text-sm font-medium leading-tight text-iconic-ink">{label}</span>
+    </Link>
+  );
+}
+
+/**
+ * Tarjeta de pendiente/alerta con estado vacío premium. `count`:
+ *  - `null`   → dato no disponible (neutro).
+ *  - `0`      → "todo al día" (verde, sin acción).
+ *  - `> 0`    → requiere acción (tono ámbar/rojo + enlace).
+ */
+function AlertCard({
+  href,
+  label,
+  count,
+  actionLabel,
+  clearLabel,
+  icon,
+  tone = 'amber',
+}: {
+  href: string;
+  label: string;
+  count: number | null;
+  actionLabel: string;
+  clearLabel: string;
+  icon: React.ReactNode;
+  tone?: 'amber' | 'red';
+}) {
+  const actionable = typeof count === 'number' && count > 0;
+  const toneRing = tone === 'red' ? 'border-red-200' : 'border-amber-200';
+  const toneText = tone === 'red' ? 'text-red-700' : 'text-amber-700';
+  const toneBg = tone === 'red' ? 'bg-red-50' : 'bg-amber-50';
+  return (
+    <Link
+      href={href}
+      className={`group flex items-center gap-3 rounded-xl border bg-white p-4 transition-all hover:-translate-y-0.5 hover:shadow-iconic ${actionable ? toneRing : 'border-gray-200'}`}
+    >
+      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${actionable ? toneBg : 'bg-green-50'}`}>
+        {actionable ? <span className={toneText}>{icon}</span> : <CheckCircle2 className="h-5 w-5 text-green-600" aria-hidden="true" />}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</p>
+        {count === null ? (
+          <p className="text-sm font-semibold text-gray-400">—</p>
+        ) : actionable ? (
+          <p className={`text-sm font-semibold ${toneText}`}>
+            <span className="tabular-nums">{count}</span> · {actionLabel}
+          </p>
+        ) : (
+          <p className="text-sm font-semibold text-green-700">{clearLabel}</p>
+        )}
+      </div>
+      <ArrowRight className="h-4 w-4 shrink-0 text-gray-300 transition-transform group-hover:translate-x-0.5 group-hover:text-iconic-primary" aria-hidden="true" />
     </Link>
   );
 }
@@ -212,25 +267,59 @@ export default async function DashboardPage() {
 
   const statusLabel =
     ESTIMATE_VERSION_STATUS_LABELS[summary.estimateStatus] ?? summary.estimateStatus;
+  const split = costSplitPct(summary.directCost, summary.budget);
 
   return (
     <div>
-      {/* Hero de marca ICONIC: bloque azul amplio + curva + detalle cian */}
+      {/* Hero ejecutivo — centro de control ICONIC (navy → azul, acento cian) */}
       <section
-        className="relative mb-6 overflow-hidden rounded-2xl px-6 py-7 text-white shadow-sm"
+        className="relative mb-6 overflow-hidden rounded-2xl px-6 py-7 text-white shadow-iconic"
         style={{ background: 'linear-gradient(120deg, #020148 0%, #013E97 55%, #005DD6 100%)' }}
       >
-        <svg className="pointer-events-none absolute inset-y-0 right-0 h-full w-1/2 text-white/10" viewBox="0 0 400 200" preserveAspectRatio="none" aria-hidden="true">
+        <svg className="pointer-events-none absolute inset-y-0 right-0 h-full w-2/3 text-white/[0.07]" viewBox="0 0 400 200" preserveAspectRatio="none" aria-hidden="true">
           <path d="M400,0 L400,200 L80,200 C260,140 120,60 400,0 Z" fill="currentColor" />
+          <circle cx="330" cy="48" r="120" fill="none" stroke="currentColor" strokeWidth="1.5" />
         </svg>
-        <div className="relative">
-          <p className="text-xs font-semibold uppercase tracking-wide text-iconic-soft-blue">Dashboard gerencial</p>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight">Resumen financiero del proyecto activo</h1>
-          <p className="mt-1 text-sm text-white/75">
-            Estado del presupuesto: <span className="font-semibold text-white">{statusLabel}</span>
-            {' · '}Actualizado {formatDateTime(summary.lastUpdatedAt)}
-          </p>
-          <span className="mt-4 inline-block h-1 w-14 rounded bg-iconic-cyan" aria-hidden="true" />
+        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-wide text-iconic-cyan">Centro de control</p>
+            <h1 className="mt-1 text-2xl font-bold tracking-tight">Resumen del proyecto activo</h1>
+            <div className="mt-3 flex flex-wrap items-end gap-x-6 gap-y-2">
+              <div>
+                <p className="text-[11px] font-medium uppercase tracking-wide text-iconic-soft-blue/80">Total presupuesto</p>
+                <p className="text-3xl font-bold tabular-nums">{formatCOP(summary.budget)}</p>
+              </div>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white ring-1 ring-inset ring-white/20">
+                <span className="h-1.5 w-1.5 rounded-full bg-iconic-cyan" aria-hidden="true" />
+                {statusLabel}
+              </span>
+            </div>
+            {/* Micro-barra de composición directo vs indirecto (presentación) */}
+            {split.directPct + split.indirectPct > 0 && (
+              <div className="mt-4 max-w-md">
+                <div className="flex h-2 w-full overflow-hidden rounded-full bg-white/15" aria-hidden="true">
+                  <span className="block h-full bg-iconic-cyan" style={{ width: `${split.directPct}%` }} />
+                  <span className="block h-full bg-white/45" style={{ width: `${split.indirectPct}%` }} />
+                </div>
+                <div className="mt-1.5 flex gap-4 text-[11px] text-white/70">
+                  <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-iconic-cyan" aria-hidden="true" />Directos {split.directPct}%</span>
+                  <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-sm bg-white/45" aria-hidden="true" />Indirectos (AIU) {split.indirectPct}%</span>
+                </div>
+              </div>
+            )}
+            <p className="mt-3 text-xs text-white/60">Actualizado {formatDateTime(summary.lastUpdatedAt)}</p>
+          </div>
+          <div className="flex shrink-0 flex-wrap gap-2">
+            <Button asChild size="sm" className="bg-white text-iconic-ink hover:bg-iconic-soft-blue">
+              <Link href={`/projects/${projectId}`}>Ver proyecto</Link>
+            </Button>
+            <Button asChild size="sm" variant="outline" className="border-white/40 bg-transparent text-white hover:bg-white/10">
+              <Link href="/planning"><CalendarRange className="h-4 w-4" aria-hidden="true" />Cronograma</Link>
+            </Button>
+            <Button asChild size="sm" variant="outline" className="border-white/40 bg-transparent text-white hover:bg-white/10">
+              <Link href="/catalog"><Package className="h-4 w-4" aria-hidden="true" />Catálogo</Link>
+            </Button>
+          </div>
         </div>
       </section>
 
@@ -244,13 +333,16 @@ export default async function DashboardPage() {
             value={formatCOP(summary.budget)}
             description="Costos directos + AIU"
             valueColor="text-iconic-ink"
+            accent="primary"
             icon={<DollarSign className="h-4 w-4 text-iconic-primary" />}
             iconBg="bg-brand-50"
+            bar={{ pct: split.directPct }}
           />
           <KpiCard
             title="Costos directos"
             value={formatCOP(summary.directCost)}
             description="Σ capítulos BOQ"
+            accent="green"
             icon={<TrendingUp className="h-4 w-4 text-green-700" />}
             iconBg="bg-green-50"
           />
@@ -258,6 +350,7 @@ export default async function DashboardPage() {
             title="Costos indirectos (AIU)"
             value={formatCOP(summary.indirectCost)}
             description="Administración + Imprevistos + Utilidad + IVA"
+            accent="amber"
             icon={<BarChart2 className="h-4 w-4 text-amber-700" />}
             iconBg="bg-amber-50"
           />
@@ -265,8 +358,9 @@ export default async function DashboardPage() {
             title="Estado del presupuesto"
             value={statusLabel}
             description={`Actualizado: ${formatDateTime(summary.lastUpdatedAt)}`}
-            icon={<Calendar className="h-4 w-4 text-purple-700" />}
-            iconBg="bg-purple-50"
+            accent="cyan"
+            icon={<Calendar className="h-4 w-4 text-iconic-primary" />}
+            iconBg="bg-brand-50"
           />
         </div>
       </section>
@@ -281,6 +375,7 @@ export default async function DashboardPage() {
             title="Proyectos"
             value={String(projectCount)}
             description="Visibles para tu organización"
+            accent="primary"
             icon={<FolderOpen className="h-4 w-4 text-iconic-primary" />}
             iconBg="bg-brand-50"
           />
@@ -288,6 +383,7 @@ export default async function DashboardPage() {
             title="Presupuestos activos"
             value={activeEstimateCount === null ? '—' : String(activeEstimateCount)}
             description="Presupuestos de trabajo vigentes"
+            accent="green"
             icon={<ClipboardList className="h-4 w-4 text-green-700" />}
             iconBg="bg-green-50"
           />
@@ -295,8 +391,9 @@ export default async function DashboardPage() {
             title="Versiones emitidas"
             value={issuedVersionCount === null ? '—' : String(issuedVersionCount)}
             description="Snapshots inmutables entregados"
-            icon={<Send className="h-4 w-4 text-purple-700" />}
-            iconBg="bg-purple-50"
+            accent="navy"
+            icon={<Send className="h-4 w-4 text-iconic-ink" />}
+            iconBg="bg-iconic-soft-blue/40"
           />
           {isAuthorizedForSavings && (
             <Link
@@ -308,6 +405,8 @@ export default async function DashboardPage() {
                 title="Precios por revisar"
                 value={pendingPriceCount === null ? '—' : String(pendingPriceCount)}
                 description="Observaciones pendientes — abrir revisión masiva"
+                accent={pendingPriceCount && pendingPriceCount > 0 ? 'amber' : 'green'}
+                valueColor={pendingPriceCount && pendingPriceCount > 0 ? 'text-amber-700' : 'text-iconic-ink'}
                 icon={<Tags className="h-4 w-4 text-amber-700" />}
                 iconBg="bg-amber-50"
               />
@@ -324,6 +423,7 @@ export default async function DashboardPage() {
                 title="Fuentes monitoreadas"
                 value={String(monitoringSummary.monitoredCount)}
                 description={`${monitoringSummary.activeCount} activas · ${monitoringSummary.pausedCount} pausadas`}
+                accent="primary"
                 icon={<Radar className="h-4 w-4 text-iconic-primary" />}
                 iconBg="bg-brand-50"
               />
@@ -331,6 +431,7 @@ export default async function DashboardPage() {
                 title="Cambios de precio pendientes"
                 value={String(monitoringSummary.pendingChangesCount)}
                 description="Detectados por el monitor, por revisar"
+                accent={monitoringSummary.pendingChangesCount > 0 ? 'amber' : 'green'}
                 valueColor={monitoringSummary.pendingChangesCount > 0 ? 'text-amber-700' : undefined}
                 icon={<TrendingUp className="h-4 w-4 text-amber-700" />}
                 iconBg="bg-amber-50"
@@ -339,6 +440,7 @@ export default async function DashboardPage() {
                 title="Fuentes con error"
                 value={String(monitoringSummary.erroredCount)}
                 description="3+ fallos consecutivos"
+                accent={monitoringSummary.erroredCount > 0 ? 'red' : 'green'}
                 valueColor={monitoringSummary.erroredCount > 0 ? 'text-red-700' : undefined}
                 icon={<AlertTriangle className="h-4 w-4 text-red-700" />}
                 iconBg="bg-red-50"
@@ -347,8 +449,9 @@ export default async function DashboardPage() {
                 title="Fuentes vencidas"
                 value={String(monitoringSummary.overdueCount)}
                 description="Pendientes de la próxima revisión"
-                icon={<Clock className="h-4 w-4 text-purple-700" />}
-                iconBg="bg-purple-50"
+                accent="navy"
+                icon={<Clock className="h-4 w-4 text-iconic-ink" />}
+                iconBg="bg-iconic-soft-blue/40"
               />
             </div>
           </div>
@@ -366,30 +469,40 @@ export default async function DashboardPage() {
       </section>
 
       {/* ------------------------------------------------------------------ */}
-      {/* Resumen financiero compacto                                          */}
+      {/* Pendientes y alertas — qué requiere acción (datos ya disponibles)    */}
       {/* ------------------------------------------------------------------ */}
-      <section aria-label="Desglose financiero" className="mt-6">
-        <h2 className="mb-4 text-base font-semibold text-gray-900">
-          Desglose financiero
-        </h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <FinancialKpiCard
-            title="Costos directos"
-            value={formatCOP(summary.directCost)}
-            valueColor="text-gray-900"
-          />
-          <FinancialKpiCard
-            title="Costos indirectos (AIU)"
-            value={formatCOP(summary.indirectCost)}
-            valueColor="text-gray-900"
-          />
-          <FinancialKpiCard
-            title="Total presupuesto"
-            value={formatCOP(summary.budget)}
-            valueColor="text-blue-700"
-          />
-        </div>
-      </section>
+      {isAuthorizedForSavings && (
+        <section aria-label="Pendientes y alertas" className="mt-6">
+          <h2 className="mb-4 text-base font-semibold text-gray-900">Pendientes y alertas</h2>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <AlertCard
+              href="/catalog/prices/review"
+              label="Precios por revisar"
+              count={pendingPriceCount}
+              actionLabel="observaciones por revisar"
+              clearLabel="Sin precios pendientes"
+              icon={<Tags className="h-5 w-5" aria-hidden="true" />}
+            />
+            <AlertCard
+              href="/catalog/monitoring"
+              label="Cambios de precio detectados"
+              count={monitoringSummary ? monitoringSummary.pendingChangesCount : null}
+              actionLabel="cambios por revisar"
+              clearLabel="Sin cambios pendientes"
+              icon={<TrendingUp className="h-5 w-5" aria-hidden="true" />}
+            />
+            <AlertCard
+              href="/catalog/monitoring"
+              label="Fuentes con error"
+              count={monitoringSummary ? monitoringSummary.erroredCount : null}
+              actionLabel="fuentes con fallos"
+              clearLabel="Sin fuentes con error"
+              icon={<AlertTriangle className="h-5 w-5" aria-hidden="true" />}
+              tone="red"
+            />
+          </div>
+        </section>
+      )}
 
       {/* ------------------------------------------------------------------ */}
       {/* Distribución por capítulo (Recharts)                                 */}
