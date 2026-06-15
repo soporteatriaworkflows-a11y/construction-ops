@@ -1,5 +1,70 @@
 # Handoff Log
 
+## 2026-06-14 — SCHEDULE_PREVIEW_CREATE_PROD_FIX_V2 — COMPLETA (Fases 0–7) (orchestrator)
+
+### Estado
+- Rama `fix/schedule-preview-create-prod-v2` @ `(pendiente commit)` (base `origin/main = 7693313`,
+  confirmada; **sin divergencia**). **Sin merge a main; sin deploy; sin db push
+  remoto; sin escrituras remotas; sin SMTP; sin correos; sin nueva feature.** Stashes intactos.
+  Producción intacta. Main intacta.
+
+### Problema raíz (3 causas independientes)
+1. **`mapWriteError` fallthrough**: códigos no reconocidos (ej. `PGRST202` — PostgREST
+   function-not-found) caían al `return new Error('schedule_write_failed: CODE')` que no
+   es instancia de `ScheduleValidationError` → `createScheduleAction` lo capturaba pero no
+   matcheaba ningún `instanceof` → mensaje genérico "No se pudo crear el cronograma. Inténtalo de nuevo."
+2. **Errores de lectura no tipados**: `loadGeneratorSource` lanza
+   `new Error('planning_version_read_failed: PGRST...')` que tampoco matcheaba ningún handler
+   tipado en `previewScheduleAction` → mismo mensaje genérico.
+3. **`nodemailer` warning en build**: `/* @vite-ignore */` es Vite-específico; Webpack/Turbopack
+   lo ignora → `Module not found: Can't resolve 'nodemailer'` en cada build.
+
+### Fixes implementados (5 archivos, sin migración)
+
+**`apps/web/server/planning/service.ts`**
+- `mapWriteError`: el fallthrough ahora devuelve `ScheduleValidationError` (no `Error` genérico)
+- Nueva `mapRpcValidationMessage(msg, code)`: mensajes específicos por código
+  (`invalid_tasks` → "El cronograma no tiene tareas válidas para crear";
+  `invalid_start_date` → "La fecha de inicio no es válida";
+  `estimate_version_not_found`/`project_not_found` → mensaje de proyecto/versión).
+
+**`apps/web/app/(dashboard)/planning/new/actions.ts`**
+- Nueva `toSafeErrorMessage(e, context)`: convierte cualquier error (tipado O genérico) en
+  mensaje de usuario seguro; maneja todos los prefijos `planning_*_read_failed` del repositorio.
+- Preview: check `stats.activityCount === 0` → `{ ok: false, error: '...' }` con mensaje específico.
+- `console.error` estructurado (nombre + mensaje; sin tokens ni secretos).
+
+**`apps/web/app/(dashboard)/planning/new/new-schedule-form.tsx`**
+- Botón "Crear cronograma" deshabilitado cuando `preview !== null && !preview.ok`
+  (evita crear con datos inválidos mientras el preview activo indica error).
+
+**`apps/web/server/email/smtp-provider.ts`**
+- `/* @vite-ignore */` → `/* webpackIgnore: true */` (magic comment correcto para Webpack/Turbopack).
+
+**`apps/web/next.config.mjs`**
+- `serverExternalPackages: ['nodemailer']` para excluir nodemailer del bundle estáticamente.
+
+### Validación (todo PASS, local)
+- typecheck 0 · lint 0 · **suite 1724 passed / 42 skipped / 0 fail** (+6 nuevos tests de servicio)
+- gm:regression 22/22 · build limpio (sin warning nodemailer) · `git diff --check` limpio
+- Planning tests: 68/68 · RLS harness: sin migraciones nuevas → no re-ejecutado (FORCE=41 sin cambio)
+
+### Tests nuevos (6) — `schedule-service.test.ts`
+1. PGRST202 → `ScheduleValidationError` (no `Error` genérico; mensaje contiene `SCHEDULE_CREATE_VALIDATION`)
+2. `22000` + `invalid_tasks` → mensaje "tareas válidas"
+3. `22000` + `invalid_start_date` → mensaje "fecha de inicio"
+4. `22000` + `estimate_version_not_found` → mensaje "proyecto y la versión"
+5. `23514` (check violation) → `ScheduleValidationError`
+6. Preview con `activityCount=0` devuelve `{ ok: false, error: '...' }`
+
+### Próximo paso
+1. Revisión visual autenticada: `/planning/new` crear cronograma ENTRE PATIOS con
+   `createChapterMilestones=true` → verificar preview útil + crear → confirmar redirect a `/planning/[id]`.
+2. Verificar que el warning de nodemailer desapareció en el siguiente deploy de Vercel.
+3. Release controlado (autorización aparte): merge a main + deploy (sin db push — sin migraciones).
+
+---
+
 ## 2026-06-14 — SCHEDULE_FROM_BOQ_V1 — COMPLETA (Fases 0–8) (orchestrator)
 
 ### Estado

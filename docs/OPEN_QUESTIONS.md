@@ -4,6 +4,14 @@
 
 _Sin blockers activos._
 
+> **Nota 2026-06-14 (SCHEDULE_PREVIEW_CREATE_PROD_FIX_V2):** 3 causas de fallo
+> silencioso en `/planning/new` resueltas: (1) `mapWriteError` fallthrough → ahora
+> siempre devuelve `ScheduleValidationError`; (2) errores de lectura del repo
+> `planning_*_read_failed` ahora cubiertos por `toSafeErrorMessage` en actions.ts;
+> (3) nodemailer warning eliminado del build (`webpackIgnore` + `serverExternalPackages`).
+> Sin blockers al cierre. Pendiente: revisión visual autenticada en producción tras
+> el siguiente release autorizado.
+
 > **Nota 2026-06-14 (SCHEDULE_FROM_BOQ_V1 — COMPLETA, Fases 0–8):** la
 > planificación se implementó **extendiendo la fundación 3B** (decisión aprobada).
 > Todas las fases completas, validadas y comiteadas (`c795b9f`→`3214ce6`); **rama

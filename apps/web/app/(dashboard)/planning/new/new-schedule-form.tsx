@@ -195,7 +195,11 @@ export function NewScheduleForm({ projects }: Props) {
         <Button type="button" variant="outline" onClick={runPreview} disabled={!canSubmit || isPending}>
           {isPending ? 'Calculando…' : 'Vista previa'}
         </Button>
-        <Button type="button" onClick={runCreate} disabled={!canSubmit || isPending}>
+        <Button
+          type="button"
+          onClick={runCreate}
+          disabled={!canSubmit || isPending || (preview !== null && !preview.ok)}
+        >
           Crear cronograma
         </Button>
       </div>

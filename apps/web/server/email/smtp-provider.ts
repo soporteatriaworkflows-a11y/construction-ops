@@ -43,10 +43,11 @@ export class SmtpEmailProvider implements EmailProvider {
   async send(message: EmailMessage): Promise<EmailSendResult> {
     let transport: MinimalTransport;
     try {
-      // Import dinámico OPCIONAL: el especificador es una variable para que el
-      // bundler no intente resolver `nodemailer` en build.
+      // webpackIgnore: true suprime el warning de Webpack/Turbopack cuando
+      // nodemailer no está instalado. La dependencia es OPCIONAL: si no existe
+      // el catch devuelve delivered:false y el llamador cae al LogEmailProvider.
       const moduleName = 'nodemailer';
-      const mod = (await import(/* @vite-ignore */ moduleName as string)) as {
+      const mod = (await import(/* webpackIgnore: true */ moduleName)) as {
         createTransport: (opts: unknown) => MinimalTransport;
       };
       transport = mod.createTransport({
