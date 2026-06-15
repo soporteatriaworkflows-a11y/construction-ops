@@ -16,6 +16,7 @@ import { PlanningSummary } from '@/components/planning/planning-summary';
 import { ScheduleTable } from '@/components/planning/schedule-table';
 import { GanttChart } from '@/components/planning/gantt-chart';
 import { ScheduleManagePanel, type EditableTask } from './schedule-manage-panel';
+import { ScheduleWorkspace, type WorkspaceTask } from './schedule-workspace';
 
 export const dynamic = 'force-dynamic';
 
@@ -77,6 +78,33 @@ export default async function ScheduleDetailPage({
     crewSize: t.crewSize,
   }));
 
+  // Tareas aplanadas para el workspace (UX Fase 1): combina el view-model (fechas,
+  // avance, brecha, holgura, crítica) con la trazabilidad cruda (tipo, capítulo,
+  // rendimiento, vínculos BOQ/APU). Sólo presentación; no recalcula nada.
+  const rawById = new Map(rawTasks.map((r) => [r.id, r]));
+  const workspaceTasks: WorkspaceTask[] = vm.tasks.map((t) => {
+    const r = rawById.get(t.id);
+    return {
+      id: t.id,
+      wbsCode: t.wbsCode, // ya viene en forma display desde el read-model
+      name: t.name,
+      parentTaskId: t.parentTaskId ?? null,
+      taskType: (r?.taskType as 'chapter' | 'activity' | 'milestone' | null) ?? null,
+      isMilestone: t.isMilestone,
+      plannedStart: t.plannedStart,
+      plannedEnd: t.plannedEnd,
+      plannedDurationDays: t.plannedDurationDays,
+      progressPct: t.progressPct,
+      status: t.status,
+      varianceStatus: t.varianceStatus,
+      totalFloatDays: t.totalFloatDays,
+      isCritical: t.isCritical,
+      productivitySource: r?.productivitySource ?? null,
+      apuTemplateId: r?.apuTemplateId ?? null,
+      boqItemId: r?.boqItemId ?? null,
+    };
+  });
+
   return (
     <div>
       <Link
@@ -105,14 +133,34 @@ export default async function ScheduleDetailPage({
         />
       </section>
 
-      <section aria-label="Diagrama de Gantt" className="mb-6">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-600">Diagrama de Gantt</h2>
-        <GanttChart tasks={ganttTasks} />
-      </section>
-
+      {/* Tareas y avance: workspace navegable (búsqueda/filtros/capítulos colapsables). */}
       <section aria-label="Tareas del cronograma" className="mb-6">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-600">Tareas y avance</h2>
-        <ScheduleTable tasks={vm.tasks} canSeeCriticalPath={canSeeCriticalPath} />
+        <ScheduleWorkspace tasks={workspaceTasks} canSeeCriticalPath={canSeeCriticalPath} />
+      </section>
+
+      {/* Gantt: pesado para 160 tareas; colapsado por defecto para aligerar la pantalla. */}
+      <section aria-label="Diagrama de Gantt" className="mb-6">
+        <details className="rounded-md border border-gray-200">
+          <summary className="cursor-pointer select-none px-3 py-2 text-sm font-semibold uppercase tracking-wide text-gray-600">
+            Diagrama de Gantt
+          </summary>
+          <div className="px-3 pb-3 pt-1">
+            <GanttChart tasks={ganttTasks} />
+          </div>
+        </details>
+      </section>
+
+      {/* Tabla detallada plan vs real (Esperado/Brecha): disponible, colapsada. */}
+      <section aria-label="Tabla detallada de avance" className="mb-6">
+        <details className="rounded-md border border-gray-200">
+          <summary className="cursor-pointer select-none px-3 py-2 text-sm font-semibold uppercase tracking-wide text-gray-600">
+            Tabla detallada (esperado / brecha)
+          </summary>
+          <div className="px-3 pb-3 pt-1">
+            <ScheduleTable tasks={vm.tasks} canSeeCriticalPath={canSeeCriticalPath} />
+          </div>
+        </details>
       </section>
 
       {/* Trazabilidad BOQ/APU + rendimiento + advertencias (read-only). */}
@@ -123,9 +171,16 @@ export default async function ScheduleDetailPage({
         const noYield = activities.filter((t) => t.productivitySource === 'unknown').length;
         return (
           <section aria-label="Trazabilidad y rendimiento" className="mb-6">
-            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-600">
-              Trazabilidad BOQ/APU y rendimiento
-            </h2>
+            <details className="rounded-md border border-gray-200">
+              <summary className="cursor-pointer select-none px-3 py-2 text-sm font-semibold uppercase tracking-wide text-gray-600">
+                Trazabilidad BOQ/APU y rendimiento
+                {(noApu > 0 || noYield > 0) && (
+                  <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                    {noApu + noYield} advertencia(s)
+                  </span>
+                )}
+              </summary>
+              <div className="px-3 pb-3 pt-1">
             {(noApu > 0 || noYield > 0) && (
               <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
                 {noApu > 0 && <span className="mr-3">⚠ {noApu} actividad(es) sin APU vinculado (duración manual).</span>}
@@ -167,6 +222,8 @@ export default async function ScheduleDetailPage({
                 </tbody>
               </table>
             </div>
+              </div>
+            </details>
           </section>
         );
       })()}
