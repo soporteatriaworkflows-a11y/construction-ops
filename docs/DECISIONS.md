@@ -257,3 +257,11 @@ Decisiones abiertas:
   dinámico) y fallback a Log. Secretos solo en el entorno, nunca en repo/remoto.
 - **D-ACC-7 — Desactivación de usuario activo: diferida** (`ACCESS_DEACTIVATION_V1`).
   No hay borrado físico de usuarios.
+
+- **D-PLAN-1 — Contrato de habilitación de /planning/new (form-gating puro).**
+  La lógica de habilitar/deshabilitar "Vista previa" y "Crear" vive en
+  `app/(dashboard)/planning/new/form-gating.ts` (sin React/DOM, testeable en node).
+  Vista previa = proyecto + versión + fecha válida (read-only, sin nombre, sin
+  depender de un preview/error previo). Crear = solo con `previewOk===true` +
+  nombre. Cuando algo está deshabilitado se muestra el motivo (nada de bloqueos
+  silenciosos). Cambiar entradas que afectan el cálculo invalida el preview.

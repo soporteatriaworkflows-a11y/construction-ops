@@ -319,3 +319,10 @@ _Sin blockers activos._
   se habilita un bootstrap controlado? Hoy ya existe un admin en producción; la
   cadena de invitaciones parte de él. Recomendación: documentar el bootstrap y no
   exponer creación de admin fuera de un admin existente (ya garantizado por RPC).
+
+### SCHEDULE_PROD_RUNTIME_ROOT_CAUSE_V3
+- Q-PLAN-1 (pendiente de evidencia de prod, read-only): si tras este fix el usuario
+  obtiene preview.ok pero "Crear" responde "No tienes permiso…", confirmar
+  `profiles.role` del usuario (¿`compras`?) y los conteos de capítulos/ítems de
+  "Versión 1" de ENTRE PATIOS antes de decidir si `compras` debe poder crear
+  cronogramas (cambio de contrato de permisos) o si la versión está vacía.
