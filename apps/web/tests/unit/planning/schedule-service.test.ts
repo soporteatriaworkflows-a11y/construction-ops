@@ -14,6 +14,7 @@ import {
   canViewSchedules,
   displayWbs,
   SchedulePermissionError,
+  ScheduleValidationError,
   type PlanningRepository,
   type GeneratorSourceRow,
   type ScheduleRow,
@@ -195,6 +196,47 @@ describe('createScheduleFromBoq', () => {
       SchedulePermissionError,
     );
     expect(calls.createScheduleFromBoq).not.toHaveBeenCalled();
+  });
+
+  it('incluye hitos de cierre por capítulo cuando createChapterMilestones=true', async () => {
+    const { repo, calls } = makeRepo();
+    const params = { ...baseParams, createChapterMilestones: true };
+    const id = await createScheduleFromBoq(viewer('internal'), params, repo);
+    expect(id).toBe('sched-1');
+    expect(calls.createScheduleFromBoq).toHaveBeenCalledTimes(1);
+    const payload = calls.createScheduleFromBoq.mock.calls[0]![0] as {
+      tasks: { taskType: string; isMilestone?: boolean; durationDays?: number }[];
+    };
+    const milestones = payload.tasks.filter((t) => t.taskType === 'milestone');
+    // fakeSource tiene 1 capítulo → 1 hito de cierre.
+    expect(milestones).toHaveLength(1);
+    expect(milestones.every((m) => m.isMilestone === true && m.durationDays === 0)).toBe(true);
+  });
+
+  it('lanza ScheduleValidationError cuando el repo devuelve errorCode 22000 (SQLSTATE data exception)', async () => {
+    const { repo } = makeRepo({
+      createScheduleFromBoq: vi.fn(async () => ({
+        scheduleId: '',
+        errorCode: '22000',
+        errorMessage: 'invalid_tasks',
+      })) as unknown as PlanningRepository['createScheduleFromBoq'],
+    });
+    await expect(
+      createScheduleFromBoq(viewer('internal'), baseParams, repo),
+    ).rejects.toBeInstanceOf(ScheduleValidationError);
+  });
+
+  it('lanza SchedulePermissionError cuando el repo devuelve errorCode 42501', async () => {
+    const { repo } = makeRepo({
+      createScheduleFromBoq: vi.fn(async () => ({
+        scheduleId: '',
+        errorCode: '42501',
+        errorMessage: 'insufficient_role',
+      })) as unknown as PlanningRepository['createScheduleFromBoq'],
+    });
+    await expect(
+      createScheduleFromBoq(viewer('internal'), baseParams, repo),
+    ).rejects.toBeInstanceOf(SchedulePermissionError);
   });
 });
 
