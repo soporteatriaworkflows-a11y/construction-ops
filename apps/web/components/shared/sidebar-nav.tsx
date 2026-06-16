@@ -55,16 +55,29 @@ function NavLink({
         href={href}
         aria-current={active ? 'page' : undefined}
         className={cn(
-          'relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iconic-cyan',
+          'group relative flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iconic-cyan',
           active
-            ? 'bg-iconic-primary text-white shadow-sm'
-            : 'text-iconic-soft-blue/90 hover:bg-white/10 hover:text-white',
+            ? 'bg-gradient-to-r from-iconic-primary to-iconic-primary/70 text-white ring-1 ring-inset ring-iconic-cyan/30'
+            : 'text-iconic-soft-blue/90 hover:bg-white/[0.07] hover:text-white',
         )}
+        style={active ? { boxShadow: '0 8px 20px -10px rgba(0,93,214,0.8)' } : undefined}
       >
         {active && (
-          <span className="absolute left-0 top-1/2 h-5 -translate-y-1/2 rounded-r bg-iconic-cyan" style={{ width: 3 }} aria-hidden="true" />
+          <span
+            className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r bg-iconic-cyan"
+            style={{ boxShadow: '0 0 8px 1px rgba(0,184,255,0.7)' }}
+            aria-hidden="true"
+          />
         )}
-        <Icon className={cn('h-4 w-4 shrink-0', active ? 'text-white' : 'text-iconic-soft-blue')} aria-hidden="true" />
+        <span
+          className={cn(
+            'flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors',
+            active ? 'bg-white/15' : 'bg-white/[0.04] group-hover:bg-white/10',
+          )}
+          aria-hidden="true"
+        >
+          <Icon className={cn('h-4 w-4', active ? 'text-white' : 'text-iconic-soft-blue')} />
+        </span>
         {label}
       </Link>
     </li>

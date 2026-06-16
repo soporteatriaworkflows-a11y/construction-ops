@@ -266,6 +266,11 @@ export default async function DashboardPage() {
     ESTIMATE_VERSION_STATUS_LABELS[summary.estimateStatus] ?? summary.estimateStatus;
   const split = costSplitPct(summary.directCost, summary.budget);
   const sparkValues = summary.chapterDistribution.map((s) => Number(s.share)).filter((n) => Number.isFinite(n));
+  // Capítulo de mayor peso (insight) — selección sobre shares YA calculados.
+  const topSlice = summary.chapterDistribution.reduce<(typeof summary.chapterDistribution)[number] | null>(
+    (best, s) => (best === null || Number(s.share) > Number(best.share) ? s : best),
+    null,
+  );
 
   return (
     <div>
@@ -294,9 +299,9 @@ export default async function DashboardPage() {
                 <p className="text-[11px] font-medium uppercase tracking-wide text-iconic-soft-blue/70">Total presupuesto</p>
                 <p className="text-4xl font-bold leading-none tabular-nums">{formatCOP(summary.budget)}</p>
               </div>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.06] px-3 py-1 text-xs font-medium text-white ring-1 ring-inset ring-iconic-cyan/30">
-                <span className="h-1.5 w-1.5 rounded-full bg-iconic-cyan" aria-hidden="true" style={{ boxShadow: '0 0 8px 1px rgba(0,184,255,0.8)' }} />
-                {statusLabel}
+              <span className="inline-flex items-center gap-2 rounded-lg bg-white/[0.06] px-3 py-1.5 text-xs text-white ring-1 ring-inset ring-white/15">
+                <span className="text-[10px] font-medium uppercase tracking-wider text-iconic-soft-blue/60">Estado</span>
+                <span className="font-semibold">{statusLabel}</span>
               </span>
             </div>
 
@@ -362,6 +367,31 @@ export default async function DashboardPage() {
       <section aria-label="Operación" className="mt-2">
         <h2 className="mb-4 text-base font-semibold text-gray-900">Operación</h2>
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {/* Insight card — personalidad propia (capítulo de mayor peso) */}
+          {topSlice && (
+            <div
+              className="relative col-span-2 overflow-hidden rounded-xl border border-iconic-soft-blue/70 p-4 shadow-iconic"
+              style={{ background: 'linear-gradient(120deg, #e8f1fd 0%, #ffffff 70%)' }}
+            >
+              <span className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-iconic-cyan/10" aria-hidden="true" />
+              <div className="relative flex items-start gap-3">
+                <IconPlate><TrendingUp className="h-5 w-5" aria-hidden="true" /></IconPlate>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-iconic-primary">Capítulo de mayor peso</p>
+                  <p className="mt-0.5 truncate text-sm font-bold text-iconic-ink">
+                    <span className="font-mono text-xs text-iconic-graphite/60">{topSlice.code}</span> {topSlice.name}
+                  </p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-iconic-soft-blue/40" aria-hidden="true">
+                      <span className="block h-full rounded-full bg-gradient-to-r from-iconic-primary to-iconic-cyan" style={{ width: `${Math.min(100, Math.round(Number(topSlice.share) * 100))}%` }} />
+                    </div>
+                    <span className="shrink-0 text-sm font-bold tabular-nums text-iconic-primary">{Math.round(Number(topSlice.share) * 100)}%</span>
+                  </div>
+                  <p className="mt-1 text-[11px] text-iconic-graphite/55">del costo directo del presupuesto activo</p>
+                </div>
+              </div>
+            </div>
+          )}
           <KpiCard
             title="Versiones emitidas"
             value={issuedVersionCount === null ? '—' : String(issuedVersionCount)}
