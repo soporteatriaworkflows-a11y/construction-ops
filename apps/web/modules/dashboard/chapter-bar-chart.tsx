@@ -20,22 +20,22 @@ import {
 import type { ChapterDistributionSlice } from '@/lib/contracts/read-model';
 import { formatCOP, formatPct } from '@/lib/utils/format';
 
-// Paleta de colores accesibles
+// Rampa ICONIC (navy → azul → cian). Coherente con la marca, sin arcoíris genérico.
 const COLORS = [
-  '#1d4ed8', // blue-700
-  '#15803d', // green-700
-  '#b45309', // amber-700
-  '#7c3aed', // violet-700
-  '#be185d', // pink-700
-  '#0891b2', // cyan-700
-  '#c2410c', // orange-700
-  '#4338ca', // indigo-700
-  '#047857', // emerald-700
-  '#9333ea', // purple-700
-  '#0e7490', // sky-700
-  '#b91c1c', // red-700
-  '#374151', // gray-700
-  '#065f46', // teal-700
+  '#005DD6', // iconic primary
+  '#00B8FF', // cyan
+  '#013E97', // deep blue
+  '#1E7FE0', // brand-400
+  '#020148', // ink
+  '#5AA6F0', // brand-300
+  '#0050BC', // brand-600
+  '#34557A', // graphite-blue
+  '#9FCBF5', // brand-200
+  '#012E73', // brand-800
+  '#7CC4F7',
+  '#1B1F3E', // graphite
+  '#0E5AA8',
+  '#C7DCED', // soft-blue
 ];
 
 interface ChartDataPoint {

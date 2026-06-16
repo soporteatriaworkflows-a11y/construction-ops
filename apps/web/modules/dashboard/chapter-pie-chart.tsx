@@ -18,14 +18,16 @@ import {
 import type { ChapterDistributionSlice } from '@/lib/contracts/read-model';
 import { formatCOP, formatPct } from '@/lib/utils/format';
 
+// Rampa ICONIC (navy → azul → cian) para el donut. "Otros" en soft-blue tenue.
 const COLORS = [
-  '#1d4ed8',
-  '#15803d',
-  '#b45309',
-  '#7c3aed',
-  '#be185d',
-  '#0891b2',
-  '#c2410c',
+  '#005DD6',
+  '#00B8FF',
+  '#013E97',
+  '#1E7FE0',
+  '#5AA6F0',
+  '#0050BC',
+  '#9FCBF5',
+  '#C7DCED',
 ];
 
 interface PieDataPoint {
@@ -125,9 +127,13 @@ export function ChapterPieChart({ data, topN = 7, height = 280 }: ChapterPieChar
             cx="40%"
             cy="50%"
             outerRadius={height / 2 - 20}
+            innerRadius={(height / 2 - 20) * 0.6}
+            paddingAngle={2}
+            cornerRadius={4}
             dataKey="value"
             nameKey="fullName"
-            stroke="none"
+            stroke="#ffffff"
+            strokeWidth={2}
           >
             {pieData.map((_, index) => (
               <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
