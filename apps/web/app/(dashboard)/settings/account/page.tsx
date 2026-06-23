@@ -6,7 +6,8 @@
  * inventa "último acceso" ni otros campos inexistentes.
  */
 import { getActiveWorkspace } from '@/lib/branding/workspace';
-import { ROLE_LABELS, initialsFromEmail } from '@/components/shared/account-menu';
+import { ROLE_LABELS } from '@/components/shared/account-menu';
+import { initialsFromEmail } from '@/app/(dashboard)/settings/_lib/account-display';
 import { resolveSettingsActor } from '@/app/(dashboard)/settings/_lib/resolve-settings-actor';
 import { Panel, InfoRow, SubSettingsHeader } from '@/app/(dashboard)/settings/_components/settings-ui';
 
