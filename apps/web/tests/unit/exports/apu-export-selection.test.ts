@@ -167,4 +167,50 @@ describe('APU export selection — dominio', () => {
     await resolveBudgetApuExportSelection(reader, 'e', undefined, deps);
     expect(JSON.stringify(links)).toBe(snapshot);
   });
+
+  // ── P1_EXPORT_APU_SELECTION_N_PLUS_ONE_PERFORMANCE_FIX ──
+  it('12. obtiene los detalles APU en paralelo acotado (mitiga el N+1 secuencial)', async () => {
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const links = [link(1, 1, 'a'), link(1, 2, 'b'), link(2, 1, 'c'), link(2, 2, 'd')];
+    const apus: Record<string, ApuDetail> = { a: apu('a'), b: apu('b'), c: apu('c'), d: apu('d') };
+    const deps: ApuExportSelectionDeps = {
+      getPayload: async () => payload(),
+      getApuLinks: async () => links,
+      getApuDetail: async (_v, id) => {
+        inFlight += 1;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        await new Promise((r) => setTimeout(r, 5));
+        inFlight -= 1;
+        return apus[id]!;
+      },
+    };
+    const sel = await resolveBudgetApuExportSelection(reader, 'e', undefined, deps);
+    // Orden BOQ preservado pese a la concurrencia (contrato §3–§6).
+    expect(sel.linkedApus.map((x) => x.apuTemplateId)).toEqual(['a', 'b', 'c', 'd']);
+    // Hubo solapamiento real (>1 en vuelo): ya no es estrictamente secuencial.
+    expect(maxInFlight).toBeGreaterThan(1);
+  });
+
+  it('13. en paralelo, un APU inaccesible se omite sin romper el anexo y preserva el orden', async () => {
+    // 'bad' no está en el mapa ⇒ getApuDetail lanza ⇒ se omite (sentinel null).
+    const links = [link(1, 1, 'a'), link(1, 2, 'bad'), link(2, 1, 'c')];
+    const sel = await resolveBudgetApuExportSelection(
+      reader,
+      'e',
+      undefined,
+      makeDeps(links, { a: apu('a'), c: apu('c') }),
+    );
+    expect(sel.linkedApus.map((x) => x.apuTemplateId)).toEqual(['a', 'c']);
+    expect(sel.counts.linkedApu).toBe(2);
+  });
+
+  it('14. la concurrencia se acota al número de APU vinculados (sin desbordar)', async () => {
+    // 1 solo APU vinculado ⇒ exactamente 1 llamada (pool no fuerza más workers).
+    const calls = { detail: [] as string[] };
+    const deps = makeDeps([link(1, 1, 'a')], { a: apu('a'), z: apu('z') }, 'draft', calls);
+    const sel = await resolveBudgetApuExportSelection(reader, 'e', undefined, deps);
+    expect(calls.detail).toEqual(['a']);
+    expect(sel.counts.linkedApu).toBe(1);
+  });
 });
