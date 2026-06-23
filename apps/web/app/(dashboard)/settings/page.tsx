@@ -1,133 +1,134 @@
 /**
- * /settings — Hub de configuración (ICONIC_OPS_UX_BLOCKERS_V1).
+ * /settings — Hub de Configuración (SETTINGS_PROFILE_ACCOUNT_V1).
  *
- * Server Component, request-time. SOLO presentación: muestra datos del actor YA
- * resueltos server-side (resolveAccessActor, solo lectura). No escribe nada, no
- * crea backend. Secciones aún no construidas se muestran como "Próximamente".
+ * Server Component, request-time. SOLO presentación + lectura de datos YA
+ * resueltos server-side (actor, workspace, modo de datos). No escribe nada, no
+ * crea backend. Hero de identidad + cards premium hacia sub-secciones read-only.
  * "Usuarios y accesos" enlaza /settings/access; "Cerrar sesión" enlaza /logout.
  */
 import Link from 'next/link';
-import {
-  User,
-  Building2,
-  Users,
-  SlidersHorizontal,
-  Palette,
-  ShieldCheck,
-  LogOut,
-  ChevronRight,
-} from 'lucide-react';
+import { LogOut, ChevronRight } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
-import { Badge } from '@/components/ui/badge';
 import { getActiveWorkspace } from '@/lib/branding/workspace';
-import { resolveAccessActor, canManageAccess } from '@/server/access';
+import { readModelModeLabel } from '@/lib/utils/mode-label';
 import { ROLE_LABELS, initialsFromEmail } from '@/components/shared/account-menu';
+import { resolveSettingsActor } from '@/app/(dashboard)/settings/_lib/resolve-settings-actor';
+import { buildSettingsSections } from '@/app/(dashboard)/settings/_lib/settings-sections';
+import { IconPlate, StatusChip, SETTINGS_ICONS } from '@/app/(dashboard)/settings/_components/settings-ui';
 
 export const dynamic = 'force-dynamic';
 
-async function resolveActor(): Promise<{ email: string | null; role: string | null; canManage: boolean }> {
-  try {
-    const a = await resolveAccessActor();
-    return { email: a.email ?? null, role: a.profileRole ?? null, canManage: canManageAccess(a.profileRole) };
-  } catch {
-    return { email: null, role: null, canManage: false };
-  }
-}
-
-interface SettingCard {
-  key: string;
-  title: string;
-  description: string;
-  icon: typeof User;
-  href?: string;
-  external?: boolean;
-  status: 'ready' | 'soon';
-}
-
 export default async function SettingsHubPage() {
   const ws = getActiveWorkspace();
-  const actor = await resolveActor();
+  const mode = readModelModeLabel();
+  const actor = await resolveSettingsActor();
   const roleLabel = actor.role ? ROLE_LABELS[actor.role] ?? actor.role : null;
-
-  const cards: SettingCard[] = [
-    { key: 'account', title: 'Mi cuenta', description: 'Tu perfil, correo y sesión.', icon: User, status: 'soon' },
-    { key: 'org', title: 'Organización', description: `${ws.workspaceName} · datos de la empresa.`, icon: Building2, status: 'soon' },
-    {
-      key: 'access',
-      title: 'Usuarios y accesos',
-      description: 'Invitaciones, roles y permisos del equipo.',
-      icon: Users,
-      href: actor.canManage ? '/settings/access' : undefined,
-      status: actor.canManage ? 'ready' : 'soon',
-    },
-    { key: 'prefs', title: 'Preferencias', description: 'Formato, idioma y opciones de visualización.', icon: SlidersHorizontal, status: 'soon' },
-    { key: 'branding', title: 'Branding', description: 'Logo y identidad del workspace.', icon: Palette, status: 'soon' },
-    { key: 'security', title: 'Seguridad', description: 'Sesiones, contraseña y autenticación.', icon: ShieldCheck, status: 'soon' },
-  ];
+  const sections = buildSettingsSections({ canManageAccess: actor.canManageAccess });
 
   return (
     <div>
-      <PageHeader title="Configuración" description="Cuenta, organización, accesos y preferencias del workspace." />
+      <PageHeader
+        eyebrow="Workspace"
+        title="Configuración"
+        description="Cuenta, organización, accesos y preferencias de ICONIC OPS."
+      />
 
-      {/* Tarjeta de identidad del usuario */}
-      <div className="mb-6 flex items-center gap-4 rounded-xl border border-iconic-soft-blue/60 bg-white p-4 shadow-iconic">
-        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-iconic-primary text-base font-semibold text-white">
-          {initialsFromEmail(actor.email)}
-        </span>
-        <div className="min-w-0">
-          <p className="truncate text-base font-semibold text-iconic-ink">{actor.email ?? 'Usuario'}</p>
-          <p className="truncate text-sm text-iconic-graphite/60">{ws.workspaceName}</p>
+      {/* Hero de identidad — panel navy con acento cian (jerarquía premium). */}
+      <section
+        className="mb-6 overflow-hidden rounded-2xl border border-white/10 text-white shadow-iconic"
+        style={{ background: 'linear-gradient(120deg, #020148 0%, #050a3a 55%, #0a1145 100%)' }}
+      >
+        <div className="flex flex-wrap items-center gap-4 p-5 sm:p-6">
+          <span
+            className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-lg font-semibold ring-1 ring-iconic-cyan/40"
+            aria-hidden="true"
+          >
+            {initialsFromEmail(actor.email)}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-lg font-semibold">{actor.email ?? 'Usuario'}</p>
+            <p className="mt-0.5 flex flex-wrap items-center gap-2 text-sm text-iconic-soft-blue/80">
+              <span className="truncate">{ws.workspaceName}</span>
+              {roleLabel && (
+                <span className="inline-flex items-center rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-medium text-white">
+                  {roleLabel}
+                </span>
+              )}
+            </p>
+          </div>
+          {/* Chip de modo de datos — refleja READ_MODEL_SOURCE sin exponerlo. */}
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-medium ring-1 ring-white/15">
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${mode.isFixture ? 'bg-amber-400' : 'bg-iconic-cyan'}`}
+              style={mode.isFixture ? undefined : { boxShadow: '0 0 6px 1px rgba(0,184,255,0.7)' }}
+              aria-hidden="true"
+            />
+            {mode.label}
+          </span>
         </div>
-        {roleLabel && (
-          <Badge variant="secondary" className="ml-auto shrink-0">{roleLabel}</Badge>
-        )}
-      </div>
+        <div className="flex flex-wrap items-center gap-2 border-t border-white/10 px-5 py-3 sm:px-6">
+          <Link
+            href="/settings/account"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iconic-cyan"
+          >
+            Ver mi cuenta <ChevronRight className="h-4 w-4" aria-hidden="true" />
+          </Link>
+          <a
+            href="/logout"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 px-3 py-1.5 text-sm font-medium text-iconic-soft-blue/90 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            <LogOut className="h-4 w-4" aria-hidden="true" /> Cerrar sesión
+          </a>
+        </div>
+      </section>
 
+      {/* Grid de secciones — cards premium, variadas por estado y acento. */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {cards.map((c) => {
-          const Icon = c.icon;
+        {sections.map((s) => {
+          const Icon = SETTINGS_ICONS[s.icon];
+          const navigable = Boolean(s.href);
+          const accentBorder =
+            s.tone === 'cyan' ? 'border-iconic-cyan/40' : s.tone === 'navy' ? 'border-iconic-primary/30' : 'border-iconic-soft-blue/60';
           const inner = (
             <div
-              className={`group flex h-full items-start gap-3 rounded-xl border p-4 transition-colors ${
-                c.href
-                  ? 'border-iconic-soft-blue/60 bg-white hover:border-iconic-primary/50 hover:shadow-iconic'
-                  : 'border-gray-200 bg-gray-50'
-              }`}
+              className={cnCard(navigable, accentBorder)}
             >
-              <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${c.href ? 'bg-brand-50 text-iconic-primary' : 'bg-gray-100 text-gray-400'}`}>
-                <Icon className="h-5 w-5" aria-hidden="true" />
-              </span>
+              <IconPlate icon={Icon} tone={navigable ? s.tone : 'plain'} />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <h2 className={`text-sm font-semibold ${c.href ? 'text-iconic-ink' : 'text-gray-500'}`}>{c.title}</h2>
-                  {c.status === 'soon' && (
-                    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-400">Próximamente</span>
-                  )}
+                  <h2 className={`text-sm font-semibold ${navigable ? 'text-iconic-ink' : 'text-gray-500'}`}>{s.title}</h2>
+                  <StatusChip status={s.status} />
                 </div>
-                <p className="mt-0.5 text-xs text-iconic-graphite/60">{c.description}</p>
+                <p className="mt-0.5 text-xs text-iconic-graphite/60">{s.description}</p>
               </div>
-              {c.href && <ChevronRight className="h-4 w-4 shrink-0 text-gray-300 group-hover:text-iconic-primary" aria-hidden="true" />}
+              {navigable && (
+                <ChevronRight className="h-4 w-4 shrink-0 text-iconic-soft-blue group-hover:text-iconic-primary" aria-hidden="true" />
+              )}
             </div>
           );
-          return c.href ? (
-            <Link key={c.key} href={c.href} className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iconic-primary rounded-xl">
+          return navigable ? (
+            <Link
+              key={s.key}
+              href={s.href!}
+              className="group rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iconic-primary"
+            >
               {inner}
             </Link>
           ) : (
-            <div key={c.key} aria-disabled="true">{inner}</div>
+            <div key={s.key} aria-disabled="true" className="group">
+              {inner}
+            </div>
           );
         })}
       </div>
-
-      {/* Cerrar sesión */}
-      <div className="mt-6">
-        <a
-          href="/logout"
-          className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
-        >
-          <LogOut className="h-4 w-4" aria-hidden="true" /> Cerrar sesión
-        </a>
-      </div>
     </div>
   );
+}
+
+/** Clase compuesta de la card (evita ternarios anidados en el JSX). */
+function cnCard(navigable: boolean, accentBorder: string): string {
+  return [
+    'flex h-full items-start gap-3 rounded-2xl border bg-white p-4 transition-all',
+    navigable ? `${accentBorder} hover:-translate-y-0.5 hover:shadow-iconic` : 'border-gray-200 bg-gray-50',
+  ].join(' ');
 }
