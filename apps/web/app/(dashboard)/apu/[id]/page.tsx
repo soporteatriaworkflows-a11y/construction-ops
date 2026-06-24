@@ -23,6 +23,7 @@ import {
   FACTOR_MICROCOPY,
   type WasteChipKind,
 } from '@/app/(dashboard)/apu/_lib/apu-factor-display';
+import { resolveLaborProductivityDisplay } from '@/app/(dashboard)/apu/_lib/apu-productivity-display';
 import { WasteOverrideControl } from './_components/waste-override-control';
 import { getReadModel } from '@/server/read-model';
 import { ApuNotFoundError } from '@/server/read-model/errors';
@@ -360,6 +361,13 @@ function ComponentesTab({
                   wastePct: c.wastePct,
                   apuOriginType: detail.originType,
                 });
+                // V1A read-only: capa pedagógica de rendimiento/cuadrilla para
+                // filas de M.O. No edita ni altera la cantidad/cálculo.
+                const productivity = resolveLaborProductivityDisplay({
+                  componentType: c.componentType,
+                  quantity: c.quantity,
+                  quantityText: formatNumber(c.quantity, 4),
+                });
                 return (
                   <tr key={c.id} className="border-b last:border-b-0 align-top">
                     <td className="py-2 pr-3">
@@ -373,7 +381,31 @@ function ComponentesTab({
                         </span>
                       )}
                     </td>
-                    <td className="py-2 pr-3 text-right tabular-nums">{formatNumber(c.quantity, 4)}</td>
+                    <td className="py-2 pr-3 text-right align-top">
+                      <span className="tabular-nums">{formatNumber(c.quantity, 4)}</span>
+                      {productivity.applies && (
+                        <span className="mt-1 flex flex-col items-end gap-0.5 text-right">
+                          <span className="inline-flex items-center rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 ring-1 ring-inset ring-slate-400/20">
+                            {productivity.chipLabel}
+                          </span>
+                          {productivity.description && (
+                            <span className="text-[10px] leading-tight text-gray-400">
+                              {productivity.description}
+                            </span>
+                          )}
+                          {productivity.quantityLabel && (
+                            <span className="text-[10px] leading-tight text-gray-400">
+                              {productivity.quantityLabel}
+                            </span>
+                          )}
+                          {productivity.futureNote && (
+                            <span className="text-[10px] leading-tight text-gray-300">
+                              {productivity.futureNote}
+                            </span>
+                          )}
+                        </span>
+                      )}
+                    </td>
                     <td className="py-2 pr-3 text-right">
                       <span className="tabular-nums">
                         {c.wastePct === '0' ? '—' : formatPct(c.wastePct)}
