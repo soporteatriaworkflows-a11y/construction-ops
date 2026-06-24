@@ -434,6 +434,22 @@ export const apuComponents = pgTable(
     wastePctUpdatedBy: uuid("waste_pct_updated_by").references(() => profiles.id, {
       onDelete: "set null",
     }),
+    // APU_PRODUCTIVITY_CREW_OVERRIDES_V1B (mig. 20260624090000): override trazable
+    // de rendimiento/cuadrilla para filas labor. Todas NULLABLE (aditivo). NULL ⇒
+    // heredado (quantity sigue siendo la verdad efectiva). NO altera el cálculo
+    // existente; la edición se activa en una fase posterior (V1C).
+    recommendedLaborQuantity: money("recommended_labor_quantity"),
+    recommendedProductivity: money("recommended_productivity"),
+    appliedProductivity: money("applied_productivity"),
+    productivityUnit: text("productivity_unit"),
+    recommendedCrewSize: money("recommended_crew_size"),
+    appliedCrewSize: money("applied_crew_size"),
+    productivitySource: text("productivity_source"),
+    productivityNote: text("productivity_note"),
+    productivityUpdatedAt: timestamp("productivity_updated_at", { withTimezone: true }),
+    productivityUpdatedBy: uuid("productivity_updated_by").references(() => profiles.id, {
+      onDelete: "set null",
+    }),
     unitPriceSource: text("unit_price_source").notNull(),
     unitPriceSnapshot: money("unit_price_snapshot").notNull(),
     totalComponentCost: money("total_component_cost").notNull(),

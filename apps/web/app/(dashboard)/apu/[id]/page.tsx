@@ -23,7 +23,9 @@ import {
   FACTOR_MICROCOPY,
   type WasteChipKind,
 } from '@/app/(dashboard)/apu/_lib/apu-factor-display';
+import { resolveLaborProductivityDisplay } from '@/app/(dashboard)/apu/_lib/apu-productivity-display';
 import { WasteOverrideControl } from './_components/waste-override-control';
+import { ProductivityOverrideControl } from './_components/productivity-override-control';
 import { getReadModel } from '@/server/read-model';
 import { ApuNotFoundError } from '@/server/read-model/errors';
 import { resolveViewer } from '@/server/auth/resolve-viewer';
@@ -360,6 +362,13 @@ function ComponentesTab({
                   wastePct: c.wastePct,
                   apuOriginType: detail.originType,
                 });
+                // V1A read-only: capa pedagógica de rendimiento/cuadrilla para
+                // filas de M.O. No edita ni altera la cantidad/cálculo.
+                const productivity = resolveLaborProductivityDisplay({
+                  componentType: c.componentType,
+                  quantity: c.quantity,
+                  quantityText: formatNumber(c.quantity, 4),
+                });
                 return (
                   <tr key={c.id} className="border-b last:border-b-0 align-top">
                     <td className="py-2 pr-3">
@@ -373,7 +382,28 @@ function ComponentesTab({
                         </span>
                       )}
                     </td>
-                    <td className="py-2 pr-3 text-right tabular-nums">{formatNumber(c.quantity, 4)}</td>
+                    <td className="py-2 pr-3 text-right align-top">
+                      <span className="tabular-nums">{formatNumber(c.quantity, 4)}</span>
+                      {productivity.applies && (
+                        <span className="mt-1 flex flex-col items-end gap-0.5 text-right">
+                          {productivity.quantityLabel && (
+                            <span className="text-[10px] leading-tight text-gray-400">
+                              {productivity.quantityLabel}
+                            </span>
+                          )}
+                          {/* V1C: edición controlada de rendimiento (solo M.O.). */}
+                          <ProductivityOverrideControl
+                            apuId={detail.id}
+                            componentId={c.id}
+                            quantity={c.quantity}
+                            quantityText={formatNumber(c.quantity, 4)}
+                            recommendedLaborQuantity={c.recommendedLaborQuantity ?? null}
+                            productivitySource={c.productivitySource ?? null}
+                            canEdit={canEditWaste}
+                          />
+                        </span>
+                      )}
+                    </td>
                     <td className="py-2 pr-3 text-right">
                       <span className="tabular-nums">
                         {c.wastePct === '0' ? '—' : formatPct(c.wastePct)}

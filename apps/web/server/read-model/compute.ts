@@ -352,6 +352,15 @@ export interface RawApuComponent {
   recommendedWastePct?: DecimalString | null;
   wastePctSource?: string | null;
   wastePctNote?: string | null;
+  // APU_PRODUCTIVITY_CREW_OVERRIDES_V1C (aditivo, nullable). NULL ⇒ heredado.
+  recommendedLaborQuantity?: DecimalString | null;
+  recommendedProductivity?: DecimalString | null;
+  appliedProductivity?: DecimalString | null;
+  productivityUnit?: string | null;
+  recommendedCrewSize?: DecimalString | null;
+  appliedCrewSize?: DecimalString | null;
+  productivitySource?: string | null;
+  productivityNote?: string | null;
 }
 
 /**
@@ -388,6 +397,14 @@ export function computeApuDetail(
     ...(c.recommendedWastePct != null ? { wastePctRecommended: c.recommendedWastePct } : {}),
     ...(c.wastePctSource ? { wastePctSource: c.wastePctSource } : {}),
     ...(c.wastePctNote ? { wastePctNote: c.wastePctNote } : {}),
+    ...(c.recommendedLaborQuantity != null ? { recommendedLaborQuantity: c.recommendedLaborQuantity } : {}),
+    ...(c.recommendedProductivity != null ? { recommendedProductivity: c.recommendedProductivity } : {}),
+    ...(c.appliedProductivity != null ? { appliedProductivity: c.appliedProductivity } : {}),
+    ...(c.productivityUnit ? { productivityUnit: c.productivityUnit } : {}),
+    ...(c.recommendedCrewSize != null ? { recommendedCrewSize: c.recommendedCrewSize } : {}),
+    ...(c.appliedCrewSize != null ? { appliedCrewSize: c.appliedCrewSize } : {}),
+    ...(c.productivitySource ? { productivitySource: c.productivitySource } : {}),
+    ...(c.productivityNote ? { productivityNote: c.productivityNote } : {}),
     unitPriceSnapshot: c.unitPriceSnapshot,
     totalComponentCost: c.totalComponentCost,
     sortOrder: c.sortOrder,
