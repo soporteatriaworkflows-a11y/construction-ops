@@ -25,6 +25,7 @@ import {
 } from '@/app/(dashboard)/apu/_lib/apu-factor-display';
 import { resolveLaborProductivityDisplay } from '@/app/(dashboard)/apu/_lib/apu-productivity-display';
 import { WasteOverrideControl } from './_components/waste-override-control';
+import { ProductivityOverrideControl } from './_components/productivity-override-control';
 import { getReadModel } from '@/server/read-model';
 import { ApuNotFoundError } from '@/server/read-model/errors';
 import { resolveViewer } from '@/server/auth/resolve-viewer';
@@ -385,24 +386,21 @@ function ComponentesTab({
                       <span className="tabular-nums">{formatNumber(c.quantity, 4)}</span>
                       {productivity.applies && (
                         <span className="mt-1 flex flex-col items-end gap-0.5 text-right">
-                          <span className="inline-flex items-center rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 ring-1 ring-inset ring-slate-400/20">
-                            {productivity.chipLabel}
-                          </span>
-                          {productivity.description && (
-                            <span className="text-[10px] leading-tight text-gray-400">
-                              {productivity.description}
-                            </span>
-                          )}
                           {productivity.quantityLabel && (
                             <span className="text-[10px] leading-tight text-gray-400">
                               {productivity.quantityLabel}
                             </span>
                           )}
-                          {productivity.futureNote && (
-                            <span className="text-[10px] leading-tight text-gray-300">
-                              {productivity.futureNote}
-                            </span>
-                          )}
+                          {/* V1C: edición controlada de rendimiento (solo M.O.). */}
+                          <ProductivityOverrideControl
+                            apuId={detail.id}
+                            componentId={c.id}
+                            quantity={c.quantity}
+                            quantityText={formatNumber(c.quantity, 4)}
+                            recommendedLaborQuantity={c.recommendedLaborQuantity ?? null}
+                            productivitySource={c.productivitySource ?? null}
+                            canEdit={canEditWaste}
+                          />
                         </span>
                       )}
                     </td>

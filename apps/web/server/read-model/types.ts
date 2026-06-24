@@ -88,6 +88,8 @@ export const INTERNAL_APU_COMPONENT_FIELDS = [
   'laborRoleName',
   // V1B: la justificación del override es interna (NO a rol client).
   'wastePctNote',
+  // V1C: la justificación del override de rendimiento es interna (NO a rol client).
+  'productivityNote',
 ] as const satisfies ReadonlyArray<keyof ApuComponentView>;
 
 /**
