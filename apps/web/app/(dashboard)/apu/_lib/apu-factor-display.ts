@@ -122,3 +122,55 @@ export function formatFractionPct(fraction: number): string {
 export function formatSuggestedRange(range: { min: number; max: number }): string {
   return `${formatFractionPct(range.min)} – ${formatFractionPct(range.max)}`;
 }
+
+/* ----------------------------------------------------------------------------
+ * V1B — Lógica read-side de override de desperdicio (recomendado vs aplicado).
+ * PURA, sin DB. El valor APLICADO sigue siendo la verdad del motor; el
+ * RECOMENDADO se persiste en V1B (columna `recommended_waste_pct`). Mientras la
+ * migración no esté aplicada, `recommended` llega `undefined` ⇒ fallback = aplicado.
+ * ------------------------------------------------------------------------- */
+
+/**
+ * Resuelve el desperdicio recomendado: si no hay recomendado persistido
+ * (`undefined`/`null`), el recomendado ES el aplicado (fallback contractual). PURA.
+ */
+export function resolveRecommendedWaste(
+  applied: DecimalString,
+  recommended?: DecimalString | null,
+): DecimalString {
+  return recommended === undefined || recommended === null ? applied : recommended;
+}
+
+/** ¿El aplicado difiere del recomendado (override real)? PURA. */
+export function isWastePctOverridden(
+  applied: DecimalString,
+  recommended?: DecimalString | null,
+): boolean {
+  return toNumberSafe(applied) !== toNumberSafe(resolveRecommendedWaste(applied, recommended));
+}
+
+/** Delta aplicado − recomendado, como fracción numérica. PURA. */
+export function wastePctDelta(
+  applied: DecimalString,
+  recommended?: DecimalString | null,
+): number {
+  return toNumberSafe(applied) - toNumberSafe(resolveRecommendedWaste(applied, recommended));
+}
+
+/**
+ * ¿Se puede EDITAR el desperdicio de un componente? PURA (espejo de los guards
+ * server/RPC; la barrera REAL es la RPC SECURITY DEFINER + RLS). Por seguridad,
+ * ante cualquier duda devuelve `false` (no editable).
+ */
+export function canEditWastePct(input: {
+  /** Modo creación habilitado (APP_AUTH_MODE=supabase + READ_MODEL_SOURCE=db). */
+  creationMode: boolean;
+  /** Rol del viewer (gating: management/internal). */
+  role: string;
+  /** APU archivado ⇒ NO editable. */
+  archived: boolean;
+}): boolean {
+  if (!input.creationMode) return false;
+  if (input.archived) return false;
+  return input.role === 'management' || input.role === 'internal';
+}
