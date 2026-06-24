@@ -186,6 +186,14 @@ export interface ApuComponentView {
   productivitySource?: string | null;
   /** 🔒 Justificación interna del ajuste de rendimiento (NO a rol client). */
   productivityNote?: string | null;
+  /* APU_MATERIAL_CONSUMPTION_OVERRIDES_V1 — metadata read-only del consumo material
+   * (filas material). NULL/ausente ⇒ heredado; `quantity` sigue siendo la verdad. */
+  /** Consumo unitario recomendado congelado (material). */
+  recommendedMaterialQuantity?: DecimalString | null;
+  /** Origen del consumo: 'manual' | 'reset' | 'imported' | 'suggested' | null. */
+  materialQuantitySource?: string | null;
+  /** 🔒 Justificación interna del ajuste de consumo (NO a rol client). */
+  materialQuantityNote?: string | null;
   unitPriceSnapshot: DecimalString;
   totalComponentCost: DecimalString;
   sortOrder: number;
