@@ -86,6 +86,8 @@ export function projectDashboardForRole(
 export const INTERNAL_APU_COMPONENT_FIELDS = [
   'laborRoleCode',
   'laborRoleName',
+  // V1B: la justificación del override es interna (NO a rol client).
+  'wastePctNote',
 ] as const satisfies ReadonlyArray<keyof ApuComponentView>;
 
 /**

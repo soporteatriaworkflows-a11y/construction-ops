@@ -19,9 +19,11 @@ import { formatCOP, formatDateTime, formatNumber, formatPct } from '@/lib/utils/
 import {
   describeWasteFactor,
   formatSuggestedRange,
+  resolveRecommendedWaste,
   FACTOR_MICROCOPY,
   type WasteChipKind,
 } from '@/app/(dashboard)/apu/_lib/apu-factor-display';
+import { WasteOverrideControl } from './_components/waste-override-control';
 import { getReadModel } from '@/server/read-model';
 import { ApuNotFoundError } from '@/server/read-model/errors';
 import { resolveViewer } from '@/server/auth/resolve-viewer';
@@ -234,7 +236,11 @@ export default async function ApuDetailPage({ params, searchParams }: PageProps)
 
       {tab === 'resumen' && <ResumenTab detail={detail} pendingCount={pendingCount} origin={batchName} />}
       {tab === 'componentes' && (
-        <ComponentesTab detail={detail} reconByComponent={reconByComponent} />
+        <ComponentesTab
+          detail={detail}
+          reconByComponent={reconByComponent}
+          canEditWaste={canMutate && !Boolean(detail.archivedAt)}
+        />
       )}
       {tab === 'boq' && <BoqTab links={boqLinks} canMutate={canMutate} />}
       {tab === 'trazabilidad' && (
@@ -316,9 +322,11 @@ function ResumenTab({
 function ComponentesTab({
   detail,
   reconByComponent,
+  canEditWaste,
 }: {
   detail: ApuDetail;
   reconByComponent: Map<string, ReconciliationRow>;
+  canEditWaste: boolean;
 }) {
   return (
     <Card>
@@ -390,6 +398,19 @@ function ComponentesTab({
                               ⚠ Fuera de rango
                             </span>
                           )}
+                        </span>
+                      )}
+                      {/* V1B: edición controlada del desperdicio (solo material/otros). */}
+                      {waste.applies && (
+                        <span className="mt-1 flex justify-end">
+                          <WasteOverrideControl
+                            apuId={detail.id}
+                            componentId={c.id}
+                            applied={c.wastePct}
+                            recommended={resolveRecommendedWaste(c.wastePct, c.wastePctRecommended)}
+                            suggestedRange={waste.suggestedRange}
+                            canEdit={canEditWaste}
+                          />
                         </span>
                       )}
                     </td>

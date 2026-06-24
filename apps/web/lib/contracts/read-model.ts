@@ -159,8 +159,14 @@ export interface ApuComponentView {
   laborRoleName?: string;
   /** Rendimiento/consumo por unidad de actividad del APU. */
   quantity: DecimalString;
-  /** Desperdicio como fracción (p. ej. "0.08"). */
+  /** Desperdicio como fracción (p. ej. "0.08"). Valor APLICADO (efectivo). */
   wastePct: DecimalString;
+  /** APU_SMART_DEFAULTS_V1B: desperdicio recomendado. Ausente ⇒ recommended = wastePct. */
+  wastePctRecommended?: DecimalString | null;
+  /** Origen del valor de desperdicio: 'recommended' | 'manual' | 'excel'. */
+  wastePctSource?: string | null;
+  /** 🔒 Justificación interna del ajuste (NO a rol client). */
+  wastePctNote?: string | null;
   unitPriceSnapshot: DecimalString;
   totalComponentCost: DecimalString;
   sortOrder: number;
