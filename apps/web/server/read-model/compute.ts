@@ -348,6 +348,10 @@ export interface RawApuComponent {
   unitPriceSnapshot: DecimalString;
   totalComponentCost: DecimalString;
   sortOrder: number;
+  // APU_SMART_DEFAULTS_V1B (aditivo, nullable). NULL ⇒ recommended = wastePct.
+  recommendedWastePct?: DecimalString | null;
+  wastePctSource?: string | null;
+  wastePctNote?: string | null;
 }
 
 /**
@@ -381,6 +385,9 @@ export function computeApuDetail(
     ...(c.laborRoleName ? { laborRoleName: c.laborRoleName } : {}),
     quantity: c.quantity,
     wastePct: c.wastePct,
+    ...(c.recommendedWastePct != null ? { wastePctRecommended: c.recommendedWastePct } : {}),
+    ...(c.wastePctSource ? { wastePctSource: c.wastePctSource } : {}),
+    ...(c.wastePctNote ? { wastePctNote: c.wastePctNote } : {}),
     unitPriceSnapshot: c.unitPriceSnapshot,
     totalComponentCost: c.totalComponentCost,
     sortOrder: c.sortOrder,

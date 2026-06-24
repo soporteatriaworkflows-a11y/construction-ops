@@ -425,6 +425,15 @@ export const apuComponents = pgTable(
     componentType: text("component_type").notNull(),
     quantity: money("quantity").notNull(),
     wastePct: money("waste_pct").notNull().default("0"),
+    // APU_SMART_DEFAULTS_V1B (mig. 20260623090000): override trazable de
+    // desperdicio. Todas NULLABLE (aditivo); NULL ⇒ recommended = waste_pct.
+    recommendedWastePct: money("recommended_waste_pct"),
+    wastePctSource: text("waste_pct_source"),
+    wastePctNote: text("waste_pct_note"),
+    wastePctUpdatedAt: timestamp("waste_pct_updated_at", { withTimezone: true }),
+    wastePctUpdatedBy: uuid("waste_pct_updated_by").references(() => profiles.id, {
+      onDelete: "set null",
+    }),
     unitPriceSource: text("unit_price_source").notNull(),
     unitPriceSnapshot: money("unit_price_snapshot").notNull(),
     totalComponentCost: money("total_component_cost").notNull(),
