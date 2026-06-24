@@ -115,3 +115,57 @@ export function resolveLaborProductivityDisplay(input: {
     quantityLabel: usable && quantityText ? formattedQuantityLabel(quantityText) : null,
   };
 }
+
+/* ----------------------------------------------------------------------------
+ * V1B — Estado del override de rendimiento (read-side). PURO, sin DB. Refleja la
+ * metadata persistida por la migración aditiva (NULL = heredado). La edición NO
+ * está activa todavía (llega en V1C); esto solo describe el estado para la UI.
+ * ------------------------------------------------------------------------- */
+
+/**
+ * Estado del override de rendimiento de un componente, derivado de la metadata
+ * persistida (`productivity_source`) y el tipo:
+ *  - `not_applicable` → no es labor.
+ *  - `manual`         → override aplicado por experto (`source = 'manual'`).
+ *  - `reset`          → restaurado al recomendado (`source = 'reset'`).
+ *  - `inherited`      → labor con cantidad usable y sin override (source NULL).
+ *  - `unavailable`    → labor sin cantidad usable y sin override.
+ */
+export type ProductivityOverrideStatus =
+  | 'not_applicable'
+  | 'manual'
+  | 'reset'
+  | 'inherited'
+  | 'unavailable';
+
+/** Deriva el estado del override de rendimiento. PURA (no edita ni recalcula). */
+export function resolveProductivityOverrideStatus(input: {
+  componentType: ApuComponentType;
+  quantity: DecimalString;
+  productivitySource?: string | null;
+}): ProductivityOverrideStatus {
+  if (input.componentType !== 'labor') return 'not_applicable';
+  if (input.productivitySource === 'manual') return 'manual';
+  if (input.productivitySource === 'reset') return 'reset';
+  const n = Number(input.quantity);
+  return Number.isFinite(n) && n > 0 ? 'inherited' : 'unavailable';
+}
+
+/** Texto de presentación de un valor de rendimiento + unidad. PURA. */
+export function formatProductivityDisplay(
+  value: DecimalString | null | undefined,
+  unit?: string | null,
+): string {
+  if (value === null || value === undefined || value === '') return 'No disponible';
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return 'No disponible';
+  const num = Number.isInteger(n) ? n.toFixed(0) : n.toFixed(4).replace(/0+$/, '').replace(/\.$/, '');
+  switch (unit) {
+    case 'unit_per_crew_day':
+      return `${num} unidades / día de cuadrilla`;
+    case 'person_day_per_unit':
+      return `${num} persona·día / unidad`;
+    default:
+      return num;
+  }
+}

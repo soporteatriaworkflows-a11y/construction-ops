@@ -167,6 +167,25 @@ export interface ApuComponentView {
   wastePctSource?: string | null;
   /** 🔒 Justificación interna del ajuste (NO a rol client). */
   wastePctNote?: string | null;
+  /* APU_PRODUCTIVITY_CREW_OVERRIDES_V1B — metadata read-only de rendimiento/cuadrilla
+   * (filas labor). Opcionales: el repositorio NO las pobla todavía (edición en V1C).
+   * NULL/ausente ⇒ heredado; `quantity` sigue siendo la verdad efectiva. */
+  /** Consumo laboral recomendado congelado (persona·día/unidad). */
+  recommendedLaborQuantity?: DecimalString | null;
+  /** Rendimiento recomendado (unidades/día de cuadrilla), si derivable. */
+  recommendedProductivity?: DecimalString | null;
+  /** Rendimiento aplicado por el experto. */
+  appliedProductivity?: DecimalString | null;
+  /** Unidad del rendimiento: 'person_day_per_unit' | 'unit_per_crew_day'. */
+  productivityUnit?: string | null;
+  /** Tamaño de cuadrilla recomendado (personas). */
+  recommendedCrewSize?: DecimalString | null;
+  /** Tamaño de cuadrilla aplicado (personas). */
+  appliedCrewSize?: DecimalString | null;
+  /** Origen del valor de rendimiento: 'manual' | 'reset' | null (heredado). */
+  productivitySource?: string | null;
+  /** 🔒 Justificación interna del ajuste de rendimiento (NO a rol client). */
+  productivityNote?: string | null;
   unitPriceSnapshot: DecimalString;
   totalComponentCost: DecimalString;
   sortOrder: number;
