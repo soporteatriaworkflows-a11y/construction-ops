@@ -83,7 +83,9 @@ describe('updateApuComponentLaborProductivityOverride — RPC', () => {
   it('NO envía p_waste_pct ni p_unit_price (no toca desperdicio/precio)', async () => {
     rpcMock.mockResolvedValue({ data: { componentId: CID, quantity: '0.4' }, error: null });
     await updateApuComponentLaborProductivityOverride({ componentId: CID, productivityUnit: 'person_day_per_unit', productivity: '0.4' });
-    const args = rpcMock.mock.calls[0][1] as Record<string, unknown>;
+    const call = rpcMock.mock.calls[0];
+    if (!call) throw new Error('RPC no fue invocada');
+    const args = call[1] as Record<string, unknown>;
     expect(Object.keys(args)).not.toContain('p_waste_pct');
     expect(Object.keys(args)).not.toContain('p_unit_price_snapshot');
     expect(args.p_crew_size).toBeNull();
@@ -123,6 +125,7 @@ describe('read-model wiring — computeApuDetail mapea campos productivity', () 
   it('expone los campos productivity en la vista (rol interno)', () => {
     const detail = computeApuDetail({ id: 't1', code: 'A', name: 'n', unit: 'm2', version: 1, defaultToolPct: '0' }, [laborRow]);
     const view = detail.components[0];
+    if (!view) throw new Error('sin componente');
     expect(view.appliedProductivity).toBe('4');
     expect(view.productivityUnit).toBe('unit_per_crew_day');
     expect(view.appliedCrewSize).toBe('2');
@@ -138,15 +141,19 @@ describe('read-model wiring — computeApuDetail mapea campos productivity', () 
   it('rol client NO recibe productivityNote (🔒)', () => {
     const detail = computeApuDetail({ id: 't1', code: 'A', name: 'n', unit: 'm2', version: 1, defaultToolPct: '0' }, [laborRow]);
     const projected = projectApuDetailForRole(detail, 'client');
-    expect(projected.components[0].productivityNote).toBeUndefined();
+    const pview = projected.components[0];
+    if (!pview) throw new Error('sin componente');
+    expect(pview.productivityNote).toBeUndefined();
     // pero los valores no sensibles sí permanecen.
-    expect(projected.components[0].appliedProductivity).toBe('4');
+    expect(pview.appliedProductivity).toBe('4');
   });
 
   it('componente material no recibe metadata de rendimiento', () => {
     const materialRow: RawApuComponent = { id: CID, componentType: 'material', quantity: '5', wastePct: '0.08', unitPriceSnapshot: '1000', totalComponentCost: '5400', sortOrder: 0 };
     const detail = computeApuDetail({ id: 't1', code: 'A', name: 'n', unit: 'm2', version: 1, defaultToolPct: '0' }, [materialRow]);
-    expect(detail.components[0].appliedProductivity).toBeUndefined();
-    expect(detail.components[0].productivitySource).toBeUndefined();
+    const mview = detail.components[0];
+    if (!mview) throw new Error('sin componente');
+    expect(mview.appliedProductivity).toBeUndefined();
+    expect(mview.productivitySource).toBeUndefined();
   });
 });
