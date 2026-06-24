@@ -26,6 +26,7 @@ import {
 import { resolveLaborProductivityDisplay } from '@/app/(dashboard)/apu/_lib/apu-productivity-display';
 import { WasteOverrideControl } from './_components/waste-override-control';
 import { ProductivityOverrideControl } from './_components/productivity-override-control';
+import { MaterialConsumptionControl } from './_components/material-consumption-control';
 import { getReadModel } from '@/server/read-model';
 import { ApuNotFoundError } from '@/server/read-model/errors';
 import { resolveViewer } from '@/server/auth/resolve-viewer';
@@ -399,6 +400,23 @@ function ComponentesTab({
                             quantityText={formatNumber(c.quantity, 4)}
                             recommendedLaborQuantity={c.recommendedLaborQuantity ?? null}
                             productivitySource={c.productivitySource ?? null}
+                            canEdit={canEditWaste}
+                          />
+                        </span>
+                      )}
+                      {/* MATERIAL V1: edición controlada del consumo (solo material). */}
+                      {c.componentType === 'material' && (
+                        <span className="mt-1 flex flex-col items-end gap-0.5 text-right">
+                          <MaterialConsumptionControl
+                            apuId={detail.id}
+                            componentId={c.id}
+                            quantity={c.quantity}
+                            quantityText={formatNumber(c.quantity, 4)}
+                            unitPriceSnapshot={c.unitPriceSnapshot}
+                            wastePct={c.wastePct}
+                            totalComponentCost={c.totalComponentCost}
+                            recommendedMaterialQuantity={c.recommendedMaterialQuantity ?? null}
+                            materialQuantitySource={c.materialQuantitySource ?? null}
                             canEdit={canEditWaste}
                           />
                         </span>

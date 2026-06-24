@@ -22,6 +22,11 @@ import {
   resetApuComponentLaborProductivityOverride,
   ProductivityOverrideError,
 } from '@/server/apu-productivity-overrides';
+import {
+  updateApuComponentMaterialConsumptionOverride,
+  resetApuComponentMaterialConsumptionOverride,
+  MaterialConsumptionError,
+} from '@/server/apu-material-overrides';
 
 export type WasteOverrideActionResult =
   | { ok: true; wastePct: string; recommendedWastePct: string | null; overridden: boolean }
@@ -36,6 +41,10 @@ export type ProductivityOverrideActionResult =
       productivityUnit: string | null;
       appliedCrewSize: string | null;
     }
+  | { ok: false; error: string };
+
+export type MaterialConsumptionActionResult =
+  | { ok: true; quantity: string; recommendedMaterialQuantity: string | null; overridden: boolean }
   | { ok: false; error: string };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -159,6 +168,72 @@ export async function resetApuComponentLaborProductivityOverrideAction(
     };
   } catch (e) {
     if (e instanceof ProductivityOverrideError) return { ok: false, error: e.message };
+    return { ok: false, error: 'No se pudo restaurar el valor. Inténtalo de nuevo.' };
+  }
+}
+
+/** Gating común material: db-mode real + viewer autenticado + rol management/internal. */
+async function ensureMaterialEditAllowed(): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!isCreationModeEnabled()) {
+    return { ok: false, error: 'La edición requiere modo de operación real (datos reales).' };
+  }
+  try {
+    const viewer = await resolveAuthenticatedViewer();
+    if (!['management', 'internal'].includes(viewer.role)) {
+      return { ok: false, error: 'Tu rol no permite ajustar el consumo.' };
+    }
+    return { ok: true };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof AuthError ? 'No hay sesión válida. Inicia sesión de nuevo.' : 'No se pudo verificar tu sesión.',
+    };
+  }
+}
+
+export async function updateApuComponentMaterialConsumptionOverrideAction(
+  _prev: MaterialConsumptionActionResult | null,
+  formData: FormData,
+): Promise<MaterialConsumptionActionResult> {
+  const gate = await ensureMaterialEditAllowed();
+  if (!gate.ok) return { ok: false, error: gate.error };
+
+  const componentId = String(formData.get('componentId') ?? '').trim();
+  const quantity = String(formData.get('quantity') ?? '').trim();
+  const note = String(formData.get('note') ?? '').trim() || null;
+  const apuId = String(formData.get('apuId') ?? '').trim();
+
+  try {
+    const result = await updateApuComponentMaterialConsumptionOverride({ componentId, quantity, note });
+    if (apuId && UUID_RE.test(apuId)) revalidatePath(`/apu/${apuId}`);
+    return {
+      ok: true,
+      quantity: result.quantity,
+      recommendedMaterialQuantity: result.recommendedMaterialQuantity,
+      overridden: result.overridden,
+    };
+  } catch (e) {
+    if (e instanceof MaterialConsumptionError) return { ok: false, error: e.message };
+    return { ok: false, error: 'No se pudo guardar el ajuste. Inténtalo de nuevo.' };
+  }
+}
+
+export async function resetApuComponentMaterialConsumptionOverrideAction(
+  _prev: MaterialConsumptionActionResult | null,
+  formData: FormData,
+): Promise<MaterialConsumptionActionResult> {
+  const gate = await ensureMaterialEditAllowed();
+  if (!gate.ok) return { ok: false, error: gate.error };
+
+  const componentId = String(formData.get('componentId') ?? '').trim();
+  const apuId = String(formData.get('apuId') ?? '').trim();
+
+  try {
+    const result = await resetApuComponentMaterialConsumptionOverride(componentId);
+    if (apuId && UUID_RE.test(apuId)) revalidatePath(`/apu/${apuId}`);
+    return { ok: true, quantity: result.quantity, recommendedMaterialQuantity: null, overridden: false };
+  } catch (e) {
+    if (e instanceof MaterialConsumptionError) return { ok: false, error: e.message };
     return { ok: false, error: 'No se pudo restaurar el valor. Inténtalo de nuevo.' };
   }
 }

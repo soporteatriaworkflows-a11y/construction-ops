@@ -450,6 +450,16 @@ export const apuComponents = pgTable(
     productivityUpdatedBy: uuid("productivity_updated_by").references(() => profiles.id, {
       onDelete: "set null",
     }),
+    // APU_MATERIAL_CONSUMPTION_OVERRIDES_V1 (mig. 20260624100000): override trazable
+    // del consumo unitario de MATERIAL. Todas NULLABLE (aditivo). NULL ⇒ heredado;
+    // quantity sigue siendo la verdad efectiva. NO altera precio ni desperdicio.
+    recommendedMaterialQuantity: money("recommended_material_quantity"),
+    materialQuantitySource: text("material_quantity_source"),
+    materialQuantityNote: text("material_quantity_note"),
+    materialQuantityUpdatedAt: timestamp("material_quantity_updated_at", { withTimezone: true }),
+    materialQuantityUpdatedBy: uuid("material_quantity_updated_by").references(() => profiles.id, {
+      onDelete: "set null",
+    }),
     unitPriceSource: text("unit_price_source").notNull(),
     unitPriceSnapshot: money("unit_price_snapshot").notNull(),
     totalComponentCost: money("total_component_cost").notNull(),

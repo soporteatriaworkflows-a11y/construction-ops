@@ -361,6 +361,10 @@ export interface RawApuComponent {
   appliedCrewSize?: DecimalString | null;
   productivitySource?: string | null;
   productivityNote?: string | null;
+  // APU_MATERIAL_CONSUMPTION_OVERRIDES_V1 (aditivo, nullable). NULL ⇒ heredado.
+  recommendedMaterialQuantity?: DecimalString | null;
+  materialQuantitySource?: string | null;
+  materialQuantityNote?: string | null;
 }
 
 /**
@@ -405,6 +409,9 @@ export function computeApuDetail(
     ...(c.appliedCrewSize != null ? { appliedCrewSize: c.appliedCrewSize } : {}),
     ...(c.productivitySource ? { productivitySource: c.productivitySource } : {}),
     ...(c.productivityNote ? { productivityNote: c.productivityNote } : {}),
+    ...(c.recommendedMaterialQuantity != null ? { recommendedMaterialQuantity: c.recommendedMaterialQuantity } : {}),
+    ...(c.materialQuantitySource ? { materialQuantitySource: c.materialQuantitySource } : {}),
+    ...(c.materialQuantityNote ? { materialQuantityNote: c.materialQuantityNote } : {}),
     unitPriceSnapshot: c.unitPriceSnapshot,
     totalComponentCost: c.totalComponentCost,
     sortOrder: c.sortOrder,

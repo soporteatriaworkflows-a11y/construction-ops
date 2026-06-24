@@ -90,6 +90,8 @@ export const INTERNAL_APU_COMPONENT_FIELDS = [
   'wastePctNote',
   // V1C: la justificación del override de rendimiento es interna (NO a rol client).
   'productivityNote',
+  // Material V1: la justificación del override de consumo es interna (NO a rol client).
+  'materialQuantityNote',
 ] as const satisfies ReadonlyArray<keyof ApuComponentView>;
 
 /**
