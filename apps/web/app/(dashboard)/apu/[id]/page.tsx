@@ -16,6 +16,12 @@ import { Button } from '@/components/ui/button';
 import { ArchiveApuButton } from '../_components/archive-apu-button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatCOP, formatDateTime, formatNumber, formatPct } from '@/lib/utils/format';
+import {
+  describeWasteFactor,
+  formatSuggestedRange,
+  FACTOR_MICROCOPY,
+  type WasteChipKind,
+} from '@/app/(dashboard)/apu/_lib/apu-factor-display';
 import { getReadModel } from '@/server/read-model';
 import { ApuNotFoundError } from '@/server/read-model/errors';
 import { resolveViewer } from '@/server/auth/resolve-viewer';
@@ -51,6 +57,14 @@ const STATE_BADGE: Record<ReconciliationState, { label: string; cls: string }> =
   unresolved: { label: 'Sin resolver', cls: 'bg-red-100 text-red-700' },
   associated: { label: 'Asociado', cls: 'bg-green-100 text-green-700' },
   intentionally_unresolved: { label: 'Sin asociar (consciente)', cls: 'bg-gray-100 text-gray-600' },
+};
+
+/** Tonos visuales por tipo de chip de origen del desperdicio (read-only V1A). */
+const WASTE_CHIP_CLS: Record<WasteChipKind, string> = {
+  excel: 'bg-blue-50 text-blue-700 ring-blue-600/20',
+  manual: 'bg-iconic-soft-blue/40 text-iconic-ink ring-iconic-primary/20',
+  unclassified: 'bg-gray-100 text-gray-500 ring-gray-400/20',
+  none: 'bg-gray-50 text-gray-400 ring-gray-300/20',
 };
 
 const TABS = [
@@ -309,6 +323,12 @@ function ComponentesTab({
   return (
     <Card>
       <CardContent className="pt-6">
+        {/* Banner read-only (APU_SMART_DEFAULTS_V1A): los factores se muestran para
+            entender el APU; aún no se editan ni se recalcula nada. */}
+        <div className="mb-4 rounded-lg border border-iconic-soft-blue/60 bg-iconic-gray/50 px-3 py-2 text-xs text-iconic-graphite/70">
+          <p>{FACTOR_MICROCOPY.readonlyBanner}</p>
+          <p className="mt-0.5 text-iconic-graphite/55">{FACTOR_MICROCOPY.recommendedHint}</p>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -326,8 +346,14 @@ function ComponentesTab({
               {detail.components.map((c) => {
                 const recon = reconByComponent.get(c.id);
                 const badge = recon ? STATE_BADGE[recon.state] : null;
+                // Capa de presentación read-only (no altera el valor ni el cálculo).
+                const waste = describeWasteFactor({
+                  componentType: c.componentType,
+                  wastePct: c.wastePct,
+                  apuOriginType: detail.originType,
+                });
                 return (
-                  <tr key={c.id} className="border-b last:border-b-0">
+                  <tr key={c.id} className="border-b last:border-b-0 align-top">
                     <td className="py-2 pr-3">
                       <Badge variant="secondary">{COMPONENT_TYPE_LABELS[c.componentType]}</Badge>
                     </td>
@@ -340,8 +366,32 @@ function ComponentesTab({
                       )}
                     </td>
                     <td className="py-2 pr-3 text-right tabular-nums">{formatNumber(c.quantity, 4)}</td>
-                    <td className="py-2 pr-3 text-right tabular-nums">
-                      {c.wastePct === '0' ? '—' : formatPct(c.wastePct)}
+                    <td className="py-2 pr-3 text-right">
+                      <span className="tabular-nums">
+                        {c.wastePct === '0' ? '—' : formatPct(c.wastePct)}
+                      </span>
+                      {waste.hasWaste && (
+                        <span className="mt-1 flex flex-col items-end gap-0.5">
+                          <span
+                            className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ring-1 ring-inset ${WASTE_CHIP_CLS[waste.chipKind]}`}
+                          >
+                            {waste.chipLabel}
+                          </span>
+                          {waste.suggestedRange && (
+                            <span className="text-[10px] text-gray-400">
+                              Sugerido: {formatSuggestedRange(waste.suggestedRange)}
+                            </span>
+                          )}
+                          {waste.outOfRange && (
+                            <span
+                              className="text-[10px] font-medium text-amber-600"
+                              title={waste.warning ?? undefined}
+                            >
+                              ⚠ Fuera de rango
+                            </span>
+                          )}
+                        </span>
+                      )}
                     </td>
                     <td className="py-2 pr-3 text-right tabular-nums">{formatCOP(c.unitPriceSnapshot)}</td>
                     <td className="py-2 pr-3 text-right font-medium tabular-nums">{formatCOP(c.totalComponentCost)}</td>
@@ -371,6 +421,12 @@ function ComponentesTab({
             </tbody>
           </table>
         </div>
+        {/* Nota read-only: rendimiento/cuadrilla quedan fuera de V1A (consolidados
+            dentro de la cantidad del componente). Ver discovery. */}
+        <p className="mt-3 flex items-start gap-1.5 text-[11px] text-gray-400">
+          <Wrench className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
+          {FACTOR_MICROCOPY.performanceNote}
+        </p>
       </CardContent>
     </Card>
   );
