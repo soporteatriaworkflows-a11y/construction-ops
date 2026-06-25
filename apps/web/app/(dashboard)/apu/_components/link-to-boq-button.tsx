@@ -10,6 +10,7 @@
 'use client';
 
 import { useActionState, useEffect, useMemo, useState, useTransition } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { Link2, Loader2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -108,41 +109,47 @@ export function LinkToBoqButton({
         Vincular a BOQ
       </button>
 
-      {open && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-iconic-ink/30 px-4 py-6 backdrop-blur-sm"
-          role="presentation"
-          onClick={() => setOpen(false)}
-        >
+      {open &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          // Portal a document.body: el modal escapa de cualquier ancestro con
+          // overflow/transform/contain del shell del dashboard y queda fijo al
+          // viewport (no se pinta inline dentro de la tarjeta).
           <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Vincular APU a BOQ"
-            className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-iconic-soft-blue bg-white text-left shadow-iconic"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-iconic-ink/30 px-4 py-6 backdrop-blur-sm"
+            role="presentation"
+            onClick={() => setOpen(false)}
           >
-            <div className="flex items-start justify-between gap-3 border-b border-gray-100 px-5 py-3">
-              <div className="min-w-0">
-                <h3 className="text-sm font-semibold text-iconic-ink">Vincular APU a BOQ</h3>
-                <p className="mt-0.5 truncate text-[11px] text-gray-500">
-                  <span className="font-mono">{apu.code}</span> · {apu.name} · {apu.unit}
-                </p>
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Vincular APU a BOQ"
+              className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-iconic-soft-blue bg-white text-left shadow-iconic"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-3 border-b border-gray-100 px-5 py-3">
+                <div className="min-w-0">
+                  <h3 className="text-sm font-semibold text-iconic-ink">Vincular APU a BOQ</h3>
+                  <p className="mt-0.5 truncate text-[11px] text-gray-500">
+                    <span className="font-mono">{apu.code}</span> · {apu.name} · {apu.unit}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  aria-label="Cerrar"
+                  className="rounded p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
+                >
+                  <X className="h-4 w-4" aria-hidden="true" />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                aria-label="Cerrar"
-                className="rounded p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
-              >
-                <X className="h-4 w-4" aria-hidden="true" />
-              </button>
+              <div className="overflow-y-auto px-5 py-4">
+                <LinkPanel apu={apu} onClose={() => setOpen(false)} />
+              </div>
             </div>
-            <div className="overflow-y-auto px-5 py-4">
-              <LinkPanel apu={apu} onClose={() => setOpen(false)} />
-            </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
     </>
   );
 }
