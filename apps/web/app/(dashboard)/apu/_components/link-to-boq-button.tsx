@@ -11,7 +11,7 @@
 
 import { useActionState, useEffect, useMemo, useState, useTransition } from 'react';
 import Link from 'next/link';
-import { Link2, Loader2 } from 'lucide-react';
+import { Link2, Loader2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -59,6 +59,21 @@ export function LinkToBoqButton({
   const [open, setOpen] = useState(false);
   const [showReason, setShowReason] = useState(false);
 
+  // Modal: cerrar con Escape y bloquear el scroll del fondo mientras está abierto.
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent): void {
+      if (e.key === 'Escape') setOpen(false);
+    }
+    document.addEventListener('keydown', onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [open]);
+
   // Deshabilitado: NO usamos un <span> mudo con `title` (clic silencioso). Es un
   // botón real que revela la razón de forma visible al hacer clic.
   if (!eligibility.canLink) {
@@ -82,8 +97,8 @@ export function LinkToBoqButton({
     );
   }
 
-  if (!open) {
-    return (
+  return (
+    <>
       <button
         type="button"
         onClick={() => setOpen(true)}
@@ -92,10 +107,44 @@ export function LinkToBoqButton({
         <Link2 className="h-3 w-3" aria-hidden="true" />
         Vincular a BOQ
       </button>
-    );
-  }
 
-  return <LinkPanel apu={apu} onClose={() => setOpen(false)} />;
+      {open && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-iconic-ink/30 px-4 py-6 backdrop-blur-sm"
+          role="presentation"
+          onClick={() => setOpen(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Vincular APU a BOQ"
+            className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-iconic-soft-blue bg-white text-left shadow-iconic"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-gray-100 px-5 py-3">
+              <div className="min-w-0">
+                <h3 className="text-sm font-semibold text-iconic-ink">Vincular APU a BOQ</h3>
+                <p className="mt-0.5 truncate text-[11px] text-gray-500">
+                  <span className="font-mono">{apu.code}</span> · {apu.name} · {apu.unit}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                aria-label="Cerrar"
+                className="rounded p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
+              >
+                <X className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </div>
+            <div className="overflow-y-auto px-5 py-4">
+              <LinkPanel apu={apu} onClose={() => setOpen(false)} />
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
 }
 
 function LinkPanel({ apu, onClose }: { apu: LinkApuCard; onClose: () => void }) {
@@ -211,7 +260,7 @@ function LinkPanel({ apu, onClose }: { apu: LinkApuCard; onClose: () => void }) 
 
   if (state?.ok === true) {
     return (
-      <div className="mt-2 rounded-md border border-green-200 bg-green-50 p-3 text-xs" role="status">
+      <div className="rounded-md border border-green-200 bg-green-50 p-3 text-xs" role="status">
         <p className="font-medium text-green-700">{state.message}</p>
         <p className="mt-1 text-green-700">Subtotal: {formatCOP(state.subtotal)}</p>
         <div className="mt-2 flex flex-wrap gap-2">
@@ -232,16 +281,12 @@ function LinkPanel({ apu, onClose }: { apu: LinkApuCard; onClose: () => void }) 
   }
 
   return (
-    <form action={formAction} className="mt-2 w-full rounded-md border border-gray-200 bg-gray-50/60 p-3" aria-label={`Vincular ${apu.code} a BOQ`}>
+    <form action={formAction} className="w-full" aria-label={`Vincular ${apu.code} a BOQ`}>
       <input type="hidden" name="apuTemplateId" value={apu.id} />
       <input type="hidden" name="estimateVersionId" value={versionId} />
       <input type="hidden" name="chapterId" value={chapterId} />
       <input type="hidden" name="projectId" value={projectId} />
       <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
-
-      <p className="mb-2 text-xs font-semibold text-gray-700">
-        Vincular <span className="font-mono">{apu.code}</span> · {apu.unit} · {formatCOP(apu.unitCost)}
-      </p>
 
       {state?.ok === false && (
         <div className="mb-2 rounded border border-red-200 bg-red-50 px-2 py-1.5 text-[11px] text-red-700" role="alert">
