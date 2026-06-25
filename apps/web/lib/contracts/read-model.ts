@@ -143,6 +143,10 @@ export interface ApuSummary {
   originType?: string;
   /** Fecha de archivo ISO si está archivado; null/undefined si activo (READ_MODEL_ARCHIVED_AT). */
   archivedAt?: string | null;
+  /** APU_LIBRARY_REUSABLE_ACTIVITIES_UX_V1: conteo de componentes por tipo (biblioteca). */
+  typeCounts?: Record<ApuComponentType, number>;
+  /** Materiales con precio ausente o ≤ 0 (señal de completitud). */
+  materialsWithoutPrice?: number;
 }
 
 /* --- APU detalle (FASE 4B.1 — APU_COST_MODEL_FOUNDATION_V1_CONTRACT §10) --- */
