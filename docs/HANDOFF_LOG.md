@@ -1,5 +1,32 @@
 # Handoff Log
 
+## 2026-06-25 — UX_HOTFIX_APU_BOQ_LINK_MODAL_V1 — RELEASED (orchestrator)
+
+### Problema UX
+El flujo "Vincular a BOQ" funcionaba pero se renderizaba **inline dentro de la tarjeta**, alargándola y
+rompiendo la lectura de la biblioteca. La usuaria pidió que se abra como **modal/popup**.
+
+### Cambio (UX-only, 1 archivo)
+`app/(dashboard)/apu/_components/link-to-boq-button.tsx`: el panel guiado ahora vive en un **modal
+centrado** (overlay `fixed inset-0 z-50 bg-iconic-ink/30 backdrop-blur-sm` + `role="dialog"
+aria-modal`, replicando el patrón del repo en `apu/[id]/_components/*-control.tsx`). Cabecera "Vincular
+APU a BOQ" + APU seleccionado, cuerpo con scroll (`max-h-[90vh]`), botón X, cierre por overlay/Escape y
+bloqueo de scroll de fondo. El botón de la tarjeta solo abre el modal (ya no expande). Mismos pasos
+(proyecto→versión editable→capítulo→ítem ref opcional→cantidad→resumen→confirmar), misma mutación,
+mismos enlaces de éxito (Abrir presupuesto / Abrir APU) y misma razón visible si está bloqueado.
+
+### Estado / release
+- `origin/main` = **`14dd2ca8c3e77207f2ebbcf0d503a2ef8c51d546`** (merge `--no-ff`
+  `merge(apu): release BOQ link modal UX V1`, sobre `09f9c40`). Tag = **`apu-boq-link-modal-ux-v1`** → `14dd2ca`.
+- typecheck **0** · lint **0** · tests apu/boq/link **355/0** · build **0** · **gm 22/22** · diff-check limpio.
+- Smoke prod (psi): `/login` 200 · `/apu` 307 · `/apu?view=cards` 307 · `/projects` 307 · cron 401.
+- **Sin** DB/migración/env/SMTP/usuarios; sin cambio funcional; sin tocar RPC `add_apu_to_boq`/lógica
+  financiera/`unit_price_snapshot`/BOQ/export/cantidades/cronograma; **no** se tocó `construction-ops-1rqh`.
+- Nota: sin stack jsdom/testing-library en el repo (vitest=node) → la apertura del modal se valida por
+  build + verificación manual; los tests puros cubren el gating y que la mutación no cambia.
+
+---
+
 ## 2026-06-25 — HOTFIX_APU_LIBRARY_BOQ_LINK_BUTTON_NO_ACTION_V1 — RELEASED (orchestrator)
 
 ### Síntoma (producción)
