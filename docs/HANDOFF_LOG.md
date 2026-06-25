@@ -1,5 +1,35 @@
 # Handoff Log
 
+## 2026-06-25 — HOTFIX_QUOTING_COMPANION_TRUE_IN_PLACE_GUIDE_V1 — RELEASED (orchestrator)
+
+### Causa UX
+El companion abría, pero sin cotización activa mostraba solo "Selecciona una cotización" + "Ir al
+asistente" → **redirigía a /quote/new**. No cumplía la idea real: un asistente acompañante in-place que
+no obligue a salir de la pantalla.
+
+### Qué cambió (UX/read-only/aditivo, 5 archivos)
+- **Cotización activa persistente** en localStorage (SOLO ids `projectId/scopeId/versionId` + `pinned`;
+  nunca finanzas). Rutas con contexto la actualizan (sync por patrón guard-en-render de React); rutas sin
+  contexto reusan la última guardada; al abrir se restaura desde localStorage.
+- **Selector embebido** (`quote-companion-selector.tsx`): proyecto→alcance→versión vía lecturas READ-ONLY
+  nuevas en `quote-companion-actions.ts` (`listQuoteProjects`/`listQuoteScopes`/`listQuoteVersions` =
+  listProjects/getProjectOverview/listEstimatesByScope). Elegir carga el progreso **in-place** (no navega).
+  "Crear nueva cotización" → /quote/new como acción secundaria.
+- Triggers (topbar/launcher/home) ya **no navegaban** (eran botones+CustomEvent) — confirmado.
+- El panel **solo navega** cuando el usuario abre presupuesto/APU/cantidades/precios/export o
+  "Abrir vista completa" (texto cambiado desde "Ir al centro de cotización").
+
+### Estado / release
+- `origin/main` = **`de21f95172bc2503daab7615312dffe360974cdb`** (merge `--no-ff`, sobre `bd18907`). Tag =
+  **`quoting-companion-in-place-guide-hotfix-v1`** → `de21f95`.
+- typecheck 0 · lint 0 · tests quote **60/0** · suite completa **2014/0 (+42 skip)** · build 0 · gm **22/22** · diff-check limpio.
+- Smoke prod: /login 200 · /quote 307 · /quote/new 307 · /apu 307 · /projects 307 · cron 401.
+- **Aditivo:** sin DB/migración/env/SMTP/usuarios/RPC/mutación; sin finanzas/`unit_price_snapshot`;
+  sin tocar BOQ/APU/cantidades/export/cronograma; /quote y workspace técnico intactos; no `-1rqh`.
+- **Pendiente:** verificación visual tras promoción del deploy (UI client; recordar promoción manual Vercel MCP 403).
+
+---
+
 ## 2026-06-25 — QUOTING_ASSISTED_COMPANION_PANEL_V1B_PHASE_1 — RELEASED (orchestrator)
 
 ### Qué se liberó (companion panel, capa ADITIVA, 11 archivos)
