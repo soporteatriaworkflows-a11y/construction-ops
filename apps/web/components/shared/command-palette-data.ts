@@ -61,6 +61,7 @@ export function buildCommandItems(canManageAccess: boolean): CommandItem[] {
     { id: 'nav-settings', label: 'Configuración', href: '/settings', group: 'Navegación', icon: 'settings', keywords: 'configuracion ajustes preferencias settings' },
 
     // ── Acciones rápidas (rutas de acción existentes) ──
+    { id: 'act-quote', label: 'Cotizar con asistente', href: '/quote', group: 'Acciones', icon: 'estimates', keywords: 'cotizar asistente cotizacion guiado wizard presupuesto paso a paso' },
     { id: 'act-projects-new', label: 'Crear proyecto', href: '/projects/new', group: 'Acciones', icon: 'create', keywords: 'nuevo proyecto obra agregar' },
     { id: 'act-apu-import', label: 'Importar APU', href: '/apu/import', group: 'Acciones', icon: 'import', keywords: 'apu importar excel cargar' },
     { id: 'act-apu-reconcile', label: 'Conciliación de APU', href: '/apu/reconciliation', group: 'Acciones', icon: 'reconcile', keywords: 'apu conciliar reconciliacion recursos' },

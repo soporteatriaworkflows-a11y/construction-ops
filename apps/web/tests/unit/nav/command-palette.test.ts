@@ -49,6 +49,7 @@ describe('command-palette — buildCommandItems', () => {
   it('solo usa rutas existentes (lista blanca verificada contra el árbol de app)', () => {
     const allowed = new Set([
       '/dashboard',
+      '/quote',
       '/projects',
       '/projects/new',
       '/estimates',
