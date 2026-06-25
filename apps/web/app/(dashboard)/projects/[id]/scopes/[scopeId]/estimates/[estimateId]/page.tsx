@@ -57,6 +57,7 @@ import {
   type QuoteReadiness,
 } from '@/lib/estimates/quote-readiness';
 import { QuoteReadinessSemaphore, ReadinessExportAlert } from './quote-readiness-semaphore';
+import { buildApuLibraryItemMap } from '@/lib/apu-library/from-summary';
 import { getBudgetApuExportSelection } from '@/server/estimates/export/apu-annex';
 import { ArchiveControls } from './archive-controls';
 import { VersionPanel } from './version-panel';
@@ -160,11 +161,15 @@ export default async function EstimateDetailPage({ params, searchParams }: PageP
   let readiness: QuoteReadiness | null = null;
   if (active) {
     try {
-      const detail = await getReadModel().getEstimateDetail(viewer, estimateId);
+      const [detail, apus] = await Promise.all([
+        getReadModel().getEstimateDetail(viewer, estimateId),
+        getReadModel().listApus(viewer).catch(() => []),
+      ]);
       readiness = computeQuoteReadiness({
         estimate: detail.estimate,
         chapters: detail.chapters,
         items: detail.items,
+        apusById: buildApuLibraryItemMap(apus),
       });
     } catch {
       readiness = null;

@@ -5,7 +5,21 @@
  * el export ni recalcula finanzas.
  */
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import type { QuoteReadiness, QuoteReadinessStatus, QuoteIssue } from '@/lib/estimates/quote-readiness';
+import type {
+  QuoteReadiness,
+  QuoteReadinessStatus,
+  QuoteIssue,
+  QuoteIssueGroup,
+} from '@/lib/estimates/quote-readiness';
+
+const GROUP_ORDER: QuoteIssueGroup[] = ['boq', 'pricing', 'apu', 'aiu', 'export'];
+const GROUP_LABELS: Record<QuoteIssueGroup, string> = {
+  boq: 'BOQ / cantidades',
+  pricing: 'Precios',
+  apu: 'APU',
+  aiu: 'AIU',
+  export: 'Export',
+};
 
 const TONE: Record<QuoteReadinessStatus, { dot: string; chip: string; bar: string }> = {
   ready: { dot: 'bg-green-500', chip: 'bg-green-100 text-green-700', bar: 'bg-green-500' },
@@ -19,13 +33,16 @@ const SEV_DOT: Record<QuoteIssue['severity'], string> = {
   info: 'text-gray-400',
 };
 
-function IssueGroup({ title, issues }: { title: string; issues: QuoteIssue[] }) {
+const SEV_RANK: Record<QuoteIssue['severity'], number> = { critical: 0, warning: 1, info: 2 };
+
+function ThematicGroup({ group, issues }: { group: QuoteIssueGroup; issues: QuoteIssue[] }) {
   if (issues.length === 0) return null;
+  const sorted = [...issues].sort((a, b) => SEV_RANK[a.severity] - SEV_RANK[b.severity]);
   return (
     <div>
-      <p className="mb-1 text-xs font-medium text-gray-500">{title}</p>
+      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">{GROUP_LABELS[group]}</p>
       <ul className="space-y-0.5">
-        {issues.map((i) => (
+        {sorted.map((i) => (
           <li key={i.code} className={`text-sm ${SEV_DOT[i.severity]}`}>
             {i.severity === 'critical' ? '● ' : i.severity === 'warning' ? '▲ ' : '· '}
             {i.message}
@@ -62,11 +79,15 @@ export function QuoteReadinessSemaphore({ readiness }: { readiness: QuoteReadine
           <span className="text-gray-400"><strong className="tabular-nums">{readiness.counts.info}</strong> informativos</span>
         </div>
 
-        {/* Pendientes */}
-        <div className="space-y-2">
-          <IssueGroup title="Críticos" issues={readiness.criticalIssues} />
-          <IssueGroup title="Advertencias" issues={readiness.warnings} />
-          <IssueGroup title="Informativos" issues={readiness.info} />
+        {/* Pendientes agrupados por tema (severidad dentro de cada grupo) */}
+        <div className="space-y-3">
+          {GROUP_ORDER.map((g) => (
+            <ThematicGroup
+              key={g}
+              group={g}
+              issues={[...readiness.criticalIssues, ...readiness.warnings, ...readiness.info].filter((i) => i.group === g)}
+            />
+          ))}
         </div>
 
         <p className="border-t pt-2 text-[11px] text-gray-400">

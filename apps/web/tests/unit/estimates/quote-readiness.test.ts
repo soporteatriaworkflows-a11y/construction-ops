@@ -11,7 +11,9 @@ import type {
   BoqItemView,
   ChapterSummary,
   EstimateSummary,
+  Uuid,
 } from '@/lib/contracts/read-model';
+import type { ApuLibraryItem } from '@/lib/apu-library/types';
 
 function estimate(over: Partial<EstimateSummary> = {}): EstimateSummary {
   return {
@@ -23,8 +25,22 @@ function estimate(over: Partial<EstimateSummary> = {}): EstimateSummary {
 function chap(id: string, itemCount: number): ChapterSummary {
   return { id, code: id, name: id, subtotal: '1000', itemCount };
 }
-function item(chapterId: string, quantity: string, unitPrice: string): BoqItemView {
-  return { id: `${chapterId}-i`, chapterId, code: 'c', description: 'd', unit: 'm2', quantity, unitPrice, subtotal: '100' };
+function item(chapterId: string, quantity: string, unitPrice: string, apuTemplateId?: string | null): BoqItemView {
+  return { id: `${chapterId}-i`, chapterId, code: chapterId, description: 'd', unit: 'm2', quantity, unitPrice, subtotal: '100', apuTemplateId: apuTemplateId ?? null };
+}
+
+function apu(over: Partial<ApuLibraryItem> = {}): ApuLibraryItem {
+  return {
+    id: 'apu-1', code: 'APU1', name: 'Pintura vinilo', unit: 'm2',
+    componentCount: 3, unitCost: '25000', boqLinked: true, origin: 'Manual', importBatchId: null,
+    resourceStatus: { total: 2, associated: 2, pending: 0, suggested: 0, unresolved: 0, ambiguous: 0, intentionallyUnresolved: 0 },
+    archivedAt: null,
+    typeCounts: { material: 2, labor: 1, equipment: 0, tool: 0, subcontract: 0, other: 0 },
+    materialsWithoutPrice: 0, category: 'Pintura', ...over,
+  };
+}
+function apuMap(...items: ApuLibraryItem[]): Map<Uuid, ApuLibraryItem> {
+  return new Map(items.map((a) => [a.id, a]));
 }
 
 describe('computeQuoteReadiness — estados', () => {
@@ -94,6 +110,69 @@ describe('computeQuoteReadiness — informativos (datos no disponibles hoy)', ()
     expect(r.info.some((i) => i.code === 'export_client_unverified')).toBe(true);
     // informativos NO degradan el estado.
     expect(r.status).toBe('ready');
+  });
+});
+
+describe('integración APU (V2)', () => {
+  const base = { estimate: estimate(), chapters: [chap('A', 1)] };
+
+  it('ítem con APU completo → sin issue crítico de APU (ready)', () => {
+    const r = computeQuoteReadiness({ ...base, items: [item('A', '5', '1000', 'apu-1')], apusById: apuMap(apu()) });
+    expect(r.criticalIssues.some((i) => i.group === 'apu')).toBe(false);
+    expect(r.status).toBe('ready');
+    expect(r.counts.itemsWithApu).toBe(1);
+  });
+
+  it('ítem sin APU vinculado → informativo (no crítico)', () => {
+    const r = computeQuoteReadiness({ ...base, items: [item('A', '5', '1000', null)], apusById: apuMap(apu()) });
+    expect(r.info.some((i) => i.code === 'items_without_apu')).toBe(true);
+    expect(r.criticalIssues.length).toBe(0);
+    expect(r.counts.itemsWithoutApu).toBe(1);
+  });
+
+  it('APU vinculado sin componentes → critical', () => {
+    const r = computeQuoteReadiness({ ...base, items: [item('A', '5', '1000', 'apu-1')], apusById: apuMap(apu({ componentCount: 0 })) });
+    expect(r.status).toBe('blocked');
+    expect(r.criticalIssues.some((i) => i.group === 'apu')).toBe(true);
+    expect(r.counts.apusWithCriticalIssues).toBe(1);
+  });
+
+  it('APU vinculado con material sin precio → critical', () => {
+    const r = computeQuoteReadiness({ ...base, items: [item('A', '5', '1000', 'apu-1')], apusById: apuMap(apu({ materialsWithoutPrice: 2 })) });
+    expect(r.status).toBe('blocked');
+    expect(r.criticalIssues.find((i) => i.group === 'apu')?.message).toMatch(/material/i);
+  });
+
+  it('APU vinculado archivado → critical', () => {
+    const r = computeQuoteReadiness({ ...base, items: [item('A', '5', '1000', 'apu-1')], apusById: apuMap(apu({ archivedAt: '2026-01-01T00:00:00Z' })) });
+    expect(r.status).toBe('blocked');
+    expect(r.criticalIssues.some((i) => i.code === 'apu_archived')).toBe(true);
+  });
+
+  it('APU vinculado en review (sin categoría) → warning', () => {
+    const r = computeQuoteReadiness({ ...base, items: [item('A', '5', '1000', 'apu-1')], apusById: apuMap(apu({ name: 'xyz genérico', category: 'Sin categoría' })) });
+    expect(r.warnings.some((i) => i.code === 'apu_review' && i.group === 'apu')).toBe(true);
+    expect(r.status).toBe('review');
+  });
+
+  it('APU vinculado fuera del mapa → informativo', () => {
+    const r = computeQuoteReadiness({ ...base, items: [item('A', '5', '1000', 'apu-zzz')], apusById: apuMap(apu()) });
+    expect(r.info.some((i) => i.code === 'apu_not_found')).toBe(true);
+  });
+
+  it('issues llevan group temático', () => {
+    const r = computeQuoteReadiness({ ...base, items: [item('A', '0', '0', 'apu-1')], apusById: apuMap(apu({ componentCount: 0 })) });
+    const groups = new Set([...r.criticalIssues, ...r.warnings, ...r.info].map((i) => i.group));
+    expect(groups.has('boq')).toBe(true);
+    expect(groups.has('pricing')).toBe(true);
+    expect(groups.has('apu')).toBe(true);
+    expect(groups.has('export')).toBe(true);
+  });
+
+  it('export nunca se bloquea por el semáforo (helper no lanza ni bloquea)', () => {
+    const r = computeQuoteReadiness({ ...base, items: [item('A', '5', '1000', 'apu-1')], apusById: apuMap(apu({ componentCount: 0 })) });
+    // status blocked es solo informativo; el helper devuelve datos, no impide export.
+    expect(['ready', 'review', 'blocked']).toContain(r.status);
   });
 });
 
