@@ -36,6 +36,7 @@ import {
   ClipboardCheck,
   CheckCircle2,
   CalendarRange,
+  Sparkles,
 } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
 import { EmptyState } from '@/components/shared/empty-state';
@@ -464,6 +465,7 @@ export default async function DashboardPage() {
 
         {/* Accesos rápidos */}
         <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-6">
+          <QuickLink href="/quote" label="Cotizar con asistente" icon={<Sparkles className="h-4 w-4" aria-hidden="true" />} />
           <QuickLink href="/projects" label="Proyectos" icon={<FolderOpen className="h-4 w-4" aria-hidden="true" />} />
           <QuickLink href="/catalog" label="Catálogo" icon={<Package className="h-4 w-4" aria-hidden="true" />} />
           <QuickLink href="/catalog/providers" label="Proveedores" icon={<Truck className="h-4 w-4" aria-hidden="true" />} />
