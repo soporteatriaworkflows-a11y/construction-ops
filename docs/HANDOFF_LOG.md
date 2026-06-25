@@ -1,5 +1,45 @@
 # Handoff Log
 
+## 2026-06-25 — APU_LIBRARY_BOQ_LINK_FROM_CARDS_V1 — RELEASED (orchestrator)
+
+### Estado
+- **Mergeada a `main`** vía `merge --no-ff`. `origin/main` = **`e932573ab77b40f662f787bc2b310783934d8904`**
+  (merge commit `merge(apu): release library BOQ link from cards V1`, parents `89d41d2` + feature `3ed0dd4`).
+- Tag = **`apu-library-boq-link-from-cards-v1`** → `e932573`.
+- Merge ejecutado en rama `release/...-merge` desde `origin/main` y push `HEAD:main` (worktree de `main`
+  ocupado por otro worktree; no se tocó). Árbol limpio.
+
+### Qué se liberó (5 archivos, +783/−16; sin DB/migración/env)
+Acción **"Vincular a BOQ"** desde las tarjetas de `/apu?view=cards`. **Reuso** del dominio seguro
+`addApuToBoq` → RPC `add_apu_to_boq` (snapshot server-side, solo versión editable, rol
+`management|internal`, idempotente/auditado). Vincular = **agregar partida nueva** al BOQ desde el APU.
+- `lib/apu-library/boq-link.ts` (nuevo, puro): `apuLinkEligibility` + `isEditableVersionStatus` +
+  `versionStatusLabel` + `normalizeUnit`/`unitsCompatible`.
+- `app/(dashboard)/apu/_components/link-to-boq-actions.ts` (nuevo, `'use server'`): 3 lecturas guiadas
+  (`listProjects`/`listEstimates`/`getEstimateDetail`) + wrapper de mutación que delega en `addApuToBoq`.
+- `app/(dashboard)/apu/_components/link-to-boq-button.tsx` (nuevo, `'use client'`): panel guiado
+  proyecto→versión editable→capítulo→ítem referencia (read-only)→cantidad→confirmar, con advertencia de
+  unidad y enlaces de éxito.
+- `app/(dashboard)/apu/_components/apu-library-cards.tsx` (edit): placeholder "próxima oleada" → botón activo.
+- `tests/unit/apu/apu-boq-link.test.ts` (nuevo).
+
+### Validaciones
+- typecheck **0** · lint **0** · scoped apu/estimates/boq **532/0** · suite completa
+  **1965 passed / 42 skipped / 0 fail** · build **0** · **gm 22/22** · `git diff --check` limpio.
+
+### Smoke producción (psi, GET-only, sin mutar)
+`/login` **200** · `/apu` **307** · `/apu?view=cards` **307** · `/projects` **307** ·
+`/api/cron/price-monitor` **401**. Alias vivo. Deploy auto por push a main; **commit desplegado no
+confirmado por API** (Vercel MCP 403 → confirmación manual dashboard pendiente).
+
+### Riesgos restantes
+- **No** adjunta APU a un ítem BOQ **existente**; **agrega partida nueva** desde el APU (intencional;
+  adjuntar-a-existente sería V1B con mutación nueva → fuera de alcance).
+- **Verificación visual manual pendiente** (no hubo preview): probar flujo guiado autenticado en `db`-mode.
+- `unit_price_snapshot` intacto (solo lo calcula el RPC existente).
+
+---
+
 ## 2026-06-25 — APU_QUOTE_READINESS_INTEGRATION_V2 — CIERRE / VERIFICACIÓN (orchestrator)
 
 ### Estado (RELEASED — verificación de cierre, sin re-implementar)
