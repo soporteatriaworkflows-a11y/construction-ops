@@ -1,5 +1,33 @@
 # Handoff Log
 
+## 2026-06-25 — HOTFIX_QUOTING_COMPANION_HEADER_CONTROLS_V1 — RELEASED (orchestrator)
+
+### Causa real
+Los botones del header (Restaurar/Fijar-Soltar/Minimizar) no hacían nada (la X sí): el `<header>` tenía
+`onPointerDown={onHeaderPointerDown}` que llamaba `setPointerCapture` en **cualquier** pointerdown,
+**incluido sobre los botones** → iniciaba un drag y capturaba el puntero, **robando el click**.
+
+### Fix (UX-only, 1 archivo + test)
+- `onHeaderPointerDown` ahora **aborta si el pointerdown nace en un `<button>`** (`e.target.closest('button')`).
+- El **contenedor de los controles** hace `onPointerDown={(e) => e.stopPropagation()}` → el drag nunca
+  arranca desde los botones.
+- Handlers ya eran correctos: Restaurar=`setPos(defaultFloatingPos())`, Fijar/Soltar=`setPinned(v=>!v)`,
+  Minimizar=`setState('minimized')` (NO borra la cotización activa), Cerrar=`setState('closed')`.
+- `tests/unit/quote/quote-companion-header-controls.test.ts` (fuente): cada handler + guard de drag +
+  minimizar no limpia activeQuote + localStorage sin finanzas.
+
+### Estado / release
+- `origin/main` = **`5afbff30763efb4ebe5fdfcd733e0549aa6afa69`** (merge `--no-ff`, sobre `a39d5a6`). Tag =
+  **`quoting-companion-header-controls-hotfix-v1`** → `5afbff3`.
+- typecheck 0 · lint 0 · tests quote **107/0** · suite completa **2061/0 (+42 skip)** · build 0 · gm **22/22** · diff-check limpio.
+- Smoke prod: /login 200 · /quote 307 · /quote/new 307 · /apu 307 · /projects 307 · cron 401.
+- **Aditivo:** sin DB/migración/env/SMTP/usuarios/RPC/finanzas; companion flotante, guía accionable y /quote intactos; no `-1rqh`.
+- **Pendiente:** verificación visual tras promoción del deploy (UI client; promoción manual Vercel MCP 403).
+- **LECCIÓN:** en ventanas draggables, el handler de drag del header debe ignorar pointerdowns sobre
+  controles interactivos (closest('button')) y/o stopPropagation, o la captura del puntero roba sus clicks.
+
+---
+
 ## 2026-06-25 — UX_QUOTING_COMPANION_ACTIONABLE_GUIDANCE_V1 — RELEASED (orchestrator)
 
 ### Causa UX
