@@ -1,5 +1,34 @@
 # Handoff Log
 
+## 2026-06-25 — UX_QUOTING_COMPANION_ACTIONABLE_GUIDANCE_V1 — RELEASED (orchestrator)
+
+### Causa UX
+El companion mostraba estados genéricos (Pendiente/Revisar) sin explicar qué significan ni qué hacer; la
+usuaria no entendía "pendiente en qué sentido" ni qué botón tocar.
+
+### Qué cambió (UX/read-only/aditivo, 3 archivos)
+- **Helper PURO `lib/quote/quote-guidance.ts`**: `STEP_GUIDE` (microcopy de los 8 pasos: qué significa /
+  cuándo está listo / qué hacer / CTA explícito / resultado esperado) + `buildStepGuidance`
+  (compone estático + "por qué aparece así" = la **descripción real** del paso, sin inventar conteos;
+  vacío → "No hay suficiente información…") + `pickGuidanceStep` (siguiente accionable→lugar actual→primer
+  no resuelto) + `stepReasonText` (razón corta: "Pendiente: faltan cantidades", "Revisar: …").
+- **`quote-companion-body.tsx`**: sección **"Qué sigue"** (Qué significa / Por qué aparece así / Haz esto
+  ahora / botón accionable + subtítulo "Te llevamos a la pantalla…" / Resultado esperado, con color por
+  severidad); mini-stepper muestra razón corta; bloque colapsable **"¿Por qué veo esto?"** (manual inline:
+  el asistente orienta, el progreso se calcula con datos, "pendiente" = el sistema aún no lo valida desde
+  esta vista).
+- **Honestidad (FASE 6):** no inventa números; usa la descripción derivada (datos reales del read-model).
+
+### Estado / release
+- `origin/main` = **`d7d3bf4e93c2ad22ec738b799b9d482915eadea5`** (merge `--no-ff`, sobre `08e7a1e`). Tag =
+  **`quoting-companion-actionable-guidance-v1`** → `d7d3bf4`.
+- typecheck 0 · lint 0 · tests quote **100/0** · suite completa **2054/0 (+42 skip)** · build 0 · gm **22/22** · diff-check limpio.
+- Smoke prod: /login 200 · /quote 307 · /quote/new 307 · /apu 307 · /projects 307 · cron 401.
+- **Aditivo:** sin DB/migración/env/SMTP/usuarios/RPC/finanzas; sin tocar BOQ/APU/cantidades/export/cronograma; companion flotante y /quote intactos; no `-1rqh`.
+- **Pendiente:** verificación visual tras promoción del deploy (UI client; promoción manual Vercel MCP 403).
+
+---
+
 ## 2026-06-25 — HOTFIX_QUOTING_COMPANION_NOT_FLOATING_V1 — RELEASED (orchestrator)
 
 ### Causa real
