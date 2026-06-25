@@ -68,6 +68,12 @@ function clampPos(x: number, y: number): Pos {
   return { x: Math.min(Math.max(MARGIN, x), maxX), y: Math.min(Math.max(MARGIN, y), maxY) };
 }
 
+/** Posición flotante por defecto: un punto claramente despegado de los bordes
+ * (no pegado a la esquina) para que se lea como ventana movible. */
+function defaultFloatingPos(): Pos {
+  return clampPos(window.innerWidth - WIN_W - 24, 88);
+}
+
 export function QuoteCompanion() {
   const pathname = usePathname();
   const routeCtx = useMemo(() => quoteContextFromPath(pathname), [pathname]);
@@ -139,8 +145,10 @@ export function QuoteCompanion() {
       const stored = readActiveQuote();
       if (stored) setActiveQuote(stored);
     }
+    // Por defecto FLOTANTE: siempre damos una posición explícita (no anclada).
+    // No restauramos `pinned` desde localStorage: el modo flotante es el default.
     const storedPos = readPos();
-    if (storedPos) setPos(clampPos(storedPos.x, storedPos.y));
+    setPos(storedPos ? clampPos(storedPos.x, storedPos.y) : defaultFloatingPos());
     setState('open');
   }
 
@@ -261,7 +269,7 @@ export function QuoteCompanion() {
           {!docked && (
             <button
               type="button"
-              onClick={() => setPos(null)}
+              onClick={() => setPos(defaultFloatingPos())}
               aria-label="Restaurar posición"
               title="Restaurar posición"
               className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
@@ -272,9 +280,9 @@ export function QuoteCompanion() {
           <button
             type="button"
             onClick={() => setPinned((v) => !v)}
-            aria-label={pinned ? 'Soltar del costado' : 'Fijar al costado'}
+            aria-label={pinned ? 'Soltar ventana' : 'Fijar al costado'}
             aria-pressed={pinned}
-            title={pinned ? 'Soltar del costado' : 'Fijar al costado'}
+            title={pinned ? 'Soltar ventana' : 'Fijar al costado'}
             className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
           >
             {pinned ? <Pin className="h-4 w-4" aria-hidden="true" /> : <PinOff className="h-4 w-4" aria-hidden="true" />}
@@ -297,6 +305,23 @@ export function QuoteCompanion() {
           </button>
         </div>
       </header>
+
+      {/* Estado de la ventana (flotante vs fijada) + ayuda de arrastre */}
+      <div className="flex items-center justify-between gap-2 border-b border-gray-100 bg-gray-50/60 px-3 py-1.5 text-[10px]">
+        {docked ? (
+          <>
+            <span className="font-medium text-gray-500">Fijado al costado</span>
+            <button type="button" onClick={() => setPinned(false)} className="font-medium text-iconic-primary hover:underline">
+              Soltar ventana
+            </button>
+          </>
+        ) : (
+          <>
+            <span className="font-medium text-gray-500">Ventana flotante</span>
+            <span className="text-gray-400">Arrastra para mover</span>
+          </>
+        )}
+      </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-4">
         {!effectiveCtx ? (
