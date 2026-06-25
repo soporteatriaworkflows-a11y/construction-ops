@@ -1,5 +1,34 @@
 # Handoff Log
 
+## 2026-06-25 — VERIFY_AND_RECOVER_QUOTING_ASSISTED_V1_PRODUCTION_DEPLOY (orchestrator)
+
+### Verificación
+- `origin/main` = **`717b677`** (era `3577b3e`). Tag base `quoting-assisted-mode-v1-phase-1` → `75bef7a`.
+- origin/main **sí** contiene `/quote`, `/quote/new`, `/quote/[projectId]/[scopeId]/[versionId]` + `lib/quote/quote-progress.ts`.
+- Build local **OK**: registra las 3 rutas `/quote`. Árbol limpio.
+
+### Dos causas encontradas
+1. **Protección de ruta faltante (código):** `/quote` NO estaba en `PROTECTED_ROUTES` (`server/auth/routes.ts`),
+   por eso producción servía `/quote` como **200** sin sesión (en vez de 307 como el resto). Sin fuga de
+   datos (la página resuelve viewer server-side y degrada a vacío + RLS), pero incorrecto. **FIX aplicado:**
+   añadido `/quote` a `PROTECTED_ROUTES` (cubre subrutas por prefijo) + test `31`. Commit `717b677` (merge a main).
+2. **Deploy en estado mixto/rollout (infra):** smoke mostró `/quote`=200 pero `/quote/new`=404 y dinámica=404,
+   patrón de **deployment parcial/no promovido** al alias `construction-ops-psi`. No promovible por API
+   (Vercel MCP 403, sin CLI). El push de `717b677` fuerza un build/deploy limpio de todo `main`.
+
+### Estado al cierre
+- typecheck 0 · lint 0 · tests auth/access/routes **165/0** · build 0 · gm **22/22** · diff-check limpio (2 archivos).
+- Smoke prod (aún build previo): `/login` 200 · `/quote` 200(sin proteger, build viejo) · `/quote/new` 404 ·
+  `/apu?view=cards` 307 · `/projects` 307 · cron 401.
+- **ACCIÓN del dueño (manual, bloqueante):** en Vercel → proyecto **construction-ops** (NO `construction-ops-1rqh`)
+  → **Deployments** → localizar el deploy del commit **`717b677`** de `main` → confirmar **Ready** → si no está
+  como **Production/Current**, **Promote to Production** (o completar el rolling release al 100%).
+- **Validación esperada tras promover:** `/quote`=**307**, `/quote/new`=**307**, `/quote/x/y/z`=**307**
+  (protegidas, redirigen a login sin sesión), `/login`=200, `/apu?view=cards`=307, cron=401.
+- Sin DB/migración/env/SMTP/usuarios; solo `routes.ts` + test; no se tocó `construction-ops-1rqh`.
+
+---
+
 ## 2026-06-25 — QUOTING_ASSISTED_MODE_V1_PHASE_1 — MERGED A MAIN (deploy pendiente de promoción) (orchestrator)
 
 ### Qué se liberó (capa guiada ADITIVA, sin lógica financiera nueva, 10 archivos +969)
