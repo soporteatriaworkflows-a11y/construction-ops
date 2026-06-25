@@ -1,5 +1,56 @@
 # Handoff Log
 
+## 2026-06-25 — APU_QUOTE_READINESS_INTEGRATION_V2 — CIERRE / VERIFICACIÓN (orchestrator)
+
+### Estado (RELEASED — verificación de cierre, sin re-implementar)
+- **Mergeada a `origin/main`** en ciclo anterior. Esta sesión solo verifica y cierra bitácora.
+- `origin/main` = **`46f3a77e84a5889bd15cce5927a30a759b7a9bb5`** (merge commit
+  `merge(quote): release APU readiness integration V2`).
+- Tag = **`quote-readiness-apu-integration-v2`** → apunta exactamente a `46f3a77` (confirmado).
+- Feature commit = `6463077 feat(quote): integrate APU completeness into readiness semaphore`.
+- Working tree limpio; `git fetch --all --tags` OK. `main` local quedaba viejo (`26f3fca`) por
+  falta de pull tras el merge; no afecta `origin/main` (fuente de verdad).
+
+### Qué implementó (8 archivos, +259/−32 en `6463077`)
+Integra la **completitud de APU** dentro del **semáforo de preparación de cotización** (readiness):
+- `apps/web/lib/estimates/quote-readiness.ts` (+116) — núcleo de readiness con señal de APU.
+- `.../estimates/[estimateId]/quote-readiness-semaphore.tsx` (+39) — UI del semáforo.
+- `.../estimates/[estimateId]/page.tsx` (+7) — wiring de página.
+- `apps/web/lib/apu-library/from-summary.ts` (+41) — derivación desde summary de APU.
+- `apps/web/lib/contracts/read-model.ts` (+3) — contrato read-model (campo completitud APU).
+- `server/read-model/drizzle-repository.ts` (+1) y `fixture-repository.ts` (+1) — pueblan el campo.
+- `tests/unit/estimates/quote-readiness.test.ts` (+83) — cobertura nueva.
+
+### Alcance / reglas
+- **Sin DB ni migración** (cero archivos `.sql`/migración en el commit). Campo servido desde repos
+  sobre datos existentes; esquema intacto.
+- **No tocó export / BOQ / cantidades.**
+- **APU solo lectura/derivación** (consume summary; no muta cálculo de APU, snapshots ni motor).
+- Sin env, sin SMTP/Resend, sin usuarios, sin mutación de datos reales.
+- **No se tocó `construction-ops-1rqh`** (proyecto Vercel duplicado, deuda preexistente).
+
+### Verificación (esta sesión, números reales)
+- typecheck **exit 0**; lint (`eslint .`) **exit 0**.
+- Tests scoped (estimates+apu): **512 passed / 0 fail** (39 files) — incluye readiness.
+- Suite completa: **1952 passed / 42 skipped / 0 fail** (143 files).
+- **gm:regression 22/22** (`first-floor.regression.test.ts`).
+- **build exit 0** (Next 16; ruta `…/estimates/[estimateId]` presente).
+- **Smoke producción** (`construction-ops-psi.vercel.app`, GET-only, sin mutar):
+  `/login` **200**; `/dashboard` `/apu` `/apu?view=cards` `/projects` **307** (sin 500);
+  `/api/cron/price-monitor` **401**. Alias vivo (Server: Vercel, X-Vercel-Cache HIT).
+
+### Deploy producción
+- Alias `construction-ops-psi.vercel.app` **vivo y saludable** (smoke OK).
+- **No confirmado por API** qué commit/deployment-id sirve: **Vercel MCP devolvió 403**
+  (scope `soporteatriaworkflows-8854s-projects` requiere re-autenticación). Verificación de
+  deployment-id/commit/fecha queda **pendiente de confirmación manual en el dashboard Vercel**.
+
+### Pendientes reales
+- Confirmar en dashboard Vercel que `46f3a77` es el deployment de producción activo (MCP 403).
+- (Deuda preexistente conocida) proyecto duplicado `construction-ops-1rqh` sigue fallando — no tocar.
+
+---
+
 ## 2026-06-15 — SCHEDULE_PREVIEW_READMODEL_ROOT_CAUSE_V4 — COMPLETA (Fases 0–7) (orchestrator)
 
 ### Estado
