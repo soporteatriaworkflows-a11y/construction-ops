@@ -11,6 +11,7 @@ import { SidebarNav } from '@/components/shared/sidebar-nav';
 import { AppTopbar } from '@/components/shared/app-topbar';
 import { ContextualNav } from '@/components/shared/contextual-nav';
 import { resolveAccessActor, canManageAccess } from '@/server/access';
+import { QuoteCompanion } from './_components/quote-companion';
 
 /**
  * Render REQUEST-TIME de todo el segmento autenticado. La app va detrás de auth
@@ -90,6 +91,9 @@ export default async function DashboardLayout({ children }: { children: ReactNod
           <div className="mx-auto max-w-screen-2xl px-6 py-6">{children}</div>
         </main>
       </div>
+
+      {/* Asistente acompañante de cotización (aditivo, fixed, no afecta el flujo) */}
+      <QuoteCompanion />
     </div>
   );
 }
