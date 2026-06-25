@@ -1,5 +1,36 @@
 # Handoff Log
 
+## 2026-06-25 — QUOTING_ASSISTED_COMPANION_PANEL_V1B_PHASE_1 — RELEASED (orchestrator)
+
+### Qué se liberó (companion panel, capa ADITIVA, 11 archivos)
+Asistente acompañante (Opción D) montado UNA vez en `app/(dashboard)/layout.tsx` → persiste al navegar:
+- **Launcher flotante** inferior-derecho + **panel lateral derecho** colapsable (open/minimized) + **pin**.
+- Detecta la cotización activa **desde la ruta** (`lib/quote/quote-context-from-path.ts`: `/quote/[p]/[s]/[v]`
+  y `/projects/[id]/scopes/[scopeId]/estimates/[estimateId]` + subrutas; param estimateId==versionId);
+  off-route → CTA a /quote. (Persistencia de "última cotización" diferida a Phase 2.)
+- Muestra: cotización activa, progreso 1–8, semáforo resumido, **siguiente acción** (`nextQuoteAction`),
+  enlaces rápidos (Presupuesto/APU/Cantidades/Precios/Semáforo/Export) e "Ir al centro".
+- Datos vía server action **READ-ONLY** `getQuoteCompanionState` que reusa `getEstimateById`+
+  `getEstimateDetail`+`listApus`+`computeQuoteReadiness`+`deriveQuoteProgress`+`summarizeQuoteProgress`+
+  `nextQuoteAction`. NO finanzas, NO mutación, NO conteos de export (N+1).
+- `z-30` (debajo de modales `z-50`/`z-[100]`), oculto `< lg`. Botón "Asistente" en topbar + "Abrir
+  asistente acompañante" en /quote home, vía CustomEvent `quote-companion:open`.
+- Persistencia localStorage: solo preferencia `pinned` (Phase 1).
+
+### Estado / release
+- `origin/main` = **`2e560acc38e3636a4be5ebc5aab21bc2ebd3dbdf`** (merge `--no-ff`
+  `merge(quote): release assisted quoting companion panel V1B phase 1`, sobre `1c23137`). Tag =
+  **`quoting-assisted-companion-panel-v1b-phase-1`** → `2e560ac`.
+- typecheck 0 · lint 0 · suite completa **2005/0 (+42 skip)** · build 0 (rutas /quote intactas) · gm **22/22** · diff-check limpio.
+- Smoke prod: /login 200 · /quote 307 · /quote/new 307 · /apu 307 · /projects 307 · cron 401.
+- **Aditivo:** sin DB/migración/env/SMTP/usuarios/RPC/mutación nueva; sin tocar
+  BOQ/APU/cantidades/export/cronograma ni `unit_price_snapshot`; /quote y workspace técnico intactos; no `-1rqh`.
+- **Pendiente:** verificación visual tras promoción del deploy (el panel es UI client; smoke no lo cubre).
+  Lint del repo es estricto (react-hooks/set-state-in-effect + react-hooks/refs) → companion sin setState
+  síncrono en effects ni ref-en-render (loading derivado, contexto solo de ruta).
+
+---
+
 ## 2026-06-25 — VERIFY_AND_RECOVER_QUOTING_ASSISTED_V1_PRODUCTION_DEPLOY (orchestrator)
 
 ### Verificación
