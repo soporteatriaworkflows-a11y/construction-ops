@@ -199,6 +199,9 @@ export function QuoteCompanion() {
 
   function onHeaderPointerDown(e: ReactPointerEvent): void {
     if (pinned || e.button !== 0) return;
+    // NO iniciar drag si el pointerdown nace en un control del header (botones):
+    // capturar el puntero ahí robaba el click a Restaurar/Fijar/Minimizar.
+    if ((e.target as HTMLElement).closest('button')) return;
     const el = winRef.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
@@ -265,7 +268,10 @@ export function QuoteCompanion() {
           <Sparkles className="h-4 w-4 shrink-0 text-iconic-primary" aria-hidden="true" />
           <span className="truncate">Asistente de cotización</span>
         </span>
-        <div className="flex items-center gap-0.5">
+        <div
+          className="flex items-center gap-0.5"
+          onPointerDown={(e) => e.stopPropagation()}
+        >
           {!docked && (
             <button
               type="button"
