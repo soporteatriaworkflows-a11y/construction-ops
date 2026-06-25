@@ -25,6 +25,11 @@ import type {
   ApuLibrarySort,
 } from '@/lib/apu-library/types';
 import { ApuResourceBadge } from './_components/apu-resource-badge';
+import {
+  ApuActivityCard,
+  ApuLibraryFilters,
+  ApuLibraryToolbar,
+} from './_components/apu-library-cards';
 
 export const dynamic = 'force-dynamic';
 
@@ -65,6 +70,12 @@ export default async function ApuPage({ searchParams }: PageProps) {
   const filter = (str(sp.filter, 'all') as ApuLibraryFilter) || 'all';
   const sort = (str(sp.sort, 'code') as ApuLibrarySort) || 'code';
   const origin = str(sp.origin) || null;
+  // APU_LIBRARY_REUSABLE_ACTIVITIES_UX_V1: vista tarjetas (convive con workspace).
+  const view: 'cards' | 'workspace' = str(sp.view) === 'cards' ? 'cards' : 'workspace';
+  const category = str(sp.category);
+  const unit = str(sp.unit);
+  const completeness = str(sp.completeness);
+  const cardsArchived = str(sp.archived) === '1';
 
   let result: ApuLibraryResult | null = null;
   let error: string | null = null;
@@ -80,7 +91,10 @@ export default async function ApuPage({ searchParams }: PageProps) {
       filter,
       sort,
       origin,
-      showArchived: filter === 'archived',
+      unit: view === 'cards' ? unit : null,
+      category: view === 'cards' ? category : null,
+      completeness: view === 'cards' ? completeness : null,
+      showArchived: view === 'cards' ? cardsArchived : filter === 'archived',
     });
   } catch (e) {
     error = e instanceof Error ? e.message : 'Error al cargar la biblioteca APU';
@@ -161,6 +175,42 @@ export default async function ApuPage({ searchParams }: PageProps) {
   const { items, stats, total } = result;
   const totalPages = Math.max(1, Math.ceil(total / result.pageSize));
 
+  // Vista TARJETAS: actividades reutilizables (convive con el workspace técnico).
+  if (view === 'cards') {
+    return (
+      <div>
+        <PageHeader
+          title="Biblioteca APU"
+          description="Actividades reutilizables para cotizar proyectos."
+          actions={actions}
+        />
+        <ApuLibraryToolbar activeView="cards" canMutate={canMutate} />
+        <ApuLibraryFilters
+          values={{ q: search, category, unit, completeness, size: result.pageSize, showArchived: cardsArchived }}
+          units={result.units ?? []}
+        />
+        {items.length === 0 ? (
+          <div className="rounded-md border bg-gray-50 px-4 py-10 text-center text-sm text-gray-500">
+            No hay actividades que coincidan con los filtros.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {items.map((item) => (
+              <ApuActivityCard key={item.id} item={item} canMutate={canMutate} />
+            ))}
+          </div>
+        )}
+        <div className="mt-4 flex items-center justify-between text-sm text-gray-600">
+          <span>{total} actividad{total !== 1 ? 'es' : ''} · página {result.page} de {totalPages}</span>
+          <div className="flex gap-2">
+            <PageLink sp={sp} page={result.page - 1} disabled={result.page <= 1} label="Anterior" />
+            <PageLink sp={sp} page={result.page + 1} disabled={result.page >= totalPages} label="Siguiente" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       <PageHeader
@@ -168,6 +218,7 @@ export default async function ApuPage({ searchParams }: PageProps) {
         description="Análisis de Precios Unitarios reutilizables por proyecto"
         actions={actions}
       />
+      <ApuLibraryToolbar activeView="workspace" canMutate={canMutate} />
 
       {/* Métricas de encabezado */}
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">

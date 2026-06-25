@@ -367,6 +367,35 @@ export interface RawApuComponent {
   materialQuantityNote?: string | null;
 }
 
+/** Conteo por tipo de componente + materiales sin precio (biblioteca APU). */
+export interface ApuComponentSummaryCounts {
+  typeCounts: Record<ApuComponentType, number>;
+  /** Componentes material con `unit_price_snapshot` ausente o ≤ 0. */
+  materialsWithoutPrice: number;
+}
+
+/**
+ * Resume los componentes de un APU por tipo y cuenta materiales sin precio.
+ * PURA, sin DB, sin recalcular finanzas (solo cuenta). Se deriva de componentes
+ * ya cargados (sin consultas extra), para enriquecer `ApuSummary` en la biblioteca.
+ */
+export function summarizeApuComponents(
+  components: readonly Pick<RawApuComponent, 'componentType' | 'unitPriceSnapshot'>[],
+): ApuComponentSummaryCounts {
+  const typeCounts: Record<ApuComponentType, number> = {
+    material: 0, labor: 0, equipment: 0, tool: 0, subcontract: 0, other: 0,
+  };
+  let materialsWithoutPrice = 0;
+  for (const c of components) {
+    typeCounts[c.componentType] = (typeCounts[c.componentType] ?? 0) + 1;
+    if (c.componentType === 'material') {
+      const price = Number(c.unitPriceSnapshot);
+      if (!Number.isFinite(price) || price <= 0) materialsWithoutPrice += 1;
+    }
+  }
+  return { typeCounts, materialsWithoutPrice };
+}
+
 /**
  * Deriva el `ApuDetail` COMPLETO (con campos 🔒 de rol laboral) a partir de
  * filas crudas, delegando el costo unitario completo (incluida la herramienta

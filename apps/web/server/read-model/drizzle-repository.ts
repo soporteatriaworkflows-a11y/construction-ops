@@ -42,6 +42,7 @@ import {
   computeApuDetail,
   computeDashboard,
   computeEstimate,
+  summarizeApuComponents,
   type EstimateComputation,
   type EstimateComputationInput,
   type RawApuComponent,
@@ -417,6 +418,7 @@ export class DrizzleReadModelRepository implements ReadModelPort {
         },
         rows,
       );
+      const summary = summarizeApuComponents(rows);
       return {
         id: t.id,
         code: t.code,
@@ -430,6 +432,8 @@ export class DrizzleReadModelRepository implements ReadModelPort {
         archivedAt: (t as { archivedAt?: Date | string | null }).archivedAt
           ? new Date((t as { archivedAt: Date | string }).archivedAt).toISOString()
           : null,
+        typeCounts: summary.typeCounts,
+        materialsWithoutPrice: summary.materialsWithoutPrice,
       };
     });
     });

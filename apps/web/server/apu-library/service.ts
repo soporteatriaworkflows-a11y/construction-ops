@@ -22,6 +22,8 @@ import type {
   ApuResourceStatus,
 } from '@/lib/apu-library/types';
 import type { ReconciliationRow } from '@/lib/apu-reconciliation/types';
+import { deriveApuCategory } from '@/lib/apu-library/category';
+import { computeApuCompleteness } from '@/lib/apu-library/completeness';
 
 const PAGE_SIZES = [25, 50, 100] as const;
 
@@ -115,6 +117,10 @@ export async function getApuLibrary(
     // Incompleto si el costo unitario es cero (no hay precio aprobado o sin
     // componentes con costo). Comparación con Decimal, sin float.
     const isIncomplete = toDecimal(a.unitCost ?? '0').isZero();
+    const enriched = a as typeof a & {
+      typeCounts?: ApuLibraryItem['typeCounts'];
+      materialsWithoutPrice?: number;
+    };
     return {
       id: a.id,
       code: a.code,
@@ -128,6 +134,9 @@ export async function getApuLibrary(
       resourceStatus: status,
       archivedAt,
       isIncomplete,
+      typeCounts: enriched.typeCounts,
+      materialsWithoutPrice: enriched.materialsWithoutPrice,
+      category: deriveApuCategory(a.name),
     };
   });
 
@@ -207,6 +216,18 @@ export async function getApuLibrary(
         : filtered.filter((i) => i.importBatchId === params.origin);
   }
 
+  // Filtros de la vista tarjetas (opcionales; no afectan el workspace técnico).
+  if (params.unit && params.unit.trim() !== '') {
+    const u = params.unit.trim().toLowerCase();
+    filtered = filtered.filter((i) => i.unit.toLowerCase() === u);
+  }
+  if (params.category && params.category.trim() !== '') {
+    filtered = filtered.filter((i) => i.category === params.category);
+  }
+  if (params.completeness && params.completeness.trim() !== '') {
+    filtered = filtered.filter((i) => computeApuCompleteness(i).state === params.completeness);
+  }
+
   // Ordenamiento.
   filtered = [...filtered].sort((a, b) => {
     switch (params.sort) {
@@ -240,5 +261,9 @@ export async function getApuLibrary(
     origins.push({ id: 'manual', label: 'Manual / sin lote' });
   }
 
-  return { items, total, page, pageSize, stats, origins };
+  const units = [...new Set(allItems.map((i) => i.unit).filter((u) => u && u.trim() !== ''))].sort(
+    (a, b) => a.localeCompare(b),
+  );
+
+  return { items, total, page, pageSize, stats, origins, units };
 }

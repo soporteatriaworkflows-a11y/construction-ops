@@ -42,6 +42,7 @@ import {
   computeApuDetail,
   computeDashboard,
   computeEstimate,
+  summarizeApuComponents,
   type EstimateComputation,
   type EstimateComputationInput,
 } from './compute';
@@ -383,6 +384,7 @@ export class FixtureReadModelRepository implements ReadModelPort {
         },
         components,
       );
+      const summary = summarizeApuComponents(components);
       return {
         id: tpl.id,
         code: tpl.code,
@@ -392,6 +394,8 @@ export class FixtureReadModelRepository implements ReadModelPort {
         componentCount: components.length,
         originType: (tpl as { originType?: string }).originType,
         archivedAt: (tpl as { archivedAt?: string | null }).archivedAt ?? null,
+        typeCounts: summary.typeCounts,
+        materialsWithoutPrice: summary.materialsWithoutPrice,
       };
     });
   }

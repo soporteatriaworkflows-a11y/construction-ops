@@ -2,7 +2,8 @@
  * types.ts — Contrato de la biblioteca APU compacta
  * (APU_LIBRARY_OPERATIONAL_UX_V1). Tipos puros consumidos por la UI.
  */
-import type { DecimalString, Uuid } from '@/lib/utils/types';
+import type { ApuComponentType, DecimalString, Uuid } from '@/lib/utils/types';
+import type { ApuCategory } from './category';
 
 /** Estado agregado de recursos de un APU (componentes no-labor). */
 export interface ApuResourceStatus {
@@ -31,6 +32,13 @@ export interface ApuLibraryItem {
   archivedAt?: string | null;
   /** true si unitCost = '0' o hay componente con totalComponentCost=0. */
   isIncomplete?: boolean;
+  /** APU_LIBRARY_REUSABLE_ACTIVITIES_UX_V1 (derivados, sin DB nueva): */
+  /** Conteo de componentes por tipo (del read-model). */
+  typeCounts?: Record<ApuComponentType, number>;
+  /** Materiales con precio ausente o ≤ 0. */
+  materialsWithoutPrice?: number;
+  /** Categoría derivada por palabras clave (fallback visual). */
+  category?: ApuCategory;
 }
 
 /** Métricas del encabezado de la biblioteca. */
@@ -73,6 +81,13 @@ export interface ApuLibraryParams {
    * exponer `archivedAt` por plantilla para que el filtro tenga efecto real.
    */
   showArchived?: boolean;
+  /** APU_LIBRARY_REUSABLE_ACTIVITIES_UX_V1 (vista tarjetas; opcionales): */
+  /** Filtro por unidad exacta (case-insensitive); null/'' = todas. */
+  unit?: string | null;
+  /** Filtro por categoría derivada; null/'' = todas. */
+  category?: string | null;
+  /** Filtro por estado de completitud (ready|review|incomplete|archived); null = todos. */
+  completeness?: string | null;
 }
 
 export interface ApuLibraryResult {
@@ -82,4 +97,6 @@ export interface ApuLibraryResult {
   pageSize: number;
   stats: ApuLibraryStats;
   origins: { id: string; label: string }[];
+  /** Unidades distintas presentes (para el filtro de la vista tarjetas). */
+  units?: string[];
 }
