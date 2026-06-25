@@ -1,5 +1,34 @@
 # Handoff Log
 
+## 2026-06-25 — UX_QUOTING_COMPANION_FLOATING_GUIDED_WINDOW_V1 — RELEASED (orchestrator)
+
+### Causa UX
+El companion (in-place) seguía confuso: anclado al costado derecho (no era lo esperado), el progreso
+dependía solo de color, y faltaba texto explícito de "dónde voy".
+
+### Qué cambió (UX-only/read-only/aditivo, 6 archivos)
+- **Ventana flotante draggable**: arrastrable desde el header (pointer events + setPointerCapture),
+  recuerda posición x/y en localStorage, clamp al viewport en resize, botón **"Restaurar posición"**
+  (→ bottom-right). El modo **fijar al costado (pinned)** conserva el panel anclado como **fallback**.
+  Ancho 390px, `max-h-[75vh]`, scroll interno, `z-30` (bajo modales z-50/z-[100]), oculto `< lg`.
+- **Texto de guía explícito** (no solo color): `lib/quote/quote-location.ts` (puro) → "Estás aquí:
+  <sección>" por ruta (Dashboard/Vista asistida/Presupuesto-Capítulos/Asociar APU/Cantidades/Precios/
+  Sin contexto). Cuerpo muestra "Paso actual: N de 8 · <label>", "Estado", "Siguiente"; cada paso del
+  mini-stepper muestra label textual (Listo/Revisar/Pendiente/Bloqueado) + badge "Estás aquí" en el actual.
+- Sin contexto: texto guía + selector embebido (sin redirigir).
+
+### Estado / release
+- `origin/main` = **`e782ce7f3f9fe7f2f5b4aad401e21956d2dd7a6c`** (merge `--no-ff`, sobre `ff84378`). Tag =
+  **`quoting-companion-floating-guided-window-v1`** → `e782ce7`.
+- typecheck 0 · lint 0 · tests quote **73/0** · suite completa **2027/0 (+42 skip)** · build 0 · gm **22/22** · diff-check limpio.
+- Smoke prod: /login 200 · /quote 307 · /quote/new 307 · /apu 307 · /projects 307 · cron 401.
+- **Aditivo:** sin DB/migración/env/SMTP/usuarios/RPC/finanzas/`unit_price_snapshot`; sin tocar
+  BOQ/APU/cantidades/export/cronograma; /quote y workspace técnico intactos; no `-1rqh`. localStorage
+  solo ids cotización + pinned + posición.
+- **Pendiente:** verificación visual tras promoción del deploy (UI client; recordar promoción manual Vercel MCP 403).
+
+---
+
 ## 2026-06-25 — HOTFIX_QUOTING_COMPANION_TRUE_IN_PLACE_GUIDE_V1 — RELEASED (orchestrator)
 
 ### Causa UX
