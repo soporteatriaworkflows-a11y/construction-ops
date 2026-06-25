@@ -1,5 +1,32 @@
 # Handoff Log
 
+## 2026-06-25 — HOTFIX_QUOTING_COMPANION_NOT_FLOATING_V1 — RELEASED (orchestrator)
+
+### Causa real
+`origin/main` (263280f) SÍ tenía el código draggable. La usuaria veía el asistente anclado/no movible por:
+(a) **deploy viejo** (build in-place/side-docked aún sirviendo, patrón sistémico de promoción manual), y/o
+(b) el default `bottom-5 right-5` (pegado a la esquina) **se leía como anclado**, no como ventana movible.
+Nota: `pinned` ya arrancaba en `false` y NO se restauraba de localStorage → no era pinned-forzado.
+
+### Qué cambió (UX-only, 2 archivos)
+- **Flotante por defecto, sin ambigüedad:** `openPanel` ahora asigna SIEMPRE una **posición flotante
+  explícita** (`defaultFloatingPos`, despegada de los bordes) en vez de la esquina; nunca restaura `pinned`
+  → el modo flotante es el default. El modo anclado `right-0` aplica **solo** si el usuario fija.
+- **Señales visibles:** barra de estado "Ventana flotante · Arrastra para mover" / "Fijado al costado" +
+  botón **"Soltar ventana"** (escape del modo fijo); "Restaurar posición" vuelve al punto flotante.
+- Re-release **fuerza un deploy limpio** (recupera cualquier build viejo aún servido).
+
+### Estado / release
+- `origin/main` = **`ae74d45a6ee46fb165fc664f95e9867a0856d6c4`** (merge `--no-ff`, sobre `263280f`). Tag =
+  **`quoting-companion-floating-default-hotfix-v1`** → `ae74d45`.
+- typecheck 0 · lint 0 · tests quote **79/0** · suite completa **2033/0 (+42 skip)** · build 0 · gm **22/22** · diff-check limpio.
+- Smoke prod: /login 200 · /quote 307 · /quote/new 307 · /apu 307 · /projects 307 · cron 401.
+- **Aditivo:** sin DB/migración/env/SMTP/usuarios/RPC/finanzas; sin tocar BOQ/APU/cantidades/export/cronograma; /quote intacto; no `-1rqh`. localStorage solo ids cotización + pinned + posición.
+- **Pendiente:** verificación visual tras promoción del deploy (UI client; **confirmar en Vercel que el
+  deploy de `ae74d45` quede Production/Current** — MCP 403/sin CLI).
+
+---
+
 ## 2026-06-25 — UX_QUOTING_COMPANION_FLOATING_GUIDED_WINDOW_V1 — RELEASED (orchestrator)
 
 ### Causa UX
