@@ -113,12 +113,12 @@ export function QuoteCompanionBody({ payload }: { payload: QuoteCompanionPayload
         </div>
       </div>
 
-      {/* Ir al centro */}
+      {/* Vista completa (acción secundaria) */}
       <Link
         href={centerHref}
         className="flex items-center justify-center gap-1.5 rounded-lg border border-iconic-soft-blue px-3 py-2 text-[12px] font-medium text-iconic-primary hover:bg-brand-50/60"
       >
-        Ir al centro de cotización
+        Abrir vista completa
         <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
       </Link>
     </div>

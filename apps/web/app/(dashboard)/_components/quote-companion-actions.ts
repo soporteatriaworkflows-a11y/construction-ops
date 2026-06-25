@@ -48,6 +48,62 @@ export type QuoteCompanionState =
   | { ok: true; payload: QuoteCompanionPayload }
   | { ok: false; error: string };
 
+/* ---------------------------------------------------------------------------
+ * Selector embebido (lecturas read-only; sin mutación)
+ * ------------------------------------------------------------------------ */
+
+export interface QuoteSelectOption {
+  id: string;
+  label: string;
+  disabled?: boolean;
+}
+
+export type QuoteSelectResult =
+  | { ok: true; options: QuoteSelectOption[] }
+  | { ok: false; error: string };
+
+export async function listQuoteProjects(): Promise<QuoteSelectResult> {
+  try {
+    const viewer = await resolveViewer();
+    const projects = await getReadModel().listProjects(viewer);
+    return { ok: true, options: projects.map((p) => ({ id: p.id, label: p.name })) };
+  } catch {
+    return { ok: false, error: 'No se pudieron cargar los proyectos.' };
+  }
+}
+
+export async function listQuoteScopes(projectId: string): Promise<QuoteSelectResult> {
+  if (!projectId) return { ok: true, options: [] };
+  try {
+    const viewer = await resolveViewer();
+    const overview = await getReadModel().getProjectOverview(viewer, projectId);
+    return {
+      ok: true,
+      options: overview.scopes.map((s) => ({ id: s.id, label: `${s.code} · ${s.name}` })),
+    };
+  } catch {
+    return { ok: false, error: 'No se pudieron cargar los alcances.' };
+  }
+}
+
+export async function listQuoteVersions(scopeId: string): Promise<QuoteSelectResult> {
+  if (!scopeId) return { ok: true, options: [] };
+  try {
+    const viewer = await resolveViewer();
+    const estimates = await getEstimatesWriteRepository().listEstimatesByScope(viewer, scopeId);
+    return {
+      ok: true,
+      options: estimates.map((e) => ({
+        id: e.id,
+        label: `${e.code} · ${e.name}${e.status === 'archived' ? ' (archivado)' : ''}`,
+        disabled: e.status === 'archived',
+      })),
+    };
+  } catch {
+    return { ok: false, error: 'No se pudieron cargar los presupuestos.' };
+  }
+}
+
 export async function getQuoteCompanionState(
   projectId: string,
   scopeId: string,
