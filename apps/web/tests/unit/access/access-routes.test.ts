@@ -28,4 +28,11 @@ describe('rutas de acceso', () => {
     expect(isPublicRoute('/login')).toBe(true);
     expect(isPublicRoute('/reset-password')).toBe(true);
   });
+
+  it('31: el asistente de cotización /quote está protegido (incluye subrutas)', () => {
+    expect(PROTECTED_ROUTES).toContain('/quote');
+    expect(isProtectedRoute('/quote')).toBe(true);
+    expect(isProtectedRoute('/quote/new')).toBe(true);
+    expect(isProtectedRoute('/quote/p1/s1/v1')).toBe(true);
+  });
 });

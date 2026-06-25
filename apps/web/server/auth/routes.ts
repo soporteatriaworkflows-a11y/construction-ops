@@ -19,6 +19,7 @@ export const PUBLIC_ROUTES = [
 /** Rutas protegidas (AUTH_RUNTIME_CONTRACT §5). */
 export const PROTECTED_ROUTES = [
   '/dashboard',
+  '/quote',
   '/projects',
   '/estimates',
   '/apu',
