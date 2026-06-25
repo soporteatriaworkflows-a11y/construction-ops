@@ -51,6 +51,33 @@ describe('apuLinkEligibility — elegibilidad de la tarjeta', () => {
   });
 });
 
+describe('HOTFIX no-action: el control bloqueado nunca es silencioso', () => {
+  // El botón deshabilitado revela `eligibility.message`; garantizamos que cada
+  // estado bloqueado produzca un mensaje VISIBLE (no vacío) y un reason.
+  const blockedStates = ['archived', 'incomplete'] as const;
+  for (const st of blockedStates) {
+    it(`estado ${st} ⇒ canLink=false con mensaje no vacío`, () => {
+      const e = apuLinkEligibility({ completenessState: st, canMutate: true });
+      expect(e.canLink).toBe(false);
+      expect(e.reason).toBeDefined();
+      expect(typeof e.message).toBe('string');
+      expect((e.message ?? '').length).toBeGreaterThan(0);
+    });
+  }
+
+  it('sin permiso/modo (canMutate=false) ⇒ mensaje no vacío', () => {
+    const e = apuLinkEligibility({ completenessState: 'ready', canMutate: false });
+    expect(e.canLink).toBe(false);
+    expect((e.message ?? '').length).toBeGreaterThan(0);
+  });
+
+  it('estado vinculable ⇒ canLink=true y SIN mensaje (abre panel, no muestra razón)', () => {
+    const e = apuLinkEligibility({ completenessState: 'ready', canMutate: true });
+    expect(e.canLink).toBe(true);
+    expect(e.message).toBeUndefined();
+  });
+});
+
 describe('isEditableVersionStatus — solo borrador/revisión', () => {
   it('4. draft y review ⇒ editable', () => {
     expect(isEditableVersionStatus('draft')).toBe(true);
