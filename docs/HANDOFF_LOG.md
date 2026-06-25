@@ -1,5 +1,39 @@
 # Handoff Log
 
+## 2026-06-25 — QUOTING_ASSISTED_MODE_V1_PHASE_1 — MERGED A MAIN (deploy pendiente de promoción) (orchestrator)
+
+### Qué se liberó (capa guiada ADITIVA, sin lógica financiera nueva, 10 archivos +969)
+Modo "Cotizar con asistente":
+- Rutas: `/quote` (home + CTA), `/quote/new` (wizard selector proyecto→alcance→versión, reusa
+  read-model + rutas de creación existentes), `/quote/[projectId]/[scopeId]/[versionId]` (centro de
+  cotización con stepper de 8 pasos + semáforo embebido).
+- Helper PURO `lib/quote/quote-progress.ts` (`deriveQuoteProgress`/`quoteHrefs`/`summarizeQuoteProgress`):
+  deriva estado por paso (done/attention/pending/locked) + deep-links desde read-model +
+  `computeQuoteReadiness`. **No recalcula finanzas.** + tests (37 casos).
+- Componentes `quote-stepper.tsx`/`quote-step-card.tsx` (presentacionales).
+- Reuso: `QuoteReadinessSemaphore`/`ReadinessExportAlert`, `getEstimateById`, `getEstimateDetail`,
+  `listProjects`/`getProjectOverview`/`listEstimatesByScope`, `isCreationModeEnabled`.
+- Entradas: QuickLink en `/dashboard` + comando en ⌘K (grupo Acciones, `/quote`).
+
+### Estado / release
+- `origin/main` = **`75bef7aea37ff69c15b22b8daba90cd7702ac057`** (merge `--no-ff`
+  `merge(quote): release assisted quoting mode V1 phase 1`, sobre `92c49d4`). Tag =
+  **`quoting-assisted-mode-v1-phase-1`** → `75bef7a`.
+- typecheck **0** · lint **0** · tests quote/estimates/readiness/nav **292/0** · suite completa
+  **1990/0 (+42 skip)** · build **0** (rutas `/quote`, `/quote/new`, `/quote/[…]` registradas) · **gm 22/22** · diff-check limpio.
+- **Aditivo:** sin DB/migración/env/SMTP/usuarios/RPC/mutación nueva; sin tocar
+  BOQ/APU/cantidades/export/cronograma ni `unit_price_snapshot`; workspace técnico y detalle de
+  presupuesto intactos; **no** se tocó `construction-ops-1rqh`.
+
+### ⚠️ Deploy pendiente de promoción (bloqueante para verificación)
+Smoke prod: `/login` 200, `/apu?view=cards` 307, `/projects` 307, cron 401 (sanos), pero **`/quote` y
+`/quote/new` = 404** porque el deploy de `75bef7a` aún **no está promovido** al alias `construction-ops-psi`
+(mismo patrón ya observado en el hotfix del modal). No se puede promover por API (Vercel MCP 403, sin CLI).
+**ACCIÓN del dueño:** en Vercel → construction-ops → Deployments, confirmar que el deploy de `main`
+(`75bef7a`) esté **Ready + Promovido a Production**. Tras promover, `/quote` debe responder 307 (auth).
+
+---
+
 ## 2026-06-25 — HOTFIX_APU_BOQ_LINK_MODAL_NOT_RENDERING_V1 — RELEASED (orchestrator)
 
 ### Síntoma
