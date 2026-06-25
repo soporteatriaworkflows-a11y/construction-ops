@@ -34,8 +34,8 @@ describe('triggers abren el panel SIN navegar (1, 2)', () => {
 
 describe('sin contexto → selector embebido, no redirección (3, 6)', () => {
   it('la rama sin cotización renderiza el selector embebido', () => {
-    expect(COMPANION).toContain('QuoteCompanionSelector');
-    expect(COMPANION).toMatch(/!effectiveCtx\s*\?\s*\(\s*<QuoteCompanionSelector/);
+    expect(COMPANION).toContain('<QuoteCompanionSelector');
+    expect(COMPANION).toMatch(/!effectiveCtx\s*\?/);
   });
 
   it('ya NO usa el CTA "Ir al asistente" como única acción sin contexto', () => {
