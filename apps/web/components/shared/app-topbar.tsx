@@ -9,6 +9,7 @@ import { WorkspaceBrand } from '@/components/shared/workspace-brand';
 import { Breadcrumbs } from '@/components/shared/breadcrumbs';
 import { AccountMenu } from '@/components/shared/account-menu';
 import { CommandPalette } from '@/components/shared/command-palette';
+import { QuoteCompanionTopbarTrigger } from '@/app/(dashboard)/_components/quote-companion-trigger';
 
 interface Props {
   email: string | null;
@@ -28,6 +29,7 @@ export function AppTopbar({ email, role, workspaceName, canManageAccess }: Props
       <CommandPalette canManageAccess={canManageAccess} />
 
       <div className="flex shrink-0 items-center gap-3">
+        <QuoteCompanionTopbarTrigger />
         <WorkspaceBrand variant="chip" className="hidden md:inline-flex" />
         <span className="hidden h-6 w-px bg-iconic-soft-blue/60 md:inline-block" aria-hidden="true" />
         <AccountMenu

@@ -11,6 +11,7 @@ import { PageHeader } from '@/components/shared/page-header';
 import { Button } from '@/components/ui/button';
 import { resolveViewer } from '@/server/auth/resolve-viewer';
 import { getReadModel } from '@/server/read-model';
+import { QuoteCompanionOpenButton } from '../_components/quote-companion-trigger';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,9 +46,12 @@ export default async function QuoteHomePage() {
             </p>
           </div>
         </div>
-        <Button asChild>
-          <Link href="/quote/new">Empezar</Link>
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <QuoteCompanionOpenButton />
+          <Button asChild>
+            <Link href="/quote/new">Empezar</Link>
+          </Button>
+        </div>
       </div>
 
       {/* Proyectos recientes */}

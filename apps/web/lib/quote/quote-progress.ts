@@ -287,6 +287,19 @@ export function deriveQuoteProgress(input: QuoteProgressInput): QuoteStep[] {
   return steps;
 }
 
+/**
+ * Próxima acción recomendada: el primer paso `attention` (prioritario) y, si no
+ * hay, el primer `pending`. Ignora `locked` y `done`. `null` si no hay nada que
+ * hacer (todo done o todo locked). PURO.
+ */
+export function nextQuoteAction(steps: readonly QuoteStep[]): QuoteStep | null {
+  return (
+    steps.find((s) => s.status === 'attention') ??
+    steps.find((s) => s.status === 'pending') ??
+    null
+  );
+}
+
 /** Resumen agregado del progreso (para barra/encabezado). PURO. */
 export function summarizeQuoteProgress(steps: readonly QuoteStep[]): {
   done: number;
