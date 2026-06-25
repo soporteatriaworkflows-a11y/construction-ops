@@ -375,6 +375,7 @@ export class DrizzleReadModelRepository implements ReadModelPort {
         quantity: it.quantitySnapshot,
         unitPrice: it.unitPriceSnapshot,
         subtotal: it.subtotal,
+        apuTemplateId: it.apuTemplateId ?? null,
       }));
 
     return { estimate: computation.summary, chapters: computation.chapters, items };

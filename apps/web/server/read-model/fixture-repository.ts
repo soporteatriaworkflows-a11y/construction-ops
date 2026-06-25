@@ -361,6 +361,7 @@ export class FixtureReadModelRepository implements ReadModelPort {
         quantity: it.quantitySnapshot,
         unitPrice: it.unitPriceSnapshot,
         subtotal: it.subtotal,
+        apuTemplateId: (it as { apuTemplateId?: string | null }).apuTemplateId ?? null,
       }));
     return { estimate: summary, chapters, items };
   }

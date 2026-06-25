@@ -130,6 +130,9 @@ export interface BoqItemView {
   /** unitPriceSnapshot (precio presupuestado, ✅) */
   unitPrice: DecimalString;
   subtotal: DecimalString;
+  /** APU_QUOTE_READINESS_INTEGRATION_V2: plantilla APU vinculada (boq_items.apu_template_id),
+   * o null si el ítem no está vinculado a un APU. Aditivo, opcional. */
+  apuTemplateId?: Uuid | null;
 }
 
 export interface ApuSummary {
