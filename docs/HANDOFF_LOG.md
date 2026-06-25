@@ -1,5 +1,40 @@
 # Handoff Log
 
+## 2026-06-25 — HOTFIX_APU_BOQ_LINK_MODAL_NOT_RENDERING_V1 — RELEASED (orchestrator)
+
+### Síntoma
+Tras `UX_HOTFIX_APU_BOQ_LINK_MODAL_V1`, en producción el flujo "Vincular a BOQ" **seguía pintándose
+inline dentro de la tarjeta** (no abría ventana), igual que antes, pese a Ctrl+F5.
+
+### Causa real
+El código en `origin/main` (77e8a44) **ya tenía el modal correcto** (`fixed inset-0`, `role=dialog`,
+`<LinkPanel>` dentro del overlay) y el `layout.tsx` del dashboard **no** tiene ancestros con
+`transform/filter` que rompan `position:fixed`. Por tanto el comportamiento inline en prod indicaba
+**runtime**: deploy viejo/no promovido y/o fragilidad de un overlay `fixed` anidado profundo en el árbol
+de la tarjeta. Fix robusto que cubre ambas causas + fuerza deploy nuevo.
+
+### Fix (UX-only, 2 archivos)
+- `app/(dashboard)/apu/_components/link-to-boq-button.tsx`: el overlay del modal se renderiza con
+  **`createPortal(…, document.body)`** (escapa de cualquier `overflow/transform/contain` del shell y
+  queda fijo al viewport), `z-[100]`. Mantiene `role=dialog`/`aria-modal`, cierre por X/Escape/overlay,
+  bloqueo de scroll. Mismo flujo y misma mutación.
+- `tests/unit/apu/apu-boq-link-modal.test.ts` (nuevo): **anti-regresión a nivel de fuente** (stack node,
+  sin jsdom): exige `createPortal` + `document.body` + `fixed inset-0` + `role=dialog`/`aria-modal`, y
+  prohíbe el patrón inline (`return <LinkPanel`); LinkPanel se monta una sola vez.
+
+### Estado / release
+- `origin/main` = **`a50f9bf215cffe4208d170ff709c4b454d3427d3`** (merge `--no-ff`
+  `merge(apu): release BOQ link modal render hotfix V1`, sobre `77e8a44`). Tag =
+  **`apu-boq-link-modal-render-hotfix-v1`** → `a50f9bf`.
+- typecheck **0** · lint **0** · tests apu/boq/link **360/0** · build **0** · **gm 22/22** · diff-check limpio.
+- Smoke prod (psi): `/login` 200 · `/apu` 307 · `/apu?view=cards` 307 · `/projects` 307 · cron 401.
+- **Sin** DB/migración/env/SMTP/usuarios; sin RPC/lógica financiera/BOQ/export/cantidades/cronograma;
+  **no** se tocó `construction-ops-1rqh`.
+- **Acción recomendada a la usuaria/dueño:** confirmar en el dashboard de Vercel que el último
+  deployment de `main` está **Promovido a producción** (MCP 403 impide verificarlo por API).
+
+---
+
 ## 2026-06-25 — UX_HOTFIX_APU_BOQ_LINK_MODAL_V1 — RELEASED (orchestrator)
 
 ### Problema UX
