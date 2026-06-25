@@ -1,5 +1,38 @@
 # Handoff Log
 
+## 2026-06-25 — HOTFIX_APU_LIBRARY_BOQ_LINK_BUTTON_NO_ACTION_V1 — RELEASED (orchestrator)
+
+### Síntoma (producción)
+En `/apu?view=cards` las tarjetas cargan, pero clic en "Vincular a BOQ" **no hacía nada**: no abría
+panel, no mostraba error, sin flujo.
+
+### Causa raíz (dos defectos de UI client; sin backend)
+1. **Ruta activa:** `LinkPanel` disparaba la carga de proyectos con `startTransition` **en fase de
+   render** (efecto colateral durante el render) ⇒ el panel **fallaba al montar** al hacer clic.
+2. **Ruta deshabilitada:** cuando `eligibility.canLink=false` se renderizaba un `<span>` mudo cuya única
+   pista era un `title` (hover) ⇒ clic silencioso sin razón visible.
+
+### Fix mínimo (UI-only, 2 archivos)
+- `app/(dashboard)/apu/_components/link-to-boq-button.tsx`: carga de proyectos movida a `useEffect` de
+  montaje (con cancelación); estado deshabilitado ahora es un **botón real** que revela la razón
+  (`eligibility.message`) **inline** al hacer clic (nunca silencioso).
+- `tests/unit/apu/apu-boq-link.test.ts`: bloque que garantiza que todo estado bloqueado expone un
+  mensaje no vacío y que el estado vinculable no muestra razón.
+
+### Estado / release
+- `origin/main` = **`809e340e90637463ccbbf9fd3b66e5322981da61`** (merge `--no-ff`
+  `merge(apu): release BOQ link button hotfix V1`, sobre `9ab2199`). Tag =
+  **`apu-library-boq-link-button-hotfix-v1`** → `809e340`. Merge vía rama `release/...-merge` + push
+  `HEAD:main` (worktree de `main` ocupado; no tocado).
+- typecheck **0** · lint **0** · tests apu/boq/link **355/0** · build **0** · **gm 22/22** · diff-check limpio.
+- Smoke prod (psi, GET-only): `/login` 200 · `/apu` 307 · `/apu?view=cards` 307 · `/projects` 307 ·
+  cron 401. Alias vivo. Commit desplegado no confirmado por API (Vercel MCP 403 → dashboard manual).
+- **Sin** DB/migración/env/SMTP/usuarios; sin lógica financiera; sin tocar RPC `add_apu_to_boq`;
+  `unit_price_snapshot` intacto; sin tocar BOQ/export/cantidades/cronograma; **no** se tocó `construction-ops-1rqh`.
+- Pendiente: **verificación visual manual** autenticada en `db`-mode (abrir el panel y completar un vínculo).
+
+---
+
 ## 2026-06-25 — APU_LIBRARY_BOQ_LINK_FROM_CARDS_V1 — RELEASED (orchestrator)
 
 ### Estado
