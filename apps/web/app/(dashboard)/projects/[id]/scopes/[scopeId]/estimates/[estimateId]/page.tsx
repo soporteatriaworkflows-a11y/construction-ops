@@ -50,6 +50,13 @@ import { isCreationModeEnabled } from '../../../../../mode-guard';
 import { formatVersionLabel } from '../../estimate-format';
 import { AiuForm } from './aiu-form';
 import { ExportButtons, type ExportCounts } from './export-buttons';
+import { getReadModel } from '@/server/read-model';
+import {
+  computeQuoteReadiness,
+  readinessExportMessage,
+  type QuoteReadiness,
+} from '@/lib/estimates/quote-readiness';
+import { QuoteReadinessSemaphore, ReadinessExportAlert } from './quote-readiness-semaphore';
 import { getBudgetApuExportSelection } from '@/server/estimates/export/apu-annex';
 import { ArchiveControls } from './archive-controls';
 import { VersionPanel } from './version-panel';
@@ -144,6 +151,23 @@ export default async function EstimateDetailPage({ params, searchParams }: PageP
     } catch {
       aiu = null;
       financialSummary = null;
+    }
+  }
+
+  // APU_QUOTE_READINESS_SEMAPHORE_V1: semáforo de cotización lista para exportar.
+  // Consume el read-model (getEstimateDetail) sin recalcular finanzas ni bloquear
+  // export. Degradación segura a null si el read-model falla.
+  let readiness: QuoteReadiness | null = null;
+  if (active) {
+    try {
+      const detail = await getReadModel().getEstimateDetail(viewer, estimateId);
+      readiness = computeQuoteReadiness({
+        estimate: detail.estimate,
+        chapters: detail.chapters,
+        items: detail.items,
+      });
+    } catch {
+      readiness = null;
     }
   }
 
@@ -468,6 +492,15 @@ export default async function EstimateDetailPage({ params, searchParams }: PageP
       )}
 
       {/* ------------------------------------------------------------------ */}
+      {/* Semáforo de cotización (APU_QUOTE_READINESS_SEMAPHORE_V1)           */}
+      {/* ------------------------------------------------------------------ */}
+      {hasContent && readiness && (
+        <section aria-label="Estado de la cotización" className="mt-8">
+          <QuoteReadinessSemaphore readiness={readiness} />
+        </section>
+      )}
+
+      {/* ------------------------------------------------------------------ */}
       {/* Exportar presupuesto (4E.1)                                         */}
       {/* ------------------------------------------------------------------ */}
       {hasContent && active && (
@@ -476,6 +509,11 @@ export default async function EstimateDetailPage({ params, searchParams }: PageP
             <Download className="h-4 w-4 text-gray-400" aria-hidden="true" />
             Exportar presupuesto
           </h2>
+          {readiness && (
+            <div className="mb-2">
+              <ReadinessExportAlert status={readiness.status} message={readinessExportMessage(readiness.status)} />
+            </div>
+          )}
           <p className="mb-2 text-xs text-gray-500">
             Versión exportada:{' '}
             <span className="font-medium text-gray-700">{formatVersionLabel(active.versionNumber)}</span>
