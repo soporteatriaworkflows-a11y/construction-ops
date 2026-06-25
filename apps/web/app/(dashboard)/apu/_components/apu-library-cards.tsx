@@ -15,7 +15,9 @@ import {
   type ApuCompletenessState,
   type ApuIssue,
 } from '@/lib/apu-library/completeness';
+import { apuLinkEligibility } from '@/lib/apu-library/boq-link';
 import { APU_CATEGORIES } from '@/lib/apu-library/category';
+import { LinkToBoqButton } from './link-to-boq-button';
 
 const STATE_STYLE: Record<ApuCompletenessState, { cls: string }> = {
   ready: { cls: 'bg-green-100 text-green-700' },
@@ -100,24 +102,23 @@ export function ApuActivityCard({ item, canMutate }: { item: ApuLibraryItem; can
         <ApuIssueList issues={completeness.issues} />
       </div>
 
-      <div className="mt-3 flex items-center justify-between gap-2">
-        <Button size="sm" variant="outline" asChild>
-          <Link href={`/apu/${item.id}`}>Abrir</Link>
-        </Button>
-        {canMutate ? (
+      <div className="mt-3 flex flex-col gap-2">
+        <div className="flex items-center justify-between gap-2">
           <Button size="sm" variant="outline" asChild>
-            <Link href={`/apu/${item.id}?tab=componentes`}>Editar componentes</Link>
+            <Link href={`/apu/${item.id}`}>Abrir</Link>
           </Button>
-        ) : (
-          <span className="text-[11px] text-gray-400">Solo lectura</span>
-        )}
-        <span
-          className="cursor-not-allowed text-[11px] text-gray-300"
-          title="Vincular a BOQ desde tarjetas — disponible en próxima oleada"
-        >
-          Vincular a BOQ ·{' '}
-          <span className="italic">próxima oleada</span>
-        </span>
+          {canMutate ? (
+            <Button size="sm" variant="outline" asChild>
+              <Link href={`/apu/${item.id}?tab=componentes`}>Editar componentes</Link>
+            </Button>
+          ) : (
+            <span className="text-[11px] text-gray-400">Solo lectura</span>
+          )}
+        </div>
+        <LinkToBoqButton
+          apu={{ id: item.id, code: item.code, name: item.name, unit: item.unit, unitCost: item.unitCost }}
+          eligibility={apuLinkEligibility({ completenessState: completeness.state, canMutate })}
+        />
       </div>
     </div>
   );
