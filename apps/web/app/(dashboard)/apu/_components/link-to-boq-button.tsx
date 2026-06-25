@@ -9,7 +9,7 @@
  */
 'use client';
 
-import { useActionState, useMemo, useState, useTransition } from 'react';
+import { useActionState, useEffect, useMemo, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { Link2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -57,15 +57,28 @@ export function LinkToBoqButton({
   eligibility: ApuLinkEligibility;
 }) {
   const [open, setOpen] = useState(false);
+  const [showReason, setShowReason] = useState(false);
 
+  // Deshabilitado: NO usamos un <span> mudo con `title` (clic silencioso). Es un
+  // botón real que revela la razón de forma visible al hacer clic.
   if (!eligibility.canLink) {
     return (
-      <span
-        className="cursor-not-allowed text-[11px] text-gray-300"
-        title={eligibility.message ?? 'No disponible'}
-      >
-        Vincular a BOQ
-      </span>
+      <div className="flex flex-col items-start gap-1">
+        <button
+          type="button"
+          onClick={() => setShowReason((v) => !v)}
+          aria-expanded={showReason}
+          className="inline-flex items-center gap-1 text-[11px] font-medium text-gray-400 hover:text-gray-600"
+        >
+          <Link2 className="h-3 w-3" aria-hidden="true" />
+          Vincular a BOQ
+        </button>
+        {showReason && (
+          <p className="text-[11px] text-amber-700" role="status">
+            {eligibility.message ?? 'No disponible para esta actividad.'}
+          </p>
+        )}
+      </div>
     );
   }
 
@@ -102,17 +115,24 @@ function LinkPanel({ apu, onClose }: { apu: LinkApuCard; onClose: () => void }) 
   const [quantity, setQuantity] = useState('1');
   const [idempotencyKey, setIdempotencyKey] = useState(newKey());
 
-  // Carga perezosa de proyectos al montar el panel (una sola vez).
-  if (projects === null && !isLoading) {
+  // Carga perezosa de proyectos al MONTAR el panel (efecto, no fase de render:
+  // disparar una transición durante el render rompía el montaje del panel).
+  useEffect(() => {
+    let cancelled = false;
     startLoad(async () => {
       const r = await loadLinkProjectsAction();
+      if (cancelled) return;
       if (r.ok) setProjects(r.projects);
       else {
         setProjects([]);
         setLoadError(r.error);
       }
     });
-  }
+    return () => {
+      cancelled = true;
+    };
+    // Solo al montar.
+  }, []);
 
   function rekey(): void {
     setIdempotencyKey(newKey());
