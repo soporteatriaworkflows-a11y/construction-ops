@@ -11,6 +11,7 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Search } from 'lucide-react';
+import { FilterPills } from '@/components/shared/filter-pills';
 import { Badge } from '@/components/ui/badge';
 import { formatCOP, RESOURCE_TYPE_LABELS } from '@/lib/utils/format';
 import type { CatalogResourceView } from '@/lib/contracts/read-model';
@@ -110,8 +111,21 @@ export function CatalogExplorer({ resources }: { resources: CatalogResourceView[
           </div>
           <Select id="catType" label="Tipo" value={type} onChange={setType}
             options={[['all', 'Todos los tipos'], ...RESOURCE_TYPE_ORDER.map((t) => [t, RESOURCE_TYPE_LABELS[t] ?? t] as [string, string])]} />
-          <Select id="catStatus" label="Estado de precio" value={status} onChange={setStatus}
-            options={[['all', 'Todos'], ['approved', 'Aprobado'], ['pending', 'Pendiente'], ['rejected', 'Rechazado'], ['none', 'Sin precio']]} />
+          <div>
+            <span className="mb-1 block text-xs font-medium text-gray-600">Estado de precio</span>
+            <FilterPills
+              ariaLabel="Estado de precio"
+              value={status}
+              onChange={setStatus}
+              options={[
+                { value: 'all', label: 'Todos' },
+                { value: 'approved', label: 'Aprobado' },
+                { value: 'pending', label: 'Pendiente' },
+                { value: 'rejected', label: 'Rechazado' },
+                { value: 'none', label: 'Sin precio' },
+              ]}
+            />
+          </div>
           {providers.length > 0 && (
             <Select id="catProvider" label="Proveedor" value={provider} onChange={setProvider}
               options={[['all', 'Todos'], ...providers.map((p) => [p, p] as [string, string])]} />
