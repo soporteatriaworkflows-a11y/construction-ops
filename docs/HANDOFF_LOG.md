@@ -1,5 +1,34 @@
 # Handoff Log
 
+## 2026-06-25 — UIX_REFERENCE_AUDIT_REAL_V1 (corrección de V3B, docs) — RELEASED (orchestrator)
+
+### Corrección
+En V3B se reportó que no había imágenes de referencia. **Sí existían**, pero en
+`D:\ICONIC\SOFTWARE PRESUPUESTOS\docs\design-references\uix\` — un nivel **ARRIBA** del repo
+`construction-ops\` (fuera de git). Por eso la búsqueda dentro del repo no las hallaba.
+
+### Qué se hizo (docs + imágenes, sin código)
+- **Copiadas las 5 imágenes** a `construction-ops/docs/design-references/uix/` (versionadas):
+  `01-sidebar.jpg`, `ref-02-dashboard-globe.jpg`, `ref-03-heatmap.jpg`, `ref-04-operations.jpg`,
+  `ref-05-fitness-dashboard.jpg`.
+- **Auditoría REAL** en `docs/design-references/UIX_REFERENCE_AUDIT.md** (sustituye la versión "no
+  encontradas"): ficha por imagen (qué sirve / qué NO copiar / adaptación ICONIC / patrón). Todas son
+  **dark** → ICONIC se mantiene **claro**, sin neón/morados; se extrae estructura/jerarquía/micro-data-viz.
+  Más relevante: **ref-04 (Operations)** ≈ Workspace/BOQ (lista con progreso + detalle + KPIs + acciones
+  semánticas).
+- **`DESIGN.md` §12.b**: añadidos los **patrones extraídos de las refs reales** (número héroe + breakdown,
+  operation-list + detail, acciones semánticas por color, sidebar agrupado/colapsable, right-rail de
+  estado, micro-data-viz), con la regla "todas son dark → adaptar a ICONIC claro".
+
+### Estado / release
+- `origin/main` = **`<pendiente push>`**. Tag = **`iconic-ops-uix-reference-audit-real-v1`**.
+- Solo docs + imágenes; sin tocar código ejecutable → sin typecheck/build/suite. `git diff --check` limpio.
+- Sin DB/migración/env/SMTP/usuarios/lógica/cálculos; no `-1rqh`.
+- **Siguiente:** con la auditoría real, las oleadas V3C/V4+ pueden afinar contra patrones concretos
+  (ref-04 para Workspace/companion). Recomendado mantener las imágenes en el repo a futuro.
+
+---
+
 ## 2026-06-25 — ICONIC_OPS_UIX_VISUAL_REFERENCE_AUDIT_AND_WORKSPACE_V3B — RELEASED (orchestrator)
 
 ### ⚠️ Referencias NO encontradas (honesto)
