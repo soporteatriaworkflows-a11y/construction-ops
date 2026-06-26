@@ -17,6 +17,7 @@ import {
   ClipboardList,
 } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
+import { OperationsHeader } from '@/components/shared/operations-header';
 import { ProjectStatusBadge } from '@/components/shared/status-badge';
 import { EmptyState } from '@/components/shared/empty-state';
 import {
@@ -84,9 +85,11 @@ export default async function ProjectsPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Proyectos"
-        description="Gestión de proyectos de construcción y sus alcances"
+      <OperationsHeader
+        eyebrow="Proyectos"
+        title="Proyectos y alcances"
+        subtitle="Gestión de proyectos de construcción y sus alcances"
+        stat={{ label: 'Proyectos', value: String(projects.length) }}
         actions={
           canCreate ? (
             <Button asChild size="sm">

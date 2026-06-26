@@ -19,6 +19,7 @@ import {
   listInvitations,
 } from '@/server/access';
 import { InlineCallout } from '@/components/shared/inline-callout';
+import { OperationsHeader } from '@/components/shared/operations-header';
 import { InviteForm } from './_components/invite-form';
 import { MembersTable, type MemberRow } from './_components/members-table';
 import { InvitationsTable, type InvitationRow } from './_components/invitations-table';
@@ -69,12 +70,12 @@ export default async function AccessSettingsPage() {
 
   return (
     <div className="space-y-8">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-semibold text-iconic-ink">Accesos</h1>
-        <p className="text-sm text-iconic-graphite/70">
-          Gestiona los usuarios de tu organización, sus roles y las invitaciones pendientes.
-        </p>
-      </header>
+      <OperationsHeader
+        eyebrow="Settings"
+        title="Accesos y configuración"
+        subtitle="Gestiona los usuarios de tu organización, sus roles y las invitaciones pendientes."
+        stat={{ label: 'Usuarios', value: String(memberRows.length) }}
+      />
 
       {/* Invitar */}
       <section className="rounded-xl border border-iconic-soft-blue/50 bg-white p-6 shadow-sm">
