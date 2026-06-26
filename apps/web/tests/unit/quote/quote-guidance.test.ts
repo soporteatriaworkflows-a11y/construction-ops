@@ -36,10 +36,11 @@ describe('buildStepGuidance — guías por paso (1–6)', () => {
     });
   }
 
-  it('2. Asociar APU describe vinculación técnica', () => {
+  it('2. Asociar APU describe vinculación técnica y CTA enfocado en "Sin APU"', () => {
     const g = buildStepGuidance(step('apu', 'pending'));
     expect(g.whatItMeans).toMatch(/APU/);
-    expect(g.primaryActionLabel).toMatch(/asociar APU/i);
+    expect(g.primaryActionLabel).toMatch(/sin APU/i);
+    expect(g.whatToDoNow).toMatch(/Sin APU/);
   });
 
   it('3/4. Cantidades y Precios tienen CTA específico', () => {

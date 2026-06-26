@@ -39,6 +39,12 @@ export interface BoqItemReviewView {
   sourceRow: number | null;
   /** 4E.2B: ítem archivado (solo aparece con includeArchived). */
   archived: boolean;
+  /**
+   * QUOTING_COMPANION_WORKSPACE_FOCUS_V1: plantilla APU vinculada
+   * (boq_items.apu_template_id). `null` ⇒ sin APU; `undefined` ⇒ el origen no lo
+   * expone (No verificable). Aditivo y read-only; no participa en cálculos.
+   */
+  apuTemplateId?: Uuid | null;
 }
 
 /** Detalle de un capítulo + contexto (proyecto/alcance/presupuesto/versión). */

@@ -44,11 +44,11 @@ export const STEP_GUIDE: Record<QuoteStepId, StepGuideStatic> = {
     expectedResult: 'Con la estructura completa, el asistente puede evaluar cantidades, precios y APU.',
   },
   apu: {
-    whatItMeans: 'Conectas actividades técnicas reutilizables (APU) con las partidas para calcular materiales, mano de obra, desperdicio y rendimiento.',
+    whatItMeans: 'Vas a conectar actividades técnicas reutilizables (APU) con las partidas del presupuesto, para calcular materiales, mano de obra, desperdicio y rendimiento.',
     whenReady: 'Listo cuando las partidas que lo requieren tienen APU vinculado y sin pendientes críticos.',
-    whatToDoNow: 'Abre el workspace del presupuesto (o la Biblioteca APU) y revisa los ítems sin APU vinculado.',
-    primaryActionLabel: 'Revisar ítems y asociar APU',
-    expectedResult: 'Con APU vinculado, el semáforo valida mejor costos, cantidades y pendientes técnicos.',
+    whatToDoNow: 'Abre el workspace y usa el filtro “Sin APU” para ver las partidas pendientes. Luego usa “Agregar actividad desde APU” o asocia el APU que corresponda.',
+    primaryActionLabel: 'Ver ítems sin APU',
+    expectedResult: 'Cuando los ítems tengan APU vinculado, el semáforo podrá validar mejor componentes, precios y rendimientos.',
   },
   quantities: {
     whatItMeans: 'Defines cuánto de cada partida hay que ejecutar (cantidades de obra).',

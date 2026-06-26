@@ -416,7 +416,7 @@ export class DbEstimatesWriteRepository implements EstimatesWriteRepository {
     const supabase = await this.clientFactory();
     let query = supabase
       .from('boq_items')
-      .select('id, code, description_snapshot, unit_snapshot, quantity_snapshot, unit_price_snapshot, subtotal, sort_order, source_code, source_row, archived_at')
+      .select('id, code, description_snapshot, unit_snapshot, quantity_snapshot, unit_price_snapshot, subtotal, sort_order, source_code, source_row, archived_at, apu_template_id')
       .eq('chapter_id', chapterId);
     if (!includeArchived) query = query.is('archived_at', null);
     const { data, error } = await query.order('sort_order', { ascending: true });
@@ -426,12 +426,14 @@ export class DbEstimatesWriteRepository implements EstimatesWriteRepository {
         id: string; code: string; description_snapshot: string; unit_snapshot: string;
         quantity_snapshot: string; unit_price_snapshot: string; subtotal: string; sort_order: number;
         source_code: string | null; source_row: number | null; archived_at: string | null;
+        apu_template_id: string | null;
       };
       return {
         id: r.id, code: r.code, description: r.description_snapshot, unit: r.unit_snapshot,
         quantity: r.quantity_snapshot, unitPrice: r.unit_price_snapshot, subtotal: r.subtotal,
         sortOrder: r.sort_order, sourceCode: r.source_code ?? null, sourceRow: r.source_row ?? null,
         archived: !!r.archived_at,
+        apuTemplateId: r.apu_template_id ?? null,
       };
     });
   }

@@ -1,20 +1,21 @@
 /**
- * quote-companion.tsx — Asistente acompañante: VENTANA FLOTANTE GUIADA
- * (UX_QUOTING_COMPANION_FLOATING_GUIDED_WINDOW_V1). 'use client'. Montado una
- * vez en el layout del dashboard; acompaña al usuario por todo el shell.
+ * quote-companion.tsx — Asistente acompañante: ventana guiada con modos de
+ * ubicación (UX_QUOTING_COMPANION_WORKSPACE_FOCUS_AND_DOCKING_V1). 'use client'.
+ * Montado una vez en el layout del dashboard.
  *
- * - Ventana flotante arrastrable (desde el header) que recuerda su posición; el
- *   modo "fijar al costado" (pinned) conserva el panel anclado como fallback.
- * - Cotización activa de la ruta o de la última guardada; si no hay, selector.
- * - Texto explícito (Estás aquí / Paso actual) vía `quoteLocationFromPath`.
- * - Persistencia localStorage: SOLO ids de cotización, pinned y posición x/y.
- * - z-30 (debajo de modales z-50/z-[100]); oculto en mobile (< lg).
+ * Modos (placement):
+ *  - 'floating' (default): ventana arrastrable que recuerda su posición.
+ *  - 'corner': anclada en el área inferior izquierda del contenido (compacta).
+ *  - 'side': lateral derecho; reserva espacio (padding del body) para no tapar
+ *    el contenido (solo en lg).
+ * Persistencia localStorage: SOLO ids de cotización, placement y posición x/y.
+ * z-30 (debajo de modales z-50/z-[100]); oculto en mobile (< lg).
  */
 'use client';
 
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { usePathname } from 'next/navigation';
-import { Sparkles, X, Minus, Pin, PinOff, Loader2, GripVertical, RotateCcw } from 'lucide-react';
+import { Sparkles, X, Minus, Loader2, GripVertical, RotateCcw } from 'lucide-react';
 import { quoteContextFromPath, type QuoteContext } from '@/lib/quote/quote-context-from-path';
 import { quoteLocationFromPath } from '@/lib/quote/quote-location';
 import { QuoteCompanionBody } from './quote-companion-body';
@@ -25,7 +26,7 @@ import {
 } from './quote-companion-actions';
 
 const ACTIVE_KEY = 'quote-companion:active';
-const PINNED_KEY = 'quote-companion:pinned';
+const PLACEMENT_KEY = 'quote-companion:placement';
 const POS_KEY = 'quote-companion:pos';
 const OPEN_EVENT = 'quote-companion:open';
 
@@ -33,10 +34,17 @@ const WIN_W = 390;
 const MARGIN = 8;
 
 type PanelState = 'closed' | 'open' | 'minimized';
+type Placement = 'floating' | 'corner' | 'side';
 interface Pos {
   x: number;
   y: number;
 }
+
+const PLACEMENT_LABELS: Record<Placement, string> = {
+  floating: 'Flotante',
+  corner: 'Esquina',
+  side: 'Lateral',
+};
 
 function keyOf(c: QuoteContext | null): string {
   return c ? `${c.projectId}/${c.scopeId}/${c.versionId}` : '';
@@ -50,6 +58,15 @@ function readActiveQuote(): QuoteContext | null {
       : null;
   } catch {
     return null;
+  }
+}
+
+function readPlacement(): Placement {
+  try {
+    const v = localStorage.getItem(PLACEMENT_KEY);
+    return v === 'corner' || v === 'side' ? v : 'floating';
+  } catch {
+    return 'floating';
   }
 }
 
@@ -68,8 +85,7 @@ function clampPos(x: number, y: number): Pos {
   return { x: Math.min(Math.max(MARGIN, x), maxX), y: Math.min(Math.max(MARGIN, y), maxY) };
 }
 
-/** Posición flotante por defecto: un punto claramente despegado de los bordes
- * (no pegado a la esquina) para que se lea como ventana movible. */
+/** Posición flotante por defecto: despegada de los bordes (no anclada). */
 function defaultFloatingPos(): Pos {
   return clampPos(window.innerWidth - WIN_W - 24, 88);
 }
@@ -81,7 +97,7 @@ export function QuoteCompanion() {
   const routeKey = keyOf(routeCtx);
 
   const [state, setState] = useState<PanelState>('closed');
-  const [pinned, setPinned] = useState(false);
+  const [placement, setPlacement] = useState<Placement>('floating');
   const [pos, setPos] = useState<Pos | null>(null);
   const [activeQuote, setActiveQuote] = useState<QuoteContext | null>(null);
   const [syncedRouteKey, setSyncedRouteKey] = useState('');
@@ -99,12 +115,12 @@ export function QuoteCompanion() {
   const [error, setError] = useState<string | null>(null);
   const [loadedKey, setLoadedKey] = useState('');
 
-  // Drag
+  // Drag (solo en modo flotante)
   const winRef = useRef<HTMLElement | null>(null);
   const dragRef = useRef<{ dx: number; dy: number } | null>(null);
   const [dragging, setDragging] = useState(false);
 
-  // Persistir cotización activa / pinned / posición (solo localStorage).
+  // Persistencia (solo localStorage; sin setState).
   useEffect(() => {
     if (ctxKey) {
       try {
@@ -117,11 +133,11 @@ export function QuoteCompanion() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(PINNED_KEY, pinned ? '1' : '0');
+      localStorage.setItem(PLACEMENT_KEY, placement);
     } catch {
       /* no disponible */
     }
-  }, [pinned]);
+  }, [placement]);
 
   useEffect(() => {
     try {
@@ -131,7 +147,7 @@ export function QuoteCompanion() {
     }
   }, [pos]);
 
-  // Reajustar si la ventana queda fuera del viewport al redimensionar.
+  // Reajustar la ventana flotante si queda fuera del viewport al redimensionar.
   useEffect(() => {
     function onResize(): void {
       setPos((prev) => (prev ? clampPos(prev.x, prev.y) : null));
@@ -140,13 +156,28 @@ export function QuoteCompanion() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
+  // Modo lateral: reservar espacio (padding del body) para NO tapar el contenido.
+  // Solo en lg; se reajusta al redimensionar y se limpia al cerrar/cambiar modo.
+  useEffect(() => {
+    if (state !== 'open' || placement !== 'side') return;
+    function apply(): void {
+      document.body.style.paddingRight = window.matchMedia('(min-width: 1024px)').matches ? '20rem' : '';
+    }
+    apply();
+    window.addEventListener('resize', apply);
+    return () => {
+      window.removeEventListener('resize', apply);
+      document.body.style.paddingRight = '';
+    };
+  }, [state, placement]);
+
   function openPanel(): void {
     if (!activeQuote && !routeCtx) {
       const stored = readActiveQuote();
       if (stored) setActiveQuote(stored);
     }
-    // Por defecto FLOTANTE: siempre damos una posición explícita (no anclada).
-    // No restauramos `pinned` desde localStorage: el modo flotante es el default.
+    // Por defecto FLOTANTE: posición explícita; restauramos el modo elegido.
+    setPlacement(readPlacement());
     const storedPos = readPos();
     setPos(storedPos ? clampPos(storedPos.x, storedPos.y) : defaultFloatingPos());
     setState('open');
@@ -198,9 +229,8 @@ export function QuoteCompanion() {
   }
 
   function onHeaderPointerDown(e: ReactPointerEvent): void {
-    if (pinned || e.button !== 0) return;
-    // NO iniciar drag si el pointerdown nace en un control del header (botones):
-    // capturar el puntero ahí robaba el click a Restaurar/Fijar/Minimizar.
+    if (placement !== 'floating' || e.button !== 0) return;
+    // NO iniciar drag si el pointerdown nace en un control (botones).
     if ((e.target as HTMLElement).closest('button')) return;
     const el = winRef.current;
     if (!el) return;
@@ -243,11 +273,14 @@ export function QuoteCompanion() {
     );
   }
 
-  const docked = pinned;
-  const asideClass = docked
-    ? 'fixed right-0 top-0 z-30 hidden h-screen w-80 flex-col border-l border-iconic-soft-blue bg-white shadow-iconic lg:flex'
-    : `fixed z-30 hidden max-h-[75vh] w-[390px] flex-col rounded-2xl border border-iconic-soft-blue bg-white shadow-iconic lg:flex ${pos ? '' : 'bottom-5 right-5'}`;
-  const asideStyle = !docked && pos ? { left: pos.x, top: pos.y } : undefined;
+  const isFloating = placement === 'floating';
+  const asideClass =
+    placement === 'side'
+      ? 'fixed right-0 top-0 z-30 hidden h-screen w-80 flex-col border-l border-iconic-soft-blue bg-white shadow-iconic lg:flex'
+      : placement === 'corner'
+        ? 'fixed bottom-4 left-[15.5rem] z-30 hidden max-h-[60vh] w-[320px] flex-col rounded-2xl border border-iconic-soft-blue bg-white shadow-iconic lg:flex'
+        : `fixed z-30 hidden max-h-[75vh] w-[390px] flex-col rounded-2xl border border-iconic-soft-blue bg-white shadow-iconic lg:flex ${pos ? '' : 'bottom-5 right-5'}`;
+  const asideStyle = isFloating && pos ? { left: pos.x, top: pos.y } : undefined;
 
   return (
     <aside
@@ -261,38 +294,14 @@ export function QuoteCompanion() {
         onPointerDown={onHeaderPointerDown}
         onPointerMove={onHeaderPointerMove}
         onPointerUp={onHeaderPointerUp}
-        className={`flex items-center justify-between border-b border-gray-100 px-3 py-3 ${docked ? '' : 'cursor-move select-none'} ${docked ? 'rounded-none' : 'rounded-t-2xl'}`}
+        className={`flex items-center justify-between border-b border-gray-100 px-3 py-3 ${isFloating ? 'cursor-move select-none rounded-t-2xl' : ''}`}
       >
         <span className="flex min-w-0 items-center gap-1.5 text-sm font-semibold text-iconic-ink">
-          {!docked && <GripVertical className="h-4 w-4 shrink-0 text-gray-300" aria-hidden="true" />}
+          {isFloating && <GripVertical className="h-4 w-4 shrink-0 text-gray-300" aria-hidden="true" />}
           <Sparkles className="h-4 w-4 shrink-0 text-iconic-primary" aria-hidden="true" />
           <span className="truncate">Asistente de cotización</span>
         </span>
-        <div
-          className="flex items-center gap-0.5"
-          onPointerDown={(e) => e.stopPropagation()}
-        >
-          {!docked && (
-            <button
-              type="button"
-              onClick={() => setPos(defaultFloatingPos())}
-              aria-label="Restaurar posición"
-              title="Restaurar posición"
-              className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
-            >
-              <RotateCcw className="h-4 w-4" aria-hidden="true" />
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => setPinned((v) => !v)}
-            aria-label={pinned ? 'Soltar ventana' : 'Fijar al costado'}
-            aria-pressed={pinned}
-            title={pinned ? 'Soltar ventana' : 'Fijar al costado'}
-            className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
-          >
-            {pinned ? <Pin className="h-4 w-4" aria-hidden="true" /> : <PinOff className="h-4 w-4" aria-hidden="true" />}
-          </button>
+        <div className="flex items-center gap-0.5" onPointerDown={(e) => e.stopPropagation()}>
           <button
             type="button"
             onClick={() => setState('minimized')}
@@ -312,20 +321,36 @@ export function QuoteCompanion() {
         </div>
       </header>
 
-      {/* Estado de la ventana (flotante vs fijada) + ayuda de arrastre */}
-      <div className="flex items-center justify-between gap-2 border-b border-gray-100 bg-gray-50/60 px-3 py-1.5 text-[10px]">
-        {docked ? (
-          <>
-            <span className="font-medium text-gray-500">Fijado al costado</span>
-            <button type="button" onClick={() => setPinned(false)} className="font-medium text-iconic-primary hover:underline">
-              Soltar ventana
+      {/* Modos de ubicación (texto, no solo iconos) + restaurar posición */}
+      <div className="flex items-center justify-between gap-2 border-b border-gray-100 bg-gray-50/60 px-3 py-1.5">
+        <div className="inline-flex rounded-md border border-gray-200" role="group" aria-label="Ubicación del asistente">
+          {(Object.keys(PLACEMENT_LABELS) as Placement[]).map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => setPlacement(p)}
+              aria-pressed={placement === p}
+              className={`px-2 py-0.5 text-[10px] font-medium first:rounded-l-md last:rounded-r-md ${
+                placement === p ? 'bg-iconic-primary text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              {PLACEMENT_LABELS[p]}
             </button>
-          </>
+          ))}
+        </div>
+        {isFloating ? (
+          <button
+            type="button"
+            onClick={() => setPos(defaultFloatingPos())}
+            className="inline-flex items-center gap-1 text-[10px] font-medium text-iconic-primary hover:underline"
+            title="Restaurar posición"
+            aria-label="Restaurar posición"
+          >
+            <RotateCcw className="h-3 w-3" aria-hidden="true" />
+            Restaurar posición
+          </button>
         ) : (
-          <>
-            <span className="font-medium text-gray-500">Ventana flotante</span>
-            <span className="text-gray-400">Arrastra para mover</span>
-          </>
+          <span className="text-[10px] text-gray-400">{placement === 'side' ? 'Fijado al costado' : 'Fijado en la esquina'}</span>
         )}
       </div>
 

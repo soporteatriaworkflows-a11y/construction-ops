@@ -35,10 +35,16 @@ export const dynamic = 'force-dynamic';
 
 interface PageProps {
   params: Promise<{ id: string; scopeId: string; estimateId: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }
 
-export default async function BoqWorkspacePage({ params }: PageProps) {
+export default async function BoqWorkspacePage({ params, searchParams }: PageProps) {
   const { id, scopeId, estimateId } = await params;
+  const sp = searchParams ? await searchParams : {};
+  // Deep-link desde el asistente: ?apu=missing activa el filtro "Sin APU".
+  const apuParam = typeof sp.apu === 'string' ? sp.apu : '';
+  const initialApuFilter: 'all' | 'with' | 'without' =
+    apuParam === 'missing' ? 'without' : apuParam === 'with' ? 'with' : 'all';
   const basePath = `/projects/${id}/scopes/${scopeId}/estimates/${estimateId}`;
 
   let viewer: Awaited<ReturnType<typeof resolveViewer>>;
@@ -163,6 +169,7 @@ export default async function BoqWorkspacePage({ params }: PageProps) {
           canMutate={canMutate}
           versionStatusLabel={statusLabel}
           versionLocked={!versionEditable}
+          initialApuFilter={initialApuFilter}
         />
       </section>
 

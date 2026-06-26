@@ -77,6 +77,8 @@ export function quoteHrefs(ctx: QuoteProgressContext) {
     chapters: estimateBase ?? '/quote/new',
     chaptersNew: estimateBase ? `${estimateBase}/chapters/new` : '/quote/new',
     workspace: estimateBase ? `${estimateBase}/workspace` : '/quote/new',
+    /** Workspace con el filtro "Sin APU" activado (deep-link del asistente). */
+    workspaceApuMissing: estimateBase ? `${estimateBase}/workspace?apu=missing` : '/quote/new',
     apuLibrary: '/apu?view=cards',
     quantities: '/quantities',
     quantitiesImport: '/quantities/import',
@@ -184,8 +186,8 @@ export function deriveQuoteProgress(input: QuoteProgressInput): QuoteStep[] {
         : itemsWithApu > 0
           ? `${itemsWithApu} ítem(s) con APU vinculado.`
           : 'Vincula actividades APU a los ítems del BOQ.',
-    primaryActionLabel: 'Abrir workspace',
-    primaryHref: h.workspace,
+    primaryActionLabel: 'Ver ítems sin APU',
+    primaryHref: h.workspaceApuMissing,
     secondaryHref: h.apuLibrary,
     summary: ctxComplete && itemCount > 0 ? `${itemsWithApu}/${itemCount} con APU` : undefined,
   });
