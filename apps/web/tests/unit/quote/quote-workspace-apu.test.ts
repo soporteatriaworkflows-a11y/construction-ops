@@ -76,6 +76,20 @@ describe('guía APU menciona el filtro (5)', () => {
   });
 });
 
+describe('restyle V3: chip "sin APU" accionable en la toolbar', () => {
+  it('el workspace muestra el conteo "sin APU" que activa el filtro', () => {
+    const WS = readFileSync(
+      fileURLToPath(
+        new URL('../../../app/(dashboard)/projects/[id]/scopes/[scopeId]/estimates/[estimateId]/workspace/boq-workspace.tsx', import.meta.url),
+      ),
+      'utf8',
+    );
+    expect(WS).toMatch(/itemsWithoutApu > 0 && apuFilter !== 'without'/);
+    expect(WS).toContain("onClick={() => setApuFilter('without')}");
+    expect(WS).toMatch(/sin APU/);
+  });
+});
+
 describe('?apu=missing activa el filtro en el workspace (3)', () => {
   it('la página mapea apu=missing → without', () => {
     const PAGE = readFileSync(

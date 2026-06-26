@@ -118,6 +118,18 @@ export function BoqWorkspace({
   const visibleItems = countVisibleItems(view);
   const filtered = query.trim() !== '' || filter !== 'active' || apuFilter !== 'all';
 
+  // Conteo "Sin APU" (display, honesto): solo ítems activos cuyo vínculo APU se
+  // puede verificar y es null. No cuenta los "No verificable" (undefined).
+  const itemsWithoutApu = useMemo(
+    () =>
+      localData.reduce(
+        (acc, ch) =>
+          acc + ch.items.filter((it) => !it.archived && itemApuState(it) === 'unlinked').length,
+        0,
+      ),
+    [localData],
+  );
+
   function toggleChapter(id: string) {
     setCollapsed((prev) => {
       const next = new Set(prev);
@@ -266,6 +278,17 @@ export function BoqWorkspace({
           </div>
 
           <div className="ml-auto flex items-center gap-3">
+            {itemsWithoutApu > 0 && apuFilter !== 'without' && (
+              <button
+                type="button"
+                onClick={() => setApuFilter('without')}
+                title="Ver solo las partidas sin APU vinculado"
+                className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700 hover:bg-amber-100"
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden="true" />
+                {itemsWithoutApu} sin APU
+              </button>
+            )}
             <span className="text-xs text-gray-500 tabular-nums">
               {visibleItems} ítem{visibleItems === 1 ? '' : 's'} visibles
             </span>
@@ -382,7 +405,7 @@ function SummaryCard({
 }) {
   return (
     <div
-      className={`rounded-lg border px-3 py-2 ${
+      className={`rounded-lg border px-3 py-2 shadow-sm ${
         accent === 'primary'
           ? 'border-iconic-primary/30 bg-brand-50'
           : accent === 'ink'
