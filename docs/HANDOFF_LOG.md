@@ -1,5 +1,40 @@
 # Handoff Log
 
+## 2026-06-25 — UX_QUOTING_COMPANION_WORKSPACE_FOCUS_AND_DOCKING_V1 — RELEASED (orchestrator)
+
+### Problemas UX
+(1) El CTA del asistente abría el workspace pero la usuaria no veía CUÁLES ítems faltaban por vincular APU.
+(2) Quería más opciones de ubicación del asistente (flotante / esquina / lateral con espacio reservado).
+
+### Qué cambió (UX/read-only/aditivo, 12 archivos)
+**Workspace — foco en APU:**
+- `BoqItemReviewView.apuTemplateId?` (aditivo, read-only) + `db-repository.listItemsByChapter` selecciona
+  `apu_template_id` (columna existente; sin migración/RPC/cálculo).
+- `workspace-view.ts` (puro): `ApuLinkFilter`(all/with/without) + `APU_FILTER_LABELS` + `itemApuState`
+  (linked/unlinked/**unknown**='No verificable', honesto) + `applyApuFilter` + `APU_STATE_LABELS`.
+- `boq-workspace.tsx`: grupo de filtro **Todos/Con APU/Sin APU** + **banner** "Mostrando ítems sin APU…" +
+  **badge textual por fila** (APU vinculado / Sin APU / No verificable, no solo color).
+- `workspace/page.tsx`: `?apu=missing` → `initialApuFilter='without'`.
+- Asistente: el paso APU enlaza a `…/workspace?apu=missing` (`quoteHrefs.workspaceApuMissing`), CTA
+  **"Ver ítems sin APU"**; la guía explica usar el filtro "Sin APU".
+
+**Asistente — modos de ubicación:** `placement = floating | corner | side` (reemplaza `pinned`):
+- floating (default, arrastrable, recuerda x/y); corner (área inferior izquierda del contenido,
+  `left-[15.5rem]`, no tapa la nav); side (derecha, **reserva espacio** con `body.paddingRight` solo en lg
+  → no tapa el contenido). Controles de texto **Flotante/Esquina/Lateral** + Restaurar posición.
+
+### Estado / release
+- `origin/main` = **`2fffd735086bbe30177601d172927cb4c90ea5aa`** (merge `--no-ff`, sobre `d83a190`). Tag =
+  **`quoting-companion-workspace-focus-docking-v1`** → `2fffd73`.
+- typecheck 0 · lint 0 · tests quote/workspace/apu **520/0** · suite completa **2069/0 (+42 skip)** · build 0 · gm **22/22** · diff-check limpio.
+- Smoke prod: /login 200 · /quote 307 · /quote/new 307 · /apu 307 · /projects 307 · cron 401.
+- **Read-only/aditivo:** sin DB/migración/env/SMTP/usuarios/RPC/finanzas; `apu_template_id` solo se LEE
+  (no cálculo); sin tocar `unit_price_snapshot`; companion/guía/`/quote` intactos; no `-1rqh`.
+- **Pendiente:** verificación visual tras promoción del deploy (UI client; promoción manual Vercel MCP 403).
+  Nota honestidad: en demo/fixture `apuTemplateId` es `undefined` → badge "No verificable" (no inventa).
+
+---
+
 ## 2026-06-25 — HOTFIX_QUOTING_COMPANION_HEADER_CONTROLS_V1 — RELEASED (orchestrator)
 
 ### Causa real
