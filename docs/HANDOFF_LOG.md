@@ -1,5 +1,29 @@
 # Handoff Log
 
+## 2026-06-26 — ICONIC_OPS_UIX_WORKSPACE_OPERATIONS_V3C_1_VISUAL_DELTA_HOTFIX — EN RAMA (sin merge) (orchestrator)
+
+### Diagnóstico
+La usuaria revisó el preview (PR #3) y sintió "casi todo igual". Causa probable: abrió el **detalle del
+presupuesto** (`…/estimates/[estimateId]`, que tiene su PROPIA tabla simple, NO tocada), no el **Workspace**
+(`…/estimates/[estimateId]/workspace`, único componente modificado). Verificado además: `BoqGrid`/
+`BudgetBoqGrid` (AG Grid) NO se usan en ninguna página (componentes muertos) → no hay render paralelo.
+Aun así, el delta V3C era conservador → hotfix de delta visual.
+
+### Qué cambió (V3C.1, mismo `boq-workspace.tsx`, UIX-only)
+- **Barra de comando navy de operación** arriba (gradiente iconic-ink + label cian + stats + Total general
+  héroe) — señal premium inmediata; navy ICONIC (no dark mode global).
+- **Dos zonas**: Estado operativo (Cobertura APU % con barra + KPIs) | Resumen financiero (6 sub-montos).
+- **Zona de detalle SIEMPRE presente** (placeholder con instrucción; panel con acento izquierdo al seleccionar).
+- QA-confirm visual: si ves la barra navy "BOQ · Workspace de operación", es V3C.1.
+
+### QA / estado
+- Rama **`feature/uix-workspace-operations-v3c`** (PR #3, **sin merge/tag/prod**). Nuevo commit encima.
+- typecheck 0 · lint 0 · tests workspace/quote **207/0** · suite **2086/0 (+42 skip)** · build 0 · gm **22/22** · diff-check limpio.
+- Companion intacto · filtro Sin APU intacto · todas las columnas conservadas · sin lógica/DB/RPC/cálculos/export · sin `unit_price_snapshot` · no `-1rqh`.
+- Push a la rama → PR #3 se actualiza y Vercel regenera el Preview.
+
+---
+
 ## 2026-06-26 — ICONIC_OPS_UIX_WORKSPACE_OPERATIONS_V3C — EN RAMA (sin merge; pendiente autorización) (orchestrator)
 
 ### Estado

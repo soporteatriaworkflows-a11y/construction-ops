@@ -54,6 +54,24 @@ Supabase, RLS, policies, migrations, auth, secrets/envs, Vercel config, cálculo
 cálculos BOQ/APU, export Excel/PDF, `unit_price_snapshot`, datos reales, RPCs, read-model, permisos,
 versiones aprobadas, `construction-ops-1rqh`.
 
+## V3C.1 — Visual delta hotfix (cambio evidente)
+
+Tras revisión, el delta V3C se sintió tímido. V3C.1 hace el cambio **inmediatamente visible** en la
+ruta `…/estimates/[estimateId]/workspace` (¡NO en el detalle `…/estimates/[estimateId]`, que tiene otra
+tabla y no es esta fase!):
+
+- **Barra de comando navy de operación** (arriba del todo): gradiente `iconic-ink` con label cian
+  "BOQ · Workspace de operación", stats (capítulos · partidas · **N sin APU** en ámbar · estado de versión)
+  y **Total general** héroe en blanco. Es la señal premium inmediata (navy ICONIC, no dark mode global).
+- **Dos zonas separadas** (grid lg:2): **Estado operativo** (barra de **Cobertura APU %** + KPIs
+  Capítulos/Partidas/Con APU/Sin APU/Sin cantidad/Sin precio) y **Resumen financiero** (6 sub-montos).
+- **Zona de detalle SIEMPRE presente**: placeholder con instrucción ("clic en el código…") cuando no hay
+  selección; al seleccionar, el `ItemDetailPanel` con **acento izquierdo** (`border-l-4`).
+- Confirmación visual de V3C.1 (para QA, sin gating de env): **si ves la barra navy "BOQ · Workspace de
+  operación" arriba**, estás en V3C.1. (No se añadió label dev-only para no arriesgar prod/UX.)
+
+Archivo: el mismo `boq-workspace.tsx`. typecheck 0 · lint 0 · tests 207/0 · suite 2086/0 · build 0 · gm 22/22.
+
 ## Riesgos / pendientes
 - Sin capturas locales (no hay navegador en el entorno): verificación visual final pendiente en prod.
 - El detalle es de **bajo riesgo** (estado UI + datos ya cargados); no hay drawer lateral (decisión).

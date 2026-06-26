@@ -108,6 +108,20 @@ describe('V3C operations: KPIs + panel de detalle + selección (sin perder colum
     expect(WS).toContain('>V/Unitario<');
     expect(WS).toContain('>Subtotal<');
   });
+
+  it('V3C.1 delta: barra de comando navy + zonas operativo/financiero + cobertura APU', () => {
+    expect(WS).toContain('Workspace de operación');
+    expect(WS).toContain('from-iconic-ink'); // barra navy ICONIC (no dark mode global)
+    expect(WS).toContain('Estado operativo');
+    expect(WS).toContain('Resumen financiero');
+    expect(WS).toContain('Cobertura APU');
+    expect(WS).toMatch(/width: `\$\{apuCoverage\}%`/); // barra de progreso
+  });
+
+  it('V3C.1: zona de detalle SIEMPRE presente (placeholder si no hay selección)', () => {
+    expect(WS).toMatch(/selected \? \(/);
+    expect(WS).toMatch(/haz clic en el .*código.* de una partida/s);
+  });
 });
 
 describe('restyle V3: chip "sin APU" accionable en la toolbar', () => {
