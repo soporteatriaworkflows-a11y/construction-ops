@@ -1,5 +1,23 @@
 # Handoff Log
 
+## 2026-06-26 — ICONIC_OPS_UIX_WORKSPACE_OPERATIONS_V3C (+V3C.1) — RELEASED (autorizado) (orchestrator)
+
+- Usuaria **aprobó** el preview V3C.1 (vio la barra navy "BOQ · Workspace de operación") y autorizó merge.
+- **Merge `--no-ff` a main**: `origin/main` = **`680fde1782b317247fcf589d27db135d62d6fe5f`** (merge
+  `merge(uix): release workspace operations restyle V3C (+V3C.1 visual delta)`, parents `6f4c441` + `8f614af`).
+- **Tag** = **`iconic-ops-uix-workspace-operations-v3c`** → `680fde1`.
+- Diff a main = 4 archivos (boq-workspace.tsx + test + 2 docs). PR #3 (rama `feature/uix-workspace-operations-v3c`).
+- Deploy: push a main dispara producción en proyecto **construction-ops** (alias `construction-ops-psi`).
+  Smoke prod OK: /login 200 · /projects·/quote·/apu·/catalog/prices/review 307 · cron 401. Commit desplegado
+  no confirmable por API (Vercel MCP 403) → confirmar **Production/Current** en dashboard.
+- **NO** se tocó `construction-ops-1rqh` (su check del PR falla por deuda preexistente, ajena).
+- UIX-only: sin DB/Supabase/RLS/Auth/envs/secrets/RPC/cálculos/export/`unit_price_snapshot`/datos reales.
+- Pendientes visuales siguiente oleada: micro-data-viz por capítulo (anillos/sparkbars), responsive fino,
+  extender patrón operations a Catálogo (V4)/Cantidades (V5); restyle del **detalle del presupuesto**
+  (`…/estimates/[estimateId]`, tabla simple no tocada) si se quiere unificar con el Workspace.
+
+---
+
 ## 2026-06-26 — ICONIC_OPS_UIX_WORKSPACE_OPERATIONS_V3C_1_VISUAL_DELTA_HOTFIX — EN RAMA (sin merge) (orchestrator)
 
 ### Diagnóstico
