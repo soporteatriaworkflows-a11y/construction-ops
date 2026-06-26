@@ -7,6 +7,7 @@
 import Link from 'next/link';
 import { CalendarRange, Plus } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
+import { InlineCallout } from '@/components/shared/inline-callout';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -85,6 +86,10 @@ export default async function PlanningPage() {
         description={`${schedules.length} cronograma${schedules.length === 1 ? '' : 's'}`}
         actions={actions}
       />
+      <InlineCallout tone="info" title="Cronograma en evolución" className="mb-4">
+        El cronograma se genera desde el BOQ del presupuesto. Úsalo como apoyo de planeación; revisa fechas
+        y dependencias con criterio antes de comprometer plazos.
+      </InlineCallout>
       <div className="overflow-x-auto rounded-md border border-gray-200">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">

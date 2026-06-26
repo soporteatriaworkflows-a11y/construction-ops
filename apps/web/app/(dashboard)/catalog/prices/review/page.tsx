@@ -12,6 +12,7 @@
 import Link from 'next/link';
 import { ArrowLeft, ClipboardCheck, AlertTriangle, Boxes, Radar, Building2, ListChecks } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
+import { InlineCallout } from '@/components/shared/inline-callout';
 import { EmptyState } from '@/components/shared/empty-state';
 import { resolveViewer, resolveAuthenticatedViewer } from '@/server/auth/resolve-viewer';
 import { resolveAuthMode } from '@/lib/supabase/env';
@@ -118,6 +119,14 @@ export default async function PriceReviewCenterPage() {
           </Link>
         }
       />
+
+      {canReview && (
+        <InlineCallout tone="tip" title="Cómo leer los precios" className="mb-4">
+          <strong>Aprobado</strong> = baseline vigente · <strong>Pendiente</strong> = por revisar ·
+          <strong> Manual</strong> = capturado a mano · <strong>Sin proveedor</strong> = falta fuente.
+          Aprueba en bloque lo correcto para fijar el baseline de comparación.
+        </InlineCallout>
+      )}
 
       {!canReview ? (
         <EmptyState

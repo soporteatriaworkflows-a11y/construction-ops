@@ -18,6 +18,7 @@ import {
   listMembers,
   listInvitations,
 } from '@/server/access';
+import { InlineCallout } from '@/components/shared/inline-callout';
 import { InviteForm } from './_components/invite-form';
 import { MembersTable, type MemberRow } from './_components/members-table';
 import { InvitationsTable, type InvitationRow } from './_components/invitations-table';
@@ -82,6 +83,11 @@ export default async function AccessSettingsPage() {
           <h2 className="text-lg font-semibold text-iconic-ink">Invitar usuario</h2>
         </div>
         <InviteForm assignableRoles={roles} />
+        <InlineCallout tone="info" title="¿No llega el correo de invitación?" className="mt-4">
+          Si el envío por correo no llega, copia el <strong>enlace de invitación</strong> de la tabla de
+          abajo y compártelo manualmente con la persona (p. ej. tu equipo). El enlace permite definir la
+          contraseña y entrar con el rol asignado.
+        </InlineCallout>
       </section>
 
       {/* Usuarios activos */}

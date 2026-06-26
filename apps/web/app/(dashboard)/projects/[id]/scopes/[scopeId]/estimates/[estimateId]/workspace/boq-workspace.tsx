@@ -46,6 +46,7 @@ import {
 } from '@/lib/estimates/workspace-view';
 import { updateItemAction, type ItemActionResult } from '../item-actions';
 import { ArchiveControls } from '../archive-controls';
+import { InlineCallout } from '@/components/shared/inline-callout';
 
 type RowStatus =
   | { kind: 'idle' }
@@ -199,6 +200,13 @@ export function BoqWorkspace({
         <SummaryCard label="Indirectos" value={summary.indirectTotal} />
         <SummaryCard label="Total general" value={summary.grandTotal} accent="primary" />
       </section>
+
+      {apuFilter === 'all' && (
+        <InlineCallout tone="tip" title="¿Qué partidas faltan por vincular?">
+          Usa el filtro <strong>Sin APU</strong> para encontrar las partidas pendientes; luego asocia un
+          APU para validar componentes, precios y rendimientos.
+        </InlineCallout>
+      )}
 
       {/* ---------------------------------------------------------------- */}
       {/* Toolbar sticky: búsqueda + filtros + total siempre visible        */}
