@@ -1,5 +1,37 @@
 # Handoff Log
 
+## 2026-06-25 — ICONIC_OPS_UIX_VISUAL_REFERENCE_AUDIT_AND_WORKSPACE_V3B — RELEASED (orchestrator)
+
+### ⚠️ Referencias NO encontradas (honesto)
+La usuaria indicó haber subido imágenes a `docs/design-references/uix/`, pero **esa carpeta NO existe** y
+**no hay imágenes de referencia** en el repo (solo logos de marca). No se inventó su contenido. Se creó
+**`docs/design-references/UIX_REFERENCE_AUDIT.md`** declarando la ausencia + plantilla para llenar cuando
+se suban; el lenguaje visual se derivó de los **principios listados por la usuaria** (no de imágenes).
+
+### Qué cambió (UIX-only, 3 archivos)
+- **`docs/DESIGN.md`** §12.b **"Visual Reference Language"**: reglas concretas de profundidad, gradientes
+  suaves, soft panels, cards con número héroe, tablas con zonas de lectura + bloques de capítulo, acentos
+  controlados, toolbars por zonas, evitar look de IA, mantener serio/operativo.
+- **`docs/design-references/UIX_REFERENCE_AUDIT.md`** (nuevo): auditoría honesta + plantilla.
+- **`boq-workspace.tsx`** (restyle V3B real y visible):
+  - Resumen financiero = **panel premium** (gradiente brand-50→blanco, `shadow-iconic`) con **"Total
+    general" como número héroe** (`text-2xl`, acento) + desglose compacto. Mismos datos/cálculos.
+  - **Toolbar por zonas** con divisores verticales (búsqueda | filtros | utilidades | resultado).
+  - **Cabeceras de capítulo** como bloques legibles (tinte `brand-50/60` + borde de acento izquierdo) y
+    **subtotal en chip** con ring.
+
+### Estado / release
+- `origin/main` = **`2f8975d1cafed86de28edf861a2bc09e702c91d1`** (merge `--no-ff`, sobre `2f1b93c`). Tag =
+  **`iconic-ops-uix-workspace-visual-reference-v3b`** → `2f8975d`.
+- typecheck 0 · lint 0 · tests workspace/quote **201/0** · suite completa **2080/0 (+42 skip)** · build 0 · gm **22/22** · diff-check limpio.
+- Smoke prod: /login 200 · /projects·/quote·/apu 307 · cron 401.
+- **UIX-only:** sin DB/migración/env/SMTP/usuarios/RPC/finanzas/cálculos; sin tocar `unit_price_snapshot`;
+  sin quitar columnas/datos; sin dark mode; sin romper export/APU/companion/Sin APU; no `-1rqh`.
+- **Pendiente:** verificación visual; **subir imágenes a `docs/design-references/uix/`** para completar la
+  auditoría real y afinar el lenguaje visual con base en ellas.
+
+---
+
 ## 2026-06-25 — ICONIC_OPS_UIX_WORKSPACE_RESTYLE_V3 — RELEASED (orchestrator)
 
 ### Nota de capturas
