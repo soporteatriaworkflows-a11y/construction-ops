@@ -13,6 +13,7 @@
 import Link from 'next/link';
 import { FileSpreadsheet, Hash } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
+import { InlineCallout } from '@/components/shared/inline-callout';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -131,6 +132,14 @@ export default async function QuantitiesPage() {
         }
         actions={importCta}
       />
+
+      {groups.length > 0 && (
+        <InlineCallout tone="tip" title="Flujo de cantidades" className="mb-4">
+          <strong>Importa</strong> las memorias → <strong>revisa</strong> los despieces →
+          <strong> sincroniza</strong> al BOQ del presupuesto. Cada grupo muestra su total ya calculado;
+          sincroniza los pendientes para que el presupuesto refleje las cantidades.
+        </InlineCallout>
+      )}
 
       {groups.length === 0 ? (
         <EmptyState
