@@ -17,6 +17,26 @@
     --iconic-soft-blue: #c7dced;
     --iconic-gray: #f2f4f7;
     --iconic-white: #ffffff;
+
+    /* Tokens SEMÁNTICOS de tema — LIGHT (replican la estética actual). */
+    --c-app: #f2f4f7; /* fondo de página (iconic-gray) */
+    --c-surface: #ffffff; /* cards / tablas / inputs */
+    --c-surface-soft: #f8fafc; /* cabeceras de tabla, zonas suaves */
+    --c-surface-muted: #eef2f7; /* franjas/realces sutiles */
+    --c-line: #e5e7eb; /* bordes (gris frío) */
+    --c-content: #1b1f3e; /* texto principal (graphite) */
+    --c-content-muted: #6b7280; /* texto secundario */
+  }
+
+  /* Tokens SEMÁNTICOS de tema — DARK (command center ICONIC, sobrio, no negro puro). */
+  .dark {
+    --c-app: #060b1f; /* navy casi negro */
+    --c-surface: #0b1230; /* superficie elevada */
+    --c-surface-soft: #101a3d;
+    --c-surface-muted: #141f46;
+    --c-line: #25345f; /* azul grisáceo sutil */
+    --c-content: #f8fafc; /* blanco técnico suave */
+    --c-content-muted: #aebfdb; /* blue-gray */
   }
 
   *,
@@ -32,9 +52,10 @@
   }
 
   body {
-    /* Gris claro arquitectónico como soporte; blanco como respiración (cards). */
-    @apply bg-iconic-gray text-iconic-graphite antialiased;
+    /* Tokens de tema: en claro = gris arquitectónico + graphite (sin cambio visual). */
+    @apply bg-app text-content antialiased;
     font-family: 'Inter', system-ui, sans-serif;
+    transition: background-color 0.2s ease, color 0.2s ease;
   }
 
   /* Focus visible accesible (azul ICONIC) */
@@ -53,6 +74,26 @@
   ::-webkit-scrollbar-thumb {
     @apply rounded bg-gray-300;
   }
+  .dark ::-webkit-scrollbar-track {
+    background-color: #0b1230;
+  }
+  .dark ::-webkit-scrollbar-thumb {
+    background-color: #25345f;
+  }
+}
+
+/* AG Grid — variante dark (tablas BOQ legibles en modo oscuro). */
+.dark .ag-theme-alpine {
+  --ag-background-color: #0b1230;
+  --ag-foreground-color: #f8fafc;
+  --ag-header-background-color: #101a3d;
+  --ag-header-foreground-color: #aebfdb;
+  --ag-border-color: #25345f;
+  --ag-row-border-color: #1b2748;
+  --ag-odd-row-background-color: #0d1738;
+  --ag-selected-row-background-color: #14224a;
+  --ag-range-selection-border-color: #2f7bff;
+  --ag-input-focus-border-color: #2f7bff;
 }
 
 /* AG Grid — sobreescrituras para tabla densa de BOQ */

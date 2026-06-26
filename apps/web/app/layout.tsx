@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { getActiveWorkspace } from "@/lib/branding/workspace";
+import { ThemeProvider, THEME_INIT_SCRIPT } from "@/components/shared/theme-provider";
 
 const ws = getActiveWorkspace();
 
@@ -15,8 +16,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="es">
-      <body>{children}</body>
+    <html lang="es" suppressHydrationWarning>
+      <head>
+        {/* Aplica el tema antes del paint (anti-FOUC / anti hydration mismatch). */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
+      <body>
+        <ThemeProvider>{children}</ThemeProvider>
+      </body>
     </html>
   );
 }
