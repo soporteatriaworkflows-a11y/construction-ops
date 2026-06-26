@@ -70,12 +70,12 @@ describe('CTAs de creación — anclas navegables (Button asChild + Link)', () =
   const projects = read('projects/page.tsx');
   const dashboard = read('dashboard/page.tsx');
 
-  it('/projects: ambos CTAs usan Button asChild con Link a /projects/new', () => {
-    const matches = projects.match(
-      /<Button\s+asChild[^>]*>\s*<Link\s+href="\/projects\/new">/g,
-    );
-    expect(matches).not.toBeNull();
-    expect((matches ?? []).length).toBeGreaterThanOrEqual(2);
+  it('/projects: ≥2 CTAs navegables a /projects/new (Button asChild+Link o OperationsHeaderAction)', () => {
+    // V4.1: el CTA del header pasó a <OperationsHeaderAction href="/projects/new"> (Link interno);
+    // el del estado vacío sigue como <Button asChild><Link>. Ambos navegan.
+    const buttonLink = projects.match(/<Button\s+asChild[^>]*>\s*<Link\s+href="\/projects\/new">/g) ?? [];
+    const headerAction = projects.match(/<OperationsHeaderAction[^>]*href="\/projects\/new"/g) ?? [];
+    expect(buttonLink.length + headerAction.length).toBeGreaterThanOrEqual(2);
   });
 
   it('/projects: no anida <Button> dentro de <Link> (patrón que no navega)', () => {
