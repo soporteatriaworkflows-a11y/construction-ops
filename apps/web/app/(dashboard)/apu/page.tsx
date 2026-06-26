@@ -10,6 +10,8 @@
 import Link from 'next/link';
 import { Calculator, FileSpreadsheet, GitMerge, Link2, Plus } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
+import { OperationsHeader } from '@/components/shared/operations-header';
+import { KpiCard, KpiBand } from '@/components/shared/kpi-card';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -179,11 +181,21 @@ export default async function ApuPage({ searchParams }: PageProps) {
   if (view === 'cards') {
     return (
       <div>
-        <PageHeader
-          title="Biblioteca APU"
-          description="Actividades reutilizables para cotizar proyectos."
+        <OperationsHeader
+          eyebrow="APU"
+          title="Biblioteca reutilizable"
+          subtitle="Actividades reutilizables para cotizar proyectos."
+          stat={{ label: 'Actividades', value: String(stats.totalApus) }}
           actions={actions}
         />
+        <KpiBand className="mb-4">
+          <KpiCard label="Actividades" value={stats.totalApus} />
+          <KpiCard label="Componentes" value={stats.totalComponents} />
+          <KpiCard label="Vinculadas BOQ" value={stats.linkedToBoq} tone={stats.linkedToBoq > 0 ? 'ok' : 'default'} />
+          <KpiCard label="Completas" value={stats.complete} tone="ok" />
+          <KpiCard label="Con pendientes" value={stats.withPending} tone={stats.withPending > 0 ? 'warn' : 'default'} />
+          <KpiCard label="Sin resolver" value={stats.withUnresolved} tone={stats.withUnresolved > 0 ? 'danger' : 'default'} />
+        </KpiBand>
         <ApuLibraryToolbar activeView="cards" canMutate={canMutate} />
         <ApuLibraryFilters
           values={{ q: search, category, unit, completeness, size: result.pageSize, showArchived: cardsArchived }}
@@ -213,9 +225,11 @@ export default async function ApuPage({ searchParams }: PageProps) {
 
   return (
     <div>
-      <PageHeader
-        title="Biblioteca de APU"
-        description="Análisis de Precios Unitarios reutilizables por proyecto"
+      <OperationsHeader
+        eyebrow="APU"
+        title="Biblioteca reutilizable"
+        subtitle="Análisis de Precios Unitarios reutilizables por proyecto"
+        stat={{ label: 'Actividades', value: String(stats.totalApus) }}
         actions={actions}
       />
       <ApuLibraryToolbar activeView="workspace" canMutate={canMutate} />

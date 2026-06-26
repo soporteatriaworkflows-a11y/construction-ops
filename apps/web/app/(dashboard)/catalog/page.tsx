@@ -9,6 +9,8 @@
 import Link from 'next/link';
 import { BookOpen } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
+import { OperationsHeader } from '@/components/shared/operations-header';
+import { KpiCard, KpiBand } from '@/components/shared/kpi-card';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Button } from '@/components/ui/button';
 import { getReadModel } from '@/server/read-model';
@@ -129,13 +131,31 @@ export default async function CatalogPage() {
     </Button>
   );
 
+  const catApproved = resources.filter((r) => r.priceStatus === 'approved').length;
+  const catPending = resources.filter((r) => r.priceStatus === 'pending').length;
+  const catNoSupplier = resources.filter((r) => !r.supplierName).length;
+  const catNoPrice = resources.filter((r) => !r.priceStatus || r.priceStatus === 'none').length;
+
   return (
     <div>
-      <PageHeader
-        title="Catálogo de Recursos"
-        description="Materiales, mano de obra y equipos disponibles para APU y BOQ"
+      <OperationsHeader
+        eyebrow="Catálogo"
+        title="Control de precios"
+        subtitle="Materiales, mano de obra y equipos disponibles para APU y BOQ"
+        stat={{ label: 'Recursos', value: String(resources.length) }}
         actions={headerActions}
       />
+
+      {resources.length > 0 && (
+        <KpiBand className="mb-4">
+          <KpiCard label="Recursos" value={resources.length} />
+          <KpiCard label="Aprobados" value={catApproved} tone={catApproved > 0 ? 'ok' : 'default'} />
+          <KpiCard label="Pendientes" value={catPending} tone={catPending > 0 ? 'warn' : 'default'} />
+          <KpiCard label="Sin precio" value={catNoPrice} tone={catNoPrice > 0 ? 'warn' : 'ok'} />
+          <KpiCard label="Sin proveedor" value={catNoSupplier} tone={catNoSupplier > 0 ? 'warn' : 'default'} />
+          <KpiCard label="Revisar precios" value="Abrir" href="/catalog/prices/review" hint="Aprobación en bloque" />
+        </KpiBand>
+      )}
 
       {disabledNotice && (
         <div
