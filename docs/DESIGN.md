@@ -300,6 +300,38 @@ Para cada uno: **objetivo visual · problema actual · patrón recomendado · qu
 
 ---
 
+## 12.b Visual Reference Language (calidad premium, sin look genérico)
+
+Reglas concretas para que ICONIC OPS se sienta **diseñado**, no "generado". Inspiración de
+calidad/jerarquía; **nunca** copia de branding/colores externos (ver `design-references/UIX_REFERENCE_AUDIT.md`).
+
+- **Profundidad:** superficies premium con `shadow-iconic` (o `shadow-sm`) + borde sutil
+  `border-iconic-soft-blue/60-70`. Las cards no son planas; tienen elevación leve. No abusar de
+  sombras fuertes ni múltiples niveles.
+- **Gradientes suaves:** solo de token a blanco y muy sutiles, p. ej.
+  `bg-gradient-to-br from-brand-50/70 via-white to-white`, para zonas de resumen/hero. Nunca gradientes
+  saturados ni multicolor.
+- **Glass / soft panels:** permitido en barras sticky (`bg-white/95 backdrop-blur`) y overlays; el cuerpo
+  de tablas permanece sólido (legibilidad). Sin glass sobre datos densos.
+- **Cards / paneles:** un **número "héroe"** dominante (grande, `text-2xl`, acento `iconic-primary`) +
+  desglose secundario en grid compacto. Etiquetas `text-[11px] uppercase tracking-wide text-gray-500`,
+  cifras `tabular-nums`. `rounded-xl`/`rounded-2xl`.
+- **Tablas:** "zonas de lectura" — id (`font-mono`) + descripción a la izquierda; cifras a la derecha;
+  estado/acción al final. Encabezado sticky tenue; **bloques de capítulo** con tinte `brand-50/60` y
+  **borde de acento izquierdo** (`border-l-2 border-iconic-primary/60`) + subtotal en chip
+  (`ring-1 ring-iconic-soft-blue/60`). Hover de fila `hover:bg-brand-50/40`. Nunca quitar columnas.
+- **Acentos:** uso **controlado** de `iconic-primary` (acción/activo) e `iconic-cyan` (realce puntual,
+  escaso). El color porta significado; no decorar con color.
+- **Toolbars:** agrupar por zonas (búsqueda · filtros · utilidades · resultado) con **divisores**
+  (`h-5 w-px bg-iconic-soft-blue/60`) en vez de controles pegados; segmented controls (`FilterPills`)
+  para dimensiones cortas.
+- **Recursos gráficos:** acentos sutiles (líneas, anillos, puntos de estado, blueprint inline tenue).
+  Prohibido: imágenes decorativas pesadas, ilustraciones genéricas, stock.
+- **Evitar look de IA:** nada de cards uniformes sin jerarquía, ni párrafos de relleno, ni gradientes
+  morados/neón, ni emojis decorativos. Jerarquía tipográfica real, spacing intencional, un acento por zona.
+- **Serio y operativo:** ante la duda, prioriza densidad de datos y control técnico sobre el adorno.
+  Sin dark mode salvo que se prepare el sistema completo.
+
 ## 13. Roadmap visual
 
 | Fase | Módulo | Foco |
