@@ -31,7 +31,8 @@ import {
   ClipboardList,
   LayoutGrid,
 } from 'lucide-react';
-import { PageHeader } from '@/components/shared/page-header';
+import { OperationsHeader } from '@/components/shared/operations-header';
+import { KpiCard, KpiBand } from '@/components/shared/kpi-card';
 import { EstimateVersionBadge } from '@/components/shared/status-badge';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -184,18 +185,42 @@ export default async function EstimateDetailPage({ params, searchParams }: PageP
 
   return (
     <div>
-      <PageHeader
+      <OperationsHeader
+        eyebrow="Presupuesto"
         title={estimate.name}
+        subtitle={`${estimate.code}${active ? ` · ${formatVersionLabel(active.versionNumber)}` : ''}`}
+        stat={financialSummary ? { label: 'Total general', value: formatCOP(financialSummary.grandTotal) } : undefined}
         breadcrumb={
-          <Link
-            href={scopeHref}
-            className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
-          >
+          <Link href={scopeHref} className="inline-flex items-center gap-1 text-white/70 hover:text-white">
             <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
             Volver al alcance
           </Link>
         }
       />
+
+      {active && (
+        <KpiBand className="mb-4">
+          <KpiCard label="Total general" value={financialSummary ? formatCOP(financialSummary.grandTotal) : '—'} />
+          <KpiCard label="Capítulos" value={active.chapterCount} />
+          <KpiCard label="Partidas" value={active.itemCount} />
+          {readiness ? (
+            <KpiCard label="Con APU" value={readiness.counts.itemsWithApu} tone={readiness.counts.itemsWithApu > 0 ? 'ok' : 'default'} />
+          ) : (
+            <KpiCard label="Con APU" value="—" />
+          )}
+          {readiness ? (
+            <KpiCard label="Sin APU" value={readiness.counts.itemsWithoutApu} tone={readiness.counts.itemsWithoutApu > 0 ? 'warn' : 'ok'} />
+          ) : (
+            <KpiCard label="Sin APU" value="—" />
+          )}
+          <KpiCard
+            label="Workspace"
+            value="Abrir"
+            href={hasContent ? `${scopeHref}/estimates/${estimateId}/workspace` : undefined}
+            hint="BOQ de operación"
+          />
+        </KpiBand>
+      )}
 
       {justImported && (
         <div
