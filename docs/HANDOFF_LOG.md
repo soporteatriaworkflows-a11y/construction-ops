@@ -1,5 +1,35 @@
 # Handoff Log
 
+## 2026-06-25 — ICONIC_OPS_UIX_WORKSPACE_RESTYLE_V3 — RELEASED (orchestrator)
+
+### Nota de capturas
+**No llegaron capturas adjuntas** en este ciclo → reportado; restyle anclado a `docs/DESIGN.md` + código real.
+
+### Diagnóstico
+El Workspace ya estaba bastante pulido (toolbar/header/footer sticky, SummaryCards con acento, badge APU
+por fila, FilterPills V2, callout V1). La carencia de mayor valor (DESIGN §11): visibilidad inmediata de
+"qué falta" — cuántas partidas sin APU.
+
+### Qué cambió (UIX-only, 1 archivo + test)
+- `boq-workspace.tsx`: **chip accionable "N sin APU"** en el área de resultados de la toolbar (conteo
+  display desde el `apu_template_id` real; honesto: omite "No verificable"); al hacer clic activa el
+  filtro "Sin APU". Pulido premium del `SummaryCard` (sombra, alineado a MetricCard de DESIGN §5).
+- Todo lo demás intacto: columnas/datos técnicos, totales server-derived, FilterPills Estado/APU, filtro
+  Sin APU, badges por fila, sticky header/footer, InlineCallout.
+
+### Estado / release
+- `origin/main` = **`37424ddf8bfc10dc0649e4aaa541c2e922573e59`** (merge `--no-ff`, sobre `461a780`). Tag =
+  **`iconic-ops-uix-workspace-restyle-v3`** → `37424dd`.
+- typecheck 0 · lint 0 · tests workspace/quote **200/0** · suite completa **2079/0 (+42 skip)** (1ª corrida
+  falló transitoria; re-run limpio) · build 0 · gm **22/22** · diff-check limpio.
+- Smoke prod: /login 200 · /projects·/quote·/apu 307 · cron 401 (workspace protegido → 307 sin sesión).
+- **UIX-only:** sin DB/migración/env/SMTP/usuarios/RPC/finanzas/cálculos; sin tocar `unit_price_snapshot`;
+  sin quitar columnas; sin romper export/APU/companion/Sin APU; no `-1rqh`.
+- **Pendiente:** verificación visual con capturas; futuro DESIGN §11 Workspace (filas expandibles de
+  trazabilidad, densidad fina). Siguiente fase: **V4 Catálogo/Precios**.
+
+---
+
 ## 2026-06-25 — ICONIC_OPS_DESIGN_SYSTEM_FOUNDATION_V1 (docs) — RELEASED (orchestrator)
 
 ### Qué se hizo (docs-only)
