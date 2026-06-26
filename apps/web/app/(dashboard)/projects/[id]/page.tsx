@@ -20,7 +20,8 @@ import {
   Plus,
   ChevronRight,
 } from 'lucide-react';
-import { PageHeader } from '@/components/shared/page-header';
+import { OperationsHeader } from '@/components/shared/operations-header';
+import { KpiCard, KpiBand } from '@/components/shared/kpi-card';
 import { ProjectStatusBadge } from '@/components/shared/status-badge';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Badge } from '@/components/ui/badge';
@@ -85,18 +86,26 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
 
   return (
     <div>
-      <PageHeader
+      <OperationsHeader
+        eyebrow="Proyecto"
         title={project.name}
+        subtitle={`Centro operativo${project.city ? ` · ${project.city}` : ''}`}
+        stat={{ label: 'Alcances', value: String(scopes.length) }}
         breadcrumb={
-          <Link
-            href="/projects"
-            className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
-          >
+          <Link href="/projects" className="inline-flex items-center gap-1 text-white/70 hover:text-white">
             <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
             Proyectos
           </Link>
         }
       />
+
+      {scopes.length > 0 && (
+        <KpiBand className="mb-4 sm:grid-cols-3 lg:grid-cols-3">
+          <KpiCard label="Alcances" value={scopes.length} />
+          <KpiCard label="Activos" value={scopes.filter((s) => s.status === 'active').length} tone="ok" />
+          <KpiCard label="Archivados" value={scopes.filter((s) => s.status === 'archived').length} />
+        </KpiBand>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2">
         {/* Información general */}

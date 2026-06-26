@@ -24,6 +24,11 @@ describe('componentes shell operativos', () => {
     for (const t of ['default', 'ok', 'warn', 'danger']) expect(KPI).toContain(`${t}:`);
     expect(KPI).toContain('export function KpiBand');
   });
+  it('V4.1: OperationsHeaderAction (acción legible sobre navy)', () => {
+    expect(HEADER).toContain('export function OperationsHeaderAction');
+    expect(HEADER).toContain("variant === 'primary'");
+    expect(HEADER).toContain('bg-white'); // primaria de alto contraste sobre navy
+  });
 });
 
 describe('adopción app-wide (identidad común)', () => {
@@ -35,6 +40,11 @@ describe('adopción app-wide (identidad común)', () => {
     ['Cronograma', '../../../app/(dashboard)/planning/page.tsx'],
     ['Proyectos', '../../../app/(dashboard)/projects/page.tsx'],
     ['Accesos', '../../../app/(dashboard)/settings/access/page.tsx'],
+    // V4.1 — pantallas puente/hub del recorrido principal
+    ['Detalle proyecto', '../../../app/(dashboard)/projects/[id]/page.tsx'],
+    ['Detalle alcance', '../../../app/(dashboard)/projects/[id]/scopes/[scopeId]/page.tsx'],
+    ['Índice presupuestos', '../../../app/(dashboard)/estimates/page.tsx'],
+    ['Dashboard', '../../../app/(dashboard)/dashboard/page.tsx'],
   ];
   for (const [name, rel] of pages) {
     it(`${name} usa OperationsHeader`, () => {

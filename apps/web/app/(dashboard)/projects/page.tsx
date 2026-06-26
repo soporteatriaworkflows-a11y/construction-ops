@@ -17,7 +17,7 @@ import {
   ClipboardList,
 } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
-import { OperationsHeader } from '@/components/shared/operations-header';
+import { OperationsHeader, OperationsHeaderAction } from '@/components/shared/operations-header';
 import { ProjectStatusBadge } from '@/components/shared/status-badge';
 import { EmptyState } from '@/components/shared/empty-state';
 import {
@@ -92,22 +92,19 @@ export default async function ProjectsPage() {
         stat={{ label: 'Proyectos', value: String(projects.length) }}
         actions={
           canCreate ? (
-            <Button asChild size="sm">
-              <Link href="/projects/new">
-                <Plus className="h-4 w-4" aria-hidden="true" />
-                Nuevo proyecto
-              </Link>
-            </Button>
+            <OperationsHeaderAction href="/projects/new" variant="primary">
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              Nuevo proyecto
+            </OperationsHeaderAction>
           ) : (
-            <Button
-              size="sm"
-              disabled
+            <span
+              className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-lg border border-white/20 px-3 py-1.5 text-sm font-medium text-white/50"
               aria-disabled="true"
               title="Disponible en modo supabase+db"
             >
               <Plus className="h-4 w-4" aria-hidden="true" />
               Nuevo proyecto
-            </Button>
+            </span>
           )
         }
       />

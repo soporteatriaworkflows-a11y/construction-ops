@@ -21,7 +21,8 @@ import {
   Plus,
   ChevronRight,
 } from 'lucide-react';
-import { PageHeader } from '@/components/shared/page-header';
+import { OperationsHeader } from '@/components/shared/operations-header';
+import { KpiCard, KpiBand } from '@/components/shared/kpi-card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/shared/empty-state';
@@ -83,18 +84,26 @@ export default async function ScopeDetailPage({ params }: PageProps) {
 
   return (
     <div>
-      <PageHeader
+      <OperationsHeader
+        eyebrow="Alcance"
         title={scope.name}
+        subtitle={`Control de presupuesto · ${scope.code} · ${SCOPE_TYPE_LABELS[scope.scopeType]}`}
+        stat={{ label: 'Presupuestos', value: String(estimates.length) }}
         breadcrumb={
-          <Link
-            href={backHref}
-            className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
-          >
+          <Link href={backHref} className="inline-flex items-center gap-1 text-white/70 hover:text-white">
             <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
             Volver al proyecto
           </Link>
         }
       />
+
+      {estimates.length > 0 && (
+        <KpiBand className="mb-4 sm:grid-cols-3 lg:grid-cols-3">
+          <KpiCard label="Presupuestos" value={estimates.length} />
+          <KpiCard label="Activos" value={estimates.filter((e) => e.status !== 'archived').length} tone="ok" />
+          <KpiCard label="Archivados" value={estimates.filter((e) => e.status === 'archived').length} />
+        </KpiBand>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2">
         {/* Información general */}

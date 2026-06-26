@@ -7,7 +7,45 @@
  * un stat/héroe opcional a la derecha y acciones. Tokens ICONIC; NO dark mode
  * global (es una banda de cabecera sobre página clara).
  */
+import Link from 'next/link';
 import type { ReactNode } from 'react';
+
+/**
+ * Acción legible sobre la barra navy (contraste seguro):
+ * - `primary`: superficie blanca + texto ink (alto contraste sobre navy).
+ * - `secondary`: transparente + borde/texto claros (no compite con la primaria).
+ * Renderiza <Link> si hay `href`, si no <button>.
+ */
+export function OperationsHeaderAction({
+  children,
+  href,
+  onClick,
+  variant = 'secondary',
+  type = 'button',
+}: {
+  children: ReactNode;
+  href?: string;
+  onClick?: () => void;
+  variant?: 'primary' | 'secondary';
+  type?: 'button' | 'submit';
+}) {
+  const cls =
+    variant === 'primary'
+      ? 'inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-sm font-semibold text-iconic-ink transition-colors hover:bg-iconic-soft-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iconic-cyan'
+      : 'inline-flex items-center gap-1.5 rounded-lg border border-white/35 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iconic-cyan';
+  if (href) {
+    return (
+      <Link href={href} className={cls}>
+        {children}
+      </Link>
+    );
+  }
+  return (
+    <button type={type} onClick={onClick} className={cls}>
+      {children}
+    </button>
+  );
+}
 
 export function OperationsHeader({
   eyebrow,
