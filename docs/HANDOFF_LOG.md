@@ -1,5 +1,28 @@
 # Handoff Log
 
+## 2026-06-25 — ICONIC_OPS_DESIGN_SYSTEM_FOUNDATION_V1 (docs) — RELEASED (orchestrator)
+
+### Qué se hizo (docs-only)
+- Nuevo **`docs/DESIGN.md`** = fuente de verdad visual/UIX de ICONIC OPS. 13 secciones:
+  principios; identidad visual (tokens reales `iconic-primary #005DD6`, `iconic-ink #020148`,
+  `iconic-cyan #00B8FF`, `iconic-graphite`, `iconic-soft-blue #C7DCED`, `iconic-gray #F2F4F7`,
+  `brand-50 #E8F1FD`; Inter+JetBrains Mono; `shadow-iconic`); colores de estado y qué NO usar
+  (sin morado, sin placeholders, sin copiar plataformas externas); layout/shell/z-index canónico;
+  headers (`PageHeader`); cards/paneles (card vs tabla); **tablas operativas** (no quitar columnas
+  técnicas, jerarquía, filas expandibles); filtros/toolbars (`FilterPills` vs select); badges/estados
+  (texto+color); empty states/callouts (`InlineCallout`, honestidad); acciones; **módulo por módulo**
+  (objetivo/problema/patrón/qué NO cambiar/futuro); **reglas anti-regresión**; **roadmap V1–V7**.
+- Sin links externos (placeholder vacío + no se abren URLs) → basado en repo/tokens/componentes reales.
+
+### Estado / release
+- `origin/main` = **`<pendiente push>`**. Tag = **`iconic-ops-design-system-foundation-v1`**.
+- **Solo docs** (`docs/DESIGN.md` + este log). Sin tocar pantallas/código ejecutable → sin typecheck/build/suite.
+  `git diff --check` limpio.
+- Sin DB/migración/env/SMTP/usuarios/lógica/cálculos; no `-1rqh`.
+- Próximo: **V3 = Presupuestos/BOQ/Workspace** restyle profundo anclado a `docs/DESIGN.md` (con capturas).
+
+---
+
 ## 2026-06-25 — ICONIC_OPS_UIX_VISUAL_SYSTEM_ROLLOUT_V2_CORE_MODULES — RELEASED (orchestrator)
 
 ### Alcance (UIX-only) y nota honesta de screenshots
