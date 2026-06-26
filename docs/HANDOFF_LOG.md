@@ -1,5 +1,35 @@
 # Handoff Log
 
+## 2026-06-25 — ICONIC_OPS_UIX_VISUAL_SYSTEM_ROLLOUT_V1 — RELEASED (orchestrator)
+
+### Alcance (UIX-only, aditivo, sin lógica)
+Primera oleada de una **capa de claridad visual compartida**. No es rediseño total (no es seguro reestilar
+5 módulos a ciegas); se establece el patrón + se aplica ayuda contextual consistente.
+
+### Qué cambió (7 archivos)
+- **`components/shared/inline-callout.tsx`** (nuevo, server-safe): `InlineCallout` con 4 tonos
+  (tip/info/warning/success) usando tokens ICONIC; `role="note"`, sin librerías nuevas.
+- Adopción consistente por módulo prioritario:
+  - **Workspace** (`boq-workspace.tsx`): ayuda "usa el filtro Sin APU para encontrar partidas pendientes;
+    luego asocia un APU para validar componentes, precios y rendimientos" (solo cuando apuFilter=all).
+  - **Catálogo/Precios** (`prices/review`): cómo leer estados (Aprobado/Pendiente/Manual/Sin proveedor).
+  - **Cantidades** (`quantities`): flujo Importa → revisa → sincroniza al BOQ.
+  - **Cronograma** (`planning`): nota honesta "en evolución / usar con criterio".
+  - **Accesos** (`settings/access`): "si no llega el correo, copia el enlace de invitación y compártelo".
+
+### Estado / release
+- `origin/main` = **`71d5358afb719757ce1990b743e1bc6d09a36722`** (merge `--no-ff`, sobre `1ef4984`). Tag =
+  **`iconic-ops-uix-visual-system-rollout-v1`** → `71d5358`.
+- typecheck 0 · lint 0 · tests components/quote/workspace **244/0** · suite completa **2076/0 (+42 skip)** · build 0 · gm **22/22** · diff-check limpio.
+- Smoke prod: /login 200 · /dashboard·/projects·/apu·/quote·/quantities·/catalog/prices/review·/planning·/settings/access 307 · cron 401.
+- **UIX-only/aditivo:** sin DB/migración/env/SMTP/usuarios/RPC/finanzas; sin cambiar cálculos
+  BOQ/APU/export/cantidades/cronograma; sin tocar `unit_price_snapshot`; sin rediseño total; no `-1rqh`.
+- **Pendiente / siguiente fase (V2):** restyle profundo por módulo (tablas/cards/headers) **con revisión
+  visual** (no a ciegas): MetricCard/TableToolbar/SectionPanel consistentes, densidad de tablas, jerarquía.
+  Verificación visual tras promoción del deploy.
+
+---
+
 ## 2026-06-25 — UX_QUOTING_COMPANION_WORKSPACE_FOCUS_AND_DOCKING_V1 — RELEASED (orchestrator)
 
 ### Problemas UX
