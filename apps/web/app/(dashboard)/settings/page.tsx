@@ -8,7 +8,6 @@
  */
 import Link from 'next/link';
 import { LogOut, ChevronRight } from 'lucide-react';
-import { PageHeader } from '@/components/shared/page-header';
 import { getActiveWorkspace } from '@/lib/branding/workspace';
 import { readModelModeLabel } from '@/lib/utils/mode-label';
 import { ROLE_LABELS } from '@/components/shared/account-menu';
@@ -28,18 +27,17 @@ export default async function SettingsHubPage() {
 
   return (
     <div>
-      <PageHeader
-        eyebrow="Workspace"
-        title="Configuración"
-        description="Cuenta, organización, accesos y preferencias de ICONIC OPS."
-      />
-
-      {/* Hero de identidad — panel navy con acento cian (jerarquía premium). */}
+      {/* Hero de identidad — panel navy con acento cian (header del módulo Settings). */}
       <section
         className="mb-6 overflow-hidden rounded-2xl border border-white/10 text-white shadow-iconic"
         style={{ background: 'linear-gradient(120deg, #020148 0%, #050a3a 55%, #0a1145 100%)' }}
       >
-        <div className="flex flex-wrap items-center gap-4 p-5 sm:p-6">
+        <div className="px-5 pt-4 sm:px-6">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-iconic-cyan">
+            Settings · Configuración operativa
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-4 px-5 pb-5 pt-3 sm:px-6">
           <span
             className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-lg font-semibold ring-1 ring-iconic-cyan/40"
             aria-hidden="true"

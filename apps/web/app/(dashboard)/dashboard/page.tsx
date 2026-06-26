@@ -38,7 +38,7 @@ import {
   CalendarRange,
   Sparkles,
 } from 'lucide-react';
-import { PageHeader } from '@/components/shared/page-header';
+import { OperationsHeader } from '@/components/shared/operations-header';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Button } from '@/components/ui/button';
 import { KpiCard } from '@/modules/dashboard/kpi-card';
@@ -135,7 +135,7 @@ function AlertCard({
 function DashboardError({ message }: { message: string }) {
   return (
     <div>
-      <PageHeader title="Dashboard gerencial" />
+      <OperationsHeader eyebrow="Panel" title="Centro de control" />
       <div
         className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
         role="alert"
@@ -179,9 +179,10 @@ export default async function DashboardPage() {
   if (!projectId) {
     return (
       <div>
-        <PageHeader
-          title="Dashboard gerencial"
-          description="Resumen financiero de la organización"
+        <OperationsHeader
+          eyebrow="Panel"
+          title="Centro de control"
+          subtitle="Resumen financiero de la organización"
         />
         <EmptyState
           icon={LayoutDashboard}
