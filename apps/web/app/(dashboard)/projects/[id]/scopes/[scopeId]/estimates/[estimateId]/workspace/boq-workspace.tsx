@@ -47,6 +47,7 @@ import {
 import { updateItemAction, type ItemActionResult } from '../item-actions';
 import { ArchiveControls } from '../archive-controls';
 import { InlineCallout } from '@/components/shared/inline-callout';
+import { FilterPills } from '@/components/shared/filter-pills';
 
 type RowStatus =
   | { kind: 'idle' }
@@ -225,41 +226,23 @@ export function BoqWorkspace({
             />
           </div>
 
-          <div className="inline-flex rounded-md border border-gray-200" role="group" aria-label="Filtro de estado">
-            {(Object.keys(WORKSPACE_FILTER_LABELS) as WorkspaceFilter[]).map((f) => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => setFilter(f)}
-                aria-pressed={filter === f}
-                className={`px-2.5 py-1.5 text-xs font-medium first:rounded-l-md last:rounded-r-md ${
-                  filter === f
-                    ? 'bg-iconic-ink text-white'
-                    : 'bg-white text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                {WORKSPACE_FILTER_LABELS[f]}
-              </button>
-            ))}
-          </div>
+          <FilterPills
+            label="Estado"
+            ariaLabel="Filtro de estado"
+            tone="ink"
+            value={filter}
+            onChange={(v) => setFilter(v as WorkspaceFilter)}
+            options={(Object.keys(WORKSPACE_FILTER_LABELS) as WorkspaceFilter[]).map((f) => ({ value: f, label: WORKSPACE_FILTER_LABELS[f] }))}
+          />
 
-          <div className="inline-flex rounded-md border border-gray-200" role="group" aria-label="Filtro de vínculo APU">
-            {(Object.keys(APU_FILTER_LABELS) as ApuLinkFilter[]).map((f) => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => setApuFilter(f)}
-                aria-pressed={apuFilter === f}
-                className={`px-2.5 py-1.5 text-xs font-medium first:rounded-l-md last:rounded-r-md ${
-                  apuFilter === f
-                    ? 'bg-iconic-primary text-white'
-                    : 'bg-white text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                {APU_FILTER_LABELS[f]}
-              </button>
-            ))}
-          </div>
+          <FilterPills
+            label="APU"
+            ariaLabel="Filtro de vínculo APU"
+            tone="primary"
+            value={apuFilter}
+            onChange={(v) => setApuFilter(v as ApuLinkFilter)}
+            options={(Object.keys(APU_FILTER_LABELS) as ApuLinkFilter[]).map((f) => ({ value: f, label: APU_FILTER_LABELS[f] }))}
+          />
 
           <div className="inline-flex items-center gap-1">
             <button
