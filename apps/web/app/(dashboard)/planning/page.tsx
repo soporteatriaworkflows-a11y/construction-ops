@@ -7,6 +7,7 @@
 import Link from 'next/link';
 import { CalendarRange, Plus } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
+import { OperationsHeader } from '@/components/shared/operations-header';
 import { InlineCallout } from '@/components/shared/inline-callout';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Button } from '@/components/ui/button';
@@ -81,9 +82,11 @@ export default async function PlanningPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Cronogramas de obra"
-        description={`${schedules.length} cronograma${schedules.length === 1 ? '' : 's'}`}
+      <OperationsHeader
+        eyebrow="Cronograma"
+        title="Planeación de obra"
+        subtitle={`${schedules.length} cronograma${schedules.length === 1 ? '' : 's'}`}
+        stat={{ label: 'Cronogramas', value: String(schedules.length) }}
         actions={actions}
       />
       <InlineCallout tone="info" title="Cronograma en evolución" className="mb-4">

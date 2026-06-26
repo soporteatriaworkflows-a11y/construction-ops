@@ -13,6 +13,7 @@
 import Link from 'next/link';
 import { FileSpreadsheet, Hash } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
+import { OperationsHeader } from '@/components/shared/operations-header';
 import { InlineCallout } from '@/components/shared/inline-callout';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Badge } from '@/components/ui/badge';
@@ -123,13 +124,15 @@ export default async function QuantitiesPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Cantidades y Despieces"
-        description={
+      <OperationsHeader
+        eyebrow="Cantidades"
+        title="Revisión y sincronización"
+        subtitle={
           projectName && scopeName
             ? `${projectName} / ${scopeName}`
             : 'Despieces geométricos vinculados a alcances del proyecto'
         }
+        stat={{ label: 'Grupos', value: String(groups.length) }}
         actions={importCta}
       />
 
