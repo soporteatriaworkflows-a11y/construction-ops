@@ -365,6 +365,23 @@ Componentes canónicos para la identidad común (usar en toda pantalla principal
 Regla: cada módulo principal = `OperationsHeader` arriba + (si hay datos) `KpiBand` + contenido
 (tabla/lista/cards) + ayuda (`InlineCallout`). Estados con texto+color (sección 8).
 
+## 12.d Tema claro/oscuro (V4.2)
+
+ICONIC OPS soporta **claro (default) y oscuro** vía `darkMode: 'class'` + **tokens semánticos**
+(CSS variables en `app/globals.css`, expuestos en Tailwind):
+
+- `bg-app` (fondo página), `bg-surface` / `bg-surface-soft` / `bg-surface-muted` (superficies),
+  `border-line`, `text-content`, `text-content-muted`.
+- En **claro** replican la estética actual (sin cambio visual); en **oscuro** usan la paleta ICONIC dark
+  (navy casi negro `#060b1f`, superficies `#0b1230+`, texto `#f8fafc`/blue-gray). **Sin negro puro, sin morado/neón.**
+- La marca (navy/azul/cian, barras `OperationsHeader`, sidebar) **no cambia**: sirve en ambos modos.
+
+Reglas:
+- Para superficies/textos nuevos usar **tokens** (`bg-surface`, `text-content`, `border-line`) en vez de
+  `bg-white`/`text-gray-*`, para que sean theme-aware automáticamente.
+- Tema vía `ThemeProvider` (propio) + `ThemeToggle` (Claro/Oscuro/Sistema) en el menú de cuenta. Persiste
+  en `localStorage`; script inline anti-FOUC. Ver `docs/design-references/UIX_THEME_MODES_V4_2.md`.
+
 ## 13. Roadmap visual
 
 | Fase | Módulo | Foco |

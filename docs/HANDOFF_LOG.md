@@ -1,5 +1,34 @@
 # Handoff Log
 
+## 2026-06-26 — ICONIC_OPS_UIX_THEME_MODES_V4_2 — EN RAMA (sin merge; pendiente revisión visual) (orchestrator)
+
+### Estado
+- Rama **`feature/uix-theme-modes-v4-2`** (base `origin/main = f6cd634`, tras V4.1). **NO mergeada.**
+
+### Qué cambió (base de tema claro/oscuro, UIX-only)
+- **Fundación**: `darkMode:'class'` + **tokens semánticos** por CSS vars (`--c-app/surface/surface-soft/
+  surface-muted/line/content/content-muted`) en `globals.css` (`:root` light = estética actual; `.dark` =
+  paleta ICONIC dark, navy casi negro #060b1f, sin negro puro/morado/neón). Expuestos en Tailwind (`bg-app`,
+  `bg-surface`, `border-line`, `text-content`…).
+- **ThemeProvider propio** (sin dependencia nueva; NO se instaló next-themes) + **script inline anti-FOUC**
+  en `<head>` + `<html suppressHydrationWarning>`. Default **claro**; persiste en localStorage; soporta system.
+- **ThemeToggle** (Claro/Oscuro/Sistema, accesible) en el **menú de cuenta** del topbar.
+- **Theme-aware (dark: variants, light intacto)**: shell (`(dashboard)/layout.tsx` bg-app, `app-topbar`,
+  `account-menu`; sidebar ya navy), primitivos (`ui/card`, `ui/input`, `ui/badge`), compartidos (`kpi-card`,
+  `inline-callout`, `filter-pills`; `OperationsHeader` navy ya sirve), y AG Grid (`.dark .ag-theme-alpine`).
+
+### QA
+- typecheck 0 · lint 0 · tests `theme-modes` 6/0 · suite **2107/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio.
+- Workspace V3C / companion / filtro Sin APU / exports intactos · sin DB/Auth/envs/cálculos/datos · no `-1rqh`.
+
+### Pendiente (honesto)
+- **Tablas densas crudas** (Workspace BOQ, CatalogExplorer, capítulos) usan `bg-white`/`text-gray-*`: en
+  dark se ven como papel claro legible sobre el shell oscuro, **aún no dark-themed** → pase V4.3.
+- Migrar literales de páginas a tokens; revisar Recharts del dashboard en dark.
+- Abrir PR → preview → revisión visual → autorizar merge.
+
+---
+
 ## 2026-06-26 — ICONIC_OPS_UIX_COHERENCE_COMPLETION_V4_1 — RELEASED (merge + prod smoke) (orchestrator)
 
 - Usuaria aprobó (opción "mergear V4.1 primero"). **Merge `--no-ff` a main**: `origin/main` =
