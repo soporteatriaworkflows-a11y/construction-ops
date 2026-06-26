@@ -11,6 +11,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { ChevronDown, Settings, Users, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
+import { ThemeToggle } from './theme-toggle';
 
 /** Etiquetas es-CO de los roles de perfil. */
 export const ROLE_LABELS: Record<string, string> = {
@@ -67,12 +68,12 @@ export function AccountMenu({ email, role, workspaceName, canManageAccess }: Pro
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="flex items-center gap-2 rounded-full border border-iconic-soft-blue bg-white py-1 pl-1 pr-2 text-sm hover:bg-iconic-gray focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iconic-primary"
+        className="flex items-center gap-2 rounded-full border border-iconic-soft-blue bg-white py-1 pl-1 pr-2 text-sm hover:bg-iconic-gray focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iconic-primary dark:border-line dark:bg-surface dark:hover:bg-surface-muted"
       >
         <span className="flex h-7 w-7 items-center justify-center rounded-full bg-iconic-primary text-xs font-semibold text-white">
           {initialsFromEmail(email)}
         </span>
-        <span className="hidden max-w-[140px] truncate text-iconic-ink sm:inline">{email ?? 'Usuario'}</span>
+        <span className="hidden max-w-[140px] truncate text-iconic-ink sm:inline dark:text-content">{email ?? 'Usuario'}</span>
         <ChevronDown className="h-4 w-4 text-iconic-graphite/50" aria-hidden="true" />
       </button>
 
@@ -80,15 +81,15 @@ export function AccountMenu({ email, role, workspaceName, canManageAccess }: Pro
         <>
           {/* Cierre por clic fuera. */}
           <button type="button" aria-label="Cerrar menú" className="fixed inset-0 z-30 cursor-default" onClick={() => setOpen(false)} />
-          <div role="menu" className="absolute right-0 z-40 mt-2 w-64 overflow-hidden rounded-xl border border-iconic-soft-blue bg-white shadow-iconic">
-            <div className="border-b border-iconic-soft-blue/60 bg-iconic-gray/40 px-4 py-3">
+          <div role="menu" className="absolute right-0 z-40 mt-2 w-64 overflow-hidden rounded-xl border border-iconic-soft-blue bg-white shadow-iconic dark:border-line dark:bg-surface">
+            <div className="border-b border-iconic-soft-blue/60 bg-iconic-gray/40 px-4 py-3 dark:border-line dark:bg-surface-soft">
               <div className="flex items-center gap-3">
                 <span className="flex h-9 w-9 items-center justify-center rounded-full bg-iconic-primary text-sm font-semibold text-white">
                   {initialsFromEmail(email)}
                 </span>
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-iconic-ink">{email ?? 'Usuario'}</p>
-                  <p className="truncate text-xs text-iconic-graphite/60">{workspaceName}</p>
+                  <p className="truncate text-sm font-medium text-iconic-ink dark:text-content">{email ?? 'Usuario'}</p>
+                  <p className="truncate text-xs text-iconic-graphite/60 dark:text-content-muted">{workspaceName}</p>
                 </div>
               </div>
               {roleLabel && (
@@ -97,12 +98,17 @@ export function AccountMenu({ email, role, workspaceName, canManageAccess }: Pro
                 </span>
               )}
             </div>
+            {/* Tema de la interfaz */}
+            <div className="border-b border-iconic-soft-blue/60 px-4 py-3 dark:border-line">
+              <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-content-muted">Tema</p>
+              <ThemeToggle />
+            </div>
             <ul role="none" className="py-1">
               {links.map((l) => {
                 const Icon = ICONS[l.icon];
                 const className = cn(
-                  'flex items-center gap-2.5 px-4 py-2 text-sm text-iconic-graphite hover:bg-iconic-gray',
-                  l.icon === 'logout' && 'text-red-600 hover:bg-red-50',
+                  'flex items-center gap-2.5 px-4 py-2 text-sm text-iconic-graphite hover:bg-iconic-gray dark:text-content dark:hover:bg-surface-muted',
+                  l.icon === 'logout' && 'text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10',
                 );
                 return (
                   <li key={l.href} role="none">

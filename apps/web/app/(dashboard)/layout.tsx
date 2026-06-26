@@ -46,7 +46,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   const ws = getActiveWorkspace();
   const actor = await resolveShellActor();
   return (
-    <div className="flex min-h-screen bg-iconic-gray">
+    <div className="flex min-h-screen bg-app">
       {/* Rail primario — azul noche ICONIC con profundidad. Sticky: acompaña el scroll. */}
       <aside
         className="sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r border-white/10"

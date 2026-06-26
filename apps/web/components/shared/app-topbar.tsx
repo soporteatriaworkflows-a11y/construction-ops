@@ -20,7 +20,7 @@ interface Props {
 
 export function AppTopbar({ email, role, workspaceName, canManageAccess }: Props) {
   return (
-    <header className="sticky top-0 z-20 flex h-14 items-center justify-between gap-3 border-b border-iconic-soft-blue/60 bg-white/80 px-6 backdrop-blur-md">
+    <header className="sticky top-0 z-20 flex h-14 items-center justify-between gap-3 border-b border-iconic-soft-blue/60 bg-white/80 px-6 backdrop-blur-md dark:border-line dark:bg-surface">
       <div className="flex min-w-0 items-center">
         <Breadcrumbs />
       </div>
