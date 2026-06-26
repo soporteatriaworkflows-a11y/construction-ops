@@ -90,6 +90,8 @@ export function BoqWorkspace({
   const [filter, setFilter] = useState<WorkspaceFilter>('active');
   const [apuFilter, setApuFilter] = useState<ApuLinkFilter>(initialApuFilter);
   const [query, setQuery] = useState('');
+  // V3C (operations): partida seleccionada para el panel de detalle (solo UI).
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [localData, setLocalData] = useState<WorkspaceChapterData[]>(data);
   const [summary, setSummary] = useState<FinancialSummary>(serverSummary);
@@ -118,17 +120,39 @@ export function BoqWorkspace({
   const visibleItems = countVisibleItems(view);
   const filtered = query.trim() !== '' || filter !== 'active' || apuFilter !== 'all';
 
-  // Conteo "Sin APU" (display, honesto): solo ítems activos cuyo vínculo APU se
-  // puede verificar y es null. No cuenta los "No verificable" (undefined).
-  const itemsWithoutApu = useMemo(
-    () =>
-      localData.reduce(
-        (acc, ch) =>
-          acc + ch.items.filter((it) => !it.archived && itemApuState(it) === 'unlinked').length,
-        0,
-      ),
-    [localData],
-  );
+  // KPIs operativos (display, honesto): conteos sobre ítems activos. NO recalcula
+  // finanzas; cantidad/precio "pendiente" = ≤ 0 (mismo criterio que el semáforo).
+  const ops = useMemo(() => {
+    let chapters = 0, items = 0, withApu = 0, withoutApu = 0, withoutQty = 0, withoutPrice = 0;
+    for (const ch of localData) {
+      if (ch.chapter.archived) continue;
+      chapters += 1;
+      for (const it of ch.items) {
+        if (it.archived) continue;
+        items += 1;
+        const st = itemApuState(it);
+        if (st === 'linked') withApu += 1;
+        else if (st === 'unlinked') withoutApu += 1;
+        if (!(Number(it.quantity) > 0)) withoutQty += 1;
+        if (!(Number(it.unitPrice) > 0)) withoutPrice += 1;
+      }
+    }
+    return { chapters, items, withApu, withoutApu, withoutQty, withoutPrice };
+  }, [localData]);
+  const itemsWithoutApu = ops.withoutApu;
+
+  // Partida seleccionada (con su capítulo) para el panel de detalle. Cálculo
+  // simple en render (find barato); sin useMemo para no romper la memoización.
+  let selected: { item: BoqItemReviewView; chapter: WorkspaceChapterData['chapter'] } | null = null;
+  if (selectedItemId) {
+    for (const ch of localData) {
+      const it = ch.items.find((x) => x.id === selectedItemId);
+      if (it) {
+        selected = { item: it, chapter: ch.chapter };
+        break;
+      }
+    }
+  }
 
   function toggleChapter(id: string) {
     setCollapsed((prev) => {
@@ -228,6 +252,21 @@ export function BoqWorkspace({
             <SummaryCard label="Indirectos" value={summary.indirectTotal} />
           </div>
         </div>
+      </section>
+
+      {/* Banda de KPIs operativos (conteos reales; sin recalcular finanzas) */}
+      <section aria-label="Indicadores operativos" className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+        <OpsKpi label="Capítulos" value={ops.chapters} />
+        <OpsKpi label="Partidas" value={ops.items} />
+        <OpsKpi label="Con APU" value={ops.withApu} tone={ops.withApu > 0 ? 'ok' : undefined} />
+        <OpsKpi
+          label="Sin APU"
+          value={ops.withoutApu}
+          tone={ops.withoutApu > 0 ? 'warn' : 'ok'}
+          onClick={ops.withoutApu > 0 ? () => setApuFilter('without') : undefined}
+        />
+        <OpsKpi label="Sin cantidad" value={ops.withoutQty} tone={ops.withoutQty > 0 ? 'warn' : 'ok'} />
+        <OpsKpi label="Sin precio" value={ops.withoutPrice} tone={ops.withoutPrice > 0 ? 'warn' : 'ok'} />
       </section>
 
       {apuFilter === 'all' && (
@@ -339,6 +378,18 @@ export function BoqWorkspace({
         </div>
       )}
 
+      {/* Panel de detalle operativo de la partida seleccionada (lista + detalle) */}
+      {selected && (
+        <ItemDetailPanel
+          item={selected.item}
+          chapterName={selected.chapter.name}
+          basePath={basePath}
+          chapterId={selected.chapter.id}
+          onClose={() => setSelectedItemId(null)}
+          onFilterMissingApu={() => setApuFilter('without')}
+        />
+      )}
+
       {/* ---------------------------------------------------------------- */}
       {/* Grilla densa con header sticky                                     */}
       {/* ---------------------------------------------------------------- */}
@@ -391,6 +442,8 @@ export function BoqWorkspace({
                     setEdit((e) => (e ? { ...e, [field]: value } : e))
                   }
                   pending={pending}
+                  selectedItemId={selectedItemId}
+                  onSelectItem={(id) => setSelectedItemId((cur) => (cur === id ? null : id))}
                 />
               );
             })}
@@ -446,6 +499,142 @@ function SummaryCard({
   );
 }
 
+/** KPI operativo compacto (conteo). Clicable cuando hay una acción asociada. */
+function OpsKpi({
+  label,
+  value,
+  tone,
+  onClick,
+}: {
+  label: string;
+  value: number;
+  tone?: 'ok' | 'warn';
+  onClick?: () => void;
+}) {
+  const base = `rounded-lg border px-3 py-2 text-left shadow-sm ${
+    tone === 'warn' ? 'border-amber-200 bg-amber-50/50' : 'border-gray-200 bg-white'
+  }`;
+  const valueCls = tone === 'warn' ? 'text-amber-700' : 'text-iconic-ink';
+  const inner = (
+    <>
+      <p className="truncate text-[10px] font-medium uppercase tracking-wide text-gray-500">{label}</p>
+      <p className={`text-lg font-bold tabular-nums ${valueCls}`}>{value}</p>
+    </>
+  );
+  return onClick ? (
+    <button type="button" onClick={onClick} className={`${base} transition-colors hover:border-amber-300`} title={`Filtrar ${label}`}>
+      {inner}
+    </button>
+  ) : (
+    <div className={base}>{inner}</div>
+  );
+}
+
+/** Panel de detalle operativo de la partida seleccionada (lista + detalle). */
+function ItemDetailPanel({
+  item,
+  chapterName,
+  basePath,
+  chapterId,
+  onClose,
+  onFilterMissingApu,
+}: {
+  item: BoqItemReviewView;
+  chapterName: string;
+  basePath: string;
+  chapterId: string;
+  onClose: () => void;
+  onFilterMissingApu: () => void;
+}) {
+  const apuState = itemApuState(item);
+  const noQty = !(Number(item.quantity) > 0);
+  const noPrice = !(Number(item.unitPrice) > 0);
+  const next =
+    apuState === 'unlinked'
+      ? 'Vincular un APU a esta partida.'
+      : noQty
+        ? 'Ingresar la cantidad de obra.'
+        : noPrice
+          ? 'Revisar el precio unitario.'
+          : apuState === 'unknown'
+            ? 'Abrir el APU para confirmar el vínculo.'
+            : 'Partida lista: sin pendientes inmediatos.';
+
+  return (
+    <section aria-label="Detalle de la partida" className="rounded-xl border border-iconic-soft-blue/70 bg-gradient-to-br from-brand-50/60 to-white p-4 shadow-iconic">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-iconic-primary/80">Detalle de la partida</p>
+          <p className="mt-0.5 text-sm font-semibold text-iconic-ink">
+            <span className="font-mono text-xs text-gray-500">{item.code}</span> · {item.description}
+          </p>
+          <p className="text-[11px] text-gray-400">Capítulo: {chapterName}</p>
+        </div>
+        <button type="button" onClick={onClose} aria-label="Cerrar detalle" className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700">
+          <X className="h-4 w-4" aria-hidden="true" />
+        </button>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <Field label="Unidad" value={item.unit} />
+        <Field label="Cantidad" value={formatNumber(item.quantity)} />
+        <Field label="V/Unitario" value={formatCOP(item.unitPrice)} />
+        <Field label="Subtotal" value={formatCOP(item.subtotal)} accent />
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <span className="text-[10px] font-medium uppercase tracking-wide text-gray-400">Estado:</span>
+        <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${apuState === 'linked' ? 'bg-green-50 text-green-700' : apuState === 'unlinked' ? 'bg-amber-50 text-amber-700' : 'bg-gray-100 text-gray-500'}`}>
+          {APU_STATE_LABELS[apuState]}
+        </span>
+        <StateChip ok={!noQty} okLabel="Cantidad OK" warnLabel="Sin cantidad" />
+        <StateChip ok={!noPrice} okLabel="Precio OK" warnLabel="Sin precio" />
+      </div>
+
+      <p className="mt-3 rounded-lg bg-white/70 px-3 py-2 text-[12px] text-gray-700">
+        <span className="font-medium text-gray-500">Próxima acción: </span>{next}
+      </p>
+
+      {/* Acciones semánticas (flujos existentes; sin inventar) */}
+      <div className="mt-3 flex flex-wrap gap-2">
+        {apuState === 'linked' && item.apuTemplateId && (
+          <Link href={`/apu/${item.apuTemplateId}`} className="rounded-md bg-iconic-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-iconic-primary/90">
+            Ver APU
+          </Link>
+        )}
+        {apuState === 'unlinked' && (
+          <button type="button" onClick={onFilterMissingApu} className="rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-100">
+            Ver partidas sin APU
+          </button>
+        )}
+        <Link href={`${basePath}/chapters/${chapterId}/items/${item.id}/edit`} className="rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
+          Edición completa
+        </Link>
+        <Link href="/catalog/prices/review" className="rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
+          Revisar precios
+        </Link>
+      </div>
+    </section>
+  );
+}
+
+function StateChip({ ok, okLabel, warnLabel }: { ok: boolean; okLabel: string; warnLabel: string }) {
+  return (
+    <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${ok ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
+      {ok ? okLabel : warnLabel}
+    </span>
+  );
+}
+
+function Field({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5">
+      <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">{label}</p>
+      <p className={`truncate text-sm font-semibold tabular-nums ${accent ? 'text-iconic-primary' : 'text-iconic-ink'}`} title={value}>{value}</p>
+    </div>
+  );
+}
+
 function ChapterGroup({
   basePath,
   estimateId,
@@ -468,6 +657,8 @@ function ChapterGroup({
   onSaveEdit,
   onEditChange,
   pending,
+  selectedItemId,
+  onSelectItem,
 }: {
   basePath: string;
   estimateId: string;
@@ -490,6 +681,8 @@ function ChapterGroup({
   onSaveEdit: (chapterId: string, item: BoqItemReviewView) => void;
   onEditChange: (field: 'quantity' | 'unitPrice', value: string) => void;
   pending: boolean;
+  selectedItemId: string | null;
+  onSelectItem: (id: string) => void;
 }) {
   const colSpan = canEdit ? 7 : 6;
   return (
@@ -561,6 +754,8 @@ function ChapterGroup({
             onSaveEdit={() => onSaveEdit(chapterId, item)}
             onEditChange={onEditChange}
             pending={pending}
+            selected={selectedItemId === item.id}
+            onSelect={() => onSelectItem(item.id)}
           />
         ))}
     </>
@@ -596,6 +791,8 @@ function ItemRow({
   onSaveEdit,
   onEditChange,
   pending,
+  selected,
+  onSelect,
 }: {
   basePath: string;
   estimateId: string;
@@ -610,6 +807,8 @@ function ItemRow({
   onSaveEdit: () => void;
   onEditChange: (field: 'quantity' | 'unitPrice', value: string) => void;
   pending: boolean;
+  selected: boolean;
+  onSelect: () => void;
 }) {
   const editing = edit !== null;
   const editable = canMutate && !item.archived;
@@ -625,9 +824,17 @@ function ItemRow({
   }
 
   return (
-    <tr className={`${item.archived ? 'bg-gray-50/60 text-gray-400' : 'hover:bg-brand-50/40'} ${editing ? 'bg-cyan-50/40' : ''}`}>
+    <tr className={`${item.archived ? 'bg-gray-50/60 text-gray-400' : 'hover:bg-brand-50/40'} ${editing ? 'bg-cyan-50/40' : ''} ${selected ? 'bg-brand-50/70 ring-2 ring-inset ring-iconic-primary/40' : ''}`}>
       <td className="px-2 py-1.5 align-top">
-        <span className="font-mono text-xs text-gray-600">{item.code}</span>
+        <button
+          type="button"
+          onClick={onSelect}
+          aria-pressed={selected}
+          title="Ver detalle operativo de la partida"
+          className={`font-mono text-xs hover:text-iconic-primary hover:underline ${selected ? 'font-semibold text-iconic-primary' : 'text-gray-600'}`}
+        >
+          {item.code}
+        </button>
         {item.archived && (
           <span className="ml-1 rounded bg-gray-200 px-1 py-0.5 text-[10px] font-medium text-gray-600">Arch.</span>
         )}

@@ -1,5 +1,46 @@
 # Handoff Log
 
+## 2026-06-26 — ICONIC_OPS_UIX_WORKSPACE_OPERATIONS_V3C — EN RAMA (sin merge; pendiente autorización) (orchestrator)
+
+### Estado
+- Rama **`feature/uix-workspace-operations-v3c`** (base `origin/main = 6f4c441`). **NO mergeada a main**
+  (la usuaria pidió dejar en rama + reporte y autorizar el merge explícitamente).
+
+### Qué cambió (UIX-only, traducción de `ref-04-operations.jpg`)
+Workspace/BOQ como **pantalla de operaciones** (lista + detalle + KPIs + acciones semánticas), en claro ICONIC:
+- **Banda de KPIs operativos** (`OpsKpi`, conteos reales display, no finanzas): Capítulos · Partidas ·
+  Con APU · Sin APU (clicable→filtro) · Sin cantidad · Sin precio.
+- **Selección de partida** (estado UI `selectedItemId`, click en el código) + **fila resaltada**.
+- **Panel de detalle operativo** (`ItemDetailPanel`, sobre la tabla): unidad/cantidad/V.unitario/subtotal +
+  estados APU/Cantidad/Precio + **próxima acción** + **acciones semánticas reales** (Ver APU si vinculado,
+  Ver partidas sin APU, Edición completa, Revisar precios). Sin flujos inventados.
+- Conserva: resumen financiero premium (V3B, Total general héroe), toolbar por zonas, FilterPills, chip
+  "N sin APU", callout, footer total, **todas las columnas** y la edición rápida.
+- Decisión: detalle **arriba** de la tabla (no drawer lateral) para no comprimir la tabla técnica ni
+  chocar con el companion. Companion **no tocado**.
+
+### Archivos
+- `…/workspace/boq-workspace.tsx` (único de código).
+- `tests/unit/quote/quote-workspace-apu.test.ts` (+bloque V3C, source).
+- `docs/design-references/UIX_WORKSPACE_OPERATIONS_V3C.md` (nuevo), este log.
+
+### QA
+- typecheck 0 · lint 0 (resueltos `react-hooks/static-components` moviendo StateChip a módulo, y
+  `preserve-manual-memoization` quitando un useMemo problemático) · tests workspace/quote **201/0** +
+  V3C **14/14** · suite completa **2084/0 (+42 skip)** · build 0 · gm **22/22** · diff-check limpio.
+- Sin capturas (no hay navegador en el entorno) → verificación visual pendiente.
+
+### Confirmación
+Sin DB/Supabase/RLS/policies/migrations/auth/secrets/envs/Vercel/RPC/read-model/permisos; sin cálculos
+finanzas/BOQ/APU/export; sin tocar `unit_price_snapshot`/datos reales/versiones aprobadas; **no** `-1rqh`.
+Filtro Sin APU y companion intactos.
+
+### Pendiente
+- **Autorizar merge a main** (queda en rama). Luego tag `iconic-ops-uix-workspace-operations-v3c` + smoke.
+- Verificación visual; futuro: micro-data-viz por capítulo + extender patrón a Catálogo/Cantidades.
+
+---
+
 ## 2026-06-25 — UIX_REFERENCE_AUDIT_REAL_V1 (corrección de V3B, docs) — RELEASED (orchestrator)
 
 ### Corrección

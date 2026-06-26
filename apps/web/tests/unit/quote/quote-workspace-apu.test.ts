@@ -76,6 +76,40 @@ describe('guía APU menciona el filtro (5)', () => {
   });
 });
 
+describe('V3C operations: KPIs + panel de detalle + selección (sin perder columnas)', () => {
+  const WS = readFileSync(
+    fileURLToPath(
+      new URL('../../../app/(dashboard)/projects/[id]/scopes/[scopeId]/estimates/[estimateId]/workspace/boq-workspace.tsx', import.meta.url),
+    ),
+    'utf8',
+  );
+
+  it('banda de KPIs operativos (Capítulos/Partidas/Con APU/Sin APU/Sin cantidad/Sin precio)', () => {
+    expect(WS).toContain('<OpsKpi');
+    for (const l of ['Capítulos', 'Partidas', 'Con APU', 'Sin APU', 'Sin cantidad', 'Sin precio']) {
+      expect(WS).toContain(`label="${l}"`);
+    }
+  });
+
+  it('panel de detalle de la partida seleccionada con próxima acción y acciones semánticas', () => {
+    expect(WS).toContain('<ItemDetailPanel');
+    expect(WS).toContain('Próxima acción');
+    expect(WS).toMatch(/Ver APU|Ver partidas sin APU/);
+    expect(WS).toContain('Edición completa');
+  });
+
+  it('selección de partida (estado UI), sin tocar lógica', () => {
+    expect(WS).toContain('selectedItemId');
+    expect(WS).toContain('onSelectItem');
+  });
+
+  it('NO se pierden columnas técnicas (Cantidad/V/Unitario/Subtotal siguen en el header)', () => {
+    expect(WS).toContain('>Cantidad<');
+    expect(WS).toContain('>V/Unitario<');
+    expect(WS).toContain('>Subtotal<');
+  });
+});
+
 describe('restyle V3: chip "sin APU" accionable en la toolbar', () => {
   it('el workspace muestra el conteo "sin APU" que activa el filtro', () => {
     const WS = readFileSync(
