@@ -1,32 +1,32 @@
 # Handoff Log
 
-## 2026-06-26 — ICONIC_OPS_UIX_APP_WIDE_OPERATIONS_ROLLOUT_V4 — EN RAMA (sin merge; pendiente revisión visual) (orchestrator)
+## 2026-06-26 — ICONIC_OPS_UIX_APP_WIDE_OPERATIONS_ROLLOUT_V4 — RELEASED (merge + prod smoke) (orchestrator)
 
 ### Estado
-- Rama **`feature/uix-app-wide-operations-rollout-v4`** (base `origin/main = befa56f`). **NO mergeada**
-  (queda en rama + PR + preview; merge requiere aprobación visual de la usuaria).
+- PR #4 **MERGED** (`feature/uix-app-wide-operations-rollout-v4` -> `main`) tras autorizacion explicita "merge + tag + smoke".
+- **Merge `--no-ff` a main**: `defb2dc67a08652fc7593c4e0b211364580d00e3` (`merge(uix): release app-wide operations rollout V4`, parents `befa56f` + `f093ca9`).
+- **Tag**: `iconic-ops-uix-app-wide-operations-rollout-v4`.
+- Produccion: `https://construction-ops-psi.vercel.app` (proyecto Vercel **construction-ops**).
 
-### Qué cambió (UIX-only — extiende el lenguaje V3C a toda la app)
-- **Componentes shell compartidos nuevos**: `components/shared/operations-header.tsx` (`OperationsHeader`,
-  command bar navy ICONIC generalizado del Workspace) + `components/shared/kpi-card.tsx`
-  (`KpiCard`+`KpiBand`, generaliza `OpsKpi`).
-- **Aplicado a**: Detalle de presupuesto (header + KPIs + link Workspace), APU Library (header + KPIs),
-  Catálogo (header + KPIs), Cantidades, Cronograma, Proyectos, Settings/Accesos (headers). Workspace V3C
-  **no rehecho** (intacto).
+### Que cambio (UIX-only — extiende el lenguaje V3C a toda la app)
+- **Componentes shell compartidos nuevos**: `components/shared/operations-header.tsx` (`OperationsHeader`, command bar navy ICONIC generalizado del Workspace) + `components/shared/kpi-card.tsx` (`KpiCard`+`KpiBand`, generaliza `OpsKpi`).
+- **Aplicado a**: Detalle de presupuesto (header + KPIs + link Workspace), APU Library (header + KPIs), Catalogo (header + KPIs), Cantidades, Cronograma, Proyectos, Settings/Accesos (headers). Workspace V3C **no rehecho** (intacto).
 - Solo datos existentes en los KPIs (nada inventado); acciones reusan flujos/links existentes.
 - `docs/DESIGN.md` §12.c (shell operativo compartido) + `docs/design-references/UIX_APP_WIDE_OPERATIONS_ROLLOUT_V4.md`.
 
 ### QA
-- typecheck 0 · lint 0 · tests `operations-shell` 10/0 · suite completa **2096/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio.
-- Companion intacto · filtro Sin APU intacto · columnas conservadas · sin DB/Supabase/RLS/Auth/envs/secrets/RPC/cálculos/export/`unit_price_snapshot`/datos reales · no `-1rqh`.
-- Sin capturas (no hay navegador) → revisión en Preview (PR).
+- QA de rama: typecheck 0 · lint 0 · tests `operations-shell` 10/0 · suite completa **2096/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio.
+- Companion intacto · filtro Sin APU intacto · columnas conservadas · sin DB/Supabase/RLS/Auth/envs/secrets/RPC/calculos/export/`unit_price_snapshot`/datos reales.
+- Preview revisado por la usuaria y release autorizado.
+- Vercel commit status post-merge: **`Vercel - construction-ops` SUCCESS** (`32nrvvMqbep5PVeJDxnWYdeSUD9N`). El status agregado queda failure por **`construction-ops-1rqh`**, deuda/proyecto ajeno no tocado.
+- Smoke prod anonimo: `/login` 200; `/projects`, `/apu?view=cards`, `/catalog/prices/review`, `/quantities`, `/planning`, `/settings/access`, detalle de presupuesto fixture y workspace fixture -> redirect protegido a `/login?next=...` y final 200; `/api/estimates/export` sin parametros -> 400 controlado (no 500).
+- Tests dirigidos post-merge: operations shell, workspace/Sin APU, companion y exports **87/0**.
 
 ### Pendiente
-- Abrir/actualizar PR → preview Vercel (proyecto construction-ops) → **revisión visual de la usuaria** → autorizar merge.
-- Afinar contraste de acciones sobre la barra navy; KPI bands con conteos reales en Cantidades/Cronograma/Settings; restyle profundo de tablas internas; dashboard (intacto por menor riesgo).
+- Pendientes visuales recomendados: contraste fino de acciones sobre barra navy; KPI bands con conteos reales en Cantidades/Cronograma/Settings; restyle profundo de tablas internas; dashboard (intacto por menor riesgo).
+- Confirmar visualmente en sesion autenticada que el delta V4 se ve correcto en datos reales.
 
 ---
-
 ## 2026-06-26 — ICONIC_OPS_UIX_WORKSPACE_OPERATIONS_V3C (+V3C.1) — RELEASED (autorizado) (orchestrator)
 
 - Usuaria **aprobó** el preview V3C.1 (vio la barra navy "BOQ · Workspace de operación") y autorizó merge.
