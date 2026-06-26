@@ -34,7 +34,7 @@ export function FilterPills({
       {label && (
         <span className="text-[10px] font-medium uppercase tracking-wide text-gray-400">{label}</span>
       )}
-      <div className="inline-flex rounded-md border border-gray-200" role="group" aria-label={ariaLabel ?? label}>
+      <div className="inline-flex rounded-md border border-gray-200 dark:border-line" role="group" aria-label={ariaLabel ?? label}>
         {options.map((o) => (
           <button
             key={o.value}
@@ -42,7 +42,7 @@ export function FilterPills({
             onClick={() => onChange(o.value)}
             aria-pressed={value === o.value}
             className={`px-2.5 py-1.5 text-xs font-medium transition-colors first:rounded-l-md last:rounded-r-md ${
-              value === o.value ? activeCls : 'bg-white text-gray-600 hover:bg-gray-50'
+              value === o.value ? activeCls : 'bg-white text-gray-600 hover:bg-gray-50 dark:bg-surface dark:text-content-muted dark:hover:bg-surface-muted'
             }`}
           >
             {o.label}

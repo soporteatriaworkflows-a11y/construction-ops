@@ -11,10 +11,10 @@ import { Info, Lightbulb, AlertTriangle, CheckCircle2 } from 'lucide-react';
 export type CalloutTone = 'tip' | 'info' | 'warning' | 'success';
 
 const TONE: Record<CalloutTone, { wrap: string; icon: string; Icon: typeof Info }> = {
-  tip: { wrap: 'border-iconic-soft-blue/60 bg-brand-50/50 text-iconic-ink', icon: 'text-iconic-primary', Icon: Lightbulb },
-  info: { wrap: 'border-gray-200 bg-gray-50/70 text-gray-700', icon: 'text-gray-400', Icon: Info },
-  warning: { wrap: 'border-amber-200 bg-amber-50 text-amber-800', icon: 'text-amber-500', Icon: AlertTriangle },
-  success: { wrap: 'border-green-200 bg-green-50 text-green-800', icon: 'text-green-600', Icon: CheckCircle2 },
+  tip: { wrap: 'border-iconic-soft-blue/60 bg-brand-50/50 text-iconic-ink dark:border-line dark:bg-surface-soft dark:text-content', icon: 'text-iconic-primary dark:text-iconic-cyan', Icon: Lightbulb },
+  info: { wrap: 'border-gray-200 bg-gray-50/70 text-gray-700 dark:border-line dark:bg-surface-soft dark:text-content-muted', icon: 'text-gray-400', Icon: Info },
+  warning: { wrap: 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-200', icon: 'text-amber-500', Icon: AlertTriangle },
+  success: { wrap: 'border-green-200 bg-green-50 text-green-800 dark:border-green-500/25 dark:bg-green-500/10 dark:text-green-200', icon: 'text-green-600', Icon: CheckCircle2 },
 };
 
 /**
