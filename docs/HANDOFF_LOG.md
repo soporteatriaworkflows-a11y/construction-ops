@@ -1,5 +1,35 @@
 # Handoff Log
 
+## 2026-06-25 — ICONIC_OPS_UIX_VISUAL_SYSTEM_ROLLOUT_V2_CORE_MODULES — RELEASED (orchestrator)
+
+### Alcance (UIX-only) y nota honesta de screenshots
+**No hay capacidad de levantar la app y capturar screenshots** en este entorno → según la regla, se
+reporta y se trabaja sobre el **código real** (no se inventan layouts). Auditoría por código: el
+catálogo ya estaba bien estructurado (tabla por tipo + badges de estado de precio + acción contextual); el
+workspace tenía dos grupos de filtro inline con estilos distintos. La mejora consistente y de bajo riesgo
+fue **unificar los controles de filtro** en un segmented control premium compartido.
+
+### Qué cambió (UIX-only, 4 archivos)
+- **`components/shared/filter-pills.tsx`** (nuevo): `FilterPills` (segmented control, tokens ICONIC,
+  `role="group"` + `aria-pressed`, tonos primary/ink). Sin hooks (usable en client). No cambia lógica.
+- **Workspace** (`boq-workspace.tsx`): filtros **Estado** (Todos/Activos/Archivados) y **APU**
+  (Todos/Con APU/Sin APU) ahora son `FilterPills` con etiqueta, en vez de dos grupos ad-hoc. Mismo
+  filtrado; el filtro "Sin APU" y todo lo demás intactos.
+- **Catálogo** (`catalog-explorer.tsx`): el `<select>` "Estado de precio" → `FilterPills`
+  (Aprobado/Pendiente/Rechazado/Sin precio), escaneable. Mismo filtrado.
+
+### Estado / release
+- `origin/main` = **`9cd54e33921d5a4e92f87107ff04b2cb5c871995`** (merge `--no-ff`, sobre `1227c8c`). Tag =
+  **`iconic-ops-uix-core-modules-v2`** → `9cd54e3`.
+- typecheck 0 · lint 0 · tests components/quote/workspace/catalog **414/0** · suite completa **2079/0 (+42 skip)** · build 0 · gm **22/22** · diff-check limpio.
+- Smoke prod: /login 200 · /projects·/apu·/quote·/catalog/prices/review·/catalog 307 · cron 401.
+- **UIX-only:** sin DB/migración/env/SMTP/usuarios/RPC/finanzas; sin cambiar cálculos; sin tocar
+  `unit_price_snapshot`; sin romper filtro Sin APU/companion/export; sin rediseño total; no `-1rqh`.
+- **Pendiente (V3, requiere revisión visual con screenshots):** densidad/jerarquía de tablas, MetricCard/
+  SectionPanel/TableToolbar más ricos, headers premium. No hacer a ciegas.
+
+---
+
 ## 2026-06-25 — ICONIC_OPS_UIX_VISUAL_SYSTEM_ROLLOUT_V1 — RELEASED (orchestrator)
 
 ### Alcance (UIX-only, aditivo, sin lógica)
