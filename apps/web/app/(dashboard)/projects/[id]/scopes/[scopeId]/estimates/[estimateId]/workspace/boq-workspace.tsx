@@ -204,14 +204,30 @@ export function BoqWorkspace({
       {/* ---------------------------------------------------------------- */}
       {/* Resumen financiero compacto (C) — server-derived, ICONIC          */}
       {/* ---------------------------------------------------------------- */}
-      <section aria-label="Resumen financiero" className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">
-        <SummaryCard label="Costo directo" value={summary.directTotal} accent="ink" />
-        <SummaryCard label="Administración" value={summary.administrationAmount} />
-        <SummaryCard label="Imprevistos" value={summary.contingencyAmount} />
-        <SummaryCard label="Utilidad" value={summary.utilityAmount} />
-        <SummaryCard label="IVA utilidad" value={summary.utilityVatAmount} />
-        <SummaryCard label="Indirectos" value={summary.indirectTotal} />
-        <SummaryCard label="Total general" value={summary.grandTotal} accent="primary" />
+      <section
+        aria-label="Resumen financiero"
+        className="rounded-2xl border border-iconic-soft-blue/70 bg-gradient-to-br from-brand-50/70 via-white to-white p-4 shadow-iconic"
+      >
+        <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-iconic-primary/80">Resumen financiero</p>
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,18rem)_1fr]">
+          {/* Total general — número héroe */}
+          <div className="flex flex-col justify-center rounded-xl border border-iconic-primary/30 bg-white px-4 py-3 shadow-sm">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-gray-500">Total general</p>
+            <p className="mt-1 truncate text-2xl font-bold tabular-nums text-iconic-primary" title={formatCOP(summary.grandTotal)}>
+              {formatCOP(summary.grandTotal)}
+            </p>
+            <p className="mt-0.5 text-[11px] text-gray-400">Costo directo + indirectos (AIU + IVA)</p>
+          </div>
+          {/* Desglose */}
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <SummaryCard label="Costo directo" value={summary.directTotal} accent="ink" />
+            <SummaryCard label="Administración" value={summary.administrationAmount} />
+            <SummaryCard label="Imprevistos" value={summary.contingencyAmount} />
+            <SummaryCard label="Utilidad" value={summary.utilityAmount} />
+            <SummaryCard label="IVA utilidad" value={summary.utilityVatAmount} />
+            <SummaryCard label="Indirectos" value={summary.indirectTotal} />
+          </div>
+        </div>
       </section>
 
       {apuFilter === 'all' && (
@@ -224,8 +240,8 @@ export function BoqWorkspace({
       {/* ---------------------------------------------------------------- */}
       {/* Toolbar sticky: búsqueda + filtros + total siempre visible        */}
       {/* ---------------------------------------------------------------- */}
-      <div className="sticky top-14 z-10 -mx-1 rounded-lg border border-iconic-soft-blue/60 bg-white/95 px-3 py-2 shadow-sm backdrop-blur">
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="sticky top-14 z-10 -mx-1 rounded-xl border border-iconic-soft-blue/70 bg-white/95 px-3 py-2.5 shadow-iconic backdrop-blur">
+        <div className="flex flex-wrap items-center gap-2.5">
           <div className="relative min-w-[200px] flex-1">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" aria-hidden="true" />
             <Input
@@ -237,6 +253,8 @@ export function BoqWorkspace({
               className="h-8 pl-8 text-sm"
             />
           </div>
+
+          <span className="hidden h-5 w-px bg-iconic-soft-blue/60 lg:inline-block" aria-hidden="true" />
 
           <FilterPills
             label="Estado"
@@ -255,6 +273,8 @@ export function BoqWorkspace({
             onChange={(v) => setApuFilter(v as ApuLinkFilter)}
             options={(Object.keys(APU_FILTER_LABELS) as ApuLinkFilter[]).map((f) => ({ value: f, label: APU_FILTER_LABELS[f] }))}
           />
+
+          <span className="hidden h-5 w-px bg-iconic-soft-blue/60 lg:inline-block" aria-hidden="true" />
 
           <div className="inline-flex items-center gap-1">
             <button
@@ -474,8 +494,8 @@ function ChapterGroup({
   const colSpan = canEdit ? 7 : 6;
   return (
     <>
-      <tr className={`${chapterArchived ? 'bg-gray-100/80' : 'bg-iconic-gray/70'}`}>
-        <td colSpan={colSpan} className="px-2 py-1.5">
+      <tr className={`${chapterArchived ? 'bg-gray-100/80' : 'bg-brand-50/60'} border-l-2 ${chapterArchived ? 'border-gray-300' : 'border-iconic-primary/60'}`}>
+        <td colSpan={colSpan} className="px-2 py-2">
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
@@ -517,7 +537,9 @@ function ChapterGroup({
               >
                 Detalle
               </Link>
-              <span className="text-sm font-bold tabular-nums text-iconic-ink">{formatCOP(subtotal)}</span>
+              <span className="rounded-md bg-white/80 px-2 py-0.5 text-sm font-bold tabular-nums text-iconic-ink ring-1 ring-inset ring-iconic-soft-blue/60">
+                {formatCOP(subtotal)}
+              </span>
             </span>
           </div>
         </td>
