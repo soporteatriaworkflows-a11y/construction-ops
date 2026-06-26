@@ -114,6 +114,57 @@ export function applyWorkspaceView(
   return out;
 }
 
+/* ---------------------------------------------------------------------------
+ * QUOTING_COMPANION_WORKSPACE_FOCUS_V1 — filtro/estado de vínculo APU por ítem.
+ * Read-only; sin cálculo. Honesto: si el origen no expone el vínculo, "unknown".
+ * ------------------------------------------------------------------------ */
+
+export type ApuLinkFilter = 'all' | 'with' | 'without';
+
+export const APU_FILTER_LABELS: Record<ApuLinkFilter, string> = {
+  all: 'Todos',
+  with: 'Con APU',
+  without: 'Sin APU',
+};
+
+export type ApuItemState = 'linked' | 'unlinked' | 'unknown';
+
+export const APU_STATE_LABELS: Record<ApuItemState, string> = {
+  linked: 'APU vinculado',
+  unlinked: 'Sin APU',
+  unknown: 'No verificable',
+};
+
+/** Estado de vínculo APU de un ítem. `undefined` ⇒ no verificable (no inventa). */
+export function itemApuState(item: BoqItemReviewView): ApuItemState {
+  if (item.apuTemplateId === undefined) return 'unknown';
+  return item.apuTemplateId ? 'linked' : 'unlinked';
+}
+
+/**
+ * Filtra la vista por estado de vínculo APU. `with` ⇒ solo vinculados; `without`
+ * ⇒ solo sin vínculo. Los `unknown` NO aparecen en with/without (no se puede
+ * confirmar). Oculta capítulos que quedan sin ítems visibles.
+ */
+export function applyApuFilter(
+  view: VisibleWorkspaceChapter[],
+  filter: ApuLinkFilter,
+): VisibleWorkspaceChapter[] {
+  if (filter === 'all') return view;
+  const target: ApuItemState = filter === 'with' ? 'linked' : 'unlinked';
+  const out: VisibleWorkspaceChapter[] = [];
+  for (const ch of view) {
+    const items = ch.items.filter((it) => itemApuState(it) === target);
+    if (items.length > 0) out.push({ ...ch, items });
+  }
+  return out;
+}
+
+/** ¿Hay al menos un ítem cuyo vínculo APU se puede verificar en esta vista? */
+export function hasVerifiableApu(view: VisibleWorkspaceChapter[]): boolean {
+  return view.some((ch) => ch.items.some((it) => it.apuTemplateId !== undefined));
+}
+
 /** ¿La versión permite mutaciones? (issued/approved/archived ⇒ inmutable). */
 export function isVersionEditable(status: string): boolean {
   return !['approved', 'issued', 'archived'].includes(status);

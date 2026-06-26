@@ -34,10 +34,15 @@ import type { FinancialSummary } from '@/lib/estimates/aiu-types';
 import type { BoqItemReviewView } from '@/lib/estimates/review-types';
 import {
   applyWorkspaceView,
+  applyApuFilter,
   countVisibleItems,
+  itemApuState,
   WORKSPACE_FILTER_LABELS,
+  APU_FILTER_LABELS,
+  APU_STATE_LABELS,
   type WorkspaceChapterData,
   type WorkspaceFilter,
+  type ApuLinkFilter,
 } from '@/lib/estimates/workspace-view';
 import { updateItemAction, type ItemActionResult } from '../item-actions';
 import { ArchiveControls } from '../archive-controls';
@@ -63,6 +68,7 @@ export function BoqWorkspace({
   canMutate,
   versionStatusLabel,
   versionLocked,
+  initialApuFilter = 'all',
 }: {
   estimateId: string;
   /** /projects/[id]/scopes/[scopeId]/estimates/[estimateId] */
@@ -75,9 +81,12 @@ export function BoqWorkspace({
   canMutate: boolean;
   versionStatusLabel: string;
   versionLocked: boolean;
+  /** Filtro APU inicial (p. ej. desde el asistente con ?apu=missing). */
+  initialApuFilter?: ApuLinkFilter;
 }) {
   const router = useRouter();
   const [filter, setFilter] = useState<WorkspaceFilter>('active');
+  const [apuFilter, setApuFilter] = useState<ApuLinkFilter>(initialApuFilter);
   const [query, setQuery] = useState('');
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [localData, setLocalData] = useState<WorkspaceChapterData[]>(data);
@@ -101,11 +110,11 @@ export function BoqWorkspace({
   }
 
   const view = useMemo(
-    () => applyWorkspaceView(localData, filter, query),
-    [localData, filter, query],
+    () => applyApuFilter(applyWorkspaceView(localData, filter, query), apuFilter),
+    [localData, filter, query, apuFilter],
   );
   const visibleItems = countVisibleItems(view);
-  const filtered = query.trim() !== '' || filter !== 'active';
+  const filtered = query.trim() !== '' || filter !== 'active' || apuFilter !== 'all';
 
   function toggleChapter(id: string) {
     setCollapsed((prev) => {
@@ -226,6 +235,24 @@ export function BoqWorkspace({
             ))}
           </div>
 
+          <div className="inline-flex rounded-md border border-gray-200" role="group" aria-label="Filtro de vínculo APU">
+            {(Object.keys(APU_FILTER_LABELS) as ApuLinkFilter[]).map((f) => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => setApuFilter(f)}
+                aria-pressed={apuFilter === f}
+                className={`px-2.5 py-1.5 text-xs font-medium first:rounded-l-md last:rounded-r-md ${
+                  apuFilter === f
+                    ? 'bg-iconic-primary text-white'
+                    : 'bg-white text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                {APU_FILTER_LABELS[f]}
+              </button>
+            ))}
+          </div>
+
           <div className="inline-flex items-center gap-1">
             <button
               type="button"
@@ -263,6 +290,18 @@ export function BoqWorkspace({
         <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800" role="status">
           Versión <strong>{versionStatusLabel}</strong>: inmutable. La edición rápida está deshabilitada;
           clona la versión para seguir trabajando.
+        </div>
+      )}
+
+      {apuFilter !== 'all' && (
+        <div className="flex items-center justify-between gap-2 rounded-md border border-iconic-soft-blue/60 bg-brand-50/60 px-3 py-2 text-xs text-iconic-ink" role="status">
+          <span>
+            Mostrando ítems <strong>{apuFilter === 'without' ? 'sin APU vinculado' : 'con APU vinculado'}</strong>.
+            Usa <strong>Agregar actividad desde APU</strong> para vincular las partidas pendientes.
+          </span>
+          <button type="button" onClick={() => setApuFilter('all')} className="shrink-0 font-medium text-iconic-primary hover:underline">
+            Ver todos
+          </button>
         </div>
       )}
 
@@ -492,6 +531,22 @@ function ChapterGroup({
   );
 }
 
+/** Indicador textual del estado de vínculo APU del ítem (no solo color). */
+function ApuStateBadge({ item }: { item: BoqItemReviewView }) {
+  const state = itemApuState(item);
+  const cls =
+    state === 'linked'
+      ? 'bg-green-50 text-green-700'
+      : state === 'unlinked'
+        ? 'bg-amber-50 text-amber-700'
+        : 'bg-gray-100 text-gray-500';
+  return (
+    <span className={`ml-2 inline-block rounded px-1.5 py-0.5 align-middle text-[10px] font-medium ${cls}`}>
+      {APU_STATE_LABELS[state]}
+    </span>
+  );
+}
+
 function ItemRow({
   basePath,
   chapterId,
@@ -549,7 +604,10 @@ function ItemRow({
           </span>
         )}
       </td>
-      <td className="px-2 py-1.5 align-top text-gray-900">{item.description}</td>
+      <td className="px-2 py-1.5 align-top text-gray-900">
+        <span>{item.description}</span>
+        <ApuStateBadge item={item} />
+      </td>
       <td className="px-2 py-1.5 align-top text-gray-500">{item.unit}</td>
 
       {/* Cantidad */}
