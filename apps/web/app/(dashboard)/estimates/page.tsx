@@ -11,6 +11,8 @@
 import Link from 'next/link';
 import { ClipboardList, Layers, FolderOpen, ChevronRight, Calendar } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
+import { OperationsHeader } from '@/components/shared/operations-header';
+import { KpiCard, KpiBand } from '@/components/shared/kpi-card';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -72,10 +74,20 @@ export default async function EstimatesPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Presupuestos"
-        description="Presupuestos visibles para tu organización"
+      <OperationsHeader
+        eyebrow="Presupuestos"
+        title="Versiones y control"
+        subtitle="Presupuestos visibles para tu organización"
+        stat={{ label: 'Presupuestos', value: String(estimates.length) }}
       />
+
+      {estimates.length > 0 && (
+        <KpiBand className="mb-4 sm:grid-cols-3 lg:grid-cols-3">
+          <KpiCard label="Presupuestos" value={estimates.length} />
+          <KpiCard label="Activos" value={estimates.filter((e) => e.status !== 'archived').length} tone="ok" />
+          <KpiCard label="Archivados" value={estimates.filter((e) => e.status === 'archived').length} />
+        </KpiBand>
+      )}
 
       {estimates.length === 0 ? (
         <EmptyState
