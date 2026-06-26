@@ -332,6 +332,22 @@ calidad/jerarquía; **nunca** copia de branding/colores externos (ver `design-re
 - **Serio y operativo:** ante la duda, prioriza densidad de datos y control técnico sobre el adorno.
   Sin dark mode salvo que se prepare el sistema completo.
 
+### Patrones extraídos de las referencias reales (ver `design-references/UIX_REFERENCE_AUDIT.md`)
+
+Las 5 referencias (todas **dark** — se adapta a ICONIC **claro**, sin neón/morados):
+
+- **Número héroe + breakdown** (ref-02, ref-05): un dato dominante grande + desglose y micro-data-viz.
+- **Operation-list + detail** (ref-04, la más relevante para obra): lista con estado/progreso por ítem +
+  ítem seleccionado resaltado + panel de detalle con fila de KPIs (Planned/Done…) → modelo de jerarquía
+  para Workspace/BOQ y para la cotización asistida.
+- **Acciones semánticas por color** (ref-04): verde/azul/ámbar/rojo por tipo de acción → en ICONIC con
+  estados (success/info/warning/destructive), no decorativo.
+- **Sidebar agrupado + colapsable** (ref-01, ref-03): secciones con badges de conteo, rail icono-only con
+  tooltips, pill activo.
+- **Right-rail de cards de estado** (ref-03): clave/valor + dot + barra de progreso %.
+- **Micro-data-viz**: anillos de progreso, sparkbars/sparklines, barras de participación — en
+  `iconic-primary`/`iconic-cyan`.
+
 ## 13. Roadmap visual
 
 | Fase | Módulo | Foco |
