@@ -348,6 +348,20 @@ Las 5 referencias (todas **dark** — se adapta a ICONIC **claro**, sin neón/mo
 - **Micro-data-viz**: anillos de progreso, sparkbars/sparklines, barras de participación — en
   `iconic-primary`/`iconic-cyan`.
 
+## 12.c Shell operativo compartido (V4)
+
+Componentes canónicos para la identidad común (usar en toda pantalla principal):
+
+- **`OperationsHeader`** (`components/shared/operations-header.tsx`): command bar navy de módulo
+  (gradiente `iconic-ink` + eyebrow cian + título + microcopy + `stat` héroe + acciones). Reemplaza
+  al `PageHeader` plano en los módulos operativos. NO dark mode global.
+- **`KpiCard` + `KpiBand`** (`components/shared/kpi-card.tsx`): KPIs compactos (no inflados), tono por
+  significado (default/ok/warn/danger), opcional link/click. Banda responsive.
+- **`FilterPills`**, **`InlineCallout`**, **`Badge`/`StatusBadge`**, **`EmptyState`**: ya canónicos.
+
+Regla: cada módulo principal = `OperationsHeader` arriba + (si hay datos) `KpiBand` + contenido
+(tabla/lista/cards) + ayuda (`InlineCallout`). Estados con texto+color (sección 8).
+
 ## 13. Roadmap visual
 
 | Fase | Módulo | Foco |

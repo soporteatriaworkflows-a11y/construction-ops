@@ -1,5 +1,32 @@
 # Handoff Log
 
+## 2026-06-26 — ICONIC_OPS_UIX_APP_WIDE_OPERATIONS_ROLLOUT_V4 — EN RAMA (sin merge; pendiente revisión visual) (orchestrator)
+
+### Estado
+- Rama **`feature/uix-app-wide-operations-rollout-v4`** (base `origin/main = befa56f`). **NO mergeada**
+  (queda en rama + PR + preview; merge requiere aprobación visual de la usuaria).
+
+### Qué cambió (UIX-only — extiende el lenguaje V3C a toda la app)
+- **Componentes shell compartidos nuevos**: `components/shared/operations-header.tsx` (`OperationsHeader`,
+  command bar navy ICONIC generalizado del Workspace) + `components/shared/kpi-card.tsx`
+  (`KpiCard`+`KpiBand`, generaliza `OpsKpi`).
+- **Aplicado a**: Detalle de presupuesto (header + KPIs + link Workspace), APU Library (header + KPIs),
+  Catálogo (header + KPIs), Cantidades, Cronograma, Proyectos, Settings/Accesos (headers). Workspace V3C
+  **no rehecho** (intacto).
+- Solo datos existentes en los KPIs (nada inventado); acciones reusan flujos/links existentes.
+- `docs/DESIGN.md` §12.c (shell operativo compartido) + `docs/design-references/UIX_APP_WIDE_OPERATIONS_ROLLOUT_V4.md`.
+
+### QA
+- typecheck 0 · lint 0 · tests `operations-shell` 10/0 · suite completa **2096/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio.
+- Companion intacto · filtro Sin APU intacto · columnas conservadas · sin DB/Supabase/RLS/Auth/envs/secrets/RPC/cálculos/export/`unit_price_snapshot`/datos reales · no `-1rqh`.
+- Sin capturas (no hay navegador) → revisión en Preview (PR).
+
+### Pendiente
+- Abrir/actualizar PR → preview Vercel (proyecto construction-ops) → **revisión visual de la usuaria** → autorizar merge.
+- Afinar contraste de acciones sobre la barra navy; KPI bands con conteos reales en Cantidades/Cronograma/Settings; restyle profundo de tablas internas; dashboard (intacto por menor riesgo).
+
+---
+
 ## 2026-06-26 — ICONIC_OPS_UIX_WORKSPACE_OPERATIONS_V3C (+V3C.1) — RELEASED (autorizado) (orchestrator)
 
 - Usuaria **aprobó** el preview V3C.1 (vio la barra navy "BOQ · Workspace de operación") y autorizó merge.
