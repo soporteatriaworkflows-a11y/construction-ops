@@ -1,5 +1,13 @@
 # Handoff Log
 
+## 2026-06-26 — ICONIC_OPS_UIX_COHERENCE_COMPLETION_V4_1 — RELEASED (merge + prod smoke) (orchestrator)
+
+- Usuaria aprobó (opción "mergear V4.1 primero"). **Merge `--no-ff` a main**: `origin/main` =
+  **`a7816d0`** (parents `805bb8c` + `95b614c`). Tag **`iconic-ops-uix-coherence-completion-v4-1`**. PR #5 MERGED.
+- Smoke prod OK: /login 200 · /projects·/estimates·/dashboard·/settings 307 · cron 401. Proyecto construction-ops; no `-1rqh`.
+
+---
+
 ## 2026-06-26 — ICONIC_OPS_UIX_COHERENCE_COMPLETION_V4_1 — EN RAMA (sin merge; pendiente revisión visual) (orchestrator)
 
 ### Estado
