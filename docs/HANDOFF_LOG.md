@@ -1,5 +1,31 @@
 # Handoff Log
 
+## 2026-06-26 — ICONIC_OPS_UIX_COHERENCE_COMPLETION_V4_1 — EN RAMA (sin merge; pendiente revisión visual) (orchestrator)
+
+### Estado
+- Rama **`feature/uix-coherence-completion-v4-1`** (base `origin/main = 805bb8c`, tras V4). **NO mergeada.**
+
+### Qué cambió (UIX-only — cierra costuras del recorrido principal)
+- **Pantallas puente/hub** migradas de `PageHeader` plano a `OperationsHeader`: `projects/[id]`
+  ("Proyecto · Centro operativo" + KPI band), `projects/[id]/scopes/[scopeId]` ("Alcance · Control de
+  presupuesto" + KPI band), `estimates/page.tsx` ("Presupuestos · Versiones y control" + KPI band).
+- **Settings hub**: ya tenía hero navy propio; se **elimina el `PageHeader` plano redundante** y el hero
+  queda etiquetado "Settings · Configuración operativa" (un solo elemento navy).
+- **Dashboard**: estados error/vacío alineados a `OperationsHeader` "Panel · Centro de control"; el cuerpo
+  command-center (que ya tiene su hero navy "Centro de mando") **NO se tocó**.
+- **Contraste navy**: nuevo `OperationsHeaderAction` (primary blanco/ink, secondary borde claro), aplicado
+  en `projects/page` ("Nuevo proyecto"); documentado en DESIGN §12.c.
+
+### QA
+- typecheck 0 · lint 0 · tests `operations-shell` 15/0 + `db-mode-routes` ok · suite **2101/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio.
+- Workspace V3C / companion / filtro Sin APU intactos · columnas conservadas · sin DB/Auth/envs/cálculos/exports/datos reales · no `-1rqh`.
+
+### Pendiente
+- Abrir PR → preview Vercel (construction-ops) → revisión visual → autorizar merge.
+- V5: tablas internas premium, data-viz dashboard, migrar acciones heredadas V4 a OperationsHeaderAction.
+
+---
+
 ## 2026-06-26 — ICONIC_OPS_UIX_APP_WIDE_OPERATIONS_ROLLOUT_V4 — RELEASED (merge + prod smoke) (orchestrator)
 
 ### Estado

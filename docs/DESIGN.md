@@ -357,6 +357,9 @@ Componentes canónicos para la identidad común (usar en toda pantalla principal
   al `PageHeader` plano en los módulos operativos. NO dark mode global.
 - **`KpiCard` + `KpiBand`** (`components/shared/kpi-card.tsx`): KPIs compactos (no inflados), tono por
   significado (default/ok/warn/danger), opcional link/click. Banda responsive.
+- **`OperationsHeaderAction`** (en `operations-header.tsx`): acción **legible sobre navy** —
+  `primary` = superficie blanca + texto ink; `secondary` = borde/texto claros. Usar SIEMPRE para acciones
+  dentro de la barra navy (no botones azules llenos: azul sobre navy tiene bajo contraste).
 - **`FilterPills`**, **`InlineCallout`**, **`Badge`/`StatusBadge`**, **`EmptyState`**: ya canónicos.
 
 Regla: cada módulo principal = `OperationsHeader` arriba + (si hay datos) `KpiBand` + contenido
