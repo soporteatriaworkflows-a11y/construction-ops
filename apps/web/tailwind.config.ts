@@ -1,6 +1,8 @@
 import type { Config } from 'tailwindcss';
 
 const config: Config = {
+  // Tema claro/oscuro por clase `.dark` en <html> (ICONIC_OPS_UIX_THEME_MODES_V4_2).
+  darkMode: 'class',
   content: [
     './app/**/*.{ts,tsx}',
     './components/**/*.{ts,tsx}',
@@ -10,6 +12,15 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // Tokens SEMÁNTICOS de tema (CSS vars; ver app/globals.css :root y .dark).
+        // En claro replican la estética actual; en oscuro usan la paleta ICONIC dark.
+        app: 'var(--c-app)',
+        surface: 'var(--c-surface)',
+        'surface-soft': 'var(--c-surface-soft)',
+        'surface-muted': 'var(--c-surface-muted)',
+        line: 'var(--c-line)',
+        content: 'var(--c-content)',
+        'content-muted': 'var(--c-content-muted)',
         // Tokens de marca — paleta ICONIC oficial (ver docs/branding).
         // Nombre visible del producto: "Presupuestos"; swappable por tenant.
         brand: {
@@ -35,8 +46,10 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        mono: ['JetBrains Mono', 'Consolas', 'monospace'],
+        sans: ['var(--font-inter)', 'Inter', 'system-ui', 'sans-serif'],
+        // Display = Inter (misma familia UI); el peso/tracking lo da la clase (font-bold tracking-tight).
+        display: ['var(--font-inter)', 'Inter', 'system-ui', 'sans-serif'],
+        mono: ['var(--font-mono)', 'JetBrains Mono', 'Consolas', 'monospace'],
       },
       borderRadius: {
         DEFAULT: '0.375rem',

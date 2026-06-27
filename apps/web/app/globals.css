@@ -17,6 +17,40 @@
     --iconic-soft-blue: #c7dced;
     --iconic-gray: #f2f4f7;
     --iconic-white: #ffffff;
+
+    /* Tokens SEMÁNTICOS — LIGHT (Apple-like: off-white limpio, hairlines suaves,
+       texto casi-negro neutro). V4.2.5: menos "navy en el texto", más aire. */
+    --c-app: #f5f6f8; /* off-white frío, no blanco plano */
+    --c-surface: #ffffff; /* cards / tablas / inputs */
+    --c-surface-soft: #f7f8fa; /* zonas suaves / cabeceras */
+    --c-surface-muted: #eef0f4; /* franjas/realces sutiles */
+    --c-line: #e7e9ee; /* hairline suave */
+    --c-content: #1a1d23; /* texto principal: casi-negro neutro (no navy) */
+    --c-content-muted: #6b7280; /* texto secundario */
+  }
+
+  /* Tokens SEMÁNTICOS — DARK (V4.2.5: GRAPHITE NEUTRO tipo Linear/Vercel/Raycast).
+     Base charcoal de muy baja croma (NO navy saturado): así el azul/cian ICONIC pasa a ser
+     ACENTO de marca (rail, command bar, datos/estados activos) en vez de "toda la app azul".
+     Capas sutiles con hairline fino; blanco suave (no quemado); secundario gris-azulado. */
+  .dark {
+    --c-app: #0d0f14; /* slate-charcoal (navy profundo suave, sin saturar) */
+    --c-surface: #161922; /* card — claramente elevada sobre el fondo */
+    --c-surface-soft: #1d212c; /* zonas suaves */
+    --c-surface-muted: #262b38; /* realces / hover */
+    --c-line: #2d3340; /* hairline slate */
+    --c-content: #e8eaf0; /* blanco suave (no #fff) */
+    --c-content-muted: #98a0af; /* gris-azulado frío, dosificado */
+  }
+
+  /* CAUSA RAÍZ del "perímetro blanco" en dark: el Preflight de Tailwind fija el
+     color de borde por defecto en #e5e7eb (gris claro) para CUALQUIER `border` sin
+     clase de color. En dark lo redefinimos a un slate sutil. Va en @layer base, así
+     las utilidades `border-{color}` (capa utilities) SIEMPRE ganan donde son explícitas. */
+  .dark *,
+  .dark ::before,
+  .dark ::after {
+    border-color: var(--c-line);
   }
 
   *,
@@ -32,9 +66,22 @@
   }
 
   body {
-    /* Gris claro arquitectónico como soporte; blanco como respiración (cards). */
-    @apply bg-iconic-gray text-iconic-graphite antialiased;
-    font-family: 'Inter', system-ui, sans-serif;
+    /* Tokens de tema: en claro = gris arquitectónico + graphite (sin cambio visual). */
+    @apply bg-app text-content antialiased;
+    font-family: var(--font-inter), 'Inter', system-ui, sans-serif;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  /* Quality floor (frontend-design): respetar reduced-motion. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 
   /* Focus visible accesible (azul ICONIC) */
@@ -53,6 +100,180 @@
   ::-webkit-scrollbar-thumb {
     @apply rounded bg-gray-300;
   }
+  .dark ::-webkit-scrollbar-track {
+    background-color: #0b1230;
+  }
+  .dark ::-webkit-scrollbar-thumb {
+    background-color: #25345f;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* V4.2.1 — Capa de COBERTURA DARK (centralizada y reversible).         */
+/* Remapea utilidades CLARAS PLANAS a tokens de tema SOLO en .dark, para */
+/* eliminar "bloques blancos" en superficies densas sin editar cientos   */
+/* de clases a mano. NO afecta variantes con opacidad (bg-white/10,      */
+/* bg-brand-50/60…), que son clases distintas y se tratan aparte.        */
+/* Las barras navy usan text-white / border-white/* → no se ven tocadas. */
+/* ------------------------------------------------------------------ */
+.dark .bg-white { background-color: var(--c-surface); }
+.dark .bg-gray-50 { background-color: var(--c-surface-soft); }
+.dark .bg-gray-100 { background-color: var(--c-surface-muted); }
+.dark .bg-slate-50 { background-color: var(--c-surface-soft); }
+.dark .bg-brand-50 { background-color: var(--c-surface-soft); }
+
+.dark .border-gray-100,
+.dark .border-gray-200,
+.dark .border-gray-300 { border-color: var(--c-line); }
+
+.dark .text-gray-400 { color: #8a99bd; }
+.dark .text-gray-500,
+.dark .text-gray-600 { color: var(--c-content-muted); }
+.dark .text-gray-700,
+.dark .text-gray-800,
+.dark .text-gray-900 { color: var(--c-content); }
+.dark .text-slate-500,
+.dark .text-slate-600 { color: var(--c-content-muted); }
+.dark .text-slate-700,
+.dark .text-slate-800,
+.dark .text-slate-900 { color: var(--c-content); }
+
+/* Estados (sobrios en dark): fondos suaves + texto legible. */
+.dark .bg-amber-50 { background-color: rgba(245, 158, 11, 0.12); }
+.dark .text-amber-700,
+.dark .text-amber-800 { color: #fcd34d; }
+.dark .bg-green-50 { background-color: rgba(34, 197, 94, 0.12); }
+.dark .text-green-700,
+.dark .text-green-800 { color: #86efac; }
+.dark .bg-red-50 { background-color: rgba(239, 68, 68, 0.12); }
+.dark .text-red-600,
+.dark .text-red-700 { color: #fca5a5; }
+.dark .bg-blue-50,
+.dark .bg-cyan-50 { background-color: rgba(0, 184, 255, 0.12); }
+
+/* ------------------------------------------------------------------ */
+/* V4.2.3 — Iconografía premium + utilidades glass (centralizado).      */
+/* ------------------------------------------------------------------ */
+/* Monoline consistente: afina el trazo de TODOS los íconos lucide (2→1.75)
+   y asegura uniones/terminaciones redondeadas (look humano, menos genérico). */
+svg.lucide {
+  stroke-width: 1.75px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Superficie "glass" sobria (frosted) — para barras/menús/acciones premium.
+   Sin blur pesado; baja opacidad + borde sutil. Adaptada a claro/oscuro. */
+.glass {
+  background-color: rgba(255, 255, 255, 0.72);
+  backdrop-filter: saturate(140%) blur(10px);
+  -webkit-backdrop-filter: saturate(140%) blur(10px);
+  border: 1px solid rgba(2, 1, 72, 0.08);
+}
+.dark .glass {
+  background-color: rgba(22, 25, 34, 0.66);
+  border-color: rgba(255, 255, 255, 0.07);
+}
+/* Glass oscuro (sobre el rail navy): vidrio azul-noche translúcido. */
+.glass-navy {
+  backdrop-filter: saturate(140%) blur(12px);
+  -webkit-backdrop-filter: saturate(140%) blur(12px);
+}
+
+/* ------------------------------------------------------------------ */
+/* V4.2.11 — Rescate de contraste DARK (sistémico).                      */
+/* Tokens de MARCA usados como texto/borde/fondo NO los cubría el remap  */
+/* gray-*; aquí se corrigen para que en dark sean legibles.              */
+/* ------------------------------------------------------------------ */
+/* TEXTO: navy/graphite como texto → claro. El azul de marca como texto  */
+/* (links/acentos/íconos) → azul VIVO legible (no el navy oscuro).        */
+.dark .text-iconic-ink,
+.dark .text-iconic-graphite {
+  color: var(--c-content);
+}
+.dark .text-iconic-primary {
+  color: #4d8dff;
+}
+/* FONDOS de marca claros → superficies dark. */
+.dark .bg-iconic-gray {
+  background-color: var(--c-surface-soft);
+}
+/* Bordes y fills "soft-blue" (incl. variantes con opacidad) → sutil oscuro,
+   para eliminar los marcos blancos/"tiza" sobre superficies oscuras. */
+.dark [class*='border-iconic-soft-blue'] {
+  border-color: var(--c-line);
+}
+.dark [class*='bg-iconic-soft-blue'] {
+  background-color: var(--c-surface-muted);
+}
+/* CONTROLES de formulario: nada blanco en dark. Fondo surface + texto claro +
+   borde sutil + placeholder legible. (No afecta a [type=checkbox/radio] de color.) */
+.dark input:not([type='checkbox']):not([type='radio']),
+.dark select,
+.dark textarea {
+  background-color: var(--c-surface-soft);
+  color: var(--c-content);
+  border-color: var(--c-line);
+}
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: var(--c-content-muted);
+}
+
+/* ------------------------------------------------------------------ */
+/* V4.2.12 — Cobertura de VARIANTES CON OPACIDAD en dark.               */
+/* El remap por clase exacta NO captura `bg-gray-50/50`, `text-iconic-  */
+/* graphite/60`, `border-iconic-soft-blue/70`… El sufijo `/` evita      */
+/* colisiones (p.ej. NO toca `bg-gray-500`). Solo tokens claros/navy de  */
+/* marca, que sobre superficie oscura siempre son incorrectos.          */
+/* NO se incluye `bg-white/*` (se usa translúcido a propósito en barras  */
+/* navy/graphite); esos casos se tratan puntualmente.                    */
+/* ------------------------------------------------------------------ */
+.dark [class*='bg-gray-50/'],
+.dark [class*='bg-iconic-gray/'],
+.dark [class*='bg-slate-50/'] {
+  background-color: var(--c-surface-soft);
+}
+.dark [class*='bg-gray-100/'],
+.dark [class*='bg-slate-100/'] {
+  background-color: var(--c-surface-muted);
+}
+.dark [class*='border-gray-100/'],
+.dark [class*='border-gray-200/'],
+.dark [class*='border-gray-300/'],
+.dark [class*='border-iconic-soft-blue/'] {
+  border-color: var(--c-line);
+}
+.dark [class*='text-iconic-ink/'] {
+  color: var(--c-content);
+}
+.dark [class*='text-iconic-graphite/'] {
+  color: var(--c-content-muted);
+}
+.dark [class*='text-iconic-primary/'] {
+  color: #4d8dff;
+}
+/* Links/acentos en azul oscuro (blue-600..950) → azul vivo legible en dark. */
+.dark .text-blue-600,
+.dark .text-blue-700,
+.dark .text-blue-800,
+.dark .text-blue-900,
+.dark .text-blue-950 {
+  color: #60a5fa;
+}
+
+/* AG Grid — variante dark (tablas BOQ legibles en modo oscuro). */
+.dark .ag-theme-alpine {
+  --ag-background-color: #161922;
+  --ag-foreground-color: #e8eaf0;
+  --ag-header-background-color: #1d212c;
+  --ag-header-foreground-color: #98a0af;
+  --ag-border-color: #2d3340;
+  --ag-row-border-color: #232936;
+  --ag-odd-row-background-color: #191d26;
+  --ag-selected-row-background-color: #1f2738;
+  --ag-range-selection-border-color: #2f7bff;
+  --ag-input-focus-border-color: #2f7bff;
 }
 
 /* AG Grid — sobreescrituras para tabla densa de BOQ */

@@ -132,18 +132,18 @@ export function CommandPalette({ canManageAccess }: { canManageAccess: boolean }
         onClick={() => setOpen(true)}
         aria-label="Abrir búsqueda global (Ctrl o ⌘ K)"
         aria-haspopup="dialog"
-        className="hidden min-w-0 max-w-sm flex-1 items-center gap-2 rounded-lg border border-iconic-soft-blue/70 bg-iconic-gray/60 px-3 py-1.5 text-sm text-iconic-graphite/45 transition-colors hover:border-iconic-primary/40 hover:bg-white lg:flex"
+        className="hidden min-w-0 max-w-sm flex-1 items-center gap-2.5 rounded-lg border border-line bg-surface-soft px-3 py-2 text-sm text-content-muted transition-colors hover:border-iconic-primary/40 hover:bg-surface lg:flex"
       >
-        <Search className="h-4 w-4 shrink-0 text-iconic-graphite/40" aria-hidden="true" />
+        <Search className="h-4 w-4 shrink-0 text-iconic-primary/70" aria-hidden="true" />
         <span className="truncate">Buscar en ICONIC OPS…</span>
-        <kbd className="ml-auto hidden shrink-0 rounded border border-iconic-soft-blue bg-white px-1.5 py-0.5 font-mono text-[10px] text-iconic-graphite/50 xl:inline">
+        <kbd className="ml-auto hidden shrink-0 items-center rounded border border-line bg-surface px-1.5 py-0.5 font-mono text-[10px] text-content-muted xl:inline-flex">
           ⌘K
         </kbd>
       </button>
 
       {open && (
         <div
-          className="fixed inset-0 z-50 flex items-start justify-center bg-iconic-ink/30 px-4 pt-[12vh] backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-start justify-center bg-black/30 px-4 pt-[14vh] backdrop-blur-[3px]"
           role="presentation"
           onClick={close}
         >
@@ -151,12 +151,12 @@ export function CommandPalette({ canManageAccess }: { canManageAccess: boolean }
             role="dialog"
             aria-modal="true"
             aria-label="Búsqueda global de ICONIC OPS"
-            className="w-full max-w-xl overflow-hidden rounded-2xl border border-iconic-soft-blue bg-white shadow-iconic"
+            className="w-full max-w-xl overflow-hidden rounded-2xl border border-line bg-surface shadow-[0_24px_64px_-16px_rgba(2,1,72,0.35)]"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Campo de búsqueda */}
-            <div className="flex items-center gap-3 border-b border-iconic-soft-blue/60 px-4">
-              <Search className="h-5 w-5 shrink-0 text-iconic-graphite/40" aria-hidden="true" />
+            <div className="flex items-center gap-3 border-b border-line px-4">
+              <Search className="h-5 w-5 shrink-0 text-iconic-primary/70" aria-hidden="true" />
               <input
                 ref={inputRef}
                 type="text"
@@ -172,9 +172,9 @@ export function CommandPalette({ canManageAccess }: { canManageAccess: boolean }
                 aria-expanded="true"
                 aria-controls="command-palette-list"
                 aria-activedescendant={filtered[activeIndex] ? `cmd-${filtered[activeIndex]!.id}` : undefined}
-                className="w-full bg-transparent py-3.5 text-base text-iconic-ink outline-none placeholder:text-iconic-graphite/40"
+                className="w-full bg-transparent py-3.5 text-base text-content outline-none placeholder:text-content-muted"
               />
-              <kbd className="hidden shrink-0 rounded border border-iconic-soft-blue bg-iconic-gray/60 px-1.5 py-0.5 font-mono text-[10px] text-iconic-graphite/50 sm:inline">
+              <kbd className="hidden shrink-0 rounded border border-line bg-surface-soft px-1.5 py-0.5 font-mono text-[10px] text-content-muted sm:inline">
                 Esc
               </kbd>
             </div>
@@ -243,18 +243,18 @@ export function CommandPalette({ canManageAccess }: { canManageAccess: boolean }
             </div>
 
             {/* Pie con ayudas de teclado */}
-            <div className="flex items-center gap-4 border-t border-iconic-soft-blue/60 bg-iconic-gray/40 px-4 py-2 text-[11px] text-iconic-graphite/55">
+            <div className="flex items-center gap-4 border-t border-line bg-surface-soft px-4 py-2 text-[11px] text-content-muted">
               <span className="flex items-center gap-1">
-                <kbd className="rounded border border-iconic-soft-blue bg-white px-1 font-mono">↑</kbd>
-                <kbd className="rounded border border-iconic-soft-blue bg-white px-1 font-mono">↓</kbd>
+                <kbd className="rounded border border-line bg-surface px-1 font-mono">↑</kbd>
+                <kbd className="rounded border border-line bg-surface px-1 font-mono">↓</kbd>
                 navegar
               </span>
               <span className="flex items-center gap-1">
-                <kbd className="rounded border border-iconic-soft-blue bg-white px-1 font-mono">↵</kbd>
+                <kbd className="rounded border border-line bg-surface px-1 font-mono">↵</kbd>
                 abrir
               </span>
               <span className="flex items-center gap-1">
-                <kbd className="rounded border border-iconic-soft-blue bg-white px-1 font-mono">Esc</kbd>
+                <kbd className="rounded border border-line bg-surface px-1 font-mono">Esc</kbd>
                 cerrar
               </span>
             </div>

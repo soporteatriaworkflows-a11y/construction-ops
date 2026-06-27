@@ -174,18 +174,19 @@ describe('Dashboard operativo (G)', () => {
   });
 
   it('🔒 precios por revisar SOLO para roles autorizados', () => {
-    // REVIEW_CENTER_V1: el KPI va enlazado al centro de revisión, siempre
-    // detrás del guard de roles autorizados.
-    expect(source).toMatch(
-      /isAuthorizedForSavings\s*&&\s*\(\s*<Link[\s\S]{0,400}?<KpiCard[\s\S]*?Precios por revisar/,
-    );
+    // V4.2.7: "Precios por revisar" vive en el panel Operación; el enlace al centro
+    // de revisión sigue detrás del guard de roles (ahora vía ternario isAuthorizedForSavings ?).
+    expect(source).toMatch(/Precios por revisar/);
+    expect(source).toMatch(/isAuthorizedForSavings\s*\?\s*\(\s*<Link href="\/catalog\/prices\/review"/);
     expect(source).toMatch(/countPendingResourcePriceObservations\(/);
   });
 
-  it('accesos rápidos: proyectos, catálogo, proveedores, inteligencia de precios', () => {
-    expect(source).toMatch(/QuickLink href="\/projects"/);
-    expect(source).toMatch(/QuickLink href="\/catalog"/);
-    expect(source).toMatch(/QuickLink href="\/catalog\/providers"/);
+  it('accesos rápidos (workflow strip): proyectos, catálogo, proveedores, inteligencia de precios', () => {
+    // V4.2.7: las cards de acceso pasaron a una franja WorkflowStrip con hrefs en los steps.
+    expect(source).toContain('<WorkflowStrip');
+    expect(source).toMatch(/href: '\/projects'/);
+    expect(source).toMatch(/href: '\/catalog'/);
+    expect(source).toMatch(/href: '\/catalog\/providers'/);
     expect(source).toMatch(/Inteligencia de precios/);
   });
 

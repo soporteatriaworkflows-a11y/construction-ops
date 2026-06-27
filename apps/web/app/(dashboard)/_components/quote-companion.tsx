@@ -258,19 +258,11 @@ export function QuoteCompanion() {
     }
   }
 
-  // Launcher flotante (cerrado o minimizado).
+  // V4.2.6: sin launcher flotante derecho (era redundante con el CTA del AppRail y
+  // el trigger del topbar). El panel se abre por el evento `quote-companion:open`
+  // (rail/topbar) → openPanel(); la lógica/eventos del companion no cambian.
   if (state !== 'open') {
-    return (
-      <button
-        type="button"
-        onClick={openPanel}
-        aria-label="Abrir asistente de cotización"
-        className="fixed bottom-5 right-5 z-40 hidden items-center gap-2 rounded-full bg-iconic-primary px-4 py-3 text-sm font-medium text-white shadow-iconic transition-transform hover:scale-[1.03] lg:flex"
-      >
-        <Sparkles className="h-4 w-4" aria-hidden="true" />
-        Asistente
-      </button>
-    );
+    return null;
   }
 
   const isFloating = placement === 'floating';

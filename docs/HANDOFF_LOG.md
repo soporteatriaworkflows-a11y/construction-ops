@@ -1,5 +1,321 @@
 # Handoff Log
 
+## 2026-06-27 — ICONIC_OPS_UIX_FLOATING_WORKFLOW_COMPANION_V4_2_13 — EN RAMA (sin merge) (orchestrator)
+
+- Nuevo `components/shared/floating-workflow-dock.tsx` (`FloatingWorkflowDock`, client) montado en
+  `(dashboard)/layout.tsx`: dock flotante compacto (fixed bottom-4, glass claro/oscuro) que acompaña fuera del
+  dashboard; **se auto-oculta en `/dashboard`**. 7 pasos (rutas reales verificadas), detección de paso por ruta
+  (específico→general; `*/workspace`→Cotizar), minimizable a pill "Flujo" (persiste `iconic-workflow-dock-collapsed`),
+  solo `lg+`. NO duplica el CTA del Asistente (primer nodo navega a `/quote`, sin disparar el evento del companion).
+- Verificado que el dark fix raíz (default border + opacity remaps, V4.2.12) ya está integrado en la rama antes de implementar.
+- QA: typecheck 0 · lint 0 · tests floating-workflow-dock 5/0 · suite **2129/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio.
+- Sin tocar AppRail/companion/Workspace lógica/rutas/DB/datos. No `-1rqh`. **Sin merge/tag/prod.**
+
+---
+
+## 2026-06-27 — ICONIC_OPS_UIX_DARK_MODE_P0_CONTRAST_FIX_V4_2_12 — EN RAMA (sin merge) (orchestrator)
+
+### CAUSA RAÍZ (la que faltaba)
+El **Preflight de Tailwind** fija `border-color: #e5e7eb` (gris claro) por defecto para CUALQUIER `border`
+sin clase de color. El código usa `border` a secas en cards/forms/inputs/tabla → en dark eso era el
+**"perímetro blanco" omnipresente**. Mis remaps solo cubrían `border-gray-*`/soft-blue EXPLÍCITOS, no el default.
+
+### Fix raíz + complementos
+- **`@layer base`**: `.dark *, ::before, ::after { border-color: var(--c-line) }` → borde por defecto en dark = slate
+  sutil. Las utilidades `border-{color}` (capa utilities) siguen ganando donde son explícitas (p.ej. tab activa azul).
+- **Links azul oscuro** `text-blue-600..950 → #60a5fa` (azul vivo legible).
+- (V4.2.12 previo: chip "Grupo ICONIC" dark surface + texto claro; variantes con opacidad bg/border/text de marca;
+  form-controls dark; V4.2.11: logo bg-iconic-white, ContextualNav dark, topbar Asistente filled, text/border/bg exactos.)
+
+### Verificación por ruta (dark) — cobertura sistémica
+dashboard/apu/catalog/projects/estimates/quantities/planning/settings(+access)/workspace: Topbar/Tabs/Inputs/Cards/
+Textos/Bordes ✅ vía tokens + remaps (exactos y con opacidad) + default-border dark + form-controls + brand pill/logo.
+
+### QA
+typecheck 0 · lint 0 · build 0 · suite **2129/0 (+42 skip)** · gm 22/22 · diff-check limpio. Light intacto. No `-1rqh`. **Sin merge/tag/prod.**
+
+---
+
+## 2026-06-27 — ICONIC_OPS_UIX_DARK_MODE_SYSTEMIC_FIX_V4_2_12 (opacity variants) — EN RAMA (sin merge) (orchestrator)
+
+### Causa raíz (auditoría grep)
+(1) Regresión propia: el chip "Grupo ICONIC" quedó `bg-iconic-white` + `text-iconic-ink`(→content) = texto claro
+sobre pill blanco = invisible. (2) El remap por clase EXACTA no cubría **variantes con opacidad**
+(`bg-gray-50/50`, `text-iconic-graphite/60`, `border-iconic-soft-blue/70`…) → toolbars grises, navy ilegible y
+bordes "tiza" persistían en APU y otras.
+
+### Fix sistémico (globals.css `.dark`, selectores de atributo con sufijo `/` para no chocar con `bg-gray-500`)
+- Fondos: `[class*=bg-gray-50/ | bg-iconic-gray/ | bg-slate-50/]→surface-soft`; `[bg-gray-100/ | bg-slate-100/]→surface-muted`.
+- Bordes: `[border-gray-100/ /200/ /300/ | border-iconic-soft-blue/]→line` (fin de marcos blancos).
+- Texto: `[text-iconic-ink/]→content`; `[text-iconic-graphite/]→content-muted`; `[text-iconic-primary/]→#4d8dff`.
+- NO incluye `bg-white/*` (translúcido intencional en barras navy/graphite) → casos puntuales aparte.
+
+### Targeted
+- **Chip "Grupo ICONIC"**: dark = `bg-surface-muted` + texto `content`; logo tile sigue blanco (`bg-iconic-white`).
+- (V4.2.11 ya: AppRail/logo bg-iconic-white, ContextualNav dark, topbar Asistente filled, form-controls dark, text/border/bg exactos de marca.)
+
+### QA por ruta (dark) — cobertura sistémica (Topbar/Tabs/Inputs/Cards/Textos/Bordes)
+dashboard ✅✅✅✅✅✅ · apu ✅✅✅✅✅✅ · catalog ✅✅✅✅✅✅ · projects ✅✅✅✅✅✅ · estimates ✅✅✅✅✅✅ ·
+quantities ✅✅✅✅✅✅ · planning ✅✅✅✅✅✅ · settings(+access) ✅✅✅✅✅✅ · workspace ✅✅✅✅✅✅ (vía tokens/remap/reglas globales).
+
+### QA técnico
+typecheck 0 · lint 0 · build 0 · suite **2129/0 (+42 skip)** · gm 22/22 · diff-check limpio. Light intacto. No `-1rqh`. **Sin merge/tag/prod.**
+
+---
+
+## 2026-06-27 — ICONIC_OPS_UIX_DARK_MODE_CONTRAST_RESCUE_V4_2_11 — EN RAMA (sin merge) (orchestrator)
+
+### Causa raíz
+Tokens de MARCA usados como texto/borde/fondo (`text-iconic-ink/graphite`, `border-iconic-soft-blue*`,
+`bg-iconic-gray`, `bg-iconic-soft-blue*`) + controles de formulario nativos NO los cubría el remap `gray-*` →
+texto navy ilegible, bordes "tiza", inputs blancos en dark.
+
+### Rescate sistémico (globals.css `.dark`)
+- `text-iconic-ink/graphite → content` (claro); `text-iconic-primary → #4d8dff` (azul vivo legible para links/íconos).
+- `bg-iconic-gray → surface-soft`; `[class*=border-iconic-soft-blue] → line` (cubre opacidades → sin marcos blancos);
+  `[class*=bg-iconic-soft-blue] → surface-muted`.
+- **Form controls**: `.dark input/select/textarea` → fondo surface-soft + texto claro + borde line + placeholder muted (no más inputs blancos).
+
+### Targeted
+- **AppRail logo** + **WorkspaceLogo/chip**: `bg-white → bg-iconic-white` (logo nunca se pierde en dark).
+- **ContextualNav** ("Lista/Nuevo"): `bg-white/70 → dark:bg-surface`, texto tabs theme-aware (fin de la franja clara).
+- **Topbar "Asistente"**: dark variant filled (surface-muted + line + content), sin borde claro que se pierde.
+- (Outline button visible + headers azul vivo: ya de V4.2.10.)
+
+### QA
+- typecheck 0 · lint 0 · build 0 · suite **2129/0 (+42 skip)** · gm 22/22 · diff-check limpio.
+- Light intacto (todo bajo `.dark`/`dark:`). Sin layout/lógica/DB/datos. No `-1rqh`. **Sin merge/tag/prod.**
+
+---
+
+## 2026-06-27 — ICONIC_OPS_UIX_COLOR_CONTRAST_REFINEMENT_V4_2_10 — EN RAMA (sin merge) (orchestrator)
+
+### Cambios sistémicos (color/contraste; sin layout ni lógica)
+- **Headers navy → azul vivo de marca** (= azul del botón "Aplicar", `iconic-primary #005DD6`): `OperationsHeader`
+  (gradiente `from-iconic-primary via-#0a51c2 to-#013e97`) — afecta APU/Catálogo/Cantidades/Cronograma/Proyectos/
+  Presupuestos/Settings de una sola vez. También el hero de Settings y la command bar del Workspace (solo color).
+- **Dark — logo/marca visible**: el tile del logo usaba `bg-white`, que el remapeo `.dark` oscurecía → logo perdido.
+  `WorkspaceLogo` y el chip pasan a **`bg-iconic-white`** (siempre claro) → logo/marca legibles en dark.
+- **Dark — botón `outline` visible** (sin perímetro blanco): en dark pasa de `bg-white/5` (se perdía) a
+  **`bg-surface-muted` + borde `line` suave**. Primario sigue en azul vivo `iconic-primary` (el que la usuaria aprobó).
+
+### QA
+- typecheck 0 · lint 0 · build 0 · suite **2129/0 (+42 skip)** · gm 22/22 · diff-check limpio.
+- Conserva dashboard/AppRail/topbar/workflow/notas/monitoreo/command-palette/estructura. Light intacto. Sin DB/Auth/envs/cálculos/datos. No `-1rqh`. **Sin merge/tag/prod.**
+
+---
+
+## 2026-06-27 — ICONIC_OPS_UIX_DASHBOARD_COUNTDOWN_RING_HOTFIX_V4_2_9 — EN RAMA (sin merge) (orchestrator)
+
+- Ajuste puntual: en Monitoreo → "Próxima revisión", se **quitó el `02h 18m` del centro del anillo** (era
+  redundante con el texto externo). Centro ahora con icono `CalendarClock` limpio; el anillo de progreso se
+  mantiene. El dato externo (Próxima revisión en `02h 18m` + Última `{lastRunAt real}`) se conserva. Se quitó
+  el icono duplicado del eyebrow externo.
+- Solo `dashboard/page.tsx`. typecheck 0 · lint 0 · build 0 · suite 2129/0 (+42 skip) · diff-check limpio. **Sin merge/tag/prod.** No `-1rqh`.
+
+---
+
+## 2026-06-27 — ICONIC_OPS_UIX_DASHBOARD_TARGET_MATCH_V4_2_8 — EN RAMA (sin merge) (orchestrator)
+
+### Comparación real ACTUAL vs TARGET (capturas leídas del disco)
+Imágenes en `D:\ICONIC\SOFTWARE PRESUPUESTOS\docs\design-references\uix\` (fuera del repo; NO commiteadas:
+datos financieros). TARGET=`f7678e52…png`, ACTUAL=`088ccfab…png`. **La V4.2.7 ya coincidía ~90%** con el
+target (bloque superior, Operación unificada, Notas, monitoreo, workflow, AppRail). Cerré 3 deltas:
+1. **Monitoreo**: anillo countdown SVG "02h 18m" + CalendarClock + Última (lastRunAt real). "02h 18m" ilustrativo (sin next-run en backend; honesto).
+2. **Workflow strip**: nodos circulares sobre línea conectora (timeline real), no grilla de botones.
+3. **Notas**: footer "Ver todas las notas" (estilo enlace, sin nav falsa) + dots azules marcados.
+
+### QA
+- typecheck 0 · lint 0 · suite **2129/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio.
+- Sin lógica/DB/Auth/envs/cálculos/exports/datos. AppRail/topbar/command-palette/companion/Workspace V3C/rutas intactos. No `-1rqh`. **Sin merge/tag/prod.**
+
+---
+
+## 2026-06-26 — ICONIC_OPS_UIX_DASHBOARD_INFORMATION_ARCHITECTURE_REDESIGN_V4_2_7 — EN RAMA (sin merge) (orchestrator)
+
+### Nota
+Imágenes A/B no llegaron visibles; se trabajó contra la estructura objetivo detallada (A–D). Misma rama `feature/uix-theme-modes-v4-2`, PR #6.
+
+### Qué cambió (solo Dashboard; sin lógica/datos)
+- **Operación unificada**: 3 cards sueltas → UN panel con 3 columnas + divisores (Capítulo de mayor peso / Versiones
+  emitidas / Precios por revisar; enlace a revisión tras `isAuthorizedForSavings`; conteo real conservado).
+- **Notas rápidas** (`components/shared/notes-card.tsx`): UI shell con ejemplos estáticos + "+" "próximamente". Sin backend/flujo falso.
+- **Monitoreo consolidado**: 4 KpiCards → UN panel (4 indicadores tira hairline con tono + subzona de tiempo:
+  anillo reloj + Última revisión real `lastRunAt` + "Próxima: automática"). **Sin countdown fabricado** (no hay next-run en el summary).
+- **Workflow strip** (`components/shared/workflow-strip.tsx`): 7 cards de acceso → franja horizontal de nodos navegables; "Cotizar con asistente" = Actual.
+- Componentes reusables nuevos: NotesCard, WorkflowStrip. `DashMetric` ahora con tono. Removidos QuickLink/KpiCard del dashboard.
+
+### QA
+- typecheck 0 · lint 0 · tests premium-system/workspace-route-config/ui-and-invariants ok · suite **2129/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio.
+- Conserva AppRail/topbar/command-palette/toggle/card-system/datos reales/companion/Workspace V3C/rutas. Sin DB/Auth/envs/cálculos/exports/datos. No `-1rqh`. **Sin merge/tag/prod.**
+
+---
+
+## 2026-06-26 — ICONIC_OPS_UIX_FINAL_SHELL_POLISH_V4_2_6 — EN RAMA (sin merge) (orchestrator)
+
+### Hotfix puntual de shell (misma rama `feature/uix-theme-modes-v4-2`, PR #6). [Nombre V4.2.6 reusado por la usuaria; esta entrada = el "shell polish".]
+- **Buscador topbar**: theme-aware (surface-soft/line/content) + lupa clara (iconic-primary/70) + keycap ⌘K discreto (antes literales claros → raro en dark).
+- **Overlay/command palette**: dim neutro sutil `bg-black/30 backdrop-blur-[3px]` (no `bg-iconic-ink/30`); modal/pie/input theme-aware. Sin franja translúcida.
+- **CTA Asistente del rail**: centrado en colapsado (`justify-center px-0`); indicador de modo también.
+- **Launcher flotante derecho del Asistente: ELIMINADO** (`return null` cuando no-open); abre por evento (rail/topbar). Lógica/eventos del companion intactos.
+- **Rail navy → graphite** premium (`rgba(32,36,44)→(24,28,35)`, borde white/10); acentos azules vivos conservados (activo/hover/CTA/indicadores).
+
+### QA
+- typecheck 0 · lint 0 · tests premium-system/quote-companion-in-place ok · suite **2127/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio.
+- Conserva AppRail/hover/pin/CTA/toggle/dashboard/cards. Workspace V3C/companion/Sin APU/rutas/exports intactos. Sin DB/Auth/envs/cálculos/datos. No `-1rqh`. **Sin merge/tag/prod.**
+
+---
+
+## 2026-06-26 — ICONIC_OPS_UIX_REFERENCE_DRIVEN_DASHBOARD_REDESIGN_V4_2_6 — EN RAMA (sin merge) (orchestrator)
+
+### Nota
+Referencias A–G no llegaron visibles (no adjuntas); se trabajó contra las descripciones detalladas. Misma rama `feature/uix-theme-modes-v4-2`, PR #6.
+
+### Qué cambió
+- **Tipografía revertida**: fuera Space Grotesk (se sentía "documento") → **Inter única familia UI**
+  (limpia/tecnológica/buen peso); `font-display`=Inter peso alto. Datos JetBrains Mono.
+- **Dark slate-charcoal con elevación**: app `#0d0f14`, surface `#161922`, soft `#1d212c`, muted `#262b38`,
+  line `#2d3340`, content `#e8eaf0`, muted `#98a0af`. Más balance/elevación que el neutro plano. AG/glass realineados.
+- **Dashboard modular (refs B/F)**: ZONA 1 = grid lg:3 → card PRIMARY (resumen+métricas) 2/3 + card CHART
+  compacta (Distribución) 1/3 → el gráfico ya no domina. "Capítulo de mayor peso" → SurfaceCard + IconChip cápsula.
+- **Card system** nuevo `components/shared/surface-card.tsx` (SurfaceCard variantes primary/metric/action/chart/status + ActionCard).
+- **Botón primario azul premium** (highlight interno + sombra marca). **IconChip cápsula** (shape="capsule", ref G).
+
+### QA
+- typecheck 0 · lint 0 · tests premium-system/typography-system/theme-modes ok · suite **2125/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio.
+- Conserva AppRail/hover/pin/CTA/toggle. Workspace V3C/companion/Sin APU/rutas/exports intactos. Sin DB/Auth/envs/cálculos/datos. No `-1rqh`. **Sin merge/tag/prod.**
+
+---
+
+## 2026-06-26 — ICONIC_OPS_UIX_SIGNATURE_VISUAL_REDESIGN_V4_2_5 — EN RAMA (sin merge) (orchestrator)
+
+### Cambio de identidad (no más polish) — misma rama `feature/uix-theme-modes-v4-2`, PR #6
+- **Dark rearmado a graphite neutro** (Linear/Vercel/Raycast), NO navy saturado: app `#0c0d10`, surface
+  `#16171b`, soft `#1b1d22`, muted `#23252b`, line `#292b32`, content `#eceef2`, muted `#9a9ea8`. Navy ICONIC
+  pasa a ACENTO (rail/command bar/CTA). AG Grid dark + `.glass` dark realineados.
+- **Light**: off-white `#f5f6f8`, hairline `#e7e9ee`, texto casi-negro neutro `#1a1d23`, más aire.
+- **Dashboard recompuesto (editorial)**: eliminado el mega-hero navy + mini-cards (CommandStat/BlueprintBg/
+  IconPlate). Nueva composición: eyebrow → Total (cifra-héroe display) → barra de composición de costo →
+  tira de métricas plana hairline (`DashMetric`) → panel de distribución limpio.
+- **Card** premium: hairline + sombra suave + lift (claro), solo borde en dark. **Rail icons** refinados
+  (inactivo sin caja, activo con ring cian).
+
+### QA
+- typecheck 0 · lint 0 · tests `premium-system`/`theme-modes` ok · suite **2122/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio.
+- Conserva AppRail/hover/pin/CTA Asistente/toggle/tipografía/OperationsHeader. Workspace V3C/companion/Sin APU/rutas/exports intactos. Sin DB/Auth/envs/cálculos/datos. No `-1rqh`. **Sin merge/tag/prod.**
+
+---
+
+## 2026-06-26 — ICONIC_OPS_UIX_SKILL_GUIDED_VISUAL_REFINEMENT_V4_2_4 — EN RAMA (sin merge) (orchestrator)
+
+### Tooling de diseño (sin instalar nada en el repo)
+- Se evaluó: plugin oficial Anthropic **`frontend-design`** (en marketplace `claude-plugins-official`, ya
+  clonado en `~/.claude`, NO instalado) → **se leyó su SKILL.md y se aplicó su metodología** sin instalar.
+  Impeccable (tercero, `npx impeccable install` toca el repo) **descartado**. **No** se modificó `.claude`/config/repo por tooling.
+
+### Qué cambió (misma rama `feature/uix-theme-modes-v4-2`, PR #6)
+- **Tipografía deliberada** (palanca #1 del skill; además **Inter no se cargaba** → fallback system-ui):
+  `next/font` self-hosted — Inter (cuerpo) + **Space Grotesk** (display técnica, títulos/cifras-héroe) +
+  JetBrains Mono (datos). Tailwind `font-display`/`sans`/`mono` por variable. `font-display` aplicado en
+  OperationsHeader (título+stat), KpiCard (valor), Dashboard (Total + h2), Workspace (Total general navy).
+- **Audacia concentrada**: hero "Centro de mando" **aplanado** (gradiente sobrio + sombra suave, sin radial/glow).
+- **Quality floor**: `prefers-reduced-motion` respetado (globals.css).
+
+### QA
+- typecheck 0 · lint 0 · tests `typography-system` 4/0 · suite **2120/0 (+42 skip)** · build 0 (next/font compila) · gm 22/22 · diff-check limpio.
+- Sin DB/Auth/envs/cálculos/exports/datos · Workspace V3C/companion/Sin APU/rutas intactos · no `-1rqh`. **Sin merge/tag/prod.**
+
+---
+
+## 2026-06-26 — ICONIC_OPS_UIX_PREMIUM_ICONOGRAPHY_GLASS_SYSTEM_V4_2_3 — EN RAMA (sin merge) (orchestrator)
+
+### Qué cambió (misma rama `feature/uix-theme-modes-v4-2`, PR #6) — capa visual premium sistémica
+- **Iconografía central**: `components/shared/iconic-icon.tsx` (`IconicIcon`+`IconChip`, estados
+  default/active/muted/primary/success/warning/danger, theme-aware) + **normalización global** del trazo
+  lucide en `globals.css` (`svg.lucide` stroke-width 1.75 + round) → todos los íconos monoline finos de una vez.
+- **Navegación glass/dock**: `AppRail` navy translúcido + blur (`glass-navy`), borde white/12 + ring interno,
+  sombra premium + glow cian tenue, pressed state en items y CTA. Conserva hover-expand/pin/CTA Asistente/rutas.
+- **Botones premium** (`ui/button.tsx`): radios suaves + `active:scale` (táctil) + primario con sombra al hover
+  + **secundario frosted** (translúcido+blur) + variantes dark completas. Utilidades `.glass`/`.glass-navy`.
+- **Dashboard**: `IconChip` en "Capítulo de mayor peso" (iconografía consistente).
+
+### QA
+- typecheck 0 · lint 0 · tests `premium-system` 5/0 · suite **2116/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio.
+- Navegación/rutas intactas · Workspace V3C/companion/filtro Sin APU/exports intactos · sin DB/Auth/envs/cálculos/datos · no `-1rqh`.
+- **Sin merge / sin tag / sin prod.** Pendiente: revisión visual del preview (PR #6). Adopción de IconChip en más módulos = pendiente menor (V5).
+
+---
+
+## 2026-06-26 — ICONIC_OPS_UIX_THEME_AND_NAV_REFINEMENT_V4_2_2 — EN RAMA (sin merge) (orchestrator)
+
+### Qué cambió (misma rama `feature/uix-theme-modes-v4-2`, PR #6) — iteración visual fuerte por feedback real
+- **Dark mode menos pesado**: tokens `.dark` re-afinados (base neutra-profunda, menos saturación, más
+  respiración y contraste): app `#0a0e16`, surface `#141925`, soft `#1b2230`, muted `#232c3d`, line `#2c3647`,
+  content `#eef2f8`, content-muted `#9aa8c0`. El acento marca resalta en vez de saturar.
+- **Sidebar → RAIL FLOTANTE** (`components/shared/app-rail.tsx`, client): fixed inset-y-3 left-3, rounded-2xl,
+  navy; compacto (íconos) → **expande al hover**; **pin** persistente (`localStorage iconic-rail-pinned`,
+  pin empuja vía spacer / hover overlayea). `SidebarNav` recibe `expanded` (íconos+tooltip vs etiquetas).
+  Mismas rutas/íconos/lógica. Pie = **CTA Asistente** (`quote-companion:open`). Eliminado el bloque dominante
+  "Grupo ICONIC / Modo demostración" → modo de datos como indicador **sutil**.
+- **Dashboard simplificado**: Centro de mando — quitada la **sub-card** de distribución (card-en-card) →
+  integrada con divisor. Capítulo de mayor peso — quitados los **círculos decorativos** + gradiente raro →
+  card sobria, consistente, theme-aware.
+
+### QA
+- typecheck 0 · lint 0 · tests afectados ok · suite **2111/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio.
+- Navegación/rutas intactas · Workspace V3C/companion/filtro Sin APU/exports intactos · sin DB/Auth/envs/cálculos/datos · no `-1rqh`.
+- **Sin merge / sin tag / sin prod.** Pendiente: revisión visual del preview (PR #6).
+
+---
+
+## 2026-06-26 — ICONIC_OPS_UIX_THEME_MODES_V4_2_1_DARK_COVERAGE_HOTFIX — EN RAMA (sin merge) (orchestrator)
+
+### Qué cambió (misma rama `feature/uix-theme-modes-v4-2`, PR #6)
+- **Capa central de cobertura dark en `globals.css`**: remapea utilidades claras PLANAS → tokens solo bajo
+  `.dark` (bg-white/gray-50/100/brand-50/slate-50, border-gray-*, text-gray-*/slate-*, estados amber/green/
+  red/blue/cyan-50 + textos). Cubre TODAS las superficies densas (Workspace/Catálogo/APU/Cantidades/detalle/
+  review-table) sin editar cientos de clases. No toca variantes con opacidad ni navy (text-white/border-white/*).
+- **Excepción**: `OperationsHeaderAction` primary `bg-white`→`bg-iconic-white` (sigue blanco sobre navy).
+- **Variantes `dark:` puntuales** para zonas con OPACIDAD: Workspace V3C (paneles, banner, placeholder,
+  panel de detalle, filas capítulo, hover, **selección**, chip subtotal, toolbar sticky, OpsKpi warn) +
+  detalle presupuesto (CTA workspace, fila archivada) + APU (form filtros, hover fila).
+
+### QA
+- typecheck 0 · lint 0 · tests `theme-modes` 9/0 · suite **2110/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio.
+- Light intacto · Workspace V3C/companion/filtro Sin APU/exports intactos · sin DB/Auth/envs/cálculos/datos · no `-1rqh`.
+- **Sin merge / sin tag / sin prod.** Pendiente: revisión visual del preview (PR #6, dark en Workspace/Catálogo/APU/Cantidades).
+
+---
+
+## 2026-06-26 — ICONIC_OPS_UIX_THEME_MODES_V4_2 — EN RAMA (sin merge; pendiente revisión visual) (orchestrator)
+
+### Estado
+- Rama **`feature/uix-theme-modes-v4-2`** (base `origin/main = f6cd634`, tras V4.1). **NO mergeada.**
+
+### Qué cambió (base de tema claro/oscuro, UIX-only)
+- **Fundación**: `darkMode:'class'` + **tokens semánticos** por CSS vars (`--c-app/surface/surface-soft/
+  surface-muted/line/content/content-muted`) en `globals.css` (`:root` light = estética actual; `.dark` =
+  paleta ICONIC dark, navy casi negro #060b1f, sin negro puro/morado/neón). Expuestos en Tailwind (`bg-app`,
+  `bg-surface`, `border-line`, `text-content`…).
+- **ThemeProvider propio** (sin dependencia nueva; NO se instaló next-themes) + **script inline anti-FOUC**
+  en `<head>` + `<html suppressHydrationWarning>`. Default **claro**; persiste en localStorage; soporta system.
+- **ThemeToggle** (Claro/Oscuro/Sistema, accesible) en el **menú de cuenta** del topbar.
+- **Theme-aware (dark: variants, light intacto)**: shell (`(dashboard)/layout.tsx` bg-app, `app-topbar`,
+  `account-menu`; sidebar ya navy), primitivos (`ui/card`, `ui/input`, `ui/badge`), compartidos (`kpi-card`,
+  `inline-callout`, `filter-pills`; `OperationsHeader` navy ya sirve), y AG Grid (`.dark .ag-theme-alpine`).
+
+### QA
+- typecheck 0 · lint 0 · tests `theme-modes` 6/0 · suite **2107/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio.
+- Workspace V3C / companion / filtro Sin APU / exports intactos · sin DB/Auth/envs/cálculos/datos · no `-1rqh`.
+
+### Pendiente (honesto)
+- **Tablas densas crudas** (Workspace BOQ, CatalogExplorer, capítulos) usan `bg-white`/`text-gray-*`: en
+  dark se ven como papel claro legible sobre el shell oscuro, **aún no dark-themed** → pase V4.3.
+- Migrar literales de páginas a tokens; revisar Recharts del dashboard en dark.
+- Abrir PR → preview → revisión visual → autorizar merge.
+
+---
+
 ## 2026-06-26 — ICONIC_OPS_UIX_COHERENCE_COMPLETION_V4_1 — RELEASED (merge + prod smoke) (orchestrator)
 
 - Usuaria aprobó (opción "mergear V4.1 primero"). **Merge `--no-ff` a main**: `origin/main` =

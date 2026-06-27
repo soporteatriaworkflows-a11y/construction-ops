@@ -11,10 +11,10 @@ import type { ReactNode } from 'react';
 export type KpiTone = 'default' | 'ok' | 'warn' | 'danger';
 
 const TONE: Record<KpiTone, { wrap: string; value: string }> = {
-  default: { wrap: 'border-gray-200 bg-white', value: 'text-iconic-ink' },
-  ok: { wrap: 'border-green-200 bg-green-50/40', value: 'text-green-700' },
-  warn: { wrap: 'border-amber-200 bg-amber-50/50', value: 'text-amber-700' },
-  danger: { wrap: 'border-red-200 bg-red-50/50', value: 'text-red-700' },
+  default: { wrap: 'border-gray-200 bg-white dark:border-line dark:bg-surface', value: 'text-iconic-ink dark:text-content' },
+  ok: { wrap: 'border-green-200 bg-green-50/40 dark:border-green-500/25 dark:bg-green-500/10', value: 'text-green-700 dark:text-green-300' },
+  warn: { wrap: 'border-amber-200 bg-amber-50/50 dark:border-amber-500/25 dark:bg-amber-500/10', value: 'text-amber-700 dark:text-amber-300' },
+  danger: { wrap: 'border-red-200 bg-red-50/50 dark:border-red-500/25 dark:bg-red-500/10', value: 'text-red-700 dark:text-red-300' },
 };
 
 export function KpiCard({
@@ -36,9 +36,9 @@ export function KpiCard({
   const base = `block rounded-lg border px-3 py-2 text-left shadow-sm ${t.wrap}`;
   const inner = (
     <>
-      <p className="truncate text-[10px] font-medium uppercase tracking-wide text-gray-500">{label}</p>
-      <p className={`text-lg font-bold tabular-nums ${t.value}`}>{value}</p>
-      {hint && <p className="truncate text-[10px] text-gray-400">{hint}</p>}
+      <p className="truncate text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:text-content-muted">{label}</p>
+      <p className={`font-display text-lg font-bold tabular-nums ${t.value}`}>{value}</p>
+      {hint && <p className="truncate text-[10px] text-gray-400 dark:text-content-muted">{hint}</p>}
     </>
   );
   if (href) {

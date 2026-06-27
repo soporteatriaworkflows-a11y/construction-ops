@@ -365,6 +365,99 @@ Componentes canónicos para la identidad común (usar en toda pantalla principal
 Regla: cada módulo principal = `OperationsHeader` arriba + (si hay datos) `KpiBand` + contenido
 (tabla/lista/cards) + ayuda (`InlineCallout`). Estados con texto+color (sección 8).
 
+## 12.d Tema claro/oscuro (V4.2)
+
+ICONIC OPS soporta **claro (default) y oscuro** vía `darkMode: 'class'` + **tokens semánticos**
+(CSS variables en `app/globals.css`, expuestos en Tailwind):
+
+- `bg-app` (fondo página), `bg-surface` / `bg-surface-soft` / `bg-surface-muted` (superficies),
+  `border-line`, `text-content`, `text-content-muted`.
+- En **claro** replican la estética actual (sin cambio visual); en **oscuro** usan la paleta ICONIC dark
+  (navy casi negro `#060b1f`, superficies `#0b1230+`, texto `#f8fafc`/blue-gray). **Sin negro puro, sin morado/neón.**
+- La marca (navy/azul/cian, barras `OperationsHeader`, sidebar) **no cambia**: sirve en ambos modos.
+
+Reglas:
+- Para superficies/textos nuevos usar **tokens** (`bg-surface`, `text-content`, `border-line`) en vez de
+  `bg-white`/`text-gray-*`, para que sean theme-aware automáticamente.
+- Tema vía `ThemeProvider` (propio) + `ThemeToggle` (Claro/Oscuro/Sistema) en el menú de cuenta. Persiste
+  en `localStorage`; script inline anti-FOUC. Ver `docs/design-references/UIX_THEME_MODES_V4_2.md`.
+- **Cobertura dark (V4.2.1)**: `globals.css` tiene una capa central que remapea utilidades claras planas
+  (`bg-white`, `bg-gray-50`, `text-gray-*`, `border-gray-*`, estados `bg-amber-50`…) a tokens **solo bajo
+  `.dark`**. Por eso superficies densas se ven dark sin editar clase por clase. **No** cubre variantes con
+  opacidad (`bg-white/80`, `bg-brand-50/60`): esas se tratan con `dark:` puntual. Para blanco intencional
+  sobre navy usar `bg-iconic-white` (no `bg-white`, que el remapeo volvería oscuro).
+
+## 12.e Rail de navegación flotante (V4.2.2)
+
+El shell usa un **rail flotante** (`components/shared/app-rail.tsx`): `fixed inset-y-3 left-3`, rounded-2xl,
+navy ICONIC. **Compacto** (solo íconos) → **expande al hover**; **pin** para dejarlo abierto (persiste en
+`localStorage`). Pin empuja contenido (spacer en flujo); hover overlayea sin mover layout. `SidebarNav`
+recibe `expanded` (íconos vs íconos+etiqueta, con tooltip al colapsar). Pie del rail = **CTA Asistente**
+(evento `quote-companion:open`); el modo de datos es un indicador **sutil** (no un bloque dominante). Mismas
+rutas/íconos. Dark mode V4.2.2: base neutra-profunda menos saturada (ver `UIX_THEME_MODES_V4_2.md`).
+
+## 12.f Iconografía + sistema glass (V4.2.3)
+
+- **Iconografía**: usar `IconicIcon` / `IconChip` (`components/shared/iconic-icon.tsx`) con **tono** semántico
+  (`active`/`muted`/`primary`/`success`/`warning`/`danger`, theme-aware). Trazo monoline 1.75 + redondeado
+  está normalizado global (`svg.lucide` en `globals.css`) para todos los íconos lucide.
+- **Glass**: utilidades `.glass` (claro/oscuro) y `.glass-navy` para barras/menús/acciones premium (blur ligero,
+  borde de baja opacidad; **sin** blur pesado ni neón). El `AppRail` es navy translúcido + blur.
+- **Botones** (`Button`): táctiles (`active:scale`), primario con sombra al hover, **secundario frosted**
+  (translúcido + blur), variantes dark completas. Preferir `Button`/`OperationsHeaderAction` sobre botones ad-hoc.
+
+## 12.g Sistema tipográfico (V4.2.4, skill-guided)
+
+Tipografía deliberada (self-hosted vía `next/font`, sin dependencia nueva), guiada por el skill oficial
+`frontend-design` (la tipografía carga la personalidad, no usar el default de siempre):
+- **Cuerpo**: Inter (`font-sans`, `var(--font-inter)`).
+- **Display**: **Space Grotesk** (`font-display`, `var(--font-display)`) — técnica/sobria, para **títulos,
+  eyebrows y cifras-héroe** (OperationsHeader, KpiCard, totales del dashboard/workspace). Usar con restraint.
+- **Datos**: JetBrains Mono (`font-mono`) para tabulares/códigos.
+Regla: cifras-héroe y títulos de módulo → `font-display`; cuerpo → `font-sans`; datos → `font-mono`.
+Quality floor: `prefers-reduced-motion` respetado (globals.css). Audacia concentrada (hero aplanado).
+
+## 12.h Identidad V4.2.5 (dark graphite + dashboard editorial)
+
+- **Dark = graphite neutro** (Linear/Vercel/Raycast), NO navy saturado: el azul/cian ICONIC es **acento**
+  (rail, command bar, CTA, datos/estados), no la base. Tokens en `globals.css` (`.dark`).
+- **Light = off-white** con hairlines suaves y texto casi-negro neutro (menos navy en el texto), más aire.
+- **Dashboard editorial**: sin mega-hero navy; eyebrow → cifra-héroe display → barra de composición de costo
+  (instrumento firma) → tira de métricas plana con hairlines (`DashMetric`) → panel de distribución limpio.
+  Evitar "card dentro de card" y bloques navy dominantes.
+- **Cards**: hairline + sombra muy suave + lift (claro); en dark solo borde fino. No bordes pesados.
+- Regla: la audacia se concentra (rail/command bar como firma navy); el resto, superficies de tema calmadas.
+
+## 12.i Shell polish (V4.2.6): rail graphite + búsqueda + accesos al Asistente
+
+- **AppRail = graphite/dark-gray premium** (no navy saturado): fondo `rgba(32,36,44)→(24,28,35)`, borde
+  `white/10`. Acentos **azules vivos** solo en item activo / hover / CTA Asistente / indicadores. CTA y mode-dot
+  **centrados** en estado colapsado.
+- **Búsqueda (command palette)**: trigger e interior **theme-aware** (tokens), lupa clara, keycap discreto;
+  overlay con **dim neutro sutil** (no tinte navy ni franja). Tokens, no literales claros.
+- **Accesos al Asistente**: solo **topbar** + **CTA del AppRail**. El **launcher flotante derecho fue eliminado**
+  (redundante); el companion cerrado no renderiza UI y abre por evento `quote-companion:open`.
+
+## 12.j Dashboard IA (V4.2.7)
+
+Arquitectura del Dashboard en **paneles consolidados** (menos cards sueltas):
+- **Superior**: Centro de mando (2/3) + Distribución compacta (1/3).
+- **Operación**: UN panel con 3 columnas (Capítulo de mayor peso · Versiones emitidas · Precios por revisar)
+  con divisores `divide-x`; + card **Notas rápidas** (`notes-card.tsx`, UI shell con ejemplos, sin backend).
+- **Monitoreo**: UN panel (4 indicadores en tira hairline + subzona de tiempo con anillo: Última revisión real +
+  "Próxima: automática"; sin countdown fabricado).
+- **Workflow strip** (`workflow-strip.tsx`): franja horizontal de nodos navegables (reemplaza las cards de acceso),
+  primer hito "Actual". Patrón reusable para flujos.
+Regla: preferir paneles consolidados con divisores sutiles sobre colecciones de mini-cards iguales.
+
+## 12.k Workflow companion flotante (V4.2.13)
+
+`FloatingWorkflowDock` (`components/shared/floating-workflow-dock.tsx`): versión compacta y flotante del
+workflow strip, montada en el layout del dashboard. Aparece fuera de `/dashboard` (ahí se auto-oculta).
+`fixed bottom-4`, `glass` claro/oscuro, nodos redondos + íconos monoline, paso activo azul vivo, minimizable
+(pill "Flujo", persiste en localStorage). Solo navega a rutas existentes; NO duplica el CTA del Asistente.
+Solo `lg+`. Mapping de paso por ruta (específico→general).
+
 ## 13. Roadmap visual
 
 | Fase | Módulo | Foco |

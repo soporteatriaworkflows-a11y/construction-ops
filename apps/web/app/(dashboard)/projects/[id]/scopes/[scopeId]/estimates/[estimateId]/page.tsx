@@ -246,7 +246,7 @@ export default async function EstimateDetailPage({ params, searchParams }: PageP
 
       {/* Acceso al BOQ Workspace (Oleada OPERATIONAL BUDGET UX V1) */}
       {hasContent && (
-        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-iconic-soft-blue/60 bg-brand-50/60 px-4 py-3">
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-iconic-soft-blue/60 bg-brand-50/60 px-4 py-3 dark:border-line dark:bg-surface-soft">
           <LayoutGrid className="h-5 w-5 text-iconic-primary" aria-hidden="true" />
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-iconic-ink">BOQ Workspace</p>
@@ -455,7 +455,7 @@ export default async function EstimateDetailPage({ params, searchParams }: PageP
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {chapters.map((ch) => (
-                    <tr key={ch.id} className={`hover:bg-gray-50 ${ch.archived ? 'bg-gray-50/60 text-gray-400' : ''}`}>
+                    <tr key={ch.id} className={`hover:bg-gray-50 dark:hover:bg-surface-muted ${ch.archived ? 'bg-gray-50/60 text-gray-400 dark:bg-surface-soft' : ''}`}>
                       <td className="px-3 py-2">
                         <span className="font-mono text-xs text-gray-600">{ch.code}</span>
                         {ch.archived && (

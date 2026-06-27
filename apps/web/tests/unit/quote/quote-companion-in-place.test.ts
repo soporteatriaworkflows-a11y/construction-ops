@@ -26,9 +26,13 @@ describe('triggers abren el panel SIN navegar (1, 2)', () => {
     expect(TRIGGER).not.toMatch(/<Link\b/);
   });
 
-  it('el launcher es un <button onClick={openPanel}> (no navega)', () => {
-    expect(COMPANION).toContain('onClick={openPanel}');
-    expect(COMPANION).toMatch(/state !== 'open'/);
+  it('V4.2.6: sin launcher flotante; el panel abre por el evento (openPanel) y cerrado no renderiza UI', () => {
+    // Se eliminó el botón flotante derecho redundante. El panel se abre por
+    // `quote-companion:open` → openPanel(); cerrado/minimizado no renderiza launcher.
+    expect(COMPANION).toContain('addEventListener(OPEN_EVENT');
+    expect(COMPANION).toContain('openPanel()');
+    expect(COMPANION).toMatch(/if \(state !== 'open'\) \{\s*return null;/);
+    expect(COMPANION).not.toContain('bottom-5 right-5 z-40'); // ya no hay launcher flotante
   });
 });
 

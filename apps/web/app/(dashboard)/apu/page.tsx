@@ -245,7 +245,7 @@ export default async function ApuPage({ searchParams }: PageProps) {
       </div>
 
       {/* Búsqueda + filtros + orden (GET, server-side) */}
-      <form method="get" className="mb-4 flex flex-wrap items-end gap-2 rounded-md border bg-gray-50/50 p-3">
+      <form method="get" className="mb-4 flex flex-wrap items-end gap-2 rounded-md border bg-gray-50/50 p-3 dark:border-line dark:bg-surface-soft">
         <Field label="Buscar">
           <input
             type="search"
@@ -330,7 +330,7 @@ export default async function ApuPage({ searchParams }: PageProps) {
 
 function ApuRow({ item }: { item: ApuLibraryItem }) {
   return (
-    <tr className="border-b last:border-b-0 hover:bg-gray-50/50">
+    <tr className="border-b last:border-b-0 hover:bg-gray-50/50 dark:border-line dark:hover:bg-surface-muted">
       <td className="px-3 py-2 font-mono text-xs text-gray-600">{item.code}</td>
       <td className="px-3 py-2">
         <Link href={`/apu/${item.id}`} className="font-medium text-gray-900 hover:text-blue-700">

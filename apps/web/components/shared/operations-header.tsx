@@ -31,7 +31,7 @@ export function OperationsHeaderAction({
 }) {
   const cls =
     variant === 'primary'
-      ? 'inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-sm font-semibold text-iconic-ink transition-colors hover:bg-iconic-soft-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iconic-cyan'
+      ? 'inline-flex items-center gap-1.5 rounded-lg bg-iconic-white px-3 py-1.5 text-sm font-semibold text-iconic-ink transition-colors hover:bg-iconic-soft-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iconic-cyan'
       : 'inline-flex items-center gap-1.5 rounded-lg border border-white/35 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iconic-cyan';
   if (href) {
     return (
@@ -68,7 +68,7 @@ export function OperationsHeader({
   breadcrumb?: ReactNode;
 }) {
   return (
-    <div className="mb-4 overflow-hidden rounded-2xl bg-gradient-to-r from-iconic-ink via-[#071042] to-[#0a1145] px-4 py-3 text-white shadow-iconic sm:px-5 sm:py-4">
+    <div className="mb-4 overflow-hidden rounded-2xl bg-gradient-to-r from-iconic-primary via-[#0a51c2] to-[#013e97] px-4 py-3 text-white shadow-iconic sm:px-5 sm:py-4">
       {breadcrumb && <div className="mb-1.5 text-[11px] text-white/60">{breadcrumb}</div>}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
@@ -76,14 +76,14 @@ export function OperationsHeader({
             {icon}
             {eyebrow}
           </p>
-          <h1 className="mt-0.5 truncate text-lg font-semibold text-white">{title}</h1>
+          <h1 className="mt-0.5 truncate font-display text-lg font-semibold tracking-tight text-white">{title}</h1>
           {subtitle && <p className="mt-0.5 text-xs text-white/70">{subtitle}</p>}
         </div>
         <div className="flex shrink-0 items-center gap-4">
           {stat && (
             <div className="text-right">
               <p className="text-[10px] uppercase tracking-wide text-white/50">{stat.label}</p>
-              <p className={`text-xl font-bold tabular-nums ${stat.tone === 'warn' ? 'text-amber-300' : 'text-white'}`}>
+              <p className={`font-display text-xl font-bold tabular-nums ${stat.tone === 'warn' ? 'text-amber-300' : 'text-white'}`}>
                 {stat.value}
               </p>
             </div>
