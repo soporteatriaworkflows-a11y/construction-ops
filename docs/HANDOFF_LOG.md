@@ -1,18 +1,25 @@
 # Handoff Log
 
-## 2026-06-27 — ICONIC_OPS_PRICE_MONITORING_PANEL_V5_2_2A — EN RAMA (sin merge) (orchestrator)
+## 2026-06-27 — ICONIC_OPS_PRICE_MONITORING_PANEL_V5_2_2A — RELEASED (merge + tag + prod smoke) (orchestrator)
 
-- Rama `feature/price-monitoring-panel-v5-2-2a` (base `origin/main = 3170207`). V5.2.2a: `/catalog/monitoring` como
-  panel operativo, **UI/UX sobre datos reales** (MonitoringSummary/MonitorTargetView/MonitorRunView). Sin backend, sin tocar cron/actions.
+- Usuaria **validó preview AUTENTICADO** y aprobó. **Merge `--no-ff` a main**: `origin/main` = **`d499638`**
+  (parents `3170207` + `0094cfc`). **Tag** = **`iconic-ops-price-monitoring-panel-v5-2-2a`** → `d499638`. **PR #10 MERGED.**
+- V5.2.2a: `/catalog/monitoring` como panel operativo, **UI/UX sobre datos reales** (MonitoringSummary/MonitorTargetView/
+  MonitorRunView). Sin backend, sin tocar cron/actions.
 - Nuevo helper NEUTRO `lib/pricing/monitor-ui.ts` (sin `'use client'`): getMonitorTargetStatus (pausado→error→atrasado→
   saludable), formatLastChecked/formatNextCheck (humano + fallbacks), relativeDays. Importado por el Server page → **evita el error P0** server/client.
 - Cambios: OperationsHeader + KpiBand (Bajo monitoreo/Activas/Pausadas/Atrasadas/Cambios pendientes[deep-link a review]/Con
   error, dark-safe) + InlineCallout (errores/atrasados/pendientes/sin corridas) + tabla con estado vía helper + próxima/última
   revisión humanas. Acciones (RunNow/Toggle/Cadence) intactas.
 - Guard anti-regresión P0 en `monitor-ui.test.ts` (módulo no declara directiva 'use client'; page importa del módulo neutro).
-- QA: typecheck 0 · lint 0 · tests monitor-ui 11/0 · suite verde · build 0 · gm 22/22 · diff-check limpio.
-- ⚠️ **Requiere validación manual AUTENTICADA del preview antes de merge** (no solo 307). Sin tocar cron/actions/DB/RLS/
-  read-model/cálculos/`unit_price_snapshot`/sync/`construction-ops-1rqh`. **Sin merge/tag/prod.**
+- Deploy prod proyecto **construction-ops** (alias `construction-ops-psi`). Smoke OK: /login 200 · /catalog/monitoring·
+  /catalog·/prices/review·/providers·/apu·/dashboard·/projects·/estimates·/quantities·/planning·/settings 307 ·
+  /api/estimates/export **400 controlado** · /api/cron/price-monitor **401** (auth/secret respetado). Commit promovido no confirmable por API (MCP 403) → verificar Production en dashboard.
+- QA: typecheck 0 · lint 0 · tests monitor-ui 11/0 · suite verde · build 0 · gm 22/22.
+- **No-alcance**: sin cron/actions/DB/RLS/policies/migrations/Auth/envs/Vercel/cálculos/exports/datos/RPC/read-model/
+  permisos/`unit_price_snapshot`/sync/aprobación/scraper/dashboard countdown/`construction-ops-1rqh`. Catálogo V5.2.1/APU V5.1/Workspace V3C/exports intactos.
+- **Pendientes V5.2.2b (documentados, NO implementar sin autorización)**: filtros por estado (componente client con lógica
+  en el módulo neutro `lib/pricing/monitor-ui.ts`) + deep-links cruzados catálogo↔monitoring↔recurso↔review. (V5.2.2c: corridas/historial + price-intelligence.)
 
 ---
 
