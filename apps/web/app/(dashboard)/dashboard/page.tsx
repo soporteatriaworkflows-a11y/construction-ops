@@ -454,16 +454,14 @@ export default async function DashboardPage() {
                       className="stroke-iconic-primary dark:stroke-iconic-cyan"
                     />
                   </svg>
-                  <span className="absolute inset-0 flex items-center justify-center font-display text-[12px] font-bold tabular-nums text-content">
-                    02h 18m
+                  {/* Centro limpio: solo un ícono (el tiempo vive afuera, sin duplicar). */}
+                  <span className="absolute inset-0 flex items-center justify-center text-iconic-primary dark:text-iconic-cyan">
+                    <CalendarClock className="h-5 w-5" />
                   </span>
                 </div>
                 <div className="min-w-0">
-                  <p className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-content-muted">
-                    <CalendarClock className="h-3.5 w-3.5 text-iconic-primary/70" aria-hidden="true" />
-                    Próxima revisión en
-                  </p>
-                  <p className="text-sm font-semibold text-content">02h 18m</p>
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-content-muted">Próxima revisión en</p>
+                  <p className="font-display text-base font-bold tabular-nums text-content">02h 18m</p>
                   <p className="mt-1 truncate text-[11px] text-content-muted">
                     Última: {monitoringSummary.lastRunAt ? formatDateTime(monitoringSummary.lastRunAt) : 'sin corridas'}
                   </p>

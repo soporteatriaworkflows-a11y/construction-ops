@@ -1,5 +1,15 @@
 # Handoff Log
 
+## 2026-06-27 — ICONIC_OPS_UIX_DASHBOARD_COUNTDOWN_RING_HOTFIX_V4_2_9 — EN RAMA (sin merge) (orchestrator)
+
+- Ajuste puntual: en Monitoreo → "Próxima revisión", se **quitó el `02h 18m` del centro del anillo** (era
+  redundante con el texto externo). Centro ahora con icono `CalendarClock` limpio; el anillo de progreso se
+  mantiene. El dato externo (Próxima revisión en `02h 18m` + Última `{lastRunAt real}`) se conserva. Se quitó
+  el icono duplicado del eyebrow externo.
+- Solo `dashboard/page.tsx`. typecheck 0 · lint 0 · build 0 · suite 2129/0 (+42 skip) · diff-check limpio. **Sin merge/tag/prod.** No `-1rqh`.
+
+---
+
 ## 2026-06-27 — ICONIC_OPS_UIX_DASHBOARD_TARGET_MATCH_V4_2_8 — EN RAMA (sin merge) (orchestrator)
 
 ### Comparación real ACTUAL vs TARGET (capturas leídas del disco)
