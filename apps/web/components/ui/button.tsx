@@ -17,9 +17,9 @@ const buttonVariants = cva(
           'bg-iconic-primary text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_2px_8px_-2px_rgba(0,93,214,0.45)] hover:bg-brand-600 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_6px_18px_-4px_rgba(0,93,214,0.55)] active:bg-brand-700',
         destructive:
           'bg-red-600 text-white shadow-sm hover:bg-red-700 hover:shadow-md active:bg-red-800',
-        // Secundario "glass/frosted": superficie translúcida + borde sutil (claro/oscuro).
+        // Secundario "glass/frosted" en claro; en dark = superficie sólida sutil (visible, sin borde blanco).
         outline:
-          'border border-gray-300/80 bg-white/70 text-gray-700 backdrop-blur-sm hover:bg-white active:bg-gray-100 dark:border-line dark:bg-white/5 dark:text-content dark:hover:bg-white/10',
+          'border border-gray-300/80 bg-white/70 text-gray-700 backdrop-blur-sm hover:bg-white active:bg-gray-100 dark:border-line dark:bg-surface-muted dark:text-content dark:backdrop-blur-none dark:hover:bg-surface-soft',
         secondary:
           'bg-gray-100 text-gray-900 hover:bg-gray-200 active:bg-gray-300 dark:bg-surface-muted dark:text-content dark:hover:bg-surface-soft',
         ghost:

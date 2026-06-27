@@ -15,7 +15,7 @@ const KPI = read('../../../components/shared/kpi-card.tsx');
 
 describe('componentes shell operativos', () => {
   it('OperationsHeader: command bar navy ICONIC con eyebrow cian (no dark mode global)', () => {
-    expect(HEADER).toContain('from-iconic-ink');
+    expect(HEADER).toContain('from-iconic-primary'); // V4.2.10: azul vivo de marca (antes navy iconic-ink)
     expect(HEADER).toContain('text-iconic-cyan');
     expect(HEADER).toContain('eyebrow');
     expect(HEADER).toContain('stat');

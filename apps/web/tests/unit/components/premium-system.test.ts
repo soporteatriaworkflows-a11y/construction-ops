@@ -90,6 +90,15 @@ describe('V4.2.3 — sistema visual premium', () => {
     expect(cp).not.toContain('bg-iconic-ink/30'); // overlay navy reemplazado por dim neutro
   });
 
+  it('V4.2.10: header con azul vivo de marca (no navy oscuro) + logo claro en dark + outline dark visible', () => {
+    expect(read('../../../components/shared/operations-header.tsx')).toContain('from-iconic-primary');
+    expect(read('../../../components/shared/operations-header.tsx')).not.toContain('from-iconic-ink');
+    // El tile del logo debe quedar claro en dark (no lo oscurece el remapeo) → bg-iconic-white.
+    expect(read('../../../components/shared/workspace-brand.tsx')).toContain('bg-iconic-white');
+    // Botón outline en dark: superficie sólida visible, sin perímetro blanco.
+    expect(read('../../../components/ui/button.tsx')).toContain('dark:bg-surface-muted');
+  });
+
   it('V4.2.7: NotesCard (shell) + WorkflowStrip (timeline) existen', () => {
     expect(read('../../../components/shared/notes-card.tsx')).toContain('export function NotesCard');
     const ws = read('../../../components/shared/workflow-strip.tsx');

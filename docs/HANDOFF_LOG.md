@@ -1,5 +1,22 @@
 # Handoff Log
 
+## 2026-06-27 — ICONIC_OPS_UIX_COLOR_CONTRAST_REFINEMENT_V4_2_10 — EN RAMA (sin merge) (orchestrator)
+
+### Cambios sistémicos (color/contraste; sin layout ni lógica)
+- **Headers navy → azul vivo de marca** (= azul del botón "Aplicar", `iconic-primary #005DD6`): `OperationsHeader`
+  (gradiente `from-iconic-primary via-#0a51c2 to-#013e97`) — afecta APU/Catálogo/Cantidades/Cronograma/Proyectos/
+  Presupuestos/Settings de una sola vez. También el hero de Settings y la command bar del Workspace (solo color).
+- **Dark — logo/marca visible**: el tile del logo usaba `bg-white`, que el remapeo `.dark` oscurecía → logo perdido.
+  `WorkspaceLogo` y el chip pasan a **`bg-iconic-white`** (siempre claro) → logo/marca legibles en dark.
+- **Dark — botón `outline` visible** (sin perímetro blanco): en dark pasa de `bg-white/5` (se perdía) a
+  **`bg-surface-muted` + borde `line` suave**. Primario sigue en azul vivo `iconic-primary` (el que la usuaria aprobó).
+
+### QA
+- typecheck 0 · lint 0 · build 0 · suite **2129/0 (+42 skip)** · gm 22/22 · diff-check limpio.
+- Conserva dashboard/AppRail/topbar/workflow/notas/monitoreo/command-palette/estructura. Light intacto. Sin DB/Auth/envs/cálculos/datos. No `-1rqh`. **Sin merge/tag/prod.**
+
+---
+
 ## 2026-06-27 — ICONIC_OPS_UIX_DASHBOARD_COUNTDOWN_RING_HOTFIX_V4_2_9 — EN RAMA (sin merge) (orchestrator)
 
 - Ajuste puntual: en Monitoreo → "Próxima revisión", se **quitó el `02h 18m` del centro del anillo** (era

@@ -111,7 +111,7 @@ describe('V3C operations: KPIs + panel de detalle + selección (sin perder colum
 
   it('V3C.1 delta: barra de comando navy + zonas operativo/financiero + cobertura APU', () => {
     expect(WS).toContain('Workspace de operación');
-    expect(WS).toContain('from-iconic-ink'); // barra navy ICONIC (no dark mode global)
+    expect(WS).toContain('from-iconic-primary'); // V4.2.10: barra de comando azul vivo (antes navy iconic-ink)
     expect(WS).toContain('Estado operativo');
     expect(WS).toContain('Resumen financiero');
     expect(WS).toContain('Cobertura APU');

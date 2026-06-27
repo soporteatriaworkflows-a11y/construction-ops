@@ -30,7 +30,7 @@ export default async function SettingsHubPage() {
       {/* Hero de identidad — panel navy con acento cian (header del módulo Settings). */}
       <section
         className="mb-6 overflow-hidden rounded-2xl border border-white/10 text-white shadow-iconic"
-        style={{ background: 'linear-gradient(120deg, #020148 0%, #050a3a 55%, #0a1145 100%)' }}
+        style={{ background: 'linear-gradient(120deg, #005DD6 0%, #0a51c2 55%, #013e97 100%)' }}
       >
         <div className="px-5 pt-4 sm:px-6">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-iconic-cyan">

@@ -231,7 +231,7 @@ export function BoqWorkspace({
       {/* ---------------------------------------------------------------- */}
       {/* Barra de comando de operación (navy ICONIC) — señal premium V3C.1 */}
       {/* ---------------------------------------------------------------- */}
-      <div className="rounded-2xl bg-gradient-to-r from-iconic-ink via-[#071042] to-[#0a1145] px-4 py-3 text-white shadow-iconic">
+      <div className="rounded-2xl bg-gradient-to-r from-iconic-primary via-[#0a51c2] to-[#013e97] px-4 py-3 text-white shadow-iconic">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-iconic-cyan">

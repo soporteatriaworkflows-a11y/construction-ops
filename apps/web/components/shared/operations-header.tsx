@@ -68,7 +68,7 @@ export function OperationsHeader({
   breadcrumb?: ReactNode;
 }) {
   return (
-    <div className="mb-4 overflow-hidden rounded-2xl bg-gradient-to-r from-iconic-ink via-[#071042] to-[#0a1145] px-4 py-3 text-white shadow-iconic sm:px-5 sm:py-4">
+    <div className="mb-4 overflow-hidden rounded-2xl bg-gradient-to-r from-iconic-primary via-[#0a51c2] to-[#013e97] px-4 py-3 text-white shadow-iconic sm:px-5 sm:py-4">
       {breadcrumb && <div className="mb-1.5 text-[11px] text-white/60">{breadcrumb}</div>}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
