@@ -46,8 +46,10 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        mono: ['JetBrains Mono', 'Consolas', 'monospace'],
+        sans: ['var(--font-inter)', 'Inter', 'system-ui', 'sans-serif'],
+        // Display técnica (títulos, eyebrows, cifras-héroe). Personalidad de la marca.
+        display: ['var(--font-display)', 'Space Grotesk', 'var(--font-inter)', 'system-ui', 'sans-serif'],
+        mono: ['var(--font-mono)', 'JetBrains Mono', 'Consolas', 'monospace'],
       },
       borderRadius: {
         DEFAULT: '0.375rem',

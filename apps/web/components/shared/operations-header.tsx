@@ -76,14 +76,14 @@ export function OperationsHeader({
             {icon}
             {eyebrow}
           </p>
-          <h1 className="mt-0.5 truncate text-lg font-semibold text-white">{title}</h1>
+          <h1 className="mt-0.5 truncate font-display text-lg font-semibold tracking-tight text-white">{title}</h1>
           {subtitle && <p className="mt-0.5 text-xs text-white/70">{subtitle}</p>}
         </div>
         <div className="flex shrink-0 items-center gap-4">
           {stat && (
             <div className="text-right">
               <p className="text-[10px] uppercase tracking-wide text-white/50">{stat.label}</p>
-              <p className={`text-xl font-bold tabular-nums ${stat.tone === 'warn' ? 'text-amber-300' : 'text-white'}`}>
+              <p className={`font-display text-xl font-bold tabular-nums ${stat.tone === 'warn' ? 'text-amber-300' : 'text-white'}`}>
                 {stat.value}
               </p>
             </div>

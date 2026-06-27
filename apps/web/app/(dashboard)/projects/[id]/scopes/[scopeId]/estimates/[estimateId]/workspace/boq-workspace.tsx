@@ -252,7 +252,7 @@ export function BoqWorkspace({
           </div>
           <div className="text-right">
             <p className="text-[10px] uppercase tracking-wide text-white/50">Total general</p>
-            <p className="text-2xl font-bold tabular-nums text-white" title={formatCOP(summary.grandTotal)}>
+            <p className="font-display text-2xl font-bold tracking-tight tabular-nums text-white" title={formatCOP(summary.grandTotal)}>
               {formatCOP(summary.grandTotal)}
             </p>
           </div>

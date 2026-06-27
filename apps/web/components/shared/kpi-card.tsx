@@ -37,7 +37,7 @@ export function KpiCard({
   const inner = (
     <>
       <p className="truncate text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:text-content-muted">{label}</p>
-      <p className={`text-lg font-bold tabular-nums ${t.value}`}>{value}</p>
+      <p className={`font-display text-lg font-bold tabular-nums ${t.value}`}>{value}</p>
       {hint && <p className="truncate text-[10px] text-gray-400 dark:text-content-muted">{hint}</p>}
     </>
   );

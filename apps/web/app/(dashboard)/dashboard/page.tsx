@@ -281,8 +281,8 @@ export default async function DashboardPage() {
       <section
         className="relative mb-6 overflow-hidden rounded-2xl border border-white/10 px-6 py-7 text-white"
         style={{
-          background: 'radial-gradient(120% 140% at 85% 0%, #013E97 0%, #020148 60%)',
-          boxShadow: '0 0 0 1px rgba(0,184,255,0.10), 0 24px 60px -24px rgba(0,93,214,0.55)',
+          background: 'linear-gradient(180deg, #050a32 0%, #020148 100%)',
+          boxShadow: '0 18px 50px -28px rgba(2,1,72,0.6)',
         }}
       >
         <BlueprintBg />
@@ -300,7 +300,7 @@ export default async function DashboardPage() {
             <div className="mt-5 flex flex-wrap items-end gap-x-6 gap-y-3">
               <div>
                 <p className="text-[11px] font-medium uppercase tracking-wide text-iconic-soft-blue/70">Total presupuesto</p>
-                <p className="text-4xl font-bold leading-none tabular-nums">{formatCOP(summary.budget)}</p>
+                <p className="font-display text-4xl font-bold leading-none tracking-tight tabular-nums">{formatCOP(summary.budget)}</p>
               </div>
               <span className="inline-flex items-center gap-2 rounded-lg bg-white/[0.06] px-3 py-1.5 text-xs text-white ring-1 ring-inset ring-white/15">
                 <span className="text-[10px] font-medium uppercase tracking-wider text-iconic-soft-blue/60">Estado</span>
@@ -368,7 +368,7 @@ export default async function DashboardPage() {
       {/* ZONA 2 — Operación / estado de módulos                               */}
       {/* ------------------------------------------------------------------ */}
       <section aria-label="Operación" className="mt-2">
-        <h2 className="mb-4 text-base font-semibold text-gray-900">Operación</h2>
+        <h2 className="mb-4 font-display text-base font-semibold tracking-tight text-gray-900">Operación</h2>
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           {/* Insight card — personalidad propia (capítulo de mayor peso) */}
           {topSlice && (

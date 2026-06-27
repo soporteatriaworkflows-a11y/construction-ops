@@ -57,8 +57,20 @@
   body {
     /* Tokens de tema: en claro = gris arquitectónico + graphite (sin cambio visual). */
     @apply bg-app text-content antialiased;
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: var(--font-inter), 'Inter', system-ui, sans-serif;
     transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  /* Quality floor (frontend-design): respetar reduced-motion. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 
   /* Focus visible accesible (azul ICONIC) */

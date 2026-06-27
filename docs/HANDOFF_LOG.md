@@ -1,5 +1,26 @@
 # Handoff Log
 
+## 2026-06-26 — ICONIC_OPS_UIX_SKILL_GUIDED_VISUAL_REFINEMENT_V4_2_4 — EN RAMA (sin merge) (orchestrator)
+
+### Tooling de diseño (sin instalar nada en el repo)
+- Se evaluó: plugin oficial Anthropic **`frontend-design`** (en marketplace `claude-plugins-official`, ya
+  clonado en `~/.claude`, NO instalado) → **se leyó su SKILL.md y se aplicó su metodología** sin instalar.
+  Impeccable (tercero, `npx impeccable install` toca el repo) **descartado**. **No** se modificó `.claude`/config/repo por tooling.
+
+### Qué cambió (misma rama `feature/uix-theme-modes-v4-2`, PR #6)
+- **Tipografía deliberada** (palanca #1 del skill; además **Inter no se cargaba** → fallback system-ui):
+  `next/font` self-hosted — Inter (cuerpo) + **Space Grotesk** (display técnica, títulos/cifras-héroe) +
+  JetBrains Mono (datos). Tailwind `font-display`/`sans`/`mono` por variable. `font-display` aplicado en
+  OperationsHeader (título+stat), KpiCard (valor), Dashboard (Total + h2), Workspace (Total general navy).
+- **Audacia concentrada**: hero "Centro de mando" **aplanado** (gradiente sobrio + sombra suave, sin radial/glow).
+- **Quality floor**: `prefers-reduced-motion` respetado (globals.css).
+
+### QA
+- typecheck 0 · lint 0 · tests `typography-system` 4/0 · suite **2120/0 (+42 skip)** · build 0 (next/font compila) · gm 22/22 · diff-check limpio.
+- Sin DB/Auth/envs/cálculos/exports/datos · Workspace V3C/companion/Sin APU/rutas intactos · no `-1rqh`. **Sin merge/tag/prod.**
+
+---
+
 ## 2026-06-26 — ICONIC_OPS_UIX_PREMIUM_ICONOGRAPHY_GLASS_SYSTEM_V4_2_3 — EN RAMA (sin merge) (orchestrator)
 
 ### Qué cambió (misma rama `feature/uix-theme-modes-v4-2`, PR #6) — capa visual premium sistémica

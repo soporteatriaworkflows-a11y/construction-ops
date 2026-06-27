@@ -406,6 +406,17 @@ rutas/íconos. Dark mode V4.2.2: base neutra-profunda menos saturada (ver `UIX_T
 - **Botones** (`Button`): táctiles (`active:scale`), primario con sombra al hover, **secundario frosted**
   (translúcido + blur), variantes dark completas. Preferir `Button`/`OperationsHeaderAction` sobre botones ad-hoc.
 
+## 12.g Sistema tipográfico (V4.2.4, skill-guided)
+
+Tipografía deliberada (self-hosted vía `next/font`, sin dependencia nueva), guiada por el skill oficial
+`frontend-design` (la tipografía carga la personalidad, no usar el default de siempre):
+- **Cuerpo**: Inter (`font-sans`, `var(--font-inter)`).
+- **Display**: **Space Grotesk** (`font-display`, `var(--font-display)`) — técnica/sobria, para **títulos,
+  eyebrows y cifras-héroe** (OperationsHeader, KpiCard, totales del dashboard/workspace). Usar con restraint.
+- **Datos**: JetBrains Mono (`font-mono`) para tabulares/códigos.
+Regla: cifras-héroe y títulos de módulo → `font-display`; cuerpo → `font-sans`; datos → `font-mono`.
+Quality floor: `prefers-reduced-motion` respetado (globals.css). Audacia concentrada (hero aplanado).
+
 ## 13. Roadmap visual
 
 | Fase | Módulo | Foco |
