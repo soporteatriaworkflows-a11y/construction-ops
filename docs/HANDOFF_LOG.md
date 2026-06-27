@@ -1,5 +1,16 @@
 # Handoff Log
 
+## 2026-06-27 — ICONIC_OPS_APU_DARK_MODE_CONTRAST_HOTFIX_V5_1_1 — EN RAMA (sin merge) (orchestrator)
+
+- Misma rama `feature/apu-operational-depth-v5-1`. Causa: **tintes claros con opacidad no remapeados** en dark.
+- `globals.css .dark`: remap `bg-brand-50/100` (+opacidad) y `[class*=bg-cyan-50/ | bg-blue-50/]` → `surface-soft`
+  (arregla contenedor del Simulador comercial `bg-cyan-50/30`, SummaryCard primary `bg-brand-50` = "Costos directos", chips brand). Estados amber/green/red conservan tinte.
+- `commercial-simulator.tsx`: nota `bg-white/70`+texto → `dark:bg-surface-muted dark:border-line dark:text-content-muted` (fin de barra clara + texto ilegible).
+- "Activos" = KpiCard tone=ok → ya verde legible (sin cambio).
+- QA: typecheck 0 · lint 0 · build 0 · suite **2133/0 (+42 skip)** · gm 22/22 · diff-check limpio. Light intacto. No `-1rqh`. **Sin merge/tag/prod.**
+
+---
+
 ## 2026-06-27 — ICONIC_OPS_APU_OPERATIONAL_DEPTH_V5_1 — EN RAMA (sin merge) (orchestrator)
 
 - Rama `feature/apu-operational-depth-v5-1` (base `origin/main = 86578cc`). Primera fase de V5 (profundidad operativa).

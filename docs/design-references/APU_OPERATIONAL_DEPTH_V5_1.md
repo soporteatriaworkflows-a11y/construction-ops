@@ -56,3 +56,22 @@ no se modificó (limitación documentada). Dark/light heredan el sistema V4.2 (l
 
 ## QA
 typecheck 0 · lint 0 · tests `apu-operational-depth` 4/0 · suite **2133/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio.
+
+---
+
+## V5.1.1 — Dark mode contrast hotfix (APU + relacionados)
+
+Barrido grep en zonas reportadas. Hallazgos: **tintes claros con opacidad no remapeados**.
+- `bg-cyan-50/30` (contenedor del **Simulador comercial**) y `bg-white/70` (nota del simulador) → barras claras en dark.
+- Opacidades de `bg-brand-50/` y `bg-brand-100` (chips/secciones, p.ej. "Costos directos"/SummaryCard primary) no cubiertas.
+- "Activos" = `KpiCard tone="ok"` → ya **verde legible** en dark (sin cambio).
+
+**Correcciones (sistémicas + targeted):**
+- `globals.css .dark`: remap de tintes claros de marca/acento → superficie: `bg-brand-50`, `bg-brand-100`,
+  `[class*=bg-brand-50/ | bg-brand-100/ | bg-cyan-50/ | bg-blue-50/]` → `surface-soft`. (Estados amber/green/red conservan tinte.)
+  → arregla el contenedor del Simulador (cyan-50/30), SummaryCard primary (brand-50) y chips brand en dark.
+- `commercial-simulator.tsx`: la nota `bg-white/70 + text-iconic-graphite` (barra clara + texto claro = ilegible) →
+  `dark:bg-surface-muted dark:border-line dark:text-content-muted`.
+- "Costos directos": SummaryCard `accent=primary` (bg-brand-50) → ahora superficie; `accent=ink` ya era `bg-white`→surface.
+
+Light intacto (todo bajo `.dark`). QA: typecheck 0 · lint 0 · suite 2133/0 · build 0 · gm 22/22 · diff-check limpio.

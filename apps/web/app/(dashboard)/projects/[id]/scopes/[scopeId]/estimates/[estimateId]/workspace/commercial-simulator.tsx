@@ -128,7 +128,7 @@ export function CommercialSimulator({
         <Badge variant="secondary">Simulación · no modifica el presupuesto técnico</Badge>
       </div>
 
-      <p className="mb-4 rounded-md border border-cyan-200 bg-white/70 px-3 py-2 text-xs text-iconic-graphite" role="note">
+      <p className="mb-4 rounded-md border border-cyan-200 bg-white/70 px-3 py-2 text-xs text-iconic-graphite dark:border-line dark:bg-surface-muted dark:text-content-muted" role="note">
         {COMMERCIAL_SIMULATION_DISCLAIMER}
       </p>
 
