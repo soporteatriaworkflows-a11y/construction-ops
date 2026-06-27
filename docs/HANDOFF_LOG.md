@@ -1,5 +1,19 @@
 # Handoff Log
 
+## 2026-06-27 — ICONIC_OPS_V5_4_2_REAL_QUICK_NOTES_PLANNING — DOCS-ONLY (sin merge) (orchestrator)
+
+- Rama docs `feature/v5-4-2-real-quick-notes-planning` (base `origin/main = be289c3`). **Solo diagnóstico/contrato/plan** de
+  Notas reales. Sin código, sin migración, sin Supabase/RLS, sin merge/tag/prod.
+- Doc `docs/design-references/V5_4_2_REAL_QUICK_NOTES_PLANNING.md`: estado de NotesCard (shell estático), riesgo de
+  privacidad (alto), **roles reales** (DB: admin/gerencia/presupuestos/obra/compras/consulta; `client` NO es rol DB, es ViewerRole),
+  decisiones de producto (org-scoped MVP, project/estimate nullable, dashboard global, clientes NO ven, crear=admin/gerencia/
+  presupuestos/compras/obra, archivar=creador o admin/gerencia, sin edit, sin delete físico, límite 5), contrato `quick_notes`,
+  RLS (mirror price_monitor_targets: select org-scoped / insert rol+created_by=app._auth_uid() / update creador o admin-gerencia /
+  delete denegado), server actions, repository, UI, tests, fases (a migración+RLS / b repo+actions / c UI), riesgos, prompt V5.4.2a.
+- **Primera fase del ciclo V5 que tocaría DB/RLS** → ejecutar V5.4.2a con `agent-db-rls` en worktree, `db push` controlado (no automático). No `-1rqh`.
+
+---
+
 ## 2026-06-27 — ICONIC_OPS_V5_4_1_REAL_MONITORING_COUNTDOWN_DASHBOARD — RELEASED (merge + tag + prod smoke) (orchestrator)
 
 - Usuaria **validó preview AUTENTICADO** (Preview PR #14, no prod) y aprobó. **Merge `--no-ff` a main**: `origin/main` =
