@@ -192,9 +192,9 @@ export default async function ApuPage({ searchParams }: PageProps) {
           <KpiCard label="Actividades" value={stats.totalApus} />
           <KpiCard label="Componentes" value={stats.totalComponents} />
           <KpiCard label="Vinculadas BOQ" value={stats.linkedToBoq} tone={stats.linkedToBoq > 0 ? 'ok' : 'default'} />
-          <KpiCard label="Completas" value={stats.complete} tone="ok" />
-          <KpiCard label="Con pendientes" value={stats.withPending} tone={stats.withPending > 0 ? 'warn' : 'default'} />
-          <KpiCard label="Sin resolver" value={stats.withUnresolved} tone={stats.withUnresolved > 0 ? 'danger' : 'default'} />
+          <KpiCard label="Completas" value={stats.complete} tone="ok" href="/apu?view=cards&completeness=ready" hint="Listas para usar" />
+          <KpiCard label="Con pendientes" value={stats.withPending} tone={stats.withPending > 0 ? 'warn' : 'default'} href="/apu?view=cards&completeness=review" hint="Requieren revisión" />
+          <KpiCard label="Sin resolver" value={stats.withUnresolved} tone={stats.withUnresolved > 0 ? 'danger' : 'default'} href="/apu?view=cards&completeness=incomplete" hint="Incompletas" />
         </KpiBand>
         <ApuLibraryToolbar activeView="cards" canMutate={canMutate} />
         <ApuLibraryFilters

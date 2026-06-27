@@ -5,8 +5,10 @@
  * recalculan finanzas; consumen el read-model/helpers puros.
  */
 import Link from 'next/link';
+import { CheckCircle2, AlertTriangle, ArrowRight, Lock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { SurfaceCard } from '@/components/shared/surface-card';
 import { formatCOP } from '@/lib/utils/format';
 import type { ApuLibraryItem } from '@/lib/apu-library/types';
 import {
@@ -54,13 +56,56 @@ export function ApuIssueList({ issues, max = 3 }: { issues: ApuIssue[]; max?: nu
   );
 }
 
+/**
+ * Próxima acción operativa derivada del estado de completitud (V5.1). Solo guía
+ * textual (sin botones falsos); las acciones reales son Abrir/Editar/Vincular abajo.
+ */
+function ApuNextAction({ state, boqLinked, canMutate }: { state: ApuCompletenessState; boqLinked: boolean; canMutate: boolean }) {
+  const base = 'flex items-center gap-1.5 text-[11px] font-medium';
+  if (state === 'archived') {
+    return (
+      <p className={`${base} text-content-muted`}>
+        <Lock className="h-3.5 w-3.5" aria-hidden="true" /> Archivado · solo lectura
+      </p>
+    );
+  }
+  if (state === 'incomplete') {
+    return (
+      <p className={`${base} text-red-700 dark:text-red-300`}>
+        <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
+        Siguiente: {canMutate ? 'completar componentes / precios' : 'requiere edición (solo lectura)'}
+      </p>
+    );
+  }
+  if (state === 'review') {
+    return (
+      <p className={`${base} text-amber-700 dark:text-amber-300`}>
+        <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" /> Siguiente: revisar pendientes
+      </p>
+    );
+  }
+  // ready
+  if (boqLinked) {
+    return (
+      <p className={`${base} text-green-700 dark:text-green-300`}>
+        <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" /> Listo para usar · vinculado a BOQ
+      </p>
+    );
+  }
+  return (
+    <p className={`${base} text-iconic-primary`}>
+      <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" /> Listo · siguiente: vincular a BOQ
+    </p>
+  );
+}
+
 export function ApuActivityCard({ item, canMutate }: { item: ApuLibraryItem; canMutate: boolean }) {
   const completeness = computeApuCompleteness(item);
   const caps = editableCapabilities(item);
   const tc = item.typeCounts;
 
   return (
-    <div className="flex flex-col rounded-xl border bg-white p-4 shadow-sm transition-shadow hover:shadow-md">
+    <SurfaceCard variant="action" className="flex flex-col">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <Link href={`/apu/${item.id}`} className="block truncate font-semibold text-gray-900 hover:text-blue-700">
@@ -102,14 +147,21 @@ export function ApuActivityCard({ item, canMutate }: { item: ApuLibraryItem; can
         <ApuIssueList issues={completeness.issues} />
       </div>
 
-      <div className="mt-3 flex flex-col gap-2">
+      {/* Próxima acción operativa (V5.1) — guía por estado, sin botones falsos. */}
+      <div className="mt-auto pt-3">
+        <ApuNextAction state={completeness.state} boqLinked={item.boqLinked} canMutate={canMutate} />
+      </div>
+
+      <div className="mt-2 flex flex-col gap-2">
         <div className="flex items-center justify-between gap-2">
           <Button size="sm" variant="outline" asChild>
             <Link href={`/apu/${item.id}`}>Abrir</Link>
           </Button>
           {canMutate ? (
-            <Button size="sm" variant="outline" asChild>
-              <Link href={`/apu/${item.id}?tab=componentes`}>Editar componentes</Link>
+            <Button size="sm" variant={completeness.state === 'incomplete' ? 'default' : 'outline'} asChild>
+              <Link href={`/apu/${item.id}?tab=componentes`}>
+                {completeness.state === 'incomplete' ? 'Completar APU' : 'Editar componentes'}
+              </Link>
             </Button>
           ) : (
             <span className="text-[11px] text-gray-400">Solo lectura</span>
@@ -120,7 +172,7 @@ export function ApuActivityCard({ item, canMutate }: { item: ApuLibraryItem; can
           eligibility={apuLinkEligibility({ completenessState: completeness.state, canMutate })}
         />
       </div>
-    </div>
+    </SurfaceCard>
   );
 }
 
