@@ -1,9 +1,10 @@
 # Handoff Log
 
-## 2026-06-27 — ICONIC_OPS_PRICE_MONITORING_FILTERS_DEEPLINKS_V5_2_2B — EN RAMA (sin merge) (orchestrator)
+## 2026-06-27 — ICONIC_OPS_PRICE_MONITORING_FILTERS_DEEPLINKS_V5_2_2B — RELEASED (merge + tag + prod smoke) (orchestrator)
 
-- Rama `feature/price-monitoring-filters-deeplinks-v5-2-2b` (base `origin/main = 7e9cb8d`). Filtros por estado +
-  deep-links en `/catalog/monitoring`, **server-side**, datos existentes. Sin backend, sin tocar cron/actions, sin isla client.
+- Usuaria **validó preview AUTENTICADO** y aprobó. **Merge `--no-ff` a main**: `origin/main` = **`0bae47d`**
+  (parents `7e9cb8d` + `4bc4bac`). **Tag** = **`iconic-ops-price-monitoring-filters-deeplinks-v5-2-2b`** → `0bae47d`. **PR #11 MERGED.** 8 archivos.
+- Filtros por estado + deep-links en `/catalog/monitoring`, **server-side**, datos existentes. Sin backend, sin tocar cron/actions, sin isla client.
 - Helper neutro `lib/pricing/monitor-ui.ts` extendido: `MonitorFilterStatus`, `parseMonitorStatus` (fallback all),
   `MONITOR_FILTER_LABELS`, `filterTargetsByStatus`, `getMonitorStatusCounts` (PUROS, tolerantes).
 - `monitoring/page.tsx` (Server): lee `searchParams.status`, filtra targets, **pills `<Link>`** (Todos/Saludables/
@@ -13,8 +14,11 @@
   `monitor-controls`. Guard en tests + checks de deep-links.
 - QA: typecheck 0 · lint 0 · tests monitor-ui 18/0 · suite verde · build 0 · gm 22/22 · diff-check limpio (solo se commitearon
   los archivos de la fase; `globals.css`/`.codex`/`.claire`/`.gitignore` del working tree NO se tocaron ni incluyeron).
-- ⚠️ **Requiere validación manual AUTENTICADA del preview antes de merge** (no solo 307). Sin tocar cron/actions/DB/RLS/
-  read-model/cálculos/`unit_price_snapshot`/sync/`construction-ops-1rqh`. **Sin merge/tag/prod.** Pendiente V5.2.2c (corridas/historial).
+- Deploy prod proyecto **construction-ops** (alias `construction-ops-psi`). Smoke OK: /login 200 · /catalog/monitoring(+status
+  all/healthy/overdue/error/paused)·/catalog·/prices/review·/providers·/apu·/dashboard·/projects·/estimates·/quantities·/planning·
+  /settings 307 · /api/estimates/export **400 controlado** · /api/cron/price-monitor **401**. Commit promovido no confirmable por API (MCP 403) → verificar Production en dashboard.
+- Sin tocar cron/actions/DB/RLS/read-model/cálculos/`unit_price_snapshot`/sync/aprobación/scraper/dashboard countdown/`construction-ops-1rqh`. Catálogo V5.2.1/APU V5.1/exports intactos.
+- **Pendiente V5.2.2c (documentado, NO implementar sin autorización)**: lectura/timeline de corridas y errores + price-intelligence (historial sobre observaciones reales).
 
 ---
 
