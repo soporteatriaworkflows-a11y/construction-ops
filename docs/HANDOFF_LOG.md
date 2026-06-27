@@ -1,5 +1,22 @@
 # Handoff Log
 
+## 2026-06-27 — ICONIC_OPS_UIX_THEME_MODES_V4_2 — RELEASED (merge + tag + prod smoke) (orchestrator)
+
+- Usuaria aprobó cierre de V4.2 (stack .1→.13: theme light/dark/system, AppRail flotante, dashboard IA + cards,
+  workflow strip + dock flotante, iconografía/botones premium, rescate de contraste dark, headers azul vivo).
+- **Merge `--no-ff` a main**: `origin/main` = **`5c185bc`** (parents `f6cd634` + `5d194de`). **Tag** =
+  **`iconic-ops-uix-theme-modes-v4-2`** → `5c185bc`. **PR #6 MERGED**. 47 archivos.
+- Deploy prod proyecto **construction-ops** (alias `construction-ops-psi`). Smoke OK: /login 200 ·
+  /dashboard·/projects·/estimates·/apu·/catalog·/quantities·/planning·/settings·/settings/access 307 ·
+  /api/estimates/export (sin params) **400 controlado** · cron 401. Commit promovido no confirmable por API (MCP 403) → verificar Production/Current en dashboard.
+- **NO** se tocó `construction-ops-1rqh` (su check del PR falla por deuda preexistente). UIX-only: sin
+  Supabase/RLS/Auth/envs/secrets/cálculos/exports/datos/RPC/read-model/`unit_price_snapshot`/Workspace V3C/companion/Sin APU.
+- **Pendientes V5** (documentados, no implementar ahora): notas rápidas con backend real; countdown real de
+  monitoreo (next-run); responsive fino del workflow dock (mobile); restyle profundo de tablas internas;
+  revisión final de dark por módulo; mejoras reales de Catálogo/APU/Cantidades.
+
+---
+
 ## 2026-06-27 — ICONIC_OPS_UIX_FLOATING_WORKFLOW_COMPANION_V4_2_13 — EN RAMA (sin merge) (orchestrator)
 
 - Nuevo `components/shared/floating-workflow-dock.tsx` (`FloatingWorkflowDock`, client) montado en
