@@ -78,10 +78,11 @@ export function AppRail({
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
         aria-label="Navegación principal"
-        className="fixed inset-y-3 left-3 z-40 flex flex-col overflow-hidden rounded-2xl border border-white/10 shadow-iconic transition-[width] duration-200 ease-out"
+        className="glass-navy fixed inset-y-3 left-3 z-40 flex flex-col overflow-hidden rounded-2xl border border-white/12 ring-1 ring-inset ring-white/5 transition-[width] duration-200 ease-out"
         style={{
           width: expanded ? '14.5rem' : '4rem',
-          background: 'linear-gradient(180deg, #020148 0%, #050a3a 55%, #0a1145 100%)',
+          background: 'linear-gradient(180deg, rgba(2,1,72,0.94) 0%, rgba(5,10,58,0.94) 55%, rgba(10,17,69,0.94) 100%)',
+          boxShadow: '0 24px 60px -24px rgba(2,1,72,0.7), 0 0 0 1px rgba(0,184,255,0.05)',
         }}
       >
         {/* Cabecera: marca + pin */}
@@ -117,7 +118,7 @@ export function AppRail({
             type="button"
             onClick={openAssistant}
             title="Abrir asistente de cotización"
-            className="flex w-full items-center gap-2.5 rounded-xl bg-iconic-primary/90 px-2.5 py-2 text-sm font-medium text-white ring-1 ring-inset ring-iconic-cyan/30 transition-colors hover:bg-iconic-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iconic-cyan"
+            className="flex w-full items-center gap-2.5 rounded-xl bg-iconic-primary/90 px-2.5 py-2 text-sm font-medium text-white ring-1 ring-inset ring-iconic-cyan/30 transition-all duration-150 hover:bg-iconic-primary hover:shadow-[0_8px_24px_-8px_rgba(0,93,214,0.7)] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iconic-cyan"
           >
             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/15" aria-hidden="true">
               <Sparkles className="h-4 w-4" />

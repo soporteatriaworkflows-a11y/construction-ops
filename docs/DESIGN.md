@@ -396,6 +396,16 @@ recibe `expanded` (íconos vs íconos+etiqueta, con tooltip al colapsar). Pie de
 (evento `quote-companion:open`); el modo de datos es un indicador **sutil** (no un bloque dominante). Mismas
 rutas/íconos. Dark mode V4.2.2: base neutra-profunda menos saturada (ver `UIX_THEME_MODES_V4_2.md`).
 
+## 12.f Iconografía + sistema glass (V4.2.3)
+
+- **Iconografía**: usar `IconicIcon` / `IconChip` (`components/shared/iconic-icon.tsx`) con **tono** semántico
+  (`active`/`muted`/`primary`/`success`/`warning`/`danger`, theme-aware). Trazo monoline 1.75 + redondeado
+  está normalizado global (`svg.lucide` en `globals.css`) para todos los íconos lucide.
+- **Glass**: utilidades `.glass` (claro/oscuro) y `.glass-navy` para barras/menús/acciones premium (blur ligero,
+  borde de baja opacidad; **sin** blur pesado ni neón). El `AppRail` es navy translúcido + blur.
+- **Botones** (`Button`): táctiles (`active:scale`), primario con sombra al hover, **secundario frosted**
+  (translúcido + blur), variantes dark completas. Preferir `Button`/`OperationsHeaderAction` sobre botones ad-hoc.
+
 ## 13. Roadmap visual
 
 | Fase | Módulo | Foco |

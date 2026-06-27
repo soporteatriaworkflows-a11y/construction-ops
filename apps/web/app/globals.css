@@ -128,6 +128,35 @@
 .dark .bg-blue-50,
 .dark .bg-cyan-50 { background-color: rgba(0, 184, 255, 0.12); }
 
+/* ------------------------------------------------------------------ */
+/* V4.2.3 — Iconografía premium + utilidades glass (centralizado).      */
+/* ------------------------------------------------------------------ */
+/* Monoline consistente: afina el trazo de TODOS los íconos lucide (2→1.75)
+   y asegura uniones/terminaciones redondeadas (look humano, menos genérico). */
+svg.lucide {
+  stroke-width: 1.75px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Superficie "glass" sobria (frosted) — para barras/menús/acciones premium.
+   Sin blur pesado; baja opacidad + borde sutil. Adaptada a claro/oscuro. */
+.glass {
+  background-color: rgba(255, 255, 255, 0.72);
+  backdrop-filter: saturate(140%) blur(10px);
+  -webkit-backdrop-filter: saturate(140%) blur(10px);
+  border: 1px solid rgba(2, 1, 72, 0.08);
+}
+.dark .glass {
+  background-color: rgba(20, 25, 37, 0.66);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+/* Glass oscuro (sobre el rail navy): vidrio azul-noche translúcido. */
+.glass-navy {
+  backdrop-filter: saturate(140%) blur(12px);
+  -webkit-backdrop-filter: saturate(140%) blur(12px);
+}
+
 /* AG Grid — variante dark (tablas BOQ legibles en modo oscuro). */
 .dark .ag-theme-alpine {
   --ag-background-color: #0b1230;

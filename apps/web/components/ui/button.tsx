@@ -6,28 +6,32 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils/cn';
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iconic-primary focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+  // Base premium: radios suaves, transición completa, feedback táctil (active:scale),
+  // foco accesible y offset theme-aware (claro/oscuro).
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium ring-offset-white transition-all duration-150 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iconic-primary focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 dark:ring-offset-surface',
   {
     variants: {
       variant: {
+        // Primario táctil: marca + sombra suave que se eleva al hover.
         default:
-          'bg-iconic-primary text-white shadow-sm hover:bg-brand-600 active:bg-brand-700',
+          'bg-iconic-primary text-white shadow-sm hover:bg-brand-600 hover:shadow-md active:bg-brand-700',
         destructive:
-          'bg-red-600 text-white hover:bg-red-700 active:bg-red-800',
+          'bg-red-600 text-white shadow-sm hover:bg-red-700 hover:shadow-md active:bg-red-800',
+        // Secundario "glass/frosted": superficie translúcida + borde sutil (claro/oscuro).
         outline:
-          'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 active:bg-gray-100',
+          'border border-gray-300/80 bg-white/70 text-gray-700 backdrop-blur-sm hover:bg-white active:bg-gray-100 dark:border-line dark:bg-white/5 dark:text-content dark:hover:bg-white/10',
         secondary:
-          'bg-gray-100 text-gray-900 hover:bg-gray-200 active:bg-gray-300',
+          'bg-gray-100 text-gray-900 hover:bg-gray-200 active:bg-gray-300 dark:bg-surface-muted dark:text-content dark:hover:bg-surface-soft',
         ghost:
-          'text-gray-700 hover:bg-gray-100 active:bg-gray-200',
+          'text-gray-700 hover:bg-gray-100 active:bg-gray-200 dark:text-content-muted dark:hover:bg-surface-muted dark:hover:text-content',
         link:
-          'text-blue-700 underline-offset-4 hover:underline',
+          'text-blue-700 underline-offset-4 hover:underline dark:text-iconic-cyan',
       },
       size: {
         default: 'h-9 px-4 py-2',
         sm: 'h-8 rounded-md px-3 text-xs',
-        lg: 'h-10 rounded-md px-8',
-        icon: 'h-9 w-9',
+        lg: 'h-10 px-8',
+        icon: 'h-9 w-9 rounded-lg',
       },
     },
     defaultVariants: {

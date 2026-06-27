@@ -59,7 +59,7 @@ function NavLink({
         title={expanded ? undefined : label}
         aria-label={label}
         className={cn(
-          'group relative flex items-center gap-2.5 rounded-xl py-2 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iconic-cyan',
+          'group relative flex items-center gap-2.5 rounded-xl py-2 text-sm font-medium transition-all duration-150 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iconic-cyan',
           expanded ? 'px-2.5' : 'justify-center px-0',
           active
             ? 'bg-gradient-to-r from-iconic-primary to-iconic-primary/70 text-white ring-1 ring-inset ring-iconic-cyan/30'

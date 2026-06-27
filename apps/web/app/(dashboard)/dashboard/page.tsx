@@ -39,6 +39,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { OperationsHeader } from '@/components/shared/operations-header';
+import { IconChip } from '@/components/shared/iconic-icon';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Button } from '@/components/ui/button';
 import { KpiCard } from '@/modules/dashboard/kpi-card';
@@ -373,12 +374,7 @@ export default async function DashboardPage() {
           {topSlice && (
             <div className="col-span-2 rounded-xl border border-iconic-soft-blue/70 bg-brand-50/40 p-4 shadow-sm dark:border-line dark:bg-surface">
               <div className="flex items-start gap-3">
-                <span
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-iconic-primary/10 text-iconic-primary dark:bg-iconic-primary/20"
-                  aria-hidden="true"
-                >
-                  <TrendingUp className="h-5 w-5" />
-                </span>
+                <IconChip icon={TrendingUp} tone="active" />
                 <div className="min-w-0 flex-1">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-iconic-primary">Capítulo de mayor peso</p>
                   <p className="mt-0.5 truncate text-sm font-bold text-iconic-ink dark:text-content">

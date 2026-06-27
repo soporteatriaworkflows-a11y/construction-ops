@@ -143,3 +143,45 @@ en vez de saturar). Nuevos valores `.dark`:
 ### QA (V4.2.2)
 typecheck 0 · lint 0 · tests `theme-modes`/`sidebar-access` ok · suite **2111/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio.
 Navegación/rutas intactas · Workspace V3C / companion / filtro Sin APU / exports intactos · sin lógica sensible.
+
+---
+
+## V4.2.3 — Premium Iconography + Glass Navigation System
+
+Capa visual sistémica (desde componentes/tokens, no página por página) para una sensación SaaS premium
+(Apple/macOS-inspired, glass sobrio, soft UI, táctil), sin neón ni cambios de lógica.
+
+### Iconografía (capa central)
+- **`components/shared/iconic-icon.tsx`**: `IconicIcon` (ícono suelto con **tono** semántico) + `IconChip`
+  (ícono en "plate" redondeado). Estados: `default / active / muted / primary / success / warning / danger`,
+  todos theme-aware (paleta ICONIC). Activo = más presencia (azul/cian); inactivo = sutil (muted).
+- **Normalización global** en `globals.css`: `svg.lucide { stroke-width: 1.75; linecap/linejoin round }` →
+  todos los íconos lucide de la app pasan a **monoline fino y redondeado** (menos genérico) de una sola vez.
+- Adopción: `IconChip` en el dashboard (Capítulo de mayor peso); el resto hereda el trazo normalizado.
+  Adopción progresiva de `IconChip` en más action cards = pendiente menor.
+
+### Navegación — glass/dock
+- `AppRail`: navy **translúcido + blur** (`glass-navy`), borde `white/12` + ring interno sutil, sombra
+  premium y glow cian muy tenue. Active state = cápsula/pill (ya existente). **Pressed state** (`active:scale`)
+  en items y CTA. Conserva hover-expand, **pin** persistente, CTA **Asistente**, indicador de modo sutil y rutas.
+
+### Botones / superficies
+- **`Button`**: base con radios suaves + **transición completa + `active:scale-[0.98]`** (táctil) + foco con
+  offset theme-aware. Primario con sombra que se eleva al hover; **secundario (`outline`) "frosted"**
+  (translúcido + `backdrop-blur` + borde sutil); variantes **dark** en todas (secondary/ghost/link/outline).
+- Utilidades `.glass` / `.glass-navy` en `globals.css` para barras/menús/acciones premium (blur ligero, no pesado).
+- `Card`, `Badge`, `KpiCard`, `InlineCallout`, `FilterPills`, `OperationsHeaderAction` ya theme-aware (V4.2/.1)
+  → heredan el nuevo trazo de íconos y conviven con el sistema glass.
+
+### Cubierto globalmente
+Trazo de íconos (toda la app), botones (todos los que usan `Button`), rail/navegación, CTA Asistente,
+dashboard (cards + iconografía), y los componentes compartidos del shell.
+
+### Pendiente (V5)
+- Adoptar `IconChip`/`IconicIcon` en más action cards/toolbars por módulo.
+- Glass selectivo en toolbars de tablas densas (Workspace/Catálogo) al hacer su restyle profundo.
+- Micro-animaciones y revisión de contraste de Recharts en dark.
+
+### QA (V4.2.3)
+typecheck 0 · lint 0 · tests `premium-system` 5/0 · suite **2116/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio.
+Light limpio · dark elegante · navegación/rutas/Workspace V3C/companion/Sin APU/exports intactos · sin lógica sensible.

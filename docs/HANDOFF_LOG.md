@@ -1,5 +1,24 @@
 # Handoff Log
 
+## 2026-06-26 — ICONIC_OPS_UIX_PREMIUM_ICONOGRAPHY_GLASS_SYSTEM_V4_2_3 — EN RAMA (sin merge) (orchestrator)
+
+### Qué cambió (misma rama `feature/uix-theme-modes-v4-2`, PR #6) — capa visual premium sistémica
+- **Iconografía central**: `components/shared/iconic-icon.tsx` (`IconicIcon`+`IconChip`, estados
+  default/active/muted/primary/success/warning/danger, theme-aware) + **normalización global** del trazo
+  lucide en `globals.css` (`svg.lucide` stroke-width 1.75 + round) → todos los íconos monoline finos de una vez.
+- **Navegación glass/dock**: `AppRail` navy translúcido + blur (`glass-navy`), borde white/12 + ring interno,
+  sombra premium + glow cian tenue, pressed state en items y CTA. Conserva hover-expand/pin/CTA Asistente/rutas.
+- **Botones premium** (`ui/button.tsx`): radios suaves + `active:scale` (táctil) + primario con sombra al hover
+  + **secundario frosted** (translúcido+blur) + variantes dark completas. Utilidades `.glass`/`.glass-navy`.
+- **Dashboard**: `IconChip` en "Capítulo de mayor peso" (iconografía consistente).
+
+### QA
+- typecheck 0 · lint 0 · tests `premium-system` 5/0 · suite **2116/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio.
+- Navegación/rutas intactas · Workspace V3C/companion/filtro Sin APU/exports intactos · sin DB/Auth/envs/cálculos/datos · no `-1rqh`.
+- **Sin merge / sin tag / sin prod.** Pendiente: revisión visual del preview (PR #6). Adopción de IconChip en más módulos = pendiente menor (V5).
+
+---
+
 ## 2026-06-26 — ICONIC_OPS_UIX_THEME_AND_NAV_REFINEMENT_V4_2_2 — EN RAMA (sin merge) (orchestrator)
 
 ### Qué cambió (misma rama `feature/uix-theme-modes-v4-2`, PR #6) — iteración visual fuerte por feedback real
