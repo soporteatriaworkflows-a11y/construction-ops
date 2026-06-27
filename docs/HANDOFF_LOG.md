@@ -1,5 +1,25 @@
 # Handoff Log
 
+## 2026-06-27 — P0 CATALOG RUNTIME HOTFIX (V5.2.1.1) — RELEASED (merge + tag + prod smoke) (orchestrator)
+
+- **Incidente P0**: `/catalog` no renderizaba (preview+prod) tras V5.2.1. Causa raíz: `catalog/page.tsx` (Server
+  Component) llamaba `isOldPrice` definido en `catalog-explorer.tsx` (`'use client'`) → una función de un módulo
+  client importada en un Server Component es una **referencia de cliente** y **lanza al invocarla server-side**.
+  No lo detectó build/typecheck (import estático válido), tests (Node, sin cruzar límite) ni el smoke (307 ≠ render autenticado).
+- **Fix (sin backend)**: helpers a módulo PURO `lib/catalog/price-age.ts` (PRICE_OLD_THRESHOLD_DAYS/priceAgeDays/isOldPrice,
+  null-tolerantes). page importa de la lib pura; explorer importa+re-exporta. Usuaria **validó render autenticado** del preview OK.
+- **Merge `--no-ff` a main**: `origin/main` = **`0287c23`** (parents `5107086` + `f87e82b`). **Tag** =
+  **`iconic-ops-catalog-runtime-hotfix-v5-2-1`** → `0287c23`. Tag previo `iconic-ops-catalog-price-control-center-v5-2-1`
+  (`e3f51a7`) **intacto**. **PR #9 MERGED.** **Sin rollback** (V5.2.1 se conserva).
+- Smoke prod OK: /login 200 · /catalog(+status/provider/age)·/prices/review·/providers·/monitoring·/apu·/dashboard·
+  /projects·/estimates·/quantities·/planning·/settings 307 · /api/estimates/export **400 controlado**.
+- **No-alcance**: sin Supabase/RLS/policies/migrations/Auth/envs/Vercel/cálculos/fórmulas/exports/datos/RPC/read-model/
+  permisos/`unit_price_snapshot`/sync/aprobación/scraper/V5.2.2/`construction-ops-1rqh`. APU V5.1/Workspace V3C/companion/Sin APU intactos. Light/dark OK.
+- **Nota de proceso**: futuros releases de RUTAS PROTEGIDAS deben incluir **validación visual autenticada** (preview con
+  sesión), no solo smoke HTTP 307 — un 307 confirma el redirect de auth, NO el render con sesión.
+
+---
+
 ## 2026-06-27 — ICONIC_OPS_CATALOG_PRICE_CONTROL_CENTER_V5_2_1 — RELEASED (merge + tag + prod smoke) (orchestrator)
 
 - Usuaria aprobó V5.2.1 (preview Ready, proyecto construction-ops). **Merge `--no-ff` a main**: `origin/main` =
