@@ -210,6 +210,40 @@ svg.lucide {
   color: var(--c-content-muted);
 }
 
+/* ------------------------------------------------------------------ */
+/* V4.2.12 — Cobertura de VARIANTES CON OPACIDAD en dark.               */
+/* El remap por clase exacta NO captura `bg-gray-50/50`, `text-iconic-  */
+/* graphite/60`, `border-iconic-soft-blue/70`… El sufijo `/` evita      */
+/* colisiones (p.ej. NO toca `bg-gray-500`). Solo tokens claros/navy de  */
+/* marca, que sobre superficie oscura siempre son incorrectos.          */
+/* NO se incluye `bg-white/*` (se usa translúcido a propósito en barras  */
+/* navy/graphite); esos casos se tratan puntualmente.                    */
+/* ------------------------------------------------------------------ */
+.dark [class*='bg-gray-50/'],
+.dark [class*='bg-iconic-gray/'],
+.dark [class*='bg-slate-50/'] {
+  background-color: var(--c-surface-soft);
+}
+.dark [class*='bg-gray-100/'],
+.dark [class*='bg-slate-100/'] {
+  background-color: var(--c-surface-muted);
+}
+.dark [class*='border-gray-100/'],
+.dark [class*='border-gray-200/'],
+.dark [class*='border-gray-300/'],
+.dark [class*='border-iconic-soft-blue/'] {
+  border-color: var(--c-line);
+}
+.dark [class*='text-iconic-ink/'] {
+  color: var(--c-content);
+}
+.dark [class*='text-iconic-graphite/'] {
+  color: var(--c-content-muted);
+}
+.dark [class*='text-iconic-primary/'] {
+  color: #4d8dff;
+}
+
 /* AG Grid — variante dark (tablas BOQ legibles en modo oscuro). */
 .dark .ag-theme-alpine {
   --ag-background-color: #161922;

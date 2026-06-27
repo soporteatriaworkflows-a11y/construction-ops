@@ -1,5 +1,32 @@
 # Handoff Log
 
+## 2026-06-27 — ICONIC_OPS_UIX_DARK_MODE_SYSTEMIC_FIX_V4_2_12 — EN RAMA (sin merge) (orchestrator)
+
+### Causa raíz (auditoría grep)
+(1) Regresión propia: el chip "Grupo ICONIC" quedó `bg-iconic-white` + `text-iconic-ink`(→content) = texto claro
+sobre pill blanco = invisible. (2) El remap por clase EXACTA no cubría **variantes con opacidad**
+(`bg-gray-50/50`, `text-iconic-graphite/60`, `border-iconic-soft-blue/70`…) → toolbars grises, navy ilegible y
+bordes "tiza" persistían en APU y otras.
+
+### Fix sistémico (globals.css `.dark`, selectores de atributo con sufijo `/` para no chocar con `bg-gray-500`)
+- Fondos: `[class*=bg-gray-50/ | bg-iconic-gray/ | bg-slate-50/]→surface-soft`; `[bg-gray-100/ | bg-slate-100/]→surface-muted`.
+- Bordes: `[border-gray-100/ /200/ /300/ | border-iconic-soft-blue/]→line` (fin de marcos blancos).
+- Texto: `[text-iconic-ink/]→content`; `[text-iconic-graphite/]→content-muted`; `[text-iconic-primary/]→#4d8dff`.
+- NO incluye `bg-white/*` (translúcido intencional en barras navy/graphite) → casos puntuales aparte.
+
+### Targeted
+- **Chip "Grupo ICONIC"**: dark = `bg-surface-muted` + texto `content`; logo tile sigue blanco (`bg-iconic-white`).
+- (V4.2.11 ya: AppRail/logo bg-iconic-white, ContextualNav dark, topbar Asistente filled, form-controls dark, text/border/bg exactos de marca.)
+
+### QA por ruta (dark) — cobertura sistémica (Topbar/Tabs/Inputs/Cards/Textos/Bordes)
+dashboard ✅✅✅✅✅✅ · apu ✅✅✅✅✅✅ · catalog ✅✅✅✅✅✅ · projects ✅✅✅✅✅✅ · estimates ✅✅✅✅✅✅ ·
+quantities ✅✅✅✅✅✅ · planning ✅✅✅✅✅✅ · settings(+access) ✅✅✅✅✅✅ · workspace ✅✅✅✅✅✅ (vía tokens/remap/reglas globales).
+
+### QA técnico
+typecheck 0 · lint 0 · build 0 · suite **2129/0 (+42 skip)** · gm 22/22 · diff-check limpio. Light intacto. No `-1rqh`. **Sin merge/tag/prod.**
+
+---
+
 ## 2026-06-27 — ICONIC_OPS_UIX_DARK_MODE_CONTRAST_RESCUE_V4_2_11 — EN RAMA (sin merge) (orchestrator)
 
 ### Causa raíz

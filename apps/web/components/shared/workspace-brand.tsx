@@ -70,9 +70,10 @@ export function WorkspaceBrand({ variant = 'sidebar', className }: { variant?: V
 
   if (variant === 'chip') {
     return (
-      <span className={cn('inline-flex items-center gap-2 rounded-full border border-iconic-soft-blue bg-iconic-white px-2.5 py-1', className)}>
+      <span className={cn('inline-flex items-center gap-2 rounded-full border border-iconic-soft-blue bg-iconic-white px-2.5 py-1 dark:border-line dark:bg-surface-muted', className)}>
         <WorkspaceLogo size={20} />
-        <span className="text-xs font-medium text-iconic-ink">{ws.workspaceName}</span>
+        {/* En dark el chip es superficie oscura → texto claro (no navy ilegible). El logo tile sigue blanco. */}
+        <span className="text-xs font-medium text-iconic-ink dark:text-content">{ws.workspaceName}</span>
       </span>
     );
   }
