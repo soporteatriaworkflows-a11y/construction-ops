@@ -1,6 +1,29 @@
 # Handoff Log
 
-## 2026-06-27 — ICONIC_OPS_UIX_DARK_MODE_SYSTEMIC_FIX_V4_2_12 — EN RAMA (sin merge) (orchestrator)
+## 2026-06-27 — ICONIC_OPS_UIX_DARK_MODE_P0_CONTRAST_FIX_V4_2_12 — EN RAMA (sin merge) (orchestrator)
+
+### CAUSA RAÍZ (la que faltaba)
+El **Preflight de Tailwind** fija `border-color: #e5e7eb` (gris claro) por defecto para CUALQUIER `border`
+sin clase de color. El código usa `border` a secas en cards/forms/inputs/tabla → en dark eso era el
+**"perímetro blanco" omnipresente**. Mis remaps solo cubrían `border-gray-*`/soft-blue EXPLÍCITOS, no el default.
+
+### Fix raíz + complementos
+- **`@layer base`**: `.dark *, ::before, ::after { border-color: var(--c-line) }` → borde por defecto en dark = slate
+  sutil. Las utilidades `border-{color}` (capa utilities) siguen ganando donde son explícitas (p.ej. tab activa azul).
+- **Links azul oscuro** `text-blue-600..950 → #60a5fa` (azul vivo legible).
+- (V4.2.12 previo: chip "Grupo ICONIC" dark surface + texto claro; variantes con opacidad bg/border/text de marca;
+  form-controls dark; V4.2.11: logo bg-iconic-white, ContextualNav dark, topbar Asistente filled, text/border/bg exactos.)
+
+### Verificación por ruta (dark) — cobertura sistémica
+dashboard/apu/catalog/projects/estimates/quantities/planning/settings(+access)/workspace: Topbar/Tabs/Inputs/Cards/
+Textos/Bordes ✅ vía tokens + remaps (exactos y con opacidad) + default-border dark + form-controls + brand pill/logo.
+
+### QA
+typecheck 0 · lint 0 · build 0 · suite **2129/0 (+42 skip)** · gm 22/22 · diff-check limpio. Light intacto. No `-1rqh`. **Sin merge/tag/prod.**
+
+---
+
+## 2026-06-27 — ICONIC_OPS_UIX_DARK_MODE_SYSTEMIC_FIX_V4_2_12 (opacity variants) — EN RAMA (sin merge) (orchestrator)
 
 ### Causa raíz (auditoría grep)
 (1) Regresión propia: el chip "Grupo ICONIC" quedó `bg-iconic-white` + `text-iconic-ink`(→content) = texto claro

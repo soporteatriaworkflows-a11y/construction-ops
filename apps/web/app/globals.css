@@ -43,6 +43,16 @@
     --c-content-muted: #98a0af; /* gris-azulado frío, dosificado */
   }
 
+  /* CAUSA RAÍZ del "perímetro blanco" en dark: el Preflight de Tailwind fija el
+     color de borde por defecto en #e5e7eb (gris claro) para CUALQUIER `border` sin
+     clase de color. En dark lo redefinimos a un slate sutil. Va en @layer base, así
+     las utilidades `border-{color}` (capa utilities) SIEMPRE ganan donde son explícitas. */
+  .dark *,
+  .dark ::before,
+  .dark ::after {
+    border-color: var(--c-line);
+  }
+
   *,
   *::before,
   *::after {
@@ -242,6 +252,14 @@ svg.lucide {
 }
 .dark [class*='text-iconic-primary/'] {
   color: #4d8dff;
+}
+/* Links/acentos en azul oscuro (blue-600..950) → azul vivo legible en dark. */
+.dark .text-blue-600,
+.dark .text-blue-700,
+.dark .text-blue-800,
+.dark .text-blue-900,
+.dark .text-blue-950 {
+  color: #60a5fa;
 }
 
 /* AG Grid — variante dark (tablas BOQ legibles en modo oscuro). */
