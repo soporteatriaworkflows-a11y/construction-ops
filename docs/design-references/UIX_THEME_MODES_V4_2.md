@@ -103,3 +103,43 @@ Cantidades / detalle / capítulos (tablas, filas, estados), badges/estados compa
 ### QA (V4.2.1)
 typecheck 0 · lint 0 · tests `theme-modes` 9/0 · suite **2110/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio.
 Light mode intacto (variantes `dark:` y remapeo solo bajo `.dark`). Workspace V3C / companion / filtro Sin APU intactos.
+
+---
+
+## V4.2.2 — Theme + Nav Refinement
+
+Iteración visual fuerte a partir de feedback real: dark mode "feo/pesado", cards del dashboard cargadas,
+y rediseño del sidebar como rail flotante.
+
+### Dark mode — por qué se rehizo
+Se sentía "todo azul oscuro / lleno". Se **bajó la saturación** y se hizo la base más **neutra-profunda**
+con más respiración y mejor contraste fondo→superficie→contenido (el acento de marca azul/cian ahora resalta
+en vez de saturar). Nuevos valores `.dark`:
+`--c-app #0a0e16` · `--c-surface #141925` · `--c-surface-soft #1b2230` · `--c-surface-muted #232c3d` ·
+`--c-line #2c3647` · `--c-content #eef2f8` · `--c-content-muted #9aa8c0`. (Antes eran más navy/saturados.)
+
+### Sidebar → **rail flotante** (`components/shared/app-rail.tsx`, client)
+- "Flotante pero fijo": `fixed inset-y-3 left-3`, **rounded-2xl**, sombra, navy ICONIC.
+- **Compacto** (solo íconos, ~4rem) y **se expande al hover** (~14.5rem, con etiquetas). Transición suave.
+- **Pin**: botón para dejarlo abierto fijo; **persiste** en `localStorage` (`iconic-rail-pinned`). Con pin, un
+  spacer en flujo **empuja** el contenido; en hover (sin pin) **overlayea** sin mover el layout.
+- `SidebarNav` recibe `expanded`: colapsado muestra solo íconos (con `title`/`aria-label`); expandido, etiquetas.
+  **Mismas rutas/íconos/nombres**; sin cambio de lógica de navegación.
+- **Pie del rail**: CTA **Asistente** (dispara `quote-companion:open`, sin tocar la lógica del companion).
+- El bloque dominante **"Grupo ICONIC / Modo demostración" se eliminó**; el modo de datos queda como un
+  **indicador muy sutil** (punto + texto solo al expandir) en el pie.
+
+### Dashboard — simplificación
+- **Centro de mando**: se eliminó la **sub-card con borde/box** de "Distribución por capítulo" (el "card dentro
+  de card"); ahora va **integrada** con un divisor sutil. Jerarquía más limpia (encabezado → cifra → estado →
+  composición → métricas → acciones).
+- **Capítulo de mayor peso**: se quitaron los **círculos/forma decorativa** y el gradiente raro; ahora es una
+  card sobria y consistente (ícono plano + barra de progreso + %), theme-aware (claro/oscuro).
+
+### Pendiente
+- Pulir contraste de Recharts/sparkbars del dashboard en dark. Posible micro-animación del rail. Revisión
+  responsive fina del rail en pantallas muy angostas.
+
+### QA (V4.2.2)
+typecheck 0 · lint 0 · tests `theme-modes`/`sidebar-access` ok · suite **2111/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio.
+Navegación/rutas intactas · Workspace V3C / companion / filtro Sin APU / exports intactos · sin lógica sensible.

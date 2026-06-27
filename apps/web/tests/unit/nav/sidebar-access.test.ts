@@ -128,9 +128,23 @@ describe('NAV — layout.tsx resuelve y pasa canManageAccess al SidebarNav', () 
     expect(layoutSrc).toMatch(/canManageAccess\(/);
   });
 
-  it('layout pasa showAccess / canManageAccess al SidebarNav', () => {
+  it('layout pasa canManageAccess al rail (AppRail), que monta SidebarNav', () => {
+    // V4.2.2: el rail pasó a un componente flotante (AppRail) que renderiza SidebarNav.
     expect(layoutSrc).toMatch(/canManageAccess\s*=\s*\{/);
-    expect(layoutSrc).toContain('SidebarNav');
+    expect(layoutSrc).toContain('AppRail');
+    const railSrc = readSrc('../../../components/shared/app-rail.tsx');
+    expect(railSrc).toContain('SidebarNav');
+    expect(railSrc).toContain('canManageAccess');
+  });
+
+  it('rail flotante: colapsable + pin persistente + CTA Asistente + sin bloque demo dominante', () => {
+    const railSrc = readSrc('../../../components/shared/app-rail.tsx');
+    expect(railSrc).toContain('iconic-rail-pinned'); // persistencia del pin
+    expect(railSrc).toMatch(/setHovered\(true\)/); // expand on hover
+    expect(railSrc).toContain('quote-companion:open'); // CTA Asistente (sin cambiar lógica)
+    expect(railSrc).toContain('Asistente');
+    // El layout ya NO renderiza el bloque "Grupo ICONIC / Modo demostración" dominante.
+    expect(layoutSrc).not.toContain('border-t border-white/10 p-3');
   });
 
   it('layout fuerza render dinámico (request-time)', () => {

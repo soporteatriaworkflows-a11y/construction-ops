@@ -387,6 +387,15 @@ Reglas:
   opacidad (`bg-white/80`, `bg-brand-50/60`): esas se tratan con `dark:` puntual. Para blanco intencional
   sobre navy usar `bg-iconic-white` (no `bg-white`, que el remapeo volvería oscuro).
 
+## 12.e Rail de navegación flotante (V4.2.2)
+
+El shell usa un **rail flotante** (`components/shared/app-rail.tsx`): `fixed inset-y-3 left-3`, rounded-2xl,
+navy ICONIC. **Compacto** (solo íconos) → **expande al hover**; **pin** para dejarlo abierto (persiste en
+`localStorage`). Pin empuja contenido (spacer en flujo); hover overlayea sin mover layout. `SidebarNav`
+recibe `expanded` (íconos vs íconos+etiqueta, con tooltip al colapsar). Pie del rail = **CTA Asistente**
+(evento `quote-companion:open`); el modo de datos es un indicador **sutil** (no un bloque dominante). Mismas
+rutas/íconos. Dark mode V4.2.2: base neutra-profunda menos saturada (ver `UIX_THEME_MODES_V4_2.md`).
+
 ## 13. Roadmap visual
 
 | Fase | Módulo | Foco |

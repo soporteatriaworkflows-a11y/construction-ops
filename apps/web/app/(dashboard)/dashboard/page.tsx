@@ -342,8 +342,8 @@ export default async function DashboardPage() {
             </div>
           </div>
 
-          {/* Columna derecha: micro-viz distribución por capítulo */}
-          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+          {/* Columna derecha: distribución por capítulo — integrada (divisor, sin sub-card) */}
+          <div className="lg:border-l lg:border-white/10 lg:pl-6">
             <div className="flex items-center justify-between">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-iconic-soft-blue/70">Distribución por capítulo</p>
               <span className="text-[11px] text-white/50">{sparkValues.length} cap.</span>
@@ -358,7 +358,7 @@ export default async function DashboardPage() {
             ) : (
               <p className="mt-6 text-sm text-white/50">Sin capítulos para graficar todavía.</p>
             )}
-            <p className="mt-4 border-t border-white/10 pt-3 text-[11px] text-white/45">Actualizado {formatDateTime(summary.lastUpdatedAt)}</p>
+            <p className="mt-4 text-[11px] text-white/45">Actualizado {formatDateTime(summary.lastUpdatedAt)}</p>
           </div>
         </div>
       </section>
@@ -371,25 +371,26 @@ export default async function DashboardPage() {
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           {/* Insight card — personalidad propia (capítulo de mayor peso) */}
           {topSlice && (
-            <div
-              className="relative col-span-2 overflow-hidden rounded-xl border border-iconic-soft-blue/70 p-4 shadow-iconic"
-              style={{ background: 'linear-gradient(120deg, #e8f1fd 0%, #ffffff 70%)' }}
-            >
-              <span className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-iconic-cyan/10" aria-hidden="true" />
-              <div className="relative flex items-start gap-3">
-                <IconPlate><TrendingUp className="h-5 w-5" aria-hidden="true" /></IconPlate>
+            <div className="col-span-2 rounded-xl border border-iconic-soft-blue/70 bg-brand-50/40 p-4 shadow-sm dark:border-line dark:bg-surface">
+              <div className="flex items-start gap-3">
+                <span
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-iconic-primary/10 text-iconic-primary dark:bg-iconic-primary/20"
+                  aria-hidden="true"
+                >
+                  <TrendingUp className="h-5 w-5" />
+                </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-iconic-primary">Capítulo de mayor peso</p>
-                  <p className="mt-0.5 truncate text-sm font-bold text-iconic-ink">
-                    <span className="font-mono text-xs text-iconic-graphite/60">{topSlice.code}</span> {topSlice.name}
+                  <p className="mt-0.5 truncate text-sm font-bold text-iconic-ink dark:text-content">
+                    <span className="font-mono text-xs text-iconic-graphite/60 dark:text-content-muted">{topSlice.code}</span> {topSlice.name}
                   </p>
                   <div className="mt-2 flex items-center gap-2">
-                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-iconic-soft-blue/40" aria-hidden="true">
+                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-iconic-soft-blue/40 dark:bg-surface-muted" aria-hidden="true">
                       <span className="block h-full rounded-full bg-gradient-to-r from-iconic-primary to-iconic-cyan" style={{ width: `${Math.min(100, Math.round(Number(topSlice.share) * 100))}%` }} />
                     </div>
                     <span className="shrink-0 text-sm font-bold tabular-nums text-iconic-primary">{Math.round(Number(topSlice.share) * 100)}%</span>
                   </div>
-                  <p className="mt-1 text-[11px] text-iconic-graphite/55">del costo directo del presupuesto activo</p>
+                  <p className="mt-1 text-[11px] text-iconic-graphite/55 dark:text-content-muted">del costo directo del presupuesto activo</p>
                 </div>
               </div>
             </div>

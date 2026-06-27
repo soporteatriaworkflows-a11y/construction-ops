@@ -1,5 +1,27 @@
 # Handoff Log
 
+## 2026-06-26 — ICONIC_OPS_UIX_THEME_AND_NAV_REFINEMENT_V4_2_2 — EN RAMA (sin merge) (orchestrator)
+
+### Qué cambió (misma rama `feature/uix-theme-modes-v4-2`, PR #6) — iteración visual fuerte por feedback real
+- **Dark mode menos pesado**: tokens `.dark` re-afinados (base neutra-profunda, menos saturación, más
+  respiración y contraste): app `#0a0e16`, surface `#141925`, soft `#1b2230`, muted `#232c3d`, line `#2c3647`,
+  content `#eef2f8`, content-muted `#9aa8c0`. El acento marca resalta en vez de saturar.
+- **Sidebar → RAIL FLOTANTE** (`components/shared/app-rail.tsx`, client): fixed inset-y-3 left-3, rounded-2xl,
+  navy; compacto (íconos) → **expande al hover**; **pin** persistente (`localStorage iconic-rail-pinned`,
+  pin empuja vía spacer / hover overlayea). `SidebarNav` recibe `expanded` (íconos+tooltip vs etiquetas).
+  Mismas rutas/íconos/lógica. Pie = **CTA Asistente** (`quote-companion:open`). Eliminado el bloque dominante
+  "Grupo ICONIC / Modo demostración" → modo de datos como indicador **sutil**.
+- **Dashboard simplificado**: Centro de mando — quitada la **sub-card** de distribución (card-en-card) →
+  integrada con divisor. Capítulo de mayor peso — quitados los **círculos decorativos** + gradiente raro →
+  card sobria, consistente, theme-aware.
+
+### QA
+- typecheck 0 · lint 0 · tests afectados ok · suite **2111/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio.
+- Navegación/rutas intactas · Workspace V3C/companion/filtro Sin APU/exports intactos · sin DB/Auth/envs/cálculos/datos · no `-1rqh`.
+- **Sin merge / sin tag / sin prod.** Pendiente: revisión visual del preview (PR #6).
+
+---
+
 ## 2026-06-26 — ICONIC_OPS_UIX_THEME_MODES_V4_2_1_DARK_COVERAGE_HOTFIX — EN RAMA (sin merge) (orchestrator)
 
 ### Qué cambió (misma rama `feature/uix-theme-modes-v4-2`, PR #6)

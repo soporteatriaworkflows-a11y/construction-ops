@@ -28,15 +28,18 @@
     --c-content-muted: #6b7280; /* texto secundario */
   }
 
-  /* Tokens SEMÁNTICOS de tema — DARK (command center ICONIC, sobrio, no negro puro). */
+  /* Tokens SEMÁNTICOS de tema — DARK (command center ICONIC, sobrio, neutro-profundo).
+     V4.2.2: menos saturación/“azul pesado”; superficies más neutras y con más respiración;
+     mejor contraste entre fondo→superficie→contenido. El acento de marca (azul/cian) se reserva
+     para puntos clave, así resalta sobre una base más calmada. No negro puro. */
   .dark {
-    --c-app: #060b1f; /* navy casi negro */
-    --c-surface: #0b1230; /* superficie elevada */
-    --c-surface-soft: #101a3d;
-    --c-surface-muted: #141f46;
-    --c-line: #25345f; /* azul grisáceo sutil */
-    --c-content: #f8fafc; /* blanco técnico suave */
-    --c-content-muted: #aebfdb; /* blue-gray */
+    --c-app: #0a0e16; /* base neutra profunda (apenas navy) */
+    --c-surface: #141925; /* superficie elevada sobria */
+    --c-surface-soft: #1b2230;
+    --c-surface-muted: #232c3d;
+    --c-line: #2c3647; /* borde gris-azulado sutil */
+    --c-content: #eef2f8; /* blanco técnico suave */
+    --c-content-muted: #9aa8c0; /* gris-azulado, menos saturado */
   }
 
   *,

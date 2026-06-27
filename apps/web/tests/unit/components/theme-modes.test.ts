@@ -20,7 +20,7 @@ describe('fundación de tema', () => {
   it('globals: tokens :root (light) y .dark (dark) sin negro puro', () => {
     const css = read('../../../app/globals.css');
     expect(css).toMatch(/:root[\s\S]*--c-app:\s*#f2f4f7/i);
-    expect(css).toMatch(/\.dark[\s\S]*--c-app:\s*#060b1f/i); // navy casi negro, NO #000
+    expect(css).toMatch(/\.dark[\s\S]*--c-app:\s*#0a0e16/i); // base neutra profunda (V4.2.2), NO #000
     expect(css).not.toMatch(/--c-app:\s*#000000/i);
     expect(css).toContain('.dark .ag-theme-alpine'); // tablas AG legibles en dark
   });
