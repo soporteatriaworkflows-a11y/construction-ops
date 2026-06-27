@@ -238,6 +238,17 @@ svg.lucide {
 .dark [class*='bg-slate-100/'] {
   background-color: var(--c-surface-muted);
 }
+/* Tintes claros de marca/acento (brand/cyan/blue, incl. opacidad) usados como FONDO
+   de sección/barra → superficie oscura en dark (no barras azul-claro). Los estados
+   semánticos amber/green/red conservan su tinte (remap exacto). */
+.dark .bg-brand-50,
+.dark .bg-brand-100,
+.dark [class*='bg-brand-50/'],
+.dark [class*='bg-brand-100/'],
+.dark [class*='bg-cyan-50/'],
+.dark [class*='bg-blue-50/'] {
+  background-color: var(--c-surface-soft);
+}
 .dark [class*='border-gray-100/'],
 .dark [class*='border-gray-200/'],
 .dark [class*='border-gray-300/'],

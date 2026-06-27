@@ -1,5 +1,31 @@
 # Handoff Log
 
+## 2026-06-27 — ICONIC_OPS_APU_DARK_MODE_CONTRAST_HOTFIX_V5_1_1 — EN RAMA (sin merge) (orchestrator)
+
+- Misma rama `feature/apu-operational-depth-v5-1`. Causa: **tintes claros con opacidad no remapeados** en dark.
+- `globals.css .dark`: remap `bg-brand-50/100` (+opacidad) y `[class*=bg-cyan-50/ | bg-blue-50/]` → `surface-soft`
+  (arregla contenedor del Simulador comercial `bg-cyan-50/30`, SummaryCard primary `bg-brand-50` = "Costos directos", chips brand). Estados amber/green/red conservan tinte.
+- `commercial-simulator.tsx`: nota `bg-white/70`+texto → `dark:bg-surface-muted dark:border-line dark:text-content-muted` (fin de barra clara + texto ilegible).
+- "Activos" = KpiCard tone=ok → ya verde legible (sin cambio).
+- QA: typecheck 0 · lint 0 · build 0 · suite **2133/0 (+42 skip)** · gm 22/22 · diff-check limpio. Light intacto. No `-1rqh`. **Sin merge/tag/prod.**
+
+---
+
+## 2026-06-27 — ICONIC_OPS_APU_OPERATIONAL_DEPTH_V5_1 — EN RAMA (sin merge) (orchestrator)
+
+- Rama `feature/apu-operational-depth-v5-1` (base `origin/main = 86578cc`). Primera fase de V5 (profundidad operativa).
+- **Solo APU, UI/UX, datos existentes** (modelo PURO `lib/apu-library/completeness.ts`: ready/review/incomplete/archived
+  + issues + capacidades + `apuLinkEligibility`). Sin backend/migraciones.
+- Cambios: card de actividad → `SurfaceCard variant=action` + **línea "próxima acción" por estado** + CTA elevado a
+  **"Completar APU"** en incompletos (ruta existente `?tab=componentes`); KPI band de `/apu` **accionable** (deep-link
+  a `?view=cards&completeness=ready|review|incomplete`). Conserva Abrir/Editar/Vincular a BOQ.
+- **Limitación documentada**: detalle `/apu/[id]` usa `getApuDetail` (read-model distinto, sin shape de completitud) →
+  panel "qué falta" accionable requiere backend (V5.2). NO se fabricó. KPI "Vinculadas BOQ" sin filtro → no enlaza.
+- QA: typecheck 0 · lint 0 · tests apu-operational-depth 4/0 · suite **2133/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio.
+- Sin tocar cálculos/`unit_price_snapshot`/exports/RPC/read-model/sync/Workspace V3C/companion/Sin APU. No `-1rqh`. **Sin merge/tag/prod.**
+
+---
+
 ## 2026-06-27 — ICONIC_OPS_UIX_THEME_MODES_V4_2 — RELEASED (merge + tag + prod smoke) (orchestrator)
 
 - Usuaria aprobó cierre de V4.2 (stack .1→.13: theme light/dark/system, AppRail flotante, dashboard IA + cards,
