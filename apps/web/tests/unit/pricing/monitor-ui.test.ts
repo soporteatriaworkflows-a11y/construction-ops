@@ -13,6 +13,12 @@ import {
   parseMonitorStatus,
   filterTargetsByStatus,
   getMonitorStatusCounts,
+  getRunStatusLabel,
+  getRunStatusTone,
+  formatRunDuration,
+  formatRunStartedRelative,
+  summarizeRunCounters,
+  getLatestProblemRun,
 } from '../../../lib/pricing/monitor-ui';
 
 const read = (rel: string) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
@@ -93,6 +99,57 @@ describe('V5.2.2b — filtros server-side por estado', () => {
   });
 });
 
+describe('V5.2.2c — lectura de corridas (runs)', () => {
+  const NOW2 = new Date('2026-06-27T12:00:00Z');
+
+  it('getRunStatusLabel / getRunStatusTone (incl. desconocido)', () => {
+    expect(getRunStatusLabel('completed')).toBe('Completada');
+    expect(getRunStatusLabel('partial')).toBe('Parcial');
+    expect(getRunStatusLabel('failed')).toBe('Fallida');
+    expect(getRunStatusLabel('running')).toBe('En curso');
+    expect(getRunStatusLabel(null)).toBe('Desconocido');
+    expect(getRunStatusTone('completed')).toBe('success');
+    expect(getRunStatusTone('partial')).toBe('warn');
+    expect(getRunStatusTone('failed')).toBe('danger');
+    expect(getRunStatusTone('running')).toBe('muted');
+  });
+
+  it('formatRunDuration tolerante (segundos/minutos/en curso/sin duración)', () => {
+    expect(formatRunDuration('2026-06-27T12:00:00Z', '2026-06-27T12:00:24Z')).toBe('Duró 24s');
+    expect(formatRunDuration('2026-06-27T12:00:00Z', '2026-06-27T12:02:14Z')).toBe('Duró 2m 14s');
+    expect(formatRunDuration('2026-06-27T12:00:00Z', null, 'running')).toBe('En curso');
+    expect(formatRunDuration(null, null)).toBe('Sin duración');
+    expect(formatRunDuration('nope', 'nope')).toBe('Sin duración');
+  });
+
+  it('formatRunStartedRelative tolerante', () => {
+    expect(formatRunStartedRelative('2026-06-27T11:30:00Z', NOW2)).toBe('Hace 30 min');
+    expect(formatRunStartedRelative('2026-06-27T09:00:00Z', NOW2)).toBe('Hace 3 h');
+    expect(formatRunStartedRelative('2026-06-26T09:00:00Z', NOW2)).toBe('Ayer');
+    expect(formatRunStartedRelative(null)).toBe('Sin fecha');
+    expect(formatRunStartedRelative('boom')).toBe('Sin fecha');
+  });
+
+  it('summarizeRunCounters: omite ceros salvo Revisados; tolera null', () => {
+    const chips = summarizeRunCounters({ checked: 5, unchanged: 0, changed: 2, pendingCreated: 0, failed: 1 });
+    expect(chips.map((c) => c.label)).toEqual(['Revisados', 'Cambiados', 'Fallidos']);
+    expect(summarizeRunCounters(null).map((c) => c.label)).toEqual(['Revisados']); // checked=0 pero siempre presente
+  });
+
+  it('getLatestProblemRun: primera con failed/partial o errorSummary; null si ninguna', () => {
+    const runs = [
+      { status: 'completed' as const, errorSummary: null },
+      { status: 'partial' as const, errorSummary: null },
+      { status: 'failed' as const, errorSummary: 'x' },
+    ];
+    expect(getLatestProblemRun(runs)?.status).toBe('partial');
+    expect(getLatestProblemRun([{ status: 'completed' as const, errorSummary: null }])).toBeNull();
+    expect(getLatestProblemRun([])).toBeNull();
+    // @ts-expect-error tolerancia runtime a undefined
+    expect(getLatestProblemRun(undefined)).toBeNull();
+  });
+});
+
 describe('V5.2.2a/b — guard server/client (lección P0)', () => {
   it('lib/pricing/monitor-ui NO declara la directiva "use client"', () => {
     const src = read('../../../lib/pricing/monitor-ui.ts');
@@ -128,5 +185,14 @@ describe('V5.2.2a/b — guard server/client (lección P0)', () => {
   it('V5.2.2b — cross-link /catalog → monitoring', () => {
     const cat = read('../../../app/(dashboard)/catalog/page.tsx');
     expect(cat).toContain('/catalog/monitoring');
+  });
+
+  it('V5.2.2c — timeline de corridas usa helpers neutros (sin client nuevo)', () => {
+    const page = read('../../../app/(dashboard)/catalog/monitoring/page.tsx');
+    expect(page).toContain('formatRunDuration');
+    expect(page).toContain('formatRunStartedRelative');
+    expect(page).toContain('summarizeRunCounters');
+    expect(page).toContain('getLatestProblemRun');
+    expect(page).not.toContain("'use client'");
   });
 });

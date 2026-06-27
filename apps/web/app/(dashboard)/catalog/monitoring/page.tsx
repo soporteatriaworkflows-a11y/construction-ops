@@ -24,6 +24,12 @@ import {
   parseMonitorStatus,
   filterTargetsByStatus,
   getMonitorStatusCounts,
+  getRunStatusLabel,
+  getRunStatusTone,
+  formatRunDuration,
+  formatRunStartedRelative,
+  summarizeRunCounters,
+  getLatestProblemRun,
   MONITOR_FILTER_LABELS,
   type MonitorTone,
   type MonitorFilterStatus,
@@ -52,14 +58,7 @@ function targetStatusBadge(t: MonitorTargetView) {
 }
 
 function runStatusBadge(r: MonitorRunView) {
-  const map: Record<string, { label: string; variant: 'success' | 'warning' | 'destructive' | 'secondary' }> = {
-    completed: { label: 'Completada', variant: 'success' },
-    partial: { label: 'Parcial', variant: 'warning' },
-    failed: { label: 'Fallida', variant: 'destructive' },
-    running: { label: 'En curso', variant: 'secondary' },
-  };
-  const cfg = map[r.status] ?? { label: r.status, variant: 'secondary' as const };
-  return <Badge variant={cfg.variant}>{cfg.label}</Badge>;
+  return <Badge variant={TONE_VARIANT[getRunStatusTone(r.status)]}>{getRunStatusLabel(r.status)}</Badge>;
 }
 
 const MONITOR_FILTER_ORDER: MonitorFilterStatus[] = ['all', 'healthy', 'overdue', 'error', 'paused'];
@@ -288,27 +287,60 @@ export default async function MonitoringCenterPage({
         )}
       </section>
 
-      {/* Corridas recientes */}
+      {/* Corridas recientes — timeline ligero (V5.2.2c) */}
       <section aria-label="Corridas recientes">
-        <h2 className="mb-3 text-sm font-semibold text-gray-700">Corridas recientes</h2>
+        <h2 className="mb-3 text-sm font-semibold text-gray-700 dark:text-content">Corridas recientes</h2>
+
+        {(() => {
+          const problem = getLatestProblemRun(runs);
+          return problem ? (
+            <InlineCallout tone="warning" title="Última corrida con incidencias" className="mb-3">
+              {getRunStatusLabel(problem.status)} · {formatRunStartedRelative(problem.startedAt)}
+              {problem.errorSummary ? ` — ${problem.errorSummary}` : ''}
+            </InlineCallout>
+          ) : null;
+        })()}
+
         {runs.length === 0 ? (
-          <p className="text-sm text-gray-500">Aún no hay corridas del monitor.</p>
+          <p className="text-sm text-gray-500 dark:text-content-muted">Aún no hay corridas del monitor.</p>
         ) : (
-          <div className="space-y-2">
-            {runs.map((r) => (
-              <div key={r.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm shadow-sm dark:border-line dark:bg-surface">
-                {runStatusBadge(r)}
-                <span className="text-xs text-gray-500 dark:text-content-muted">
-                  {r.triggerType === 'scheduled' ? 'Programada' : 'Manual'} · {formatDate(r.startedAt)}
-                </span>
-                <span className="text-xs text-gray-500 dark:text-content-muted">
-                  Revisados {r.counters.checked ?? 0} · Sin cambio {r.counters.unchanged ?? 0} · Cambios{' '}
-                  {(r.counters.pendingCreated ?? 0) + (r.counters.changed ?? 0)} · Errores {r.counters.failed ?? 0}
-                </span>
-                {r.errorSummary && <span className="text-xs text-red-600 dark:text-red-300">{r.errorSummary}</span>}
-              </div>
-            ))}
-          </div>
+          <ol className="relative space-y-3 border-l border-gray-200 pl-5 dark:border-line">
+            {runs.map((r) => {
+              const tone = getRunStatusTone(r.status);
+              const dot =
+                tone === 'success' ? 'bg-green-500' : tone === 'warn' ? 'bg-amber-500' : tone === 'danger' ? 'bg-red-500' : 'bg-gray-400';
+              return (
+                <li key={r.id} className="relative rounded-lg border border-gray-200 bg-white px-4 py-2.5 shadow-sm dark:border-line dark:bg-surface">
+                  <span className={`absolute -left-[1.6rem] top-3.5 h-2.5 w-2.5 rounded-full ring-2 ring-white dark:ring-surface ${dot}`} aria-hidden="true" />
+                  <div className="flex flex-wrap items-center gap-2 text-sm">
+                    {runStatusBadge(r)}
+                    <span className="text-xs text-gray-500 dark:text-content-muted">
+                      {r.triggerType === 'scheduled' ? 'Programada' : 'Manual'}
+                    </span>
+                    <span className="text-xs text-gray-500 dark:text-content-muted" title={formatDate(r.startedAt)}>
+                      {formatRunStartedRelative(r.startedAt)}
+                    </span>
+                    <span className="text-xs text-gray-400">· {formatRunDuration(r.startedAt, r.finishedAt, r.status)}</span>
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {summarizeRunCounters(r.counters).map((chip) => (
+                      <span
+                        key={String(chip.key)}
+                        className={`rounded px-1.5 py-0.5 text-[11px] tabular-nums ${
+                          chip.key === 'failed' && chip.value > 0
+                            ? 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300'
+                            : 'bg-gray-100 text-gray-600 dark:bg-surface-soft dark:text-content-muted'
+                        }`}
+                      >
+                        {chip.label} {chip.value}
+                      </span>
+                    ))}
+                  </div>
+                  {r.errorSummary && <p className="mt-1.5 text-xs text-red-600 dark:text-red-300">{r.errorSummary}</p>}
+                </li>
+              );
+            })}
+          </ol>
         )}
       </section>
     </div>
