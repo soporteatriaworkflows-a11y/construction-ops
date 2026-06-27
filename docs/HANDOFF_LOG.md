@@ -1,5 +1,18 @@
 # Handoff Log
 
+## 2026-06-27 — ICONIC_OPS_UIX_FLOATING_WORKFLOW_COMPANION_V4_2_13 — EN RAMA (sin merge) (orchestrator)
+
+- Nuevo `components/shared/floating-workflow-dock.tsx` (`FloatingWorkflowDock`, client) montado en
+  `(dashboard)/layout.tsx`: dock flotante compacto (fixed bottom-4, glass claro/oscuro) que acompaña fuera del
+  dashboard; **se auto-oculta en `/dashboard`**. 7 pasos (rutas reales verificadas), detección de paso por ruta
+  (específico→general; `*/workspace`→Cotizar), minimizable a pill "Flujo" (persiste `iconic-workflow-dock-collapsed`),
+  solo `lg+`. NO duplica el CTA del Asistente (primer nodo navega a `/quote`, sin disparar el evento del companion).
+- Verificado que el dark fix raíz (default border + opacity remaps, V4.2.12) ya está integrado en la rama antes de implementar.
+- QA: typecheck 0 · lint 0 · tests floating-workflow-dock 5/0 · suite **2129/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio.
+- Sin tocar AppRail/companion/Workspace lógica/rutas/DB/datos. No `-1rqh`. **Sin merge/tag/prod.**
+
+---
+
 ## 2026-06-27 — ICONIC_OPS_UIX_DARK_MODE_P0_CONTRAST_FIX_V4_2_12 — EN RAMA (sin merge) (orchestrator)
 
 ### CAUSA RAÍZ (la que faltaba)

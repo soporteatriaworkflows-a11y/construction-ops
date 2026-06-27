@@ -450,6 +450,14 @@ Arquitectura del Dashboard en **paneles consolidados** (menos cards sueltas):
   primer hito "Actual". Patrón reusable para flujos.
 Regla: preferir paneles consolidados con divisores sutiles sobre colecciones de mini-cards iguales.
 
+## 12.k Workflow companion flotante (V4.2.13)
+
+`FloatingWorkflowDock` (`components/shared/floating-workflow-dock.tsx`): versión compacta y flotante del
+workflow strip, montada en el layout del dashboard. Aparece fuera de `/dashboard` (ahí se auto-oculta).
+`fixed bottom-4`, `glass` claro/oscuro, nodos redondos + íconos monoline, paso activo azul vivo, minimizable
+(pill "Flujo", persiste en localStorage). Solo navega a rutas existentes; NO duplica el CTA del Asistente.
+Solo `lg+`. Mapping de paso por ruta (específico→general).
+
 ## 13. Roadmap visual
 
 | Fase | Módulo | Foco |

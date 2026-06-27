@@ -361,3 +361,27 @@ Lo demás del dashboard NO se rehizo (ya coincidía). AppRail/topbar/command-pal
 
 ### QA (V4.2.8)
 typecheck 0 · lint 0 · suite **2129/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio. Sin lógica/DB/datos · no `-1rqh`.
+
+---
+
+## V4.2.13 — Floating Workflow Companion
+
+**Objetivo:** versión compacta y flotante del workflow strip del Dashboard que acompaña al usuario fuera del
+dashboard (saber dónde está, qué módulo sigue, navegar rápido) sin volver al Dashboard.
+
+- **Componente**: `components/shared/floating-workflow-dock.tsx` (`FloatingWorkflowDock`, client). Montado en
+  `(dashboard)/layout.tsx` → aparece en todas las rutas del dashboard y **se auto-oculta en `/dashboard`** (la barra grande ya existe).
+- **Visual**: dock `fixed bottom-4 left-1/2`, `glass` (claro/oscuro), borde sutil, sombra; nodos redondos, íconos
+  monoline, paso activo azul vivo (relleno) + label, inactivos muted (label desde `xl`). No es una card gigante.
+- **Pasos** (7, mismos del dashboard): Cotizar con asistente `/quote` · Proyectos `/projects` · Catálogo `/catalog` ·
+  Proveedores `/catalog/providers` · Inteligencia de precios `/catalog` · Monitoreo `/catalog/monitoring` ·
+  Revisión `/catalog/prices/review`. **Rutas reales** (verificadas); sin inventar.
+- **Detección de paso** (específico→general): review→Revisión, monitoring→Monitoreo, providers→Proveedores,
+  catalog→Catálogo, quote→Cotizar, `*/workspace`→Cotizar (presupuesto activo), projects/estimates→Proyectos.
+- **Minimizar/restaurar**: chevron → pill "Flujo"; persiste en `localStorage` (`iconic-workflow-dock-collapsed`).
+- **Responsive**: solo `lg+` (oculto en mobile para no tapar); labels inactivos desde `xl`; ancho `min(56rem, 100vw-8rem)` con scroll interno.
+- **Assistant**: NO agrega botón de Asistente; el primer nodo solo **navega** a `/quote` (no dispara el evento del companion).
+- **Riesgos/pendientes**: en `/workspace` el dock flota sobre el área inferior (minimizable si estorba); mobile sin dock (futuro: dock de íconos).
+
+### QA (V4.2.13)
+typecheck 0 · lint 0 · tests `floating-workflow-dock` 5/0 · suite **2129/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio.

@@ -7,6 +7,7 @@ import type { ReactNode } from 'react';
 import { readModelModeLabel } from '@/lib/utils/mode-label';
 import { getActiveWorkspace } from '@/lib/branding/workspace';
 import { AppRail } from '@/components/shared/app-rail';
+import { FloatingWorkflowDock } from '@/components/shared/floating-workflow-dock';
 import { AppTopbar } from '@/components/shared/app-topbar';
 import { ContextualNav } from '@/components/shared/contextual-nav';
 import { resolveAccessActor, canManageAccess } from '@/server/access';
@@ -75,6 +76,9 @@ export default async function DashboardLayout({ children }: { children: ReactNod
 
       {/* Asistente acompañante de cotización (aditivo, fixed, no afecta el flujo) */}
       <QuoteCompanion />
+
+      {/* Workflow companion flotante (compacto) — fuera del dashboard. Se auto-oculta en /dashboard. */}
+      <FloatingWorkflowDock />
     </div>
   );
 }
