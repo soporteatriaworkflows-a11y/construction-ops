@@ -1,5 +1,21 @@
 # Handoff Log
 
+## 2026-06-27 — ICONIC_OPS_PRICE_MONITORING_PANEL_V5_2_2A — EN RAMA (sin merge) (orchestrator)
+
+- Rama `feature/price-monitoring-panel-v5-2-2a` (base `origin/main = 3170207`). V5.2.2a: `/catalog/monitoring` como
+  panel operativo, **UI/UX sobre datos reales** (MonitoringSummary/MonitorTargetView/MonitorRunView). Sin backend, sin tocar cron/actions.
+- Nuevo helper NEUTRO `lib/pricing/monitor-ui.ts` (sin `'use client'`): getMonitorTargetStatus (pausado→error→atrasado→
+  saludable), formatLastChecked/formatNextCheck (humano + fallbacks), relativeDays. Importado por el Server page → **evita el error P0** server/client.
+- Cambios: OperationsHeader + KpiBand (Bajo monitoreo/Activas/Pausadas/Atrasadas/Cambios pendientes[deep-link a review]/Con
+  error, dark-safe) + InlineCallout (errores/atrasados/pendientes/sin corridas) + tabla con estado vía helper + próxima/última
+  revisión humanas. Acciones (RunNow/Toggle/Cadence) intactas.
+- Guard anti-regresión P0 en `monitor-ui.test.ts` (módulo no declara directiva 'use client'; page importa del módulo neutro).
+- QA: typecheck 0 · lint 0 · tests monitor-ui 11/0 · suite verde · build 0 · gm 22/22 · diff-check limpio.
+- ⚠️ **Requiere validación manual AUTENTICADA del preview antes de merge** (no solo 307). Sin tocar cron/actions/DB/RLS/
+  read-model/cálculos/`unit_price_snapshot`/sync/`construction-ops-1rqh`. **Sin merge/tag/prod.**
+
+---
+
 ## 2026-06-27 — P0 CATALOG RUNTIME HOTFIX (V5.2.1.1) — RELEASED (merge + tag + prod smoke) (orchestrator)
 
 - **Incidente P0**: `/catalog` no renderizaba (preview+prod) tras V5.2.1. Causa raíz: `catalog/page.tsx` (Server
