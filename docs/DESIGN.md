@@ -428,6 +428,16 @@ Quality floor: `prefers-reduced-motion` respetado (globals.css). Audacia concent
 - **Cards**: hairline + sombra muy suave + lift (claro); en dark solo borde fino. No bordes pesados.
 - Regla: la audacia se concentra (rail/command bar como firma navy); el resto, superficies de tema calmadas.
 
+## 12.i Shell polish (V4.2.6): rail graphite + búsqueda + accesos al Asistente
+
+- **AppRail = graphite/dark-gray premium** (no navy saturado): fondo `rgba(32,36,44)→(24,28,35)`, borde
+  `white/10`. Acentos **azules vivos** solo en item activo / hover / CTA Asistente / indicadores. CTA y mode-dot
+  **centrados** en estado colapsado.
+- **Búsqueda (command palette)**: trigger e interior **theme-aware** (tokens), lupa clara, keycap discreto;
+  overlay con **dim neutro sutil** (no tinte navy ni franja). Tokens, no literales claros.
+- **Accesos al Asistente**: solo **topbar** + **CTA del AppRail**. El **launcher flotante derecho fue eliminado**
+  (redundante); el companion cerrado no renderiza UI y abre por evento `quote-companion:open`.
+
 ## 13. Roadmap visual
 
 | Fase | Módulo | Foco |

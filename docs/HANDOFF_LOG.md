@@ -1,5 +1,20 @@
 # Handoff Log
 
+## 2026-06-26 — ICONIC_OPS_UIX_FINAL_SHELL_POLISH_V4_2_6 — EN RAMA (sin merge) (orchestrator)
+
+### Hotfix puntual de shell (misma rama `feature/uix-theme-modes-v4-2`, PR #6). [Nombre V4.2.6 reusado por la usuaria; esta entrada = el "shell polish".]
+- **Buscador topbar**: theme-aware (surface-soft/line/content) + lupa clara (iconic-primary/70) + keycap ⌘K discreto (antes literales claros → raro en dark).
+- **Overlay/command palette**: dim neutro sutil `bg-black/30 backdrop-blur-[3px]` (no `bg-iconic-ink/30`); modal/pie/input theme-aware. Sin franja translúcida.
+- **CTA Asistente del rail**: centrado en colapsado (`justify-center px-0`); indicador de modo también.
+- **Launcher flotante derecho del Asistente: ELIMINADO** (`return null` cuando no-open); abre por evento (rail/topbar). Lógica/eventos del companion intactos.
+- **Rail navy → graphite** premium (`rgba(32,36,44)→(24,28,35)`, borde white/10); acentos azules vivos conservados (activo/hover/CTA/indicadores).
+
+### QA
+- typecheck 0 · lint 0 · tests premium-system/quote-companion-in-place ok · suite **2127/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio.
+- Conserva AppRail/hover/pin/CTA/toggle/dashboard/cards. Workspace V3C/companion/Sin APU/rutas/exports intactos. Sin DB/Auth/envs/cálculos/datos. No `-1rqh`. **Sin merge/tag/prod.**
+
+---
+
 ## 2026-06-26 — ICONIC_OPS_UIX_REFERENCE_DRIVEN_DASHBOARD_REDESIGN_V4_2_6 — EN RAMA (sin merge) (orchestrator)
 
 ### Nota

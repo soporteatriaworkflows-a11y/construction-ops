@@ -75,4 +75,18 @@ describe('V4.2.3 — sistema visual premium', () => {
     expect(read('../../../components/shared/iconic-icon.tsx')).toContain("'capsule'");
     expect(read('../../../components/ui/button.tsx')).toContain('inset_0_1px_0');
   });
+
+  it('V4.2.6 shell polish: rail graphite (no navy), CTA centrado en colapsado', () => {
+    const rail = read('../../../components/shared/app-rail.tsx');
+    expect(rail).toMatch(/rgba\(32,36,44/); // fondo graphite
+    expect(rail).not.toMatch(/rgba\(2,1,72/); // ya no navy saturado
+    expect(rail).toContain("justify-center px-0"); // CTA/indicador centrados en colapsado
+  });
+
+  it('V4.2.6 shell polish: search theme-aware + overlay limpio (sin franja navy)', () => {
+    const cp = read('../../../components/shared/command-palette.tsx');
+    expect(cp).toContain('bg-surface-soft'); // trigger theme-aware
+    expect(cp).toContain('text-iconic-primary/70'); // lupa clara
+    expect(cp).not.toContain('bg-iconic-ink/30'); // overlay navy reemplazado por dim neutro
+  });
 });

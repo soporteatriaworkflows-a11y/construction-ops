@@ -276,3 +276,24 @@ dashboard/Workspace/companion/Sin APU, rutas.
 ### QA (V4.2.6)
 typecheck 0 · lint 0 · tests `premium-system`/`typography-system`/`theme-modes` ok · suite **2125/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio.
 Sin tocar lógica/DB/Auth/envs/cálculos/exports/datos · Workspace V3C/companion/Sin APU/rutas intactos · no `-1rqh`.
+
+---
+
+## V4.2.6 — Final Shell Polish (hotfix)
+
+Hotfix puntual de shell sobre la misma rama (no rediseño). Correcciones de feedback del preview:
+
+1. **Buscador topbar**: theme-aware (tokens `surface-soft`/`line`/`content`), **lupa clara** (`iconic-primary/70`),
+   keycap `⌘K` discreto. Se entiende como input de búsqueda en claro y oscuro (antes usaba literales claros → "raro" en dark).
+2. **Overlay / command palette**: dim **neutro sutil** (`bg-black/30 backdrop-blur-[3px]`) en vez del tinte navy
+   (`bg-iconic-ink/30`); modal y pie **theme-aware** (`bg-surface`/`border-line`). Solo el panel centrado, sin franja translúcida rara.
+3. **CTA Asistente del rail**: **centrado en estado colapsado** (`justify-center px-0`); ok en hover/pinned. Indicador de modo también centrado.
+4. **Botón flotante derecho del Asistente: ELIMINADO** (era redundante con topbar + rail). El companion cerrado/minimizado
+   ya **no renderiza launcher** (`return null`); abre por el evento `quote-companion:open` (rail/topbar). Lógica/eventos del companion intactos.
+5. **Color del rail navy → graphite premium**: fondo `rgba(32,36,44)→(24,28,35)` (dark-gray, no navy saturado),
+   borde `white/10`. Acentos azules vivos se conservan (item activo, hover, CTA Asistente, indicadores).
+
+Conserva: estructura del AppRail, hover-expand, pin, CTA abajo, dashboard/cards de esta oleada, toggle, navegación, Workspace V3C/companion/Sin APU/exports.
+
+### QA (V4.2.6 Shell Polish)
+typecheck 0 · lint 0 · tests `premium-system`/`quote-companion-in-place` ok · suite **2127/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio.

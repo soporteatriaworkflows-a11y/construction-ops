@@ -78,11 +78,13 @@ export function AppRail({
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
         aria-label="Navegación principal"
-        className="glass-navy fixed inset-y-3 left-3 z-40 flex flex-col overflow-hidden rounded-2xl border border-white/12 ring-1 ring-inset ring-white/5 transition-[width] duration-200 ease-out"
+        className="glass-navy fixed inset-y-3 left-3 z-40 flex flex-col overflow-hidden rounded-2xl border border-white/10 ring-1 ring-inset ring-white/5 transition-[width] duration-200 ease-out"
         style={{
+          // V4.2.6: graphite/dark-gray premium (no navy saturado). Acentos azules vivos
+          // viven en item activo / hover / CTA Asistente / indicadores.
           width: expanded ? '14.5rem' : '4rem',
-          background: 'linear-gradient(180deg, rgba(2,1,72,0.94) 0%, rgba(5,10,58,0.94) 55%, rgba(10,17,69,0.94) 100%)',
-          boxShadow: '0 24px 60px -24px rgba(2,1,72,0.7), 0 0 0 1px rgba(0,184,255,0.05)',
+          background: 'linear-gradient(180deg, rgba(32,36,44,0.96) 0%, rgba(28,32,40,0.96) 55%, rgba(24,28,35,0.96) 100%)',
+          boxShadow: '0 24px 60px -24px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04)',
         }}
       >
         {/* Cabecera: marca + pin */}
@@ -118,7 +120,7 @@ export function AppRail({
             type="button"
             onClick={openAssistant}
             title="Abrir asistente de cotización"
-            className="flex w-full items-center gap-2.5 rounded-xl bg-iconic-primary/90 px-2.5 py-2 text-sm font-medium text-white ring-1 ring-inset ring-iconic-cyan/30 transition-all duration-150 hover:bg-iconic-primary hover:shadow-[0_8px_24px_-8px_rgba(0,93,214,0.7)] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iconic-cyan"
+            className={`flex w-full items-center gap-2.5 rounded-xl bg-iconic-primary/90 py-2 text-sm font-medium text-white ring-1 ring-inset ring-iconic-cyan/30 transition-all duration-150 hover:bg-iconic-primary hover:shadow-[0_8px_24px_-8px_rgba(0,93,214,0.7)] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iconic-cyan ${expanded ? 'px-2.5' : 'justify-center px-0'}`}
           >
             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/15" aria-hidden="true">
               <Sparkles className="h-4 w-4" />
@@ -127,7 +129,7 @@ export function AppRail({
           </button>
 
           {/* Modo de datos — MUY sutil (reemplaza el bloque "Grupo ICONIC / demo"). */}
-          <div className="flex items-center gap-2 px-1.5">
+          <div className={`flex items-center gap-2 ${expanded ? 'px-1.5' : 'justify-center'}`}>
             <span
               className={`h-1.5 w-1.5 shrink-0 rounded-full ${isFixture ? 'bg-amber-400' : 'bg-iconic-cyan'}`}
               aria-hidden="true"
