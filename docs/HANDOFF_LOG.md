@@ -1,5 +1,24 @@
 # Handoff Log
 
+## 2026-06-27 — ICONIC_OPS_CATALOG_PRICE_CONTROL_CENTER_V5_2_1 — RELEASED (merge + tag + prod smoke) (orchestrator)
+
+- Usuaria aprobó V5.2.1 (preview Ready, proyecto construction-ops). **Merge `--no-ff` a main**: `origin/main` =
+  **`e3f51a7`** (parents `86a55b9` + `04e5b3a`). **Tag** = **`iconic-ops-catalog-price-control-center-v5-2-1`** → `e3f51a7`. **PR #8 MERGED.** 5 archivos.
+- Contenido: `/catalog` centro de control de precios (UI/UX, datos existentes): KPI band accionable
+  (Aprobados/Pendientes/Sin precio/Sin proveedor/Precios antiguos → deep-link), filtros Antigüedad/Sin-proveedor,
+  badge de antigüedad (priceAgeDays, umbral UI 90d, NO "vencido" autoritativo), acciones = enlaces existentes.
+- Deploy prod proyecto **construction-ops** (alias `construction-ops-psi`). Smoke OK: /login 200 ·
+  /catalog(+status=approved/pending/none, provider=missing, age=old)·/prices/review·/providers·/monitoring·/apu·
+  /projects·/estimates·/quantities·/planning·/settings 307 · /api/estimates/export (sin params) **400 controlado**.
+  Commit promovido no confirmable por API (MCP 403) → verificar Production/Current en dashboard.
+- **No-alcance**: sin Supabase/RLS/policies/migrations/Auth/envs/secrets/Vercel/cálculos/fórmulas/exports/datos/RPC/
+  read-model/permisos/`unit_price_snapshot`/sync BOQ/aprobación nueva/scraper/agente/`construction-ops-1rqh`. APU V5.1/Workspace V3C/companion/Sin APU/exports intactos.
+- **Pendientes V5.2.2 (documentados, NO implementar sin autorización; backend solo si se autoriza)**: Monitoreo de
+  precios como **panel operativo interno** (targets bajo monitoreo, estados overdue/error/pending, fallos, próximas
+  revisiones) + **accesos desde catálogo → monitoreo**. (Datos del monitor ya son reales; el countdown agregado real sigue siendo backend de V5.4.)
+
+---
+
 ## 2026-06-27 — ICONIC_OPS_CATALOG_PRICE_CONTROL_CENTER_V5_2_1 — EN RAMA (sin merge) (orchestrator)
 
 - Rama `feature/catalog-price-control-center-v5-2-1` (base `origin/main = 86a55b9`). V5.2.1: `/catalog` como centro
