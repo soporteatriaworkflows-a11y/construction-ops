@@ -41,11 +41,28 @@ const RESOURCE_TYPE_VARIANT: Record<string, 'default' | 'secondary' | 'destructi
   other: 'outline',
 };
 
+/**
+ * Antigüedad del precio (heurística UI, NO "vencido" autoritativo). Umbral V5.2.1 = 90 días.
+ * Devuelve días desde `priceDate`, o null si no hay fecha.
+ */
+export const PRICE_OLD_THRESHOLD_DAYS = 90;
+export function priceAgeDays(priceDate: string | null | undefined, now: Date = new Date()): number | null {
+  if (!priceDate) return null;
+  const t = Date.parse(priceDate);
+  if (!Number.isFinite(t)) return null;
+  return Math.max(0, Math.floor((now.getTime() - t) / 86_400_000));
+}
+export function isOldPrice(priceDate: string | null | undefined): boolean {
+  const d = priceAgeDays(priceDate);
+  return d !== null && d >= PRICE_OLD_THRESHOLD_DAYS;
+}
+
 export interface CatalogFilters {
   search: string;
   type: string; // 'all' | resourceType
   status: string; // 'all' | PriceStatus
-  provider: string; // 'all' | supplierName
+  provider: string; // 'all' | supplierName | 'missing'
+  age?: string; // 'all' | 'recent' | 'old' | 'nodate' (default 'all')
 }
 
 /** Filtro PURO de recursos (testeable). */
@@ -57,25 +74,47 @@ export function filterResources(resources: CatalogResourceView[], f: CatalogFilt
     }
     if (f.type !== 'all' && r.resourceType !== f.type) return false;
     if (f.status !== 'all' && (r.priceStatus ?? 'none') !== f.status) return false;
-    if (f.provider !== 'all' && (r.supplierName ?? '') !== f.provider) return false;
+    if (f.provider === 'missing') {
+      if (r.supplierName) return false;
+    } else if (f.provider !== 'all' && (r.supplierName ?? '') !== f.provider) {
+      return false;
+    }
+    const ageF = f.age ?? 'all';
+    if (ageF !== 'all') {
+      const days = priceAgeDays(r.priceDate);
+      if (ageF === 'nodate' && days !== null) return false;
+      if (ageF === 'old' && !(days !== null && days >= PRICE_OLD_THRESHOLD_DAYS)) return false;
+      if (ageF === 'recent' && !(days !== null && days < PRICE_OLD_THRESHOLD_DAYS)) return false;
+    }
     return true;
   });
 }
 
-export function CatalogExplorer({ resources }: { resources: CatalogResourceView[] }) {
+export function CatalogExplorer({
+  resources,
+  initialStatus = 'all',
+  initialProvider = 'all',
+  initialAge = 'all',
+}: {
+  resources: CatalogResourceView[];
+  initialStatus?: string;
+  initialProvider?: string;
+  initialAge?: string;
+}) {
   const [search, setSearch] = useState('');
   const [type, setType] = useState('all');
-  const [status, setStatus] = useState('all');
-  const [provider, setProvider] = useState('all');
+  const [status, setStatus] = useState(initialStatus);
+  const [provider, setProvider] = useState(initialProvider);
+  const [age, setAge] = useState(initialAge);
 
   const providers = useMemo(
     () => Array.from(new Set(resources.map((r) => r.supplierName).filter((s): s is string => !!s))).sort(),
     [resources],
   );
-  const active = search.trim() !== '' || type !== 'all' || status !== 'all' || provider !== 'all';
+  const active = search.trim() !== '' || type !== 'all' || status !== 'all' || provider !== 'all' || age !== 'all';
   const filtered = useMemo(
-    () => filterResources(resources, { search, type, status, provider }),
-    [resources, search, type, status, provider],
+    () => filterResources(resources, { search, type, status, provider, age }),
+    [resources, search, type, status, provider, age],
   );
 
   const byType = useMemo(() => {
@@ -89,6 +128,7 @@ export function CatalogExplorer({ resources }: { resources: CatalogResourceView[
     setType('all');
     setStatus('all');
     setProvider('all');
+    setAge('all');
   };
 
   return (
@@ -128,8 +168,22 @@ export function CatalogExplorer({ resources }: { resources: CatalogResourceView[
           </div>
           {providers.length > 0 && (
             <Select id="catProvider" label="Proveedor" value={provider} onChange={setProvider}
-              options={[['all', 'Todos'], ...providers.map((p) => [p, p] as [string, string])]} />
+              options={[['all', 'Todos'], ['missing', 'Sin proveedor'], ...providers.map((p) => [p, p] as [string, string])]} />
           )}
+          <div>
+            <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-content-muted">Antigüedad</span>
+            <FilterPills
+              ariaLabel="Antigüedad del precio"
+              value={age}
+              onChange={setAge}
+              options={[
+                { value: 'all', label: 'Todas' },
+                { value: 'recent', label: 'Reciente' },
+                { value: 'old', label: `Antiguo · +${PRICE_OLD_THRESHOLD_DAYS}d` },
+                { value: 'nodate', label: 'Sin fecha' },
+              ]}
+            />
+          </div>
           <button type="button" onClick={clear} disabled={!active}
             className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50">
             Limpiar filtros
@@ -184,8 +238,26 @@ export function CatalogExplorer({ resources }: { resources: CatalogResourceView[
                               )}
                             </td>
                             <td className="px-4 py-2.5 text-xs text-gray-500">
-                              {r.supplierName ? <span>{r.supplierName}</span> : <span className="text-gray-300">—</span>}
-                              {r.priceDate && <span className="ml-1 text-gray-400">· {r.priceDate.slice(0, 10)}</span>}
+                              {r.supplierName ? (
+                                <span>{r.supplierName}</span>
+                              ) : (
+                                <span className="text-amber-600 dark:text-amber-300" title="Recurso sin proveedor asignado">Sin proveedor</span>
+                              )}
+                              {(() => {
+                                const days = priceAgeDays(r.priceDate);
+                                if (days === null) {
+                                  return r.priceStatus && r.priceStatus !== 'none' ? <span className="ml-1 text-gray-400">· sin fecha</span> : null;
+                                }
+                                const old = days >= PRICE_OLD_THRESHOLD_DAYS;
+                                return (
+                                  <span
+                                    className={`ml-1 ${old ? 'font-medium text-amber-600 dark:text-amber-300' : 'text-gray-400'}`}
+                                    title={`Precio de hace ${days} día(s)${old ? ' · requiere revisión' : ''}`}
+                                  >
+                                    · hace {days}d{old ? ' · revisar' : ''}
+                                  </span>
+                                );
+                              })()}
                             </td>
                             <td className="px-4 py-2.5 text-right">
                               <Link href={href} className="text-xs font-medium text-iconic-primary hover:underline">
