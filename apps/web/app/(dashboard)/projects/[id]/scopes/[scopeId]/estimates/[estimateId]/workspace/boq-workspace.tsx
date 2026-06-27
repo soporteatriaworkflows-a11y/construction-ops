@@ -261,7 +261,7 @@ export function BoqWorkspace({
 
       {/* Zona ESTADO OPERATIVO (cobertura APU + KPIs) + RESUMEN FINANCIERO */}
       <div className="grid gap-3 lg:grid-cols-2">
-        <section aria-label="Estado operativo" className="rounded-2xl border border-iconic-soft-blue/70 bg-white p-4 shadow-iconic">
+        <section aria-label="Estado operativo" className="rounded-2xl border border-iconic-soft-blue/70 bg-white p-4 shadow-iconic dark:border-line">
           <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-iconic-primary/80">Estado operativo</p>
           <div className="mb-3">
             <div className="mb-1 flex items-center justify-between text-[11px]">
@@ -287,7 +287,7 @@ export function BoqWorkspace({
           </div>
         </section>
 
-        <section aria-label="Resumen financiero" className="rounded-2xl border border-iconic-soft-blue/70 bg-gradient-to-br from-brand-50/60 to-white p-4 shadow-iconic">
+        <section aria-label="Resumen financiero" className="rounded-2xl border border-iconic-soft-blue/70 bg-gradient-to-br from-brand-50/60 to-white p-4 shadow-iconic dark:border-line dark:from-surface dark:to-surface">
           <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-iconic-primary/80">Resumen financiero</p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             <SummaryCard label="Costo directo" value={summary.directTotal} accent="ink" />
@@ -310,7 +310,7 @@ export function BoqWorkspace({
       {/* ---------------------------------------------------------------- */}
       {/* Toolbar sticky: búsqueda + filtros + total siempre visible        */}
       {/* ---------------------------------------------------------------- */}
-      <div className="sticky top-14 z-10 -mx-1 rounded-xl border border-iconic-soft-blue/70 bg-white/95 px-3 py-2.5 shadow-iconic backdrop-blur">
+      <div className="sticky top-14 z-10 -mx-1 rounded-xl border border-iconic-soft-blue/70 bg-white/95 px-3 py-2.5 shadow-iconic backdrop-blur dark:border-line dark:bg-surface">
         <div className="flex flex-wrap items-center gap-2.5">
           <div className="relative min-w-[200px] flex-1">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" aria-hidden="true" />
@@ -398,7 +398,7 @@ export function BoqWorkspace({
       )}
 
       {apuFilter !== 'all' && (
-        <div className="flex items-center justify-between gap-2 rounded-md border border-iconic-soft-blue/60 bg-brand-50/60 px-3 py-2 text-xs text-iconic-ink" role="status">
+        <div className="flex items-center justify-between gap-2 rounded-md border border-iconic-soft-blue/60 bg-brand-50/60 px-3 py-2 text-xs text-iconic-ink dark:border-line dark:bg-surface-soft dark:text-content" role="status">
           <span>
             Mostrando ítems <strong>{apuFilter === 'without' ? 'sin APU vinculado' : 'con APU vinculado'}</strong>.
             Usa <strong>Agregar actividad desde APU</strong> para vincular las partidas pendientes.
@@ -420,7 +420,7 @@ export function BoqWorkspace({
           onFilterMissingApu={() => setApuFilter('without')}
         />
       ) : (
-        <div className="flex items-center gap-2 rounded-xl border border-dashed border-iconic-soft-blue/70 bg-brand-50/30 px-4 py-3 text-xs text-gray-500">
+        <div className="flex items-center gap-2 rounded-xl border border-dashed border-iconic-soft-blue/70 bg-brand-50/30 px-4 py-3 text-xs text-gray-500 dark:border-line dark:bg-surface-soft">
           <ArrowRight className="h-4 w-4 shrink-0 text-iconic-primary/70" aria-hidden="true" />
           <span>
             Detalle operativo: haz clic en el <strong className="font-mono text-gray-600">código</strong> de una partida
@@ -551,7 +551,7 @@ function OpsKpi({
   onClick?: () => void;
 }) {
   const base = `rounded-lg border px-3 py-2 text-left shadow-sm ${
-    tone === 'warn' ? 'border-amber-200 bg-amber-50/50' : 'border-gray-200 bg-white'
+    tone === 'warn' ? 'border-amber-200 bg-amber-50/50 dark:border-amber-500/25 dark:bg-amber-500/10' : 'border-gray-200 bg-white'
   }`;
   const valueCls = tone === 'warn' ? 'text-amber-700' : 'text-iconic-ink';
   const inner = (
@@ -600,7 +600,7 @@ function ItemDetailPanel({
             : 'Partida lista: sin pendientes inmediatos.';
 
   return (
-    <section aria-label="Detalle de la partida" className="rounded-xl border border-l-4 border-iconic-soft-blue/70 border-l-iconic-primary bg-gradient-to-br from-brand-50/60 to-white p-4 shadow-iconic">
+    <section aria-label="Detalle de la partida" className="rounded-xl border border-l-4 border-iconic-soft-blue/70 border-l-iconic-primary bg-gradient-to-br from-brand-50/60 to-white p-4 shadow-iconic dark:border-line dark:border-l-iconic-primary dark:from-surface dark:to-surface">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-iconic-primary/80">Detalle de la partida</p>
@@ -630,7 +630,7 @@ function ItemDetailPanel({
         <StateChip ok={!noPrice} okLabel="Precio OK" warnLabel="Sin precio" />
       </div>
 
-      <p className="mt-3 rounded-lg bg-white/70 px-3 py-2 text-[12px] text-gray-700">
+      <p className="mt-3 rounded-lg bg-white/70 px-3 py-2 text-[12px] text-gray-700 dark:bg-surface-muted">
         <span className="font-medium text-gray-500">Próxima acción: </span>{next}
       </p>
 
@@ -726,7 +726,7 @@ function ChapterGroup({
   const colSpan = canEdit ? 7 : 6;
   return (
     <>
-      <tr className={`${chapterArchived ? 'bg-gray-100/80' : 'bg-brand-50/60'} border-l-2 ${chapterArchived ? 'border-gray-300' : 'border-iconic-primary/60'}`}>
+      <tr className={`${chapterArchived ? 'bg-gray-100/80 dark:bg-surface-muted' : 'bg-brand-50/60 dark:bg-surface-soft'} border-l-2 ${chapterArchived ? 'border-gray-300' : 'border-iconic-primary/60'}`}>
         <td colSpan={colSpan} className="px-2 py-2">
           <div className="flex flex-wrap items-center gap-2">
             <button
@@ -769,7 +769,7 @@ function ChapterGroup({
               >
                 Detalle
               </Link>
-              <span className="rounded-md bg-white/80 px-2 py-0.5 text-sm font-bold tabular-nums text-iconic-ink ring-1 ring-inset ring-iconic-soft-blue/60">
+              <span className="rounded-md bg-white/80 px-2 py-0.5 text-sm font-bold tabular-nums text-iconic-ink ring-1 ring-inset ring-iconic-soft-blue/60 dark:bg-surface-muted dark:text-content dark:ring-line">
                 {formatCOP(subtotal)}
               </span>
             </span>
@@ -863,7 +863,7 @@ function ItemRow({
   }
 
   return (
-    <tr className={`${item.archived ? 'bg-gray-50/60 text-gray-400' : 'hover:bg-brand-50/40'} ${editing ? 'bg-cyan-50/40' : ''} ${selected ? 'bg-brand-50/70 ring-2 ring-inset ring-iconic-primary/40' : ''}`}>
+    <tr className={`${item.archived ? 'bg-gray-50/60 text-gray-400 dark:bg-surface-soft' : 'hover:bg-brand-50/40 dark:hover:bg-surface-muted'} ${editing ? 'bg-cyan-50/40 dark:bg-cyan-500/10' : ''} ${selected ? 'bg-brand-50/70 ring-2 ring-inset ring-iconic-primary/40 dark:bg-surface-muted' : ''}`}>
       <td className="px-2 py-1.5 align-top">
         <button
           type="button"

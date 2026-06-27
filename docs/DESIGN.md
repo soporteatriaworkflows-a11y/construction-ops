@@ -381,6 +381,11 @@ Reglas:
   `bg-white`/`text-gray-*`, para que sean theme-aware automáticamente.
 - Tema vía `ThemeProvider` (propio) + `ThemeToggle` (Claro/Oscuro/Sistema) en el menú de cuenta. Persiste
   en `localStorage`; script inline anti-FOUC. Ver `docs/design-references/UIX_THEME_MODES_V4_2.md`.
+- **Cobertura dark (V4.2.1)**: `globals.css` tiene una capa central que remapea utilidades claras planas
+  (`bg-white`, `bg-gray-50`, `text-gray-*`, `border-gray-*`, estados `bg-amber-50`…) a tokens **solo bajo
+  `.dark`**. Por eso superficies densas se ven dark sin editar clase por clase. **No** cubre variantes con
+  opacidad (`bg-white/80`, `bg-brand-50/60`): esas se tratan con `dark:` puntual. Para blanco intencional
+  sobre navy usar `bg-iconic-white` (no `bg-white`, que el remapeo volvería oscuro).
 
 ## 13. Roadmap visual
 

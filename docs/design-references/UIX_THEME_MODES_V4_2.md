@@ -68,3 +68,38 @@ filtro Sin APU, `construction-ops-1rqh`. Sin dependencias nuevas. Sin morado/ne�
 
 ## QA
 typecheck 0 · lint 0 · tests `theme-modes` 6/0 · suite **2107/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio.
+
+---
+
+## V4.2.1 — Dark Coverage Hotfix
+
+Completa la cobertura visual del modo oscuro en superficies densas, para que el dark
+mode se sienta ICONIC y **sin grandes bloques blancos**.
+
+### Cómo se cubrió (centralizado + reversible)
+- **Capa central en `globals.css`**: remapeo de **utilidades CLARAS PLANAS → tokens** SOLO bajo `.dark`
+  (`.dark .bg-white{var(--c-surface)}`, `bg-gray-50/100`→surface-soft/muted, `bg-brand-50`/`bg-slate-50`,
+  `border-gray-100/200/300`→line, `text-gray-400/500/600/700/800/900`→content/-muted, `text-slate-*`, y
+  **estados sobrios** `bg-amber-50`/`bg-green-50`/`bg-red-50`/`bg-blue-50`/`bg-cyan-50` + textos). Cubre de
+  una sola vez TODAS las superficies densas (Workspace, Catálogo, APU, Cantidades, detalle, review-table…)
+  sin editar cientos de clases. **No afecta** variantes con opacidad ni `text-white`/`border-white/*` de las barras navy.
+- **Excepción blanco-sobre-navy**: `OperationsHeaderAction` primary pasó de `bg-white` → `bg-iconic-white`
+  (clase distinta, no remapeada) para seguir blanca sobre la barra navy.
+- **Variantes `dark:` puntuales** en zonas con **opacidad** (no cubiertas por el remapeo): Workspace V3C
+  (paneles Estado operativo/Resumen financiero, banner, placeholder de detalle, panel de detalle, filas de
+  capítulo, hover, **selección**, chip de subtotal, toolbar sticky, OpsKpi warn) + detalle de presupuesto
+  (CTA workspace, fila de capítulo archivada) + APU (form de filtros, hover de fila).
+- **AG Grid**: variante `.dark .ag-theme-alpine` (ya en V4.2).
+
+### Superficies cubiertas
+Workspace BOQ (paneles, KPIs, tabla, headers, filas, hover, **selected**, footer navy, detalle, chips,
+estados), Catálogo (cards/tablas/badges vía primitivos + remapeo), APU (KPIs, filtros, tabla, badges),
+Cantidades / detalle / capítulos (tablas, filas, estados), badges/estados compartidos (sobrios en dark).
+
+### Pendiente
+- Recharts/sparkbars del Dashboard: revisar contraste fino de series en dark (no rompe, pero puede pulirse).
+- Casos puntuales con colores muy específicos (degradados decorativos) podrían afinarse por inspección visual.
+
+### QA (V4.2.1)
+typecheck 0 · lint 0 · tests `theme-modes` 9/0 · suite **2110/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio.
+Light mode intacto (variantes `dark:` y remapeo solo bajo `.dark`). Workspace V3C / companion / filtro Sin APU intactos.

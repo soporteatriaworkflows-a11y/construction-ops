@@ -31,7 +31,7 @@ export function OperationsHeaderAction({
 }) {
   const cls =
     variant === 'primary'
-      ? 'inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-sm font-semibold text-iconic-ink transition-colors hover:bg-iconic-soft-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iconic-cyan'
+      ? 'inline-flex items-center gap-1.5 rounded-lg bg-iconic-white px-3 py-1.5 text-sm font-semibold text-iconic-ink transition-colors hover:bg-iconic-soft-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iconic-cyan'
       : 'inline-flex items-center gap-1.5 rounded-lg border border-white/35 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iconic-cyan';
   if (href) {
     return (

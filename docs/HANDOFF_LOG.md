@@ -1,5 +1,24 @@
 # Handoff Log
 
+## 2026-06-26 — ICONIC_OPS_UIX_THEME_MODES_V4_2_1_DARK_COVERAGE_HOTFIX — EN RAMA (sin merge) (orchestrator)
+
+### Qué cambió (misma rama `feature/uix-theme-modes-v4-2`, PR #6)
+- **Capa central de cobertura dark en `globals.css`**: remapea utilidades claras PLANAS → tokens solo bajo
+  `.dark` (bg-white/gray-50/100/brand-50/slate-50, border-gray-*, text-gray-*/slate-*, estados amber/green/
+  red/blue/cyan-50 + textos). Cubre TODAS las superficies densas (Workspace/Catálogo/APU/Cantidades/detalle/
+  review-table) sin editar cientos de clases. No toca variantes con opacidad ni navy (text-white/border-white/*).
+- **Excepción**: `OperationsHeaderAction` primary `bg-white`→`bg-iconic-white` (sigue blanco sobre navy).
+- **Variantes `dark:` puntuales** para zonas con OPACIDAD: Workspace V3C (paneles, banner, placeholder,
+  panel de detalle, filas capítulo, hover, **selección**, chip subtotal, toolbar sticky, OpsKpi warn) +
+  detalle presupuesto (CTA workspace, fila archivada) + APU (form filtros, hover fila).
+
+### QA
+- typecheck 0 · lint 0 · tests `theme-modes` 9/0 · suite **2110/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio.
+- Light intacto · Workspace V3C/companion/filtro Sin APU/exports intactos · sin DB/Auth/envs/cálculos/datos · no `-1rqh`.
+- **Sin merge / sin tag / sin prod.** Pendiente: revisión visual del preview (PR #6, dark en Workspace/Catálogo/APU/Cantidades).
+
+---
+
 ## 2026-06-26 — ICONIC_OPS_UIX_THEME_MODES_V4_2 — EN RAMA (sin merge; pendiente revisión visual) (orchestrator)
 
 ### Estado

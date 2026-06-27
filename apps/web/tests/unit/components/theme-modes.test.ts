@@ -45,6 +45,29 @@ describe('fundación de tema', () => {
     expect(layout).toContain('suppressHydrationWarning');
   });
 
+  it('V4.2.1: capa central de cobertura dark (remapeo de utilidades planas)', () => {
+    const css = read('../../../app/globals.css');
+    expect(css).toContain('.dark .bg-white { background-color: var(--c-surface); }');
+    expect(css).toMatch(/\.dark \.text-gray-700[\s\S]*var\(--c-content\)/);
+    expect(css).toContain('.dark .border-gray-200');
+    // estados sobrios en dark
+    expect(css).toMatch(/\.dark \.bg-amber-50/);
+    // NO negro puro como fondo
+    expect(css).not.toMatch(/background-color:\s*#000(000)?\b/i);
+  });
+
+  it('V4.2.1: Workspace con variantes dark en zonas con opacidad (selección/filas/paneles)', () => {
+    const ws = read('../../../app/(dashboard)/projects/[id]/scopes/[scopeId]/estimates/[estimateId]/workspace/boq-workspace.tsx');
+    expect(ws).toContain('dark:bg-surface-soft'); // filas capítulo / placeholder
+    expect(ws).toContain('dark:bg-surface-muted'); // selección / hover
+    expect(ws).toContain('dark:from-surface'); // paneles con gradiente
+  });
+
+  it('OperationsHeaderAction primary NO usa bg-white plano (no lo remapea la capa dark)', () => {
+    const h = read('../../../components/shared/operations-header.tsx');
+    expect(h).toContain('bg-iconic-white');
+  });
+
   it('primitivos theme-aware (dark: variants), light intacto', () => {
     expect(read('../../../components/ui/card.tsx')).toContain('dark:bg-surface');
     expect(read('../../../components/ui/input.tsx')).toContain('dark:bg-surface');
