@@ -1,9 +1,13 @@
 # Handoff Log
 
-## 2026-06-27 — ICONIC_OPS_V5_4_1_REAL_MONITORING_COUNTDOWN_DASHBOARD — EN RAMA (sin merge) (orchestrator)
+## 2026-06-27 — ICONIC_OPS_V5_4_1_REAL_MONITORING_COUNTDOWN_DASHBOARD — RELEASED (merge + tag + prod smoke) (orchestrator)
 
-- Rama `feature/v5-4-1-real-countdown-dashboard` (base `origin/main = aa4b8a3`). **Primer backend de V5.4**: countdown real
-  del dashboard desde `price_monitor_targets.next_check_at`. **Read-model aditivo + UI. SIN migración, SIN RLS nueva.**
+- Usuaria **validó preview AUTENTICADO** (Preview PR #14, no prod) y aprobó. **Merge `--no-ff` a main**: `origin/main` =
+  **`961b571`** (parents `aa4b8a3` + `80ebd6c`). **Tag** = **`iconic-ops-v5-4-1-real-countdown-dashboard`** → `961b571`. **PR #14 MERGED.** 8 archivos.
+- **Primer backend de V5.4**: countdown real del dashboard desde `price_monitor_targets.next_check_at`. **Read-model aditivo + UI. SIN migración, SIN RLS nueva.**
+- Smoke prod OK: /login 200 · /dashboard·/catalog/monitoring(+status all/healthy/overdue/error/paused)·/prices/review·/catalog·
+  /providers·/apu·/projects·/estimates·/quantities·/planning·/settings 307 · /api/estimates/export **400 controlado** · /api/cron/price-monitor **401**.
+  Commit promovido no confirmable por API (MCP 403) → verificar Production en dashboard.
 - `MonitoringSummary` extendido (aditivo): `nextReviewAt`/`nextTargetId`/`nextTargetLabel`. `db-repository.getMonitoringSummary`
   añade sub-query org-scoped del próximo target enabled (order next_check_at asc limit 1) **en try/catch tolerante** (falla→nulls, no tumba summary).
   `fixture-repository` con contrato determinista.
@@ -11,9 +15,11 @@
   null/inválido→"Sin revisión programada", <=now→"Atrasada", futuro→"en 18m"/"en 2h 14m"/"en 1d 3h").
 - Dashboard: `02h 18m` **hardcode eliminado** → `formatCountdown(nextReviewAt)` + `nextTargetLabel`; anillo SVG decorativo; `dynamic='force-dynamic'` + tolerancia conservados.
 - Server/client safe: dashboard (Server Component) importa el helper del módulo neutro; no isla client. Guards en tests (sin "02h 18m", sin 'use client').
-- QA: typecheck 0 · lint 0 · tests monitor-ui 31/0 (+invariants 15/0) · suite verde · build 0 · gm 22/22 · diff-check limpio (solo archivos de la fase).
-- ⚠️ **Requiere validación manual AUTENTICADA del preview antes de merge** (no solo 307). Sin tocar migrations/Supabase/RLS/
-  cron/actions/scraper/review/BOQ/APU/exports/`unit_price_snapshot`/`construction-ops-1rqh`. **Sin merge/tag/prod.**
+- QA: typecheck 0 · lint 0 · tests monitor-ui 31/0 (+invariants 15/0) · suite verde · build 0 · gm 22/22 · diff-check limpio (solo 8 archivos de la fase).
+- Sin tocar migrations/Supabase/RLS/cron/actions/scraper/review/BOQ/APU/exports/snapshots/`unit_price_snapshot`/sync/`construction-ops-1rqh`.
+  Price Intelligence (panel/filtros/timeline) y campos existentes del summary intactos.
+- **Pendiente V5.4.2 (NO implementar sin autorización; requiere backend completo)**: Notas reales — tabla `quick_notes` +
+  migración + RLS + repository + server actions + decisión de privacidad (notas no expuestas a `client` por defecto). Fase backend dedicada (agent-db-rls).
 
 ---
 
