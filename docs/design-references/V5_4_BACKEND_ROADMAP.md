@@ -98,7 +98,28 @@ Regla de presentacion:
 
 - Si `nextReviewAt` es null: mostrar `Sin fuentes activas` o `Sin revision programada`.
 - Si `nextReviewAt <= now`: mostrar `Ahora` / `Atrasada` y mantener `overdueCount`.
-- Si futuro: calcular countdown en UI/server helper neutral, sin hardcode.
+- Si futuro: calcular countdown sin hardcode.
+
+Modulo del helper de formato (regla server/client, leccion P0):
+
+- El helper del countdown debe vivir en el modulo NEUTRO existente `lib/pricing/monitor-ui.ts` (SIN `'use client'`),
+  reutilizado por el Server Component del dashboard. NO definirlo en un componente client ni importarlo desde uno.
+- Helpers sugeridos: `formatCountdown(nextReviewAt, now)` y/o `formatTimeUntil(nextReviewAt, now)` — PUROS y tolerantes a
+  null/fecha invalida/pasado (devuelven etiqueta segura, nunca un valor inventado).
+
+Verificacion previa obligatoria (antes de extender):
+
+- Confirmar si `app/(dashboard)/dashboard/page.tsx` YA consume `getMonitorRepository().getMonitoringSummary(...)`.
+  - Si ya lo consume: extender esa misma llamada (campos aditivos `nextReviewAt`/`nextTargetId`/`nextTargetLabel`).
+  - Si NO lo consume: anadir la llamada de forma TOLERANTE (try/catch o equivalente), sin convertirla en dependencia dura del render.
+
+Requisitos del dashboard (no romper la pantalla principal):
+
+- Mantener `export const dynamic = 'force-dynamic'` en el dashboard (lectura request-time, sin prerender).
+- Fallback tolerante: si la query/summary falla o devuelve null, el dashboard NO debe caer; muestra
+  `Sin revision programada` (o estado vacio equivalente) y conserva el resto del panel.
+- La extension de `getMonitoringSummary` debe ser org-scoped y tolerante: un fallo en la sub-query del proximo target
+  no debe tumbar el summary completo ni el dashboard.
 
 ### Migracion
 
@@ -119,14 +140,23 @@ No requiere RLS nueva porque:
 
 ### Tests obligatorios
 
-- Summary devuelve `nextReviewAt` y target mas proximo entre enabled targets.
-- Ignora targets pausados (`enabled=false`).
-- Si no hay targets activos, devuelve nulls.
-- Si hay targets vencidos, `nextReviewAt` puede estar en pasado y el dashboard no muestra countdown falso.
-- Dashboard no contiene `02h 18m` hardcoded.
-- Server Component no importa helpers desde modulo `'use client'`.
-- Fixture repository mantiene contrato nuevo con datos deterministas.
-- Invariantes: no tocar cron, actions, review center, BOQ/APU/exports.
+Concretos y verificables:
+
+- **Summary selecciona el target enabled mas proximo**: `getMonitoringSummary` devuelve `nextReviewAt` = el `next_check_at`
+  minimo entre targets `enabled=true` (+ `nextTargetId`/`nextTargetLabel` correspondientes).
+- **Ignora pausados**: targets con `enabled=false` no compiten por el proximo (aunque su `next_check_at` sea menor).
+- **Null si no hay activos**: sin targets `enabled`, `nextReviewAt`/`nextTargetId`/`nextTargetLabel` = `null`.
+- **Vencidos sin countdown falso**: si el proximo `next_check_at <= now`, el dashboard muestra `Atrasada`/`Ahora`, nunca un countdown inventado.
+- **Guard hardcode**: el source de `dashboard/page.tsx` NO contiene `"02h 18m"` (check de fuente, estilo de los guards existentes).
+- **Guard server/client (P0)**: el dashboard (Server Component) NO importa helpers desde modulos `'use client'`; el helper
+  de countdown vive en `lib/pricing/monitor-ui.ts` (modulo neutro, sin `'use client'`).
+- **Fixture determinista**: `fixture-repository.ts` cumple el contrato nuevo con datos fijos (mismo `nextReviewAt`/target en cada corrida del test).
+- **Helpers puros**: `formatCountdown`/`formatTimeUntil` toleran null/fecha invalida/pasado (tests unitarios en `monitor-ui.test.ts`).
+- **Invariantes**: no se tocan cron, server actions, review center, BOQ/APU/exports (checks de no-regresion).
+
+Ubicacion sugerida: extender `tests/unit/pricing/monitor-ui.test.ts` (helpers + guards) y
+`tests/unit/pricing/monitor/ui-and-invariants.test.ts` (summary/fixture); agregar guard del dashboard donde corresponda
+(p.ej. `tests/unit/dashboard/route-config.test.ts` o equivalente de fuente).
 
 ### Rutas a validar autenticadas
 
@@ -268,7 +298,9 @@ Backend:
 UI:
 - Dashboard deja de mostrar '02h 18m' hardcoded.
 - Mostrar Ahora/Atrasada si nextReviewAt <= now; mostrar Sin revision programada si null.
-- Helpers de formato en modulo server-safe/neutro, no en 'use client'.
+- Helpers de formato (formatCountdown/formatTimeUntil) en el modulo NEUTRO lib/pricing/monitor-ui.ts, no en 'use client'.
+- Verificar primero si dashboard/page.tsx ya consume getMonitoringSummary; si no, anadir la llamada de forma tolerante.
+- Mantener dynamic = 'force-dynamic' y fallback tolerante: si el summary falla, el dashboard no cae.
 
 Tests:
 - Summary selecciona el target enabled mas proximo.

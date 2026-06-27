@@ -24,7 +24,7 @@ Quedo completo sin backend nuevo:
 
 - Catalogo como centro de control de precios, con KPIs accionables y lectura por estados.
 - Estados de precios visibles: aprobado, pendiente, rechazado/sin precio segun el modelo existente.
-- Filtros y deep-links server-side para monitoreo (`all`, `overdue`, `paused`, `error`, saludable por exclusion).
+- Filtros y deep-links server-side para monitoreo (`all`, `overdue`, `paused`, `error`, `healthy`). `healthy` NO es "por exclusion": es una key derivada propia = `enabled && !overdue && !failures` (sin alerta de fallos / `consecutive_failures === 0`).
 - Monitoring panel en `/catalog/monitoring` usando backend existente.
 - Targets atrasados, con error, pausados y saludables representados sin inventar datos.
 - Runs timeline V5.2.2c con duracion, estado relativo y counters desde `price_monitor_runs`.
