@@ -10,6 +10,9 @@ import {
   formatLastChecked,
   formatNextCheck,
   relativeDays,
+  parseMonitorStatus,
+  filterTargetsByStatus,
+  getMonitorStatusCounts,
 } from '../../../lib/pricing/monitor-ui';
 
 const read = (rel: string) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
@@ -53,7 +56,44 @@ describe('V5.2.2a — fechas humanas tolerantes a null/inválido', () => {
   });
 });
 
-describe('V5.2.2a — guard server/client (lección P0)', () => {
+describe('V5.2.2b — filtros server-side por estado', () => {
+  const targets = [
+    T({}), // healthy
+    T({ isOverdue: true }), // overdue
+    T({ consecutiveFailures: 2 }), // error
+    T({ enabled: false }), // paused
+    T({ hasFailureAlert: true, consecutiveFailures: 5 }), // error
+  ];
+
+  it('parseMonitorStatus normaliza y cae a all en inválidos', () => {
+    expect(parseMonitorStatus('overdue')).toBe('overdue');
+    expect(parseMonitorStatus(['paused', 'x'])).toBe('paused');
+    expect(parseMonitorStatus('boom')).toBe('all');
+    expect(parseMonitorStatus(undefined)).toBe('all');
+    expect(parseMonitorStatus(null)).toBe('all');
+  });
+
+  it('filterTargetsByStatus por cada key', () => {
+    expect(filterTargetsByStatus(targets, 'all')).toHaveLength(5);
+    expect(filterTargetsByStatus(targets, 'healthy')).toHaveLength(1);
+    expect(filterTargetsByStatus(targets, 'overdue')).toHaveLength(1);
+    expect(filterTargetsByStatus(targets, 'error')).toHaveLength(2);
+    expect(filterTargetsByStatus(targets, 'paused')).toHaveLength(1);
+  });
+
+  it('tolerante a lista vacía / null', () => {
+    expect(filterTargetsByStatus([], 'overdue')).toEqual([]);
+    // @ts-expect-error tolerancia runtime a undefined
+    expect(filterTargetsByStatus(undefined, 'all')).toEqual([]);
+  });
+
+  it('getMonitorStatusCounts suma por estado + total', () => {
+    const c = getMonitorStatusCounts(targets);
+    expect(c).toEqual({ all: 5, healthy: 1, overdue: 1, error: 2, paused: 1 });
+  });
+});
+
+describe('V5.2.2a/b — guard server/client (lección P0)', () => {
   it('lib/pricing/monitor-ui NO declara la directiva "use client"', () => {
     const src = read('../../../lib/pricing/monitor-ui.ts');
     // La directiva es un statement de línea (no mención en comentarios).
@@ -66,5 +106,27 @@ describe('V5.2.2a — guard server/client (lección P0)', () => {
     const m = page.match(/from '\.\/_components\/monitor-controls'/);
     expect(m).toBeTruthy();
     expect(page).toContain('getMonitorTargetStatus');
+  });
+
+  it('V5.2.2b — filtrado server-side: searchParams + helpers neutros + pills <Link> (sin isla client)', () => {
+    const page = read('../../../app/(dashboard)/catalog/monitoring/page.tsx');
+    expect(page).toContain('parseMonitorStatus');
+    expect(page).toContain('filterTargetsByStatus');
+    expect(page).toContain('searchParams');
+    // pills son <Link> server-rendered, no un FilterPills client nuevo
+    expect(page).not.toContain("'use client'");
+  });
+
+  it('V5.2.2b — KPI deep-links a ?status= y review', () => {
+    const page = read('../../../app/(dashboard)/catalog/monitoring/page.tsx');
+    expect(page).toContain('/catalog/monitoring?status=overdue');
+    expect(page).toContain('/catalog/monitoring?status=paused');
+    expect(page).toContain('/catalog/monitoring?status=error');
+    expect(page).toContain('/catalog/prices/review');
+  });
+
+  it('V5.2.2b — cross-link /catalog → monitoring', () => {
+    const cat = read('../../../app/(dashboard)/catalog/page.tsx');
+    expect(cat).toContain('/catalog/monitoring');
   });
 });

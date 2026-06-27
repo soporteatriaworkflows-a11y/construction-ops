@@ -17,7 +17,17 @@ import { resolveViewer, resolveAuthenticatedViewer } from '@/server/auth/resolve
 import { resolveAuthMode } from '@/lib/supabase/env';
 import { getMonitorRepository } from '@/server/pricing/monitor';
 import type { MonitorTargetView, MonitorRunView, MonitoringSummary } from '@/server/pricing/monitor';
-import { getMonitorTargetStatus, formatLastChecked, formatNextCheck, type MonitorTone } from '@/lib/pricing/monitor-ui';
+import {
+  getMonitorTargetStatus,
+  formatLastChecked,
+  formatNextCheck,
+  parseMonitorStatus,
+  filterTargetsByStatus,
+  getMonitorStatusCounts,
+  MONITOR_FILTER_LABELS,
+  type MonitorTone,
+  type MonitorFilterStatus,
+} from '@/lib/pricing/monitor-ui';
 import { RunNowButton, TargetToggleButton, CadenceForm } from './_components/monitor-controls';
 
 export const dynamic = 'force-dynamic';
@@ -52,7 +62,41 @@ function runStatusBadge(r: MonitorRunView) {
   return <Badge variant={cfg.variant}>{cfg.label}</Badge>;
 }
 
-export default async function MonitoringCenterPage() {
+const MONITOR_FILTER_ORDER: MonitorFilterStatus[] = ['all', 'healthy', 'overdue', 'error', 'paused'];
+
+/** Pills de filtro server-rendered (`<Link>`, sin isla client). V5.2.2b. */
+function MonitorFilterPills({ status, counts }: { status: MonitorFilterStatus; counts: Record<MonitorFilterStatus, number> }) {
+  return (
+    <div role="group" aria-label="Filtrar por estado" className="mb-3 flex flex-wrap gap-1.5">
+      {MONITOR_FILTER_ORDER.map((key) => {
+        const active = key === status;
+        const href = key === 'all' ? '/catalog/monitoring' : `/catalog/monitoring?status=${key}`;
+        return (
+          <Link
+            key={key}
+            href={href}
+            aria-pressed={active}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+              active
+                ? 'border-iconic-primary bg-iconic-primary text-white'
+                : 'border-gray-200 bg-white text-gray-600 hover:border-iconic-primary/50 hover:text-iconic-primary dark:border-line dark:bg-surface dark:text-content-muted'
+            }`}
+          >
+            {MONITOR_FILTER_LABELS[key]}
+            <span className={`tabular-nums ${active ? 'text-white/80' : 'text-gray-400'}`}>{counts[key]}</span>
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+
+export default async function MonitoringCenterPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const status = parseMonitorStatus((await searchParams).status);
   let viewerRole = 'consulta';
   let targets: MonitorTargetView[] = [];
   let runs: MonitorRunView[] = [];
@@ -88,6 +132,9 @@ export default async function MonitoringCenterPage() {
   }
 
   const canMutate = MUTATION_ROLES.includes(viewerRole);
+  // V5.2.2b — filtrado server-side por estado (sin isla client). Conteos sobre TODOS.
+  const statusCounts = getMonitorStatusCounts(targets);
+  const visibleTargets = filterTargetsByStatus(targets, status);
 
   if (error) {
     return (
@@ -118,10 +165,10 @@ export default async function MonitoringCenterPage() {
         <KpiBand className="mb-4 mt-4">
           <KpiCard label="Bajo monitoreo" value={summary.monitoredCount} hint="Fuentes totales" />
           <KpiCard label="Activas" value={summary.activeCount} tone={summary.activeCount > 0 ? 'ok' : 'default'} hint="Vigiladas" />
-          <KpiCard label="Pausadas" value={summary.pausedCount} hint="Sin revisar" />
-          <KpiCard label="Atrasadas" value={summary.overdueCount} tone={summary.overdueCount > 0 ? 'warn' : 'default'} hint="Toca revisar" />
+          <KpiCard label="Pausadas" value={summary.pausedCount} hint="Sin revisar" href="/catalog/monitoring?status=paused" />
+          <KpiCard label="Atrasadas" value={summary.overdueCount} tone={summary.overdueCount > 0 ? 'warn' : 'default'} hint="Toca revisar" href="/catalog/monitoring?status=overdue" />
           <KpiCard label="Cambios pendientes" value={summary.pendingChangesCount} tone={summary.pendingChangesCount > 0 ? 'warn' : 'default'} hint="Por aprobar" href="/catalog/prices/review" />
-          <KpiCard label="Con error" value={summary.erroredCount} tone={summary.erroredCount > 0 ? 'danger' : 'default'} hint="Fallos repetidos" />
+          <KpiCard label="Con error" value={summary.erroredCount} tone={summary.erroredCount > 0 ? 'danger' : 'default'} hint="Fallos repetidos" href="/catalog/monitoring?status=error" />
         </KpiBand>
       )}
 
@@ -164,7 +211,7 @@ export default async function MonitoringCenterPage() {
 
       {/* Tabla de fuentes */}
       <section aria-label="Fuentes monitoreadas" className="mb-8">
-        <h2 className="mb-3 text-sm font-semibold text-gray-700">Fuentes ({targets.length})</h2>
+        <h2 className="mb-3 text-sm font-semibold text-gray-700 dark:text-content">Fuentes ({statusCounts.all})</h2>
         {targets.length === 0 ? (
           <EmptyState
             icon={Radar}
@@ -172,10 +219,19 @@ export default async function MonitoringCenterPage() {
             description="Habilita «Monitorear esta fuente» desde la inteligencia de precios de un recurso del catálogo."
           />
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+          <>
+            <MonitorFilterPills status={status} counts={statusCounts} />
+            {visibleTargets.length === 0 ? (
+              <EmptyState
+                icon={Radar}
+                title={`No hay fuentes ${MONITOR_FILTER_LABELS[status].toLowerCase()}`}
+                description="Cambia el filtro para ver otras fuentes monitoreadas."
+              />
+            ) : (
+          <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm dark:border-line dark:bg-surface">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-medium text-gray-500">
+                <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-medium text-gray-500 dark:border-line dark:bg-surface-soft dark:text-content-muted">
                   <th className="px-3 py-2">Recurso</th>
                   <th className="px-3 py-2">Proveedor</th>
                   <th className="px-3 py-2">URL</th>
@@ -187,8 +243,8 @@ export default async function MonitoringCenterPage() {
                 </tr>
               </thead>
               <tbody>
-                {targets.map((t) => (
-                  <tr key={t.id} className="border-b border-gray-100 last:border-0">
+                {visibleTargets.map((t) => (
+                  <tr key={t.id} className="border-b border-gray-100 last:border-0 dark:border-line/60">
                     <td className="px-3 py-2">
                       <Link
                         href={`/catalog/resources/${t.resourceId}/price-intelligence`}
@@ -227,6 +283,8 @@ export default async function MonitoringCenterPage() {
               </tbody>
             </table>
           </div>
+            )}
+          </>
         )}
       </section>
 
