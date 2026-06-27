@@ -202,3 +202,34 @@ export function getLatestProblemRun<T extends Pick<MonitorRunView, 'status' | 'e
   }
   return null;
 }
+
+/* ── V5.4.1: countdown real de próxima revisión (dashboard). PURO, sin backend ── */
+
+/**
+ * Tiempo restante hasta `nextReviewAt`, en formato humano. PURO y tolerante:
+ *  - null/undefined → "Sin revisión programada"
+ *  - fecha inválida → "Sin revisión programada"
+ *  - <= now → "Atrasada"
+ *  - futuro → "en 18m" / "en 2h 14m" / "en 1d 3h"
+ * Request-time/server-rendered: NO usa setInterval ni estado.
+ */
+export function formatTimeUntil(nextReviewAt: string | null | undefined, now: Date = new Date()): string {
+  if (!nextReviewAt) return 'Sin revisión programada';
+  const t = Date.parse(nextReviewAt);
+  if (!Number.isFinite(t)) return 'Sin revisión programada';
+  const diffMs = t - now.getTime();
+  if (diffMs <= 0) return 'Atrasada';
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 60) return `en ${Math.max(1, mins)}m`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) {
+    const m = mins % 60;
+    return m === 0 ? `en ${hrs}h` : `en ${hrs}h ${m}m`;
+  }
+  const days = Math.floor(hrs / 24);
+  const h = hrs % 24;
+  return h === 0 ? `en ${days}d` : `en ${days}d ${h}h`;
+}
+
+/** Alias semántico para el countdown del dashboard (misma lógica pura que formatTimeUntil). */
+export const formatCountdown = formatTimeUntil;

@@ -287,6 +287,38 @@ export class DbMonitorRepository implements MonitorRepository {
 
     const totalCount = total.count ?? 0;
     const activeCount = active.count ?? 0;
+
+    // V5.4.1 — próxima revisión real (target enabled con menor next_check_at). TOLERANTE:
+    // un fallo aquí devuelve nulls y NO tumba el summary ni el dashboard.
+    let nextReviewAt: string | null = null;
+    let nextTargetId: string | null = null;
+    let nextTargetLabel: string | null = null;
+    try {
+      const next = await supabase
+        .from('price_monitor_targets')
+        .select('id, next_check_at, resources(code,name), suppliers(name)')
+        .eq('organization_id', orgId)
+        .eq('enabled', true)
+        .order('next_check_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (!next.error && next.data) {
+        const row = next.data as {
+          id: string;
+          next_check_at: string;
+          resources?: { code?: string | null; name?: string | null } | null;
+          suppliers?: { name?: string | null } | null;
+        };
+        nextReviewAt = row.next_check_at ?? null;
+        nextTargetId = row.id ?? null;
+        const code = row.resources?.code ?? null;
+        const supplier = row.suppliers?.name ?? null;
+        nextTargetLabel = [code, supplier].filter(Boolean).join(' · ') || null;
+      }
+    } catch {
+      // tolerante: nulls
+    }
+
     return {
       monitoredCount: totalCount,
       activeCount,
@@ -295,6 +327,9 @@ export class DbMonitorRepository implements MonitorRepository {
       erroredCount: errored.count ?? 0,
       pendingChangesCount: pendingChanges.count ?? 0,
       lastRunAt: (lastRun.data?.started_at as string | undefined) ?? null,
+      nextReviewAt,
+      nextTargetId,
+      nextTargetLabel,
     };
   }
 }

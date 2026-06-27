@@ -99,6 +99,13 @@ export class FixtureMonitorRepository implements MonitorRepository {
   }
 
   async getMonitoringSummary(): Promise<MonitoringSummary> {
+    // V5.4.1 — próximo target enabled por menor nextCheckAt (determinista). null si no hay activos.
+    const nextTarget = DEMO_TARGETS.filter((t) => t.enabled).sort((a, b) =>
+      a.nextCheckAt.localeCompare(b.nextCheckAt),
+    )[0];
+    const nextTargetLabel = nextTarget
+      ? [nextTarget.resourceCode, nextTarget.supplierName].filter(Boolean).join(' · ') || null
+      : null;
     return {
       monitoredCount: DEMO_TARGETS.length,
       activeCount: DEMO_TARGETS.filter((t) => t.enabled).length,
@@ -107,6 +114,9 @@ export class FixtureMonitorRepository implements MonitorRepository {
       erroredCount: 0,
       pendingChangesCount: 0,
       lastRunAt: DEMO_RUNS[0]?.startedAt ?? null,
+      nextReviewAt: nextTarget?.nextCheckAt ?? null,
+      nextTargetId: nextTarget?.id ?? null,
+      nextTargetLabel,
     };
   }
 }

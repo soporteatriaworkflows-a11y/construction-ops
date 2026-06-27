@@ -277,6 +277,12 @@ export interface MonitoringSummary {
   /** Observaciones pending creadas por el monitor aún sin revisar. */
   pendingChangesCount: number;
   lastRunAt: IsoDateTime | null;
+  /** V5.4.1 — próxima revisión real (min next_check_at entre targets enabled). null si no hay activos. */
+  nextReviewAt: IsoDateTime | null;
+  /** Target de esa próxima revisión (para contexto). null si no hay activos. */
+  nextTargetId: Uuid | null;
+  /** Etiqueta legible del próximo target (recurso · proveedor). null si no hay activos. */
+  nextTargetLabel: string | null;
 }
 
 export interface CreateTargetInput {

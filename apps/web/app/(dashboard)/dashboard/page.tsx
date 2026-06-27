@@ -52,6 +52,7 @@ import { getReadModel, resolveSource } from '@/server/read-model';
 import { getEstimatesWriteRepository } from '@/server/estimates';
 import { getObservationRepository } from '@/server/pricing';
 import { getMonitorRepository } from '@/server/pricing/monitor';
+import { formatCountdown } from '@/lib/pricing/monitor-ui';
 import { resolveViewer } from '@/server/auth/resolve-viewer';
 import { formatCOP, formatDateTime, ESTIMATE_VERSION_STATUS_LABELS } from '@/lib/utils/format';
 import { isCreationModeEnabled } from '../projects/mode-guard';
@@ -444,7 +445,7 @@ export default async function DashboardPage() {
 
               {/* Subzona de tiempo — anillo countdown (estilo target) + Última revisión real */}
               <div className="flex items-center gap-4 border-t border-line p-4 lg:w-72 lg:border-l lg:border-t-0">
-                {/* Anillo de "próxima revisión" — valor ilustrativo (no hay next-run en el summary). */}
+                {/* Anillo de "próxima revisión" — decorativo; el tiempo real (nextReviewAt) se muestra al lado. */}
                 <div className="relative h-16 w-16 shrink-0" aria-hidden="true">
                   <svg viewBox="0 0 36 36" className="h-16 w-16 -rotate-90">
                     <circle cx="18" cy="18" r="15.5" fill="none" strokeWidth="3" className="stroke-surface-muted" />
@@ -460,8 +461,15 @@ export default async function DashboardPage() {
                   </span>
                 </div>
                 <div className="min-w-0">
-                  <p className="text-[10px] font-medium uppercase tracking-wide text-content-muted">Próxima revisión en</p>
-                  <p className="font-display text-base font-bold tabular-nums text-content">02h 18m</p>
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-content-muted">Próxima revisión</p>
+                  <p className="font-display text-base font-bold tabular-nums text-content">
+                    {formatCountdown(monitoringSummary.nextReviewAt)}
+                  </p>
+                  {monitoringSummary.nextTargetLabel && (
+                    <p className="truncate text-[11px] text-content-muted" title={monitoringSummary.nextTargetLabel}>
+                      {monitoringSummary.nextTargetLabel}
+                    </p>
+                  )}
                   <p className="mt-1 truncate text-[11px] text-content-muted">
                     Última: {monitoringSummary.lastRunAt ? formatDateTime(monitoringSummary.lastRunAt) : 'sin corridas'}
                   </p>
