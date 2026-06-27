@@ -98,9 +98,9 @@ export function ContextualNav() {
   if (!ctx) return null;
   const active = activeContextHref(pathname, ctx.items);
   return (
-    <div className="border-b border-iconic-soft-blue/50 bg-white/70 backdrop-blur">
+    <div className="border-b border-iconic-soft-blue/50 bg-white/70 backdrop-blur dark:border-line dark:bg-surface">
       <div className="mx-auto flex max-w-screen-2xl items-center gap-1 overflow-x-auto px-6">
-        <span className="mr-2 shrink-0 text-[11px] font-semibold uppercase tracking-wide text-iconic-graphite/40">
+        <span className="mr-2 shrink-0 text-[11px] font-semibold uppercase tracking-wide text-iconic-graphite/40 dark:text-content-muted">
           {ctx.module}
         </span>
         {ctx.items.map((it) => {
@@ -114,7 +114,7 @@ export function ContextualNav() {
                 '-mb-px shrink-0 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors',
                 isActive
                   ? 'border-iconic-primary text-iconic-primary'
-                  : 'border-transparent text-iconic-graphite/60 hover:text-iconic-ink',
+                  : 'border-transparent text-iconic-graphite/60 hover:text-iconic-ink dark:text-content-muted dark:hover:text-content',
               )}
             >
               {it.label}

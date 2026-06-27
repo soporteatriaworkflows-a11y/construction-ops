@@ -170,6 +170,46 @@ svg.lucide {
   -webkit-backdrop-filter: saturate(140%) blur(12px);
 }
 
+/* ------------------------------------------------------------------ */
+/* V4.2.11 — Rescate de contraste DARK (sistémico).                      */
+/* Tokens de MARCA usados como texto/borde/fondo NO los cubría el remap  */
+/* gray-*; aquí se corrigen para que en dark sean legibles.              */
+/* ------------------------------------------------------------------ */
+/* TEXTO: navy/graphite como texto → claro. El azul de marca como texto  */
+/* (links/acentos/íconos) → azul VIVO legible (no el navy oscuro).        */
+.dark .text-iconic-ink,
+.dark .text-iconic-graphite {
+  color: var(--c-content);
+}
+.dark .text-iconic-primary {
+  color: #4d8dff;
+}
+/* FONDOS de marca claros → superficies dark. */
+.dark .bg-iconic-gray {
+  background-color: var(--c-surface-soft);
+}
+/* Bordes y fills "soft-blue" (incl. variantes con opacidad) → sutil oscuro,
+   para eliminar los marcos blancos/"tiza" sobre superficies oscuras. */
+.dark [class*='border-iconic-soft-blue'] {
+  border-color: var(--c-line);
+}
+.dark [class*='bg-iconic-soft-blue'] {
+  background-color: var(--c-surface-muted);
+}
+/* CONTROLES de formulario: nada blanco en dark. Fondo surface + texto claro +
+   borde sutil + placeholder legible. (No afecta a [type=checkbox/radio] de color.) */
+.dark input:not([type='checkbox']):not([type='radio']),
+.dark select,
+.dark textarea {
+  background-color: var(--c-surface-soft);
+  color: var(--c-content);
+  border-color: var(--c-line);
+}
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: var(--c-content-muted);
+}
+
 /* AG Grid — variante dark (tablas BOQ legibles en modo oscuro). */
 .dark .ag-theme-alpine {
   --ag-background-color: #161922;

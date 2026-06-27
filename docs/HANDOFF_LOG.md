@@ -1,5 +1,30 @@
 # Handoff Log
 
+## 2026-06-27 — ICONIC_OPS_UIX_DARK_MODE_CONTRAST_RESCUE_V4_2_11 — EN RAMA (sin merge) (orchestrator)
+
+### Causa raíz
+Tokens de MARCA usados como texto/borde/fondo (`text-iconic-ink/graphite`, `border-iconic-soft-blue*`,
+`bg-iconic-gray`, `bg-iconic-soft-blue*`) + controles de formulario nativos NO los cubría el remap `gray-*` →
+texto navy ilegible, bordes "tiza", inputs blancos en dark.
+
+### Rescate sistémico (globals.css `.dark`)
+- `text-iconic-ink/graphite → content` (claro); `text-iconic-primary → #4d8dff` (azul vivo legible para links/íconos).
+- `bg-iconic-gray → surface-soft`; `[class*=border-iconic-soft-blue] → line` (cubre opacidades → sin marcos blancos);
+  `[class*=bg-iconic-soft-blue] → surface-muted`.
+- **Form controls**: `.dark input/select/textarea` → fondo surface-soft + texto claro + borde line + placeholder muted (no más inputs blancos).
+
+### Targeted
+- **AppRail logo** + **WorkspaceLogo/chip**: `bg-white → bg-iconic-white` (logo nunca se pierde en dark).
+- **ContextualNav** ("Lista/Nuevo"): `bg-white/70 → dark:bg-surface`, texto tabs theme-aware (fin de la franja clara).
+- **Topbar "Asistente"**: dark variant filled (surface-muted + line + content), sin borde claro que se pierde.
+- (Outline button visible + headers azul vivo: ya de V4.2.10.)
+
+### QA
+- typecheck 0 · lint 0 · build 0 · suite **2129/0 (+42 skip)** · gm 22/22 · diff-check limpio.
+- Light intacto (todo bajo `.dark`/`dark:`). Sin layout/lógica/DB/datos. No `-1rqh`. **Sin merge/tag/prod.**
+
+---
+
 ## 2026-06-27 — ICONIC_OPS_UIX_COLOR_CONTRAST_REFINEMENT_V4_2_10 — EN RAMA (sin merge) (orchestrator)
 
 ### Cambios sistémicos (color/contraste; sin layout ni lógica)

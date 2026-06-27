@@ -25,7 +25,7 @@ export function QuoteCompanionTopbarTrigger() {
       type="button"
       onClick={openCompanion}
       aria-label="Abrir asistente de cotización"
-      className="hidden items-center gap-1.5 rounded-md border border-iconic-soft-blue/70 px-2.5 py-1.5 text-xs font-medium text-iconic-primary transition-colors hover:bg-brand-50/60 lg:inline-flex"
+      className="hidden items-center gap-1.5 rounded-md border border-iconic-soft-blue/70 px-2.5 py-1.5 text-xs font-medium text-iconic-primary transition-colors hover:bg-brand-50/60 lg:inline-flex dark:border-line dark:bg-surface-muted dark:text-content dark:hover:bg-surface-soft"
     >
       <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
       Asistente

@@ -64,7 +64,7 @@ export function AppRail({
   }
 
   const logo = (
-    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white ring-1 ring-iconic-soft-blue/60">
+    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-iconic-white ring-1 ring-iconic-soft-blue/60">
       <Image src={logoSymbol} alt="" width={36} height={36} className="object-contain p-1" aria-hidden="true" />
     </span>
   );
