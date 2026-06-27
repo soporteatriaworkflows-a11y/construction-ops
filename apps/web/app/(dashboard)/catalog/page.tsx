@@ -17,13 +17,22 @@ import { getReadModel } from '@/server/read-model';
 import { resolveViewer } from '@/server/auth/resolve-viewer';
 import { resolveAuthMode } from '@/lib/supabase/env';
 import { isCreationModeEnabled } from '@/app/(dashboard)/projects/mode-guard';
-import { CatalogExplorer } from './catalog-explorer';
+import { CatalogExplorer, isOldPrice } from './catalog-explorer';
 import type { CatalogResourceView } from '@/lib/contracts/read-model';
 
 // Render request-time: viewer real por modo (db=autenticado, fixture=demo).
 export const dynamic = 'force-dynamic';
 
-export default async function CatalogPage() {
+export default async function CatalogPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = await searchParams;
+  const oneStr = (v: string | string[] | undefined): string => (Array.isArray(v) ? (v[0] ?? '') : (v ?? ''));
+  const initStatus = oneStr(sp.status) || 'all';
+  const initProvider = oneStr(sp.provider) || 'all';
+  const initAge = oneStr(sp.age) || 'all';
   const rm = getReadModel();
   let resources: CatalogResourceView[] = [];
   let viewerRole: string = 'consulta';
@@ -135,6 +144,8 @@ export default async function CatalogPage() {
   const catPending = resources.filter((r) => r.priceStatus === 'pending').length;
   const catNoSupplier = resources.filter((r) => !r.supplierName).length;
   const catNoPrice = resources.filter((r) => !r.priceStatus || r.priceStatus === 'none').length;
+  // Antigüedad (heurística UI ≥90d; NO "vencido" autoritativo) sobre priceDate existente.
+  const catOld = resources.filter((r) => isOldPrice(r.priceDate)).length;
 
   return (
     <div>
@@ -148,11 +159,11 @@ export default async function CatalogPage() {
 
       {resources.length > 0 && (
         <KpiBand className="mb-4">
-          <KpiCard label="Recursos" value={resources.length} />
-          <KpiCard label="Aprobados" value={catApproved} tone={catApproved > 0 ? 'ok' : 'default'} />
-          <KpiCard label="Pendientes" value={catPending} tone={catPending > 0 ? 'warn' : 'default'} />
-          <KpiCard label="Sin precio" value={catNoPrice} tone={catNoPrice > 0 ? 'warn' : 'ok'} />
-          <KpiCard label="Sin proveedor" value={catNoSupplier} tone={catNoSupplier > 0 ? 'warn' : 'default'} />
+          <KpiCard label="Aprobados" value={catApproved} tone={catApproved > 0 ? 'ok' : 'default'} href="/catalog?status=approved" hint="Precio confiable" />
+          <KpiCard label="Pendientes" value={catPending} tone={catPending > 0 ? 'warn' : 'default'} href="/catalog?status=pending" hint="Por revisar" />
+          <KpiCard label="Sin precio" value={catNoPrice} tone={catNoPrice > 0 ? 'warn' : 'ok'} href="/catalog?status=none" hint="Falta precio" />
+          <KpiCard label="Sin proveedor" value={catNoSupplier} tone={catNoSupplier > 0 ? 'warn' : 'default'} href="/catalog?provider=missing" hint="Sin fuente" />
+          <KpiCard label="Precios antiguos" value={catOld} tone={catOld > 0 ? 'warn' : 'ok'} href="/catalog?age=old" hint={`+90 días`} />
           <KpiCard label="Revisar precios" value="Abrir" href="/catalog/prices/review" hint="Aprobación en bloque" />
         </KpiBand>
       )}
@@ -176,7 +187,7 @@ export default async function CatalogPage() {
           secondaryAction={emptyStateSecondary}
         />
       ) : (
-        <CatalogExplorer resources={resources} />
+        <CatalogExplorer resources={resources} initialStatus={initStatus} initialProvider={initProvider} initialAge={initAge} />
       )}
 
       {/* Nota de privacidad — campos internos no mostrados */}

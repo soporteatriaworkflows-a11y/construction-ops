@@ -1,5 +1,19 @@
 # Handoff Log
 
+## 2026-06-27 — ICONIC_OPS_CATALOG_PRICE_CONTROL_CENTER_V5_2_1 — EN RAMA (sin merge) (orchestrator)
+
+- Rama `feature/catalog-price-control-center-v5-2-1` (base `origin/main = 86a55b9`). V5.2.1: `/catalog` como centro
+  de control de precios, **UI/UX sobre datos existentes** (CatalogResourceView: priceStatus/supplierName/priceDate). Sin backend.
+- Cambios: **KPI band accionable** (Aprobados/Pendientes/Sin precio/Sin proveedor/**Precios antiguos** → deep-link
+  `?status=…|provider=missing|age=old`); explorer acepta filtros iniciales desde searchParams (antes useState interno);
+  nuevos filtros **Antigüedad** (Todas/Reciente/Antiguo/Sin fecha) y **Sin proveedor**; **badge de antigüedad** por fila
+  (`priceAgeDays`, umbral UI 90d, "· revisar"; NO "vencido" autoritativo). Acciones por fila = enlaces existentes (price-intelligence/review).
+- **NO backend**: fuente manual/importado (no en la vista) y "vencido" autoritativo (monitor) → diferidos. Lógica de aprobación/cron intacta.
+- QA: typecheck 0 · lint 0 · tests catalog-price-control 13/0 · suite **2146/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio.
+- Sin tocar cálculos/`unit_price_snapshot`/exports/RPC/read-model/sync/APU V5.1/Workspace V3C/companion/Sin APU. No `-1rqh`. **Sin merge/tag/prod.**
+
+---
+
 ## 2026-06-27 — ICONIC_OPS_APU_OPERATIONAL_DEPTH_V5_1 (+V5.1.1) — RELEASED (merge + tag + prod smoke) (orchestrator)
 
 - Usuaria aprobó V5.1 + V5.1.1 (preview rama). **Merge `--no-ff` a main**: `origin/main` = **`e18050b`**
