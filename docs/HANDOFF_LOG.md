@@ -1,5 +1,21 @@
 # Handoff Log
 
+## 2026-06-27 — ICONIC_OPS_APU_OPERATIONAL_DEPTH_V5_1 (+V5.1.1) — RELEASED (merge + tag + prod smoke) (orchestrator)
+
+- Usuaria aprobó V5.1 + V5.1.1 (preview rama). **Merge `--no-ff` a main**: `origin/main` = **`e18050b`**
+  (parents `86578cc` + `c00b4bf`). **Tag** = **`iconic-ops-apu-operational-depth-v5-1`** → `e18050b`. **PR #7 MERGED.** 7 archivos.
+- Contenido: APU operational depth (próxima acción por estado en cards, CTA "Completar APU", KPIs accionables →
+  filtro de completitud) + hotfix dark (tintes claros con opacidad brand/cyan/blue → surface; simulador comercial; "Costos directos"). UI/UX, sin backend.
+- Deploy prod proyecto **construction-ops** (alias `construction-ops-psi`). Smoke OK: /login 200 ·
+  /dashboard·/apu(+view=cards+completeness ready/review/incomplete)·/catalog·/projects·/estimates·/quantities·/planning·/settings·/settings/access 307 ·
+  /api/estimates/export (sin params) **400 controlado**. Commit promovido no confirmable por API (MCP 403) → verificar Production/Current en dashboard.
+- **No-alcance**: sin Supabase/RLS/policies/migrations/Auth/envs/secrets/Vercel config/cálculos/fórmulas/exports/datos/RPC/read-model/permisos/`unit_price_snapshot`/sync BOQ/`construction-ops-1rqh`. Workspace V3C/companion/Sin APU/exports intactos.
+- **Pendientes V5.2 (documentados, NO implementar sin autorización; backend solo si se autoriza)**: Catálogo / Price
+  Intelligence como **centro de control de precios**; KPIs de precios vencidos/manuales/pendientes/con error; revisión de
+  fuentes y proveedores; acciones de revisión/aprobación de precios. (El countdown real y notas reales siguen como backend de V5.4.)
+
+---
+
 ## 2026-06-27 — ICONIC_OPS_APU_DARK_MODE_CONTRAST_HOTFIX_V5_1_1 — EN RAMA (sin merge) (orchestrator)
 
 - Misma rama `feature/apu-operational-depth-v5-1`. Causa: **tintes claros con opacidad no remapeados** en dark.
