@@ -19,6 +19,8 @@ import {
   formatRunStartedRelative,
   summarizeRunCounters,
   getLatestProblemRun,
+  formatCountdown,
+  formatTimeUntil,
 } from '../../../lib/pricing/monitor-ui';
 
 const read = (rel: string) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
@@ -145,8 +147,57 @@ describe('V5.2.2c — lectura de corridas (runs)', () => {
     expect(getLatestProblemRun(runs)?.status).toBe('partial');
     expect(getLatestProblemRun([{ status: 'completed' as const, errorSummary: null }])).toBeNull();
     expect(getLatestProblemRun([])).toBeNull();
-    // @ts-expect-error tolerancia runtime a undefined
-    expect(getLatestProblemRun(undefined)).toBeNull();
+    expect(getLatestProblemRun(undefined)).toBeNull(); // tolerante a undefined (firma lo acepta)
+  });
+});
+
+describe('V5.4.1 — countdown real (formatCountdown/formatTimeUntil)', () => {
+  const NOW3 = new Date('2026-06-27T12:00:00Z');
+
+  it('null / fecha inválida → "Sin revisión programada"', () => {
+    expect(formatTimeUntil(null, NOW3)).toBe('Sin revisión programada');
+    expect(formatTimeUntil(undefined, NOW3)).toBe('Sin revisión programada');
+    expect(formatTimeUntil('boom', NOW3)).toBe('Sin revisión programada');
+  });
+  it('vencido / ahora → "Atrasada"', () => {
+    expect(formatTimeUntil('2026-06-27T11:00:00Z', NOW3)).toBe('Atrasada');
+    expect(formatTimeUntil('2026-06-27T12:00:00Z', NOW3)).toBe('Atrasada');
+  });
+  it('futuro: minutos / horas / días', () => {
+    expect(formatTimeUntil('2026-06-27T12:18:00Z', NOW3)).toBe('en 18m');
+    expect(formatTimeUntil('2026-06-27T14:14:00Z', NOW3)).toBe('en 2h 14m');
+    expect(formatTimeUntil('2026-06-27T15:00:00Z', NOW3)).toBe('en 3h');
+    expect(formatTimeUntil('2026-06-28T15:00:00Z', NOW3)).toBe('en 1d 3h');
+    expect(formatTimeUntil('2026-06-29T12:00:00Z', NOW3)).toBe('en 2d');
+  });
+  it('formatCountdown es el mismo helper puro', () => {
+    expect(formatCountdown('2026-06-27T12:18:00Z', NOW3)).toBe('en 18m');
+  });
+});
+
+describe('V5.4.1 — fixture summary expone próxima revisión (determinista)', async () => {
+  it('contrato nuevo presente + próximo target enabled', async () => {
+    const { FixtureMonitorRepository } = await import('../../../server/pricing/monitor/fixture-repository');
+    const repo = new FixtureMonitorRepository();
+    const s = await repo.getMonitoringSummary();
+    expect(s).toHaveProperty('nextReviewAt');
+    expect(s).toHaveProperty('nextTargetId');
+    expect(s).toHaveProperty('nextTargetLabel');
+    // campos existentes intactos
+    expect(typeof s.monitoredCount).toBe('number');
+    expect(typeof s.activeCount).toBe('number');
+  });
+});
+
+describe('V5.4.1 — guards de dashboard (hardcode + server/client)', () => {
+  const dash = read('../../../app/(dashboard)/dashboard/page.tsx');
+  it('dashboard ya NO contiene "02h 18m" hardcoded', () => {
+    expect(dash).not.toContain('02h 18m');
+  });
+  it('dashboard usa el helper neutro y NO declara use client', () => {
+    expect(dash).toContain('formatCountdown');
+    expect(dash).toContain("from '@/lib/pricing/monitor-ui'");
+    expect(dash).not.toContain("'use client'");
   });
 });
 

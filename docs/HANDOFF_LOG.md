@@ -1,5 +1,22 @@
 # Handoff Log
 
+## 2026-06-27 — ICONIC_OPS_V5_4_1_REAL_MONITORING_COUNTDOWN_DASHBOARD — EN RAMA (sin merge) (orchestrator)
+
+- Rama `feature/v5-4-1-real-countdown-dashboard` (base `origin/main = aa4b8a3`). **Primer backend de V5.4**: countdown real
+  del dashboard desde `price_monitor_targets.next_check_at`. **Read-model aditivo + UI. SIN migración, SIN RLS nueva.**
+- `MonitoringSummary` extendido (aditivo): `nextReviewAt`/`nextTargetId`/`nextTargetLabel`. `db-repository.getMonitoringSummary`
+  añade sub-query org-scoped del próximo target enabled (order next_check_at asc limit 1) **en try/catch tolerante** (falla→nulls, no tumba summary).
+  `fixture-repository` con contrato determinista.
+- Helper neutro `lib/pricing/monitor-ui.ts`: `formatTimeUntil`/`formatCountdown` (PURO, request-time, sin setInterval/isla client;
+  null/inválido→"Sin revisión programada", <=now→"Atrasada", futuro→"en 18m"/"en 2h 14m"/"en 1d 3h").
+- Dashboard: `02h 18m` **hardcode eliminado** → `formatCountdown(nextReviewAt)` + `nextTargetLabel`; anillo SVG decorativo; `dynamic='force-dynamic'` + tolerancia conservados.
+- Server/client safe: dashboard (Server Component) importa el helper del módulo neutro; no isla client. Guards en tests (sin "02h 18m", sin 'use client').
+- QA: typecheck 0 · lint 0 · tests monitor-ui 31/0 (+invariants 15/0) · suite verde · build 0 · gm 22/22 · diff-check limpio (solo archivos de la fase).
+- ⚠️ **Requiere validación manual AUTENTICADA del preview antes de merge** (no solo 307). Sin tocar migrations/Supabase/RLS/
+  cron/actions/scraper/review/BOQ/APU/exports/`unit_price_snapshot`/`construction-ops-1rqh`. **Sin merge/tag/prod.**
+
+---
+
 ## 2026-06-27 — ICONIC_OPS_PRICE_MONITORING_RUNS_TIMELINE_V5_2_2C — RELEASED (merge + tag + prod smoke) (orchestrator)
 
 - Usuaria **validó preview AUTENTICADO** y aprobó. **Merge `--no-ff` a main**: `origin/main` = **`e659229`**
