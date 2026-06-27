@@ -43,4 +43,17 @@ describe('V4.2.3 — sistema visual premium', () => {
     expect(dash).toContain('IconChip');
     expect(dash).not.toContain('rounded-full bg-iconic-cyan/10'); // círculo decorativo eliminado en V4.2.2
   });
+
+  it('V4.2.5: dashboard editorial (DashMetric, sin mega-hero navy con gradiente)', () => {
+    const dash = read('../../../app/(dashboard)/dashboard/page.tsx');
+    expect(dash).toContain('DashMetric'); // tira de métricas plana
+    expect(dash).not.toContain("background: 'linear-gradient(180deg, #050a32"); // mega-hero navy eliminado
+    expect(dash).not.toContain('CommandStat'); // mini-cards navy eliminadas del hero
+  });
+
+  it('V4.2.5: dark mode graphite neutro (no navy saturado de base)', () => {
+    const css = read('../../../app/globals.css');
+    expect(css).toMatch(/\.dark[\s\S]*--c-surface:\s*#16171b/i); // superficie graphite, no navy
+    expect(css).toMatch(/\.dark[\s\S]*--c-line:\s*#292b32/i); // hairline neutro
+  });
 });

@@ -1,5 +1,24 @@
 # Handoff Log
 
+## 2026-06-26 — ICONIC_OPS_UIX_SIGNATURE_VISUAL_REDESIGN_V4_2_5 — EN RAMA (sin merge) (orchestrator)
+
+### Cambio de identidad (no más polish) — misma rama `feature/uix-theme-modes-v4-2`, PR #6
+- **Dark rearmado a graphite neutro** (Linear/Vercel/Raycast), NO navy saturado: app `#0c0d10`, surface
+  `#16171b`, soft `#1b1d22`, muted `#23252b`, line `#292b32`, content `#eceef2`, muted `#9a9ea8`. Navy ICONIC
+  pasa a ACENTO (rail/command bar/CTA). AG Grid dark + `.glass` dark realineados.
+- **Light**: off-white `#f5f6f8`, hairline `#e7e9ee`, texto casi-negro neutro `#1a1d23`, más aire.
+- **Dashboard recompuesto (editorial)**: eliminado el mega-hero navy + mini-cards (CommandStat/BlueprintBg/
+  IconPlate). Nueva composición: eyebrow → Total (cifra-héroe display) → barra de composición de costo →
+  tira de métricas plana hairline (`DashMetric`) → panel de distribución limpio.
+- **Card** premium: hairline + sombra suave + lift (claro), solo borde en dark. **Rail icons** refinados
+  (inactivo sin caja, activo con ring cian).
+
+### QA
+- typecheck 0 · lint 0 · tests `premium-system`/`theme-modes` ok · suite **2122/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio.
+- Conserva AppRail/hover/pin/CTA Asistente/toggle/tipografía/OperationsHeader. Workspace V3C/companion/Sin APU/rutas/exports intactos. Sin DB/Auth/envs/cálculos/datos. No `-1rqh`. **Sin merge/tag/prod.**
+
+---
+
 ## 2026-06-26 — ICONIC_OPS_UIX_SKILL_GUIDED_VISUAL_REFINEMENT_V4_2_4 — EN RAMA (sin merge) (orchestrator)
 
 ### Tooling de diseño (sin instalar nada en el repo)

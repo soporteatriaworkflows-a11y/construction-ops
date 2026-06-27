@@ -185,3 +185,49 @@ dashboard (cards + iconografía), y los componentes compartidos del shell.
 ### QA (V4.2.3)
 typecheck 0 · lint 0 · tests `premium-system` 5/0 · suite **2116/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio.
 Light limpio · dark elegante · navegación/rutas/Workspace V3C/companion/Sin APU/exports intactos · sin lógica sensible.
+
+---
+
+## V4.2.5 — Signature Visual Redesign
+
+Las iteraciones previas (.1–.4) eran polish incremental; la usuaria pedía un **cambio de identidad
+perceptible**. Problema raíz detectado: **dark = "todo navy saturado"** + superficies genéricas + dashboard
+"mega-card navy con cards adentro". Tesis (skill `frontend-design`: *gastar la audacia en un solo lugar*):
+**mover la base dark a graphite neutro (Linear/Vercel/Raycast) para que el navy ICONIC sea ACENTO, no la app entera.**
+
+### Dark mode (rearmado)
+- Base **graphite neutro de baja croma** (NO navy): `--c-app #0c0d10` · `--c-surface #16171b` ·
+  `--c-surface-soft #1b1d22` · `--c-surface-muted #23252b` · `--c-line #292b32` (hairline) ·
+  `--c-content #eceef2` (blanco suave) · `--c-content-muted #9a9ea8` (gris neutro).
+- Acentos ICONIC (azul/cian) **reservados** a CTA/estados/datos/rail. AG Grid dark realineado a graphite.
+- Resultado: el navy del rail/command bar **resalta como firma** sobre una base neutra; ya no "todo azul".
+
+### Light mode
+- Off-white `#f5f6f8`, hairlines suaves `#e7e9ee`, **texto casi-negro neutro** `#1a1d23` (menos "navy en el
+  texto"), más aire. Cards con sombra muy suave + lift sutil (Apple-like). Sin dañar la estética clara.
+
+### Dashboard (recomposición editorial)
+- **Eliminado el mega-hero navy** con gradiente/glow y sus mini-cards (`CommandStat`/`BlueprintBg`/`IconPlate`).
+- Nueva composición sobre superficies de tema: eyebrow → **Total presupuesto** como cifra-héroe display →
+  **barra de composición de costo** (instrumento firma, específico de obra) → **tira de métricas plana con
+  hairlines** (`DashMetric`, sin cajas navy) → **panel de distribución limpio**. "Diseñado, no ensamblado".
+
+### Card system / superficies
+- `Card` premium: hairline `+ ` sombra muy suave + lift al hover (claro); en **dark solo borde fino** (sin
+  sombra pesada, estilo Linear). Métricas planas con hairline dividers en vez de cajas con borde grueso.
+
+### Botones / iconos
+- Botones ya táctiles (V4.2.3); el dashboard ahora usa `Button` primario/`outline frosted` (no botones ad-hoc navy).
+- **Rail icons** refinados: inactivo **sin caja** (monoline limpio, hover sutil), activo con contenedor + ring cian.
+
+### Qué se conserva (V4.2.3/.4)
+AppRail (layout, hover-expand, pin, CTA Asistente), theme toggle, tipografía (Inter/Space Grotesk/JetBrains),
+iconografía monoline global, OperationsHeader navy (ahora como acento), KPI honestos, rutas/lógica.
+
+### Pendiente (V5)
+- Restyle profundo de tablas internas (Workspace/Catálogo) con el nuevo sistema de superficies.
+- Variantes formales de card (primary/secondary/action/status) como API; extender `DashMetric`/IconChip a más módulos.
+
+### QA (V4.2.5)
+typecheck 0 · lint 0 · tests `premium-system`/`theme-modes` ok · suite **2122/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio.
+Sin tocar lógica/DB/Auth/envs/cálculos/exports/datos · Workspace V3C/companion/Sin APU/rutas intactos · no `-1rqh`.

@@ -417,6 +417,17 @@ Tipografía deliberada (self-hosted vía `next/font`, sin dependencia nueva), gu
 Regla: cifras-héroe y títulos de módulo → `font-display`; cuerpo → `font-sans`; datos → `font-mono`.
 Quality floor: `prefers-reduced-motion` respetado (globals.css). Audacia concentrada (hero aplanado).
 
+## 12.h Identidad V4.2.5 (dark graphite + dashboard editorial)
+
+- **Dark = graphite neutro** (Linear/Vercel/Raycast), NO navy saturado: el azul/cian ICONIC es **acento**
+  (rail, command bar, CTA, datos/estados), no la base. Tokens en `globals.css` (`.dark`).
+- **Light = off-white** con hairlines suaves y texto casi-negro neutro (menos navy en el texto), más aire.
+- **Dashboard editorial**: sin mega-hero navy; eyebrow → cifra-héroe display → barra de composición de costo
+  (instrumento firma) → tira de métricas plana con hairlines (`DashMetric`) → panel de distribución limpio.
+  Evitar "card dentro de card" y bloques navy dominantes.
+- **Cards**: hairline + sombra muy suave + lift (claro); en dark solo borde fino. No bordes pesados.
+- Regla: la audacia se concentra (rail/command bar como firma navy); el resto, superficies de tema calmadas.
+
 ## 13. Roadmap visual
 
 | Fase | Módulo | Foco |

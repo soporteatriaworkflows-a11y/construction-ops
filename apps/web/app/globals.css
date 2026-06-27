@@ -18,28 +18,29 @@
     --iconic-gray: #f2f4f7;
     --iconic-white: #ffffff;
 
-    /* Tokens SEMÁNTICOS de tema — LIGHT (replican la estética actual). */
-    --c-app: #f2f4f7; /* fondo de página (iconic-gray) */
+    /* Tokens SEMÁNTICOS — LIGHT (Apple-like: off-white limpio, hairlines suaves,
+       texto casi-negro neutro). V4.2.5: menos "navy en el texto", más aire. */
+    --c-app: #f5f6f8; /* off-white frío, no blanco plano */
     --c-surface: #ffffff; /* cards / tablas / inputs */
-    --c-surface-soft: #f8fafc; /* cabeceras de tabla, zonas suaves */
-    --c-surface-muted: #eef2f7; /* franjas/realces sutiles */
-    --c-line: #e5e7eb; /* bordes (gris frío) */
-    --c-content: #1b1f3e; /* texto principal (graphite) */
+    --c-surface-soft: #f7f8fa; /* zonas suaves / cabeceras */
+    --c-surface-muted: #eef0f4; /* franjas/realces sutiles */
+    --c-line: #e7e9ee; /* hairline suave */
+    --c-content: #1a1d23; /* texto principal: casi-negro neutro (no navy) */
     --c-content-muted: #6b7280; /* texto secundario */
   }
 
-  /* Tokens SEMÁNTICOS de tema — DARK (command center ICONIC, sobrio, neutro-profundo).
-     V4.2.2: menos saturación/“azul pesado”; superficies más neutras y con más respiración;
-     mejor contraste entre fondo→superficie→contenido. El acento de marca (azul/cian) se reserva
-     para puntos clave, así resalta sobre una base más calmada. No negro puro. */
+  /* Tokens SEMÁNTICOS — DARK (V4.2.5: GRAPHITE NEUTRO tipo Linear/Vercel/Raycast).
+     Base charcoal de muy baja croma (NO navy saturado): así el azul/cian ICONIC pasa a ser
+     ACENTO de marca (rail, command bar, datos/estados activos) en vez de "toda la app azul".
+     Capas sutiles con hairline fino; blanco suave (no quemado); secundario gris-azulado. */
   .dark {
-    --c-app: #0a0e16; /* base neutra profunda (apenas navy) */
-    --c-surface: #141925; /* superficie elevada sobria */
-    --c-surface-soft: #1b2230;
-    --c-surface-muted: #232c3d;
-    --c-line: #2c3647; /* borde gris-azulado sutil */
-    --c-content: #eef2f8; /* blanco técnico suave */
-    --c-content-muted: #9aa8c0; /* gris-azulado, menos saturado */
+    --c-app: #0c0d10; /* charcoal casi-negro neutro */
+    --c-surface: #16171b; /* card */
+    --c-surface-soft: #1b1d22; /* zonas suaves */
+    --c-surface-muted: #23252b; /* realces / hover */
+    --c-line: #292b32; /* hairline fino */
+    --c-content: #eceef2; /* blanco suave (no #fff) */
+    --c-content-muted: #9a9ea8; /* gris neutro, leve frío */
   }
 
   *,
@@ -160,8 +161,8 @@ svg.lucide {
   border: 1px solid rgba(2, 1, 72, 0.08);
 }
 .dark .glass {
-  background-color: rgba(20, 25, 37, 0.66);
-  border-color: rgba(255, 255, 255, 0.08);
+  background-color: rgba(22, 23, 27, 0.66);
+  border-color: rgba(255, 255, 255, 0.07);
 }
 /* Glass oscuro (sobre el rail navy): vidrio azul-noche translúcido. */
 .glass-navy {
@@ -171,14 +172,14 @@ svg.lucide {
 
 /* AG Grid — variante dark (tablas BOQ legibles en modo oscuro). */
 .dark .ag-theme-alpine {
-  --ag-background-color: #0b1230;
-  --ag-foreground-color: #f8fafc;
-  --ag-header-background-color: #101a3d;
-  --ag-header-foreground-color: #aebfdb;
-  --ag-border-color: #25345f;
-  --ag-row-border-color: #1b2748;
-  --ag-odd-row-background-color: #0d1738;
-  --ag-selected-row-background-color: #14224a;
+  --ag-background-color: #16171b;
+  --ag-foreground-color: #eceef2;
+  --ag-header-background-color: #1b1d22;
+  --ag-header-foreground-color: #9a9ea8;
+  --ag-border-color: #292b32;
+  --ag-row-border-color: #212329;
+  --ag-odd-row-background-color: #181a1e;
+  --ag-selected-row-background-color: #1f2330;
   --ag-range-selection-border-color: #2f7bff;
   --ag-input-focus-border-color: #2f7bff;
 }

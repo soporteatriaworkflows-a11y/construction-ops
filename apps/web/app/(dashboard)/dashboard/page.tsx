@@ -44,7 +44,7 @@ import { EmptyState } from '@/components/shared/empty-state';
 import { Button } from '@/components/ui/button';
 import { KpiCard } from '@/modules/dashboard/kpi-card';
 import { costSplitPct } from '@/modules/dashboard/visual-metrics';
-import { BlueprintBg, CommandStat, Sparkbars, IconPlate } from '@/modules/dashboard/command-center';
+import { Sparkbars } from '@/modules/dashboard/command-center';
 import { ChapterDistributionSection } from '@/modules/dashboard/chapter-distribution-section';
 import { SavingsSection } from '@/modules/dashboard/savings-section';
 import { getReadModel, resolveSource } from '@/server/read-model';
@@ -129,6 +129,17 @@ function AlertCard({
       </div>
       <ArrowRight className="h-4 w-4 shrink-0 text-gray-300 transition-transform group-hover:translate-x-0.5 group-hover:text-iconic-primary" aria-hidden="true" />
     </Link>
+  );
+}
+
+/** Métrica plana del centro de mando (tira hairline; sin caja navy). */
+function DashMetric({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div className="bg-surface p-4">
+      <p className="text-[10px] font-medium uppercase tracking-wide text-content-muted">{label}</p>
+      <p className="mt-1 font-display text-lg font-bold tabular-nums text-content">{value}</p>
+      {sub && <p className="mt-0.5 text-[10px] text-content-muted">{sub}</p>}
+    </div>
   );
 }
 
@@ -277,90 +288,70 @@ export default async function DashboardPage() {
 
   return (
     <div>
-      {/* ZONA 1 — Centro de mando financiero (bloque navy, blueprint + glow cian) */}
-      <section
-        className="relative mb-6 overflow-hidden rounded-2xl border border-white/10 px-6 py-7 text-white"
-        style={{
-          background: 'linear-gradient(180deg, #050a32 0%, #020148 100%)',
-          boxShadow: '0 18px 50px -28px rgba(2,1,72,0.6)',
-        }}
-      >
-        <BlueprintBg />
-        <div className="relative grid gap-6 lg:grid-cols-[1.4fr_1fr]">
-          {/* Columna izquierda: cifras protagonistas */}
+      {/* ZONA 1 — Centro de mando (editorial; superficies de tema, navy SOLO como acento) */}
+      <section aria-label="Centro de mando" className="mb-8">
+        <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <IconPlate variant="glow"><LayoutDashboard className="h-5 w-5" aria-hidden="true" /></IconPlate>
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-iconic-cyan">Centro de mando</p>
-                <p className="text-sm text-white/70">Resumen financiero del proyecto activo</p>
-              </div>
+            <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-iconic-primary dark:text-iconic-cyan">
+              <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
+              Centro de mando
+            </p>
+            <p className="mt-2.5 text-[11px] font-medium uppercase tracking-wide text-content-muted">
+              Total presupuesto · <span className="text-content">{statusLabel}</span>
+            </p>
+            <p className="font-display text-[2.75rem] font-bold leading-none tracking-tight tabular-nums text-content">
+              {formatCOP(summary.budget)}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild size="sm">
+              <Link href={`/projects/${projectId}`}>Ver proyecto</Link>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <Link href="/planning"><CalendarRange className="h-4 w-4" aria-hidden="true" />Cronograma</Link>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <Link href="/catalog"><Package className="h-4 w-4" aria-hidden="true" />Catálogo</Link>
+            </Button>
+          </div>
+        </div>
+
+        {/* Composición de costo — instrumento firma (específico de obra) */}
+        {split.directPct + split.indirectPct > 0 && (
+          <div className="mt-5 max-w-xl">
+            <div className="flex h-2 w-full overflow-hidden rounded-full bg-surface-muted" aria-hidden="true">
+              <span className="block h-full bg-iconic-primary" style={{ width: `${split.directPct}%` }} />
+              <span className="block h-full bg-iconic-cyan/70" style={{ width: `${split.indirectPct}%` }} />
             </div>
-
-            <div className="mt-5 flex flex-wrap items-end gap-x-6 gap-y-3">
-              <div>
-                <p className="text-[11px] font-medium uppercase tracking-wide text-iconic-soft-blue/70">Total presupuesto</p>
-                <p className="font-display text-4xl font-bold leading-none tracking-tight tabular-nums">{formatCOP(summary.budget)}</p>
-              </div>
-              <span className="inline-flex items-center gap-2 rounded-lg bg-white/[0.06] px-3 py-1.5 text-xs text-white ring-1 ring-inset ring-white/15">
-                <span className="text-[10px] font-medium uppercase tracking-wider text-iconic-soft-blue/60">Estado</span>
-                <span className="font-semibold">{statusLabel}</span>
-              </span>
-            </div>
-
-            {/* Composición directo vs indirecto */}
-            {split.directPct + split.indirectPct > 0 && (
-              <div className="mt-5 max-w-md">
-                <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-white/10 ring-1 ring-inset ring-white/10" aria-hidden="true">
-                  <span className="block h-full bg-gradient-to-r from-iconic-primary to-iconic-cyan" style={{ width: `${split.directPct}%` }} />
-                  <span className="block h-full bg-iconic-soft-blue/40" style={{ width: `${split.indirectPct}%` }} />
-                </div>
-                <div className="mt-2 flex gap-5 text-[11px] text-white/70">
-                  <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-iconic-cyan" aria-hidden="true" />Directos <strong className="font-semibold text-white">{split.directPct}%</strong></span>
-                  <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-iconic-soft-blue/50" aria-hidden="true" />Indirectos AIU <strong className="font-semibold text-white">{split.indirectPct}%</strong></span>
-                </div>
-              </div>
-            )}
-
-            {/* Tiles de dato integrados */}
-            <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <CommandStat label="Costos directos" value={formatCOP(summary.directCost)} accentBar="cyan" />
-              <CommandStat label="Indirectos (AIU)" value={formatCOP(summary.indirectCost)} accentBar="soft" />
-              <CommandStat label="Proyectos" value={String(projectCount)} sub="visibles" />
-              <CommandStat label="Presupuestos activos" value={activeEstimateCount === null ? '—' : String(activeEstimateCount)} sub="vigentes" />
-            </div>
-
-            <div className="mt-5 flex flex-wrap gap-2">
-              <Button asChild size="sm" className="bg-iconic-cyan text-iconic-ink hover:bg-iconic-cyan/85">
-                <Link href={`/projects/${projectId}`}>Ver proyecto</Link>
-              </Button>
-              <Button asChild size="sm" variant="outline" className="border-white/30 bg-white/[0.04] text-white hover:bg-white/10">
-                <Link href="/planning"><CalendarRange className="h-4 w-4" aria-hidden="true" />Cronograma</Link>
-              </Button>
-              <Button asChild size="sm" variant="outline" className="border-white/30 bg-white/[0.04] text-white hover:bg-white/10">
-                <Link href="/catalog"><Package className="h-4 w-4" aria-hidden="true" />Catálogo</Link>
-              </Button>
+            <div className="mt-2 flex gap-5 text-[11px] text-content-muted">
+              <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-iconic-primary" aria-hidden="true" />Directos <strong className="font-semibold text-content">{split.directPct}%</strong></span>
+              <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-iconic-cyan/70" aria-hidden="true" />Indirectos AIU <strong className="font-semibold text-content">{split.indirectPct}%</strong></span>
             </div>
           </div>
+        )}
 
-          {/* Columna derecha: distribución por capítulo — integrada (divisor, sin sub-card) */}
-          <div className="lg:border-l lg:border-white/10 lg:pl-6">
-            <div className="flex items-center justify-between">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-iconic-soft-blue/70">Distribución por capítulo</p>
-              <span className="text-[11px] text-white/50">{sparkValues.length} cap.</span>
-            </div>
-            {sparkValues.length > 0 ? (
-              <>
-                <div className="mt-3 h-24">
-                  <Sparkbars values={sparkValues} />
-                </div>
-                <p className="mt-2 text-[11px] text-white/55">Peso relativo de cada capítulo en el costo directo.</p>
-              </>
-            ) : (
-              <p className="mt-6 text-sm text-white/50">Sin capítulos para graficar todavía.</p>
-            )}
-            <p className="mt-4 text-[11px] text-white/45">Actualizado {formatDateTime(summary.lastUpdatedAt)}</p>
+        {/* Tira de métricas — plana, hairline, sin cajas navy */}
+        <div className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-4">
+          <DashMetric label="Costos directos" value={formatCOP(summary.directCost)} />
+          <DashMetric label="Indirectos (AIU)" value={formatCOP(summary.indirectCost)} />
+          <DashMetric label="Proyectos" value={String(projectCount)} sub="visibles" />
+          <DashMetric label="Presupuestos activos" value={activeEstimateCount === null ? '—' : String(activeEstimateCount)} sub="vigentes" />
+        </div>
+
+        {/* Distribución por capítulo — panel limpio */}
+        <div className="mt-4 rounded-xl border border-line bg-surface p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)] dark:shadow-none">
+          <div className="flex items-center justify-between">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-content-muted">Distribución por capítulo</p>
+            <span className="text-[11px] text-content-muted">{sparkValues.length} cap.</span>
           </div>
+          {sparkValues.length > 0 ? (
+            <div className="mt-3 h-20">
+              <Sparkbars values={sparkValues} />
+            </div>
+          ) : (
+            <p className="mt-4 text-sm text-content-muted">Sin capítulos para graficar todavía.</p>
+          )}
+          <p className="mt-3 text-[11px] text-content-muted">Actualizado {formatDateTime(summary.lastUpdatedAt)}</p>
         </div>
       </section>
 

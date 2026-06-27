@@ -76,12 +76,12 @@ function NavLink({
         )}
         <span
           className={cn(
-            'flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors',
-            active ? 'bg-white/15' : 'bg-white/[0.04] group-hover:bg-white/10',
+            'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors',
+            active ? 'bg-white/15 ring-1 ring-inset ring-iconic-cyan/30' : 'group-hover:bg-white/[0.07]',
           )}
           aria-hidden="true"
         >
-          <Icon className={cn('h-4 w-4', active ? 'text-white' : 'text-iconic-soft-blue')} />
+          <Icon className={cn('h-[18px] w-[18px]', active ? 'text-white' : 'text-iconic-soft-blue/80 group-hover:text-white')} />
         </span>
         {expanded && <span className="truncate">{label}</span>}
       </Link>
