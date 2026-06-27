@@ -41,21 +41,10 @@ const RESOURCE_TYPE_VARIANT: Record<string, 'default' | 'secondary' | 'destructi
   other: 'outline',
 };
 
-/**
- * Antigüedad del precio (heurística UI, NO "vencido" autoritativo). Umbral V5.2.1 = 90 días.
- * Devuelve días desde `priceDate`, o null si no hay fecha.
- */
-export const PRICE_OLD_THRESHOLD_DAYS = 90;
-export function priceAgeDays(priceDate: string | null | undefined, now: Date = new Date()): number | null {
-  if (!priceDate) return null;
-  const t = Date.parse(priceDate);
-  if (!Number.isFinite(t)) return null;
-  return Math.max(0, Math.floor((now.getTime() - t) / 86_400_000));
-}
-export function isOldPrice(priceDate: string | null | undefined): boolean {
-  const d = priceAgeDays(priceDate);
-  return d !== null && d >= PRICE_OLD_THRESHOLD_DAYS;
-}
+// Antigüedad de precio: en módulo PURO (server-safe). NO definir aquí ('use client')
+// para no romper el Server Component que los llama. Import para uso local + re-export por compat.
+import { PRICE_OLD_THRESHOLD_DAYS, priceAgeDays, isOldPrice } from '@/lib/catalog/price-age';
+export { PRICE_OLD_THRESHOLD_DAYS, priceAgeDays, isOldPrice };
 
 export interface CatalogFilters {
   search: string;

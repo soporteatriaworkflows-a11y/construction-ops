@@ -5,14 +5,9 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import {
-  priceAgeDays,
-  isOldPrice,
-  filterResources,
-  PRICE_OLD_THRESHOLD_DAYS,
-  type CatalogFilters,
-} from '../../../app/(dashboard)/catalog/catalog-explorer';
-import type { CatalogResourceView } from '@/server/read-model/types';
+import { priceAgeDays, isOldPrice, PRICE_OLD_THRESHOLD_DAYS } from '../../../lib/catalog/price-age';
+import { filterResources, type CatalogFilters } from '../../../app/(dashboard)/catalog/catalog-explorer';
+import type { CatalogResourceView } from '@/lib/contracts/read-model';
 
 const read = (rel: string) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
 const NOW = new Date('2026-06-27T00:00:00Z');

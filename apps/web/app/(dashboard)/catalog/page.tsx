@@ -17,7 +17,8 @@ import { getReadModel } from '@/server/read-model';
 import { resolveViewer } from '@/server/auth/resolve-viewer';
 import { resolveAuthMode } from '@/lib/supabase/env';
 import { isCreationModeEnabled } from '@/app/(dashboard)/projects/mode-guard';
-import { CatalogExplorer, isOldPrice } from './catalog-explorer';
+import { CatalogExplorer } from './catalog-explorer';
+import { isOldPrice } from '@/lib/catalog/price-age';
 import type { CatalogResourceView } from '@/lib/contracts/read-model';
 
 // Render request-time: viewer real por modo (db=autenticado, fixture=demo).
