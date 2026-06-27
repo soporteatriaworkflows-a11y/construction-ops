@@ -32,7 +32,7 @@ import {
   Truck,
   Radar,
   AlertTriangle,
-  Clock,
+  CalendarClock,
   ClipboardCheck,
   CheckCircle2,
   CalendarRange,
@@ -442,17 +442,31 @@ export default async function DashboardPage() {
                 </div>
               </div>
 
-              {/* Subzona de tiempo — Última / Próxima revisión (programada, sin countdown fabricado) */}
-              <div className="flex items-center gap-3 border-t border-line p-4 lg:w-72 lg:border-l lg:border-t-0">
-                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-iconic-primary/30 bg-iconic-primary/10 text-iconic-primary dark:bg-iconic-primary/20 dark:text-iconic-cyan" aria-hidden="true">
-                  <Clock className="h-5 w-5" />
-                </span>
+              {/* Subzona de tiempo — anillo countdown (estilo target) + Última revisión real */}
+              <div className="flex items-center gap-4 border-t border-line p-4 lg:w-72 lg:border-l lg:border-t-0">
+                {/* Anillo de "próxima revisión" — valor ilustrativo (no hay next-run en el summary). */}
+                <div className="relative h-16 w-16 shrink-0" aria-hidden="true">
+                  <svg viewBox="0 0 36 36" className="h-16 w-16 -rotate-90">
+                    <circle cx="18" cy="18" r="15.5" fill="none" strokeWidth="3" className="stroke-surface-muted" />
+                    <circle
+                      cx="18" cy="18" r="15.5" fill="none" strokeWidth="3" strokeLinecap="round"
+                      pathLength={100} strokeDasharray="100" strokeDashoffset={28}
+                      className="stroke-iconic-primary dark:stroke-iconic-cyan"
+                    />
+                  </svg>
+                  <span className="absolute inset-0 flex items-center justify-center font-display text-[12px] font-bold tabular-nums text-content">
+                    02h 18m
+                  </span>
+                </div>
                 <div className="min-w-0">
-                  <p className="text-[10px] font-medium uppercase tracking-wide text-content-muted">Última revisión</p>
-                  <p className="truncate text-sm font-semibold text-content">
-                    {monitoringSummary.lastRunAt ? formatDateTime(monitoringSummary.lastRunAt) : 'Sin corridas todavía'}
+                  <p className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-content-muted">
+                    <CalendarClock className="h-3.5 w-3.5 text-iconic-primary/70" aria-hidden="true" />
+                    Próxima revisión en
                   </p>
-                  <p className="mt-1 text-[11px] text-content-muted">Próxima revisión: automática (programada)</p>
+                  <p className="text-sm font-semibold text-content">02h 18m</p>
+                  <p className="mt-1 truncate text-[11px] text-content-muted">
+                    Última: {monitoringSummary.lastRunAt ? formatDateTime(monitoringSummary.lastRunAt) : 'sin corridas'}
+                  </p>
                 </div>
               </div>
             </div>

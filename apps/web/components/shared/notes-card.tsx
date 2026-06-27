@@ -30,17 +30,20 @@ export function NotesCard({ className }: { className?: string }) {
           <Plus className="h-3.5 w-3.5" />
         </span>
       </div>
-      <ul className="mt-3 space-y-2" role="list">
+      <ul className="mt-3 space-y-2.5" role="list">
         {EXAMPLE_NOTES.map((note) => (
-          <li key={note} className="flex items-start gap-2 text-sm text-content">
-            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-iconic-primary/60" aria-hidden="true" />
+          <li key={note} className="flex items-start gap-2.5 text-sm text-content">
+            <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-iconic-primary" aria-hidden="true" />
             <span className="min-w-0">{note}</span>
           </li>
         ))}
       </ul>
-      <p className="mt-3 border-t border-line pt-2 text-[11px] text-content-muted">
-        Ejemplos · gestión de notas próximamente
-      </p>
+      <div className="mt-3 flex items-center justify-between border-t border-line pt-2.5">
+        <span className="text-[11px] font-medium text-iconic-primary/80" title="Gestión de notas — próximamente">
+          Ver todas las notas
+        </span>
+        <span className="text-[10px] text-content-muted">Ejemplos</span>
+      </div>
     </SurfaceCard>
   );
 }

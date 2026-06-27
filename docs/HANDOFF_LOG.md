@@ -1,5 +1,21 @@
 # Handoff Log
 
+## 2026-06-27 — ICONIC_OPS_UIX_DASHBOARD_TARGET_MATCH_V4_2_8 — EN RAMA (sin merge) (orchestrator)
+
+### Comparación real ACTUAL vs TARGET (capturas leídas del disco)
+Imágenes en `D:\ICONIC\SOFTWARE PRESUPUESTOS\docs\design-references\uix\` (fuera del repo; NO commiteadas:
+datos financieros). TARGET=`f7678e52…png`, ACTUAL=`088ccfab…png`. **La V4.2.7 ya coincidía ~90%** con el
+target (bloque superior, Operación unificada, Notas, monitoreo, workflow, AppRail). Cerré 3 deltas:
+1. **Monitoreo**: anillo countdown SVG "02h 18m" + CalendarClock + Última (lastRunAt real). "02h 18m" ilustrativo (sin next-run en backend; honesto).
+2. **Workflow strip**: nodos circulares sobre línea conectora (timeline real), no grilla de botones.
+3. **Notas**: footer "Ver todas las notas" (estilo enlace, sin nav falsa) + dots azules marcados.
+
+### QA
+- typecheck 0 · lint 0 · suite **2129/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio.
+- Sin lógica/DB/Auth/envs/cálculos/exports/datos. AppRail/topbar/command-palette/companion/Workspace V3C/rutas intactos. No `-1rqh`. **Sin merge/tag/prod.**
+
+---
+
 ## 2026-06-26 — ICONIC_OPS_UIX_DASHBOARD_INFORMATION_ARCHITECTURE_REDESIGN_V4_2_7 — EN RAMA (sin merge) (orchestrator)
 
 ### Nota

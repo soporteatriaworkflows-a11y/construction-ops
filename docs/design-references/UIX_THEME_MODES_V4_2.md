@@ -339,3 +339,25 @@ y alertas" y ahorros NO se tocaron.
 
 ### QA (V4.2.7)
 typecheck 0 · lint 0 · tests `premium-system`/`workspace-route-config`/`ui-and-invariants` ok · suite **2129/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio.
+
+---
+
+## V4.2.8 — Dashboard target match (cierre de deltas)
+
+Se compararon las capturas reales **ACTUAL** (`088ccfab…png`) vs **TARGET** (`f7678e52…png`) leídas desde
+`D:\ICONIC\SOFTWARE PRESUPUESTOS\docs\design-references\uix\` (fuera del repo; NO se commitean: muestran datos
+financieros). **Hallazgo:** la composición V4.2.7 ya coincidía ~90% con el target (mismo bloque superior,
+Operación unificada, Notas, monitoreo, workflow). Se cerraron 3 deltas concretos hacia el target:
+
+1. **Monitoreo — anillo countdown**: la subzona de tiempo pasó de un reloj + texto a un **anillo circular**
+   (SVG donut) con **"02h 18m"** al centro + icono `CalendarClock` + "Próxima revisión en" + "Última: {lastRunAt real}".
+   ⚠️ El "02h 18m" es **valor ilustrativo** (el summary no tiene next-run; honesto, igual que el mock del target).
+2. **Workflow strip → timeline**: nodos **circulares** (`rounded-full`, borde 2px, actual relleno azul) sobre
+   una **línea conectora** con leve degradado; "Cotizar con asistente" = "Actual". Menos "grilla de botones", más timeline.
+3. **Notas rápidas**: footer cambió a **"Ver todas las notas"** (estilo enlace, `title` "próximamente"; sin nav
+   falsa) + dots azules más marcados.
+
+Lo demás del dashboard NO se rehizo (ya coincidía). AppRail/topbar/command-palette/tema sin cambios.
+
+### QA (V4.2.8)
+typecheck 0 · lint 0 · suite **2129/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio. Sin lógica/DB/datos · no `-1rqh`.
