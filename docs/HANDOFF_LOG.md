@@ -1,18 +1,23 @@
 # Handoff Log
 
-## 2026-06-27 — ICONIC_OPS_PRICE_MONITORING_RUNS_TIMELINE_V5_2_2C — EN RAMA (sin merge) (orchestrator)
+## 2026-06-27 — ICONIC_OPS_PRICE_MONITORING_RUNS_TIMELINE_V5_2_2C — RELEASED (merge + tag + prod smoke) (orchestrator)
 
-- Rama `feature/price-monitoring-runs-timeline-v5-2-2c` (base `origin/main = 59ab4bb`). Remate ligero de "Corridas
-  recientes" en `/catalog/monitoring`, **UI/UX sobre `MonitorRunView`**. Sin backend, sin cron/actions, server-rendered.
+- Usuaria **validó preview AUTENTICADO** y aprobó. **Merge `--no-ff` a main**: `origin/main` = **`e659229`**
+  (parents `59ab4bb` + `a706994`). **Tag** = **`iconic-ops-price-monitoring-runs-timeline-v5-2-2c`** → `e659229`. **PR #12 MERGED.** 6 archivos.
+- Remate ligero de "Corridas recientes" en `/catalog/monitoring`, **UI/UX sobre `MonitorRunView`**. Sin backend, sin cron/actions, server-rendered.
 - Helpers neutros añadidos a `lib/pricing/monitor-ui.ts` (sin `'use client'`): getRunStatusLabel/getRunStatusTone,
   formatRunDuration (Xs/Xm Ys / En curso / Sin duración), formatRunStartedRelative, summarizeRunCounters (chips), getLatestProblemRun. PUROS y tolerantes.
 - Cambios: **timeline `<ol>`** (puntos por tono) con badge de estado + trigger + tiempo relativo (fecha en title) +
   **duración derivada** + **counters como chips** (Fallidos>0 en rojo) + errorSummary; **callout "Última corrida con
   incidencias"** si failed/partial/errorSummary; `runStatusBadge` ahora vía helpers.
 - Server/client safe: timeline server-rendered, sin isla client; page no importa de `monitor-controls`. Guard en tests.
-- QA: typecheck 0 · lint 0 · tests monitor-ui 24/0 · suite verde · build 0 · gm 22/22 · diff-check limpio (solo archivos de la fase).
-- ⚠️ **Requiere validación manual AUTENTICADA del preview antes de merge** (no solo 307). Sin tocar cron/actions/DB/RLS/
-  read-model/`unit_price_snapshot`/dashboard countdown/`construction-ops-1rqh`. V5.2.2b intacto. **Sin merge/tag/prod.**
+- QA: typecheck 0 · lint 0 · tests monitor-ui 24/0 · suite verde · build 0 · gm 22/22 · diff-check limpio (solo 6 archivos de la fase).
+- Deploy prod proyecto **construction-ops** (alias `construction-ops-psi`). Smoke OK: /login 200 · /catalog/monitoring(+status
+  all/healthy/overdue/error/paused)·/catalog·/prices/review·/providers·/apu·/dashboard·/projects·/estimates·/quantities·/planning·
+  /settings 307 · /api/estimates/export **400 controlado** · /api/cron/price-monitor **401**. Commit promovido no confirmable por API (MCP 403) → verificar Production en dashboard.
+- Sin tocar cron/actions/DB/RLS/read-model/`unit_price_snapshot`/dashboard countdown/sync/aprobación/scraper/`construction-ops-1rqh`. V5.2.2b/Catálogo V5.2.1/APU V5.1/exports intactos.
+- **Price Intelligence queda completo en lo realizable sin backend** (panel V5.2.2a + filtros/deep-links V5.2.2b + corridas V5.2.2c).
+  **Pendientes = backend (V5.4)**: detalle por target dentro de la corrida, countdown agregado en dashboard, notas reales. NO implementar sin autorización.
 
 ---
 
