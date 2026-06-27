@@ -39,11 +39,11 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { OperationsHeader } from '@/components/shared/operations-header';
-import { IconChip } from '@/components/shared/iconic-icon';
 import { SurfaceCard } from '@/components/shared/surface-card';
+import { NotesCard } from '@/components/shared/notes-card';
+import { WorkflowStrip } from '@/components/shared/workflow-strip';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Button } from '@/components/ui/button';
-import { KpiCard } from '@/modules/dashboard/kpi-card';
 import { costSplitPct } from '@/modules/dashboard/visual-metrics';
 import { Sparkbars } from '@/modules/dashboard/command-center';
 import { ChapterDistributionSection } from '@/modules/dashboard/chapter-distribution-section';
@@ -59,27 +59,6 @@ import { selectActiveProjectId } from './select-active-project';
 
 /** Render en REQUEST-TIME (ver cabecera). Igual que `/projects` y `/projects/new`. */
 export const dynamic = 'force-dynamic';
-
-/**
- * Acceso rápido del dashboard operativo (navegación, sin datos sensibles).
- * Tile tipo "centro de control": ícono en placa de marca + etiqueta + flecha.
- */
-function QuickLink({ href, label, icon }: { href: string; label: string; icon: React.ReactNode }) {
-  return (
-    <Link
-      href={href}
-      className="group flex flex-col gap-2 rounded-xl border border-gray-200 bg-white p-3 transition-all hover:-translate-y-0.5 hover:border-iconic-primary/40 hover:shadow-iconic"
-    >
-      <span className="flex items-center justify-between">
-        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-50 text-iconic-primary transition-colors group-hover:bg-iconic-primary group-hover:text-white">
-          {icon}
-        </span>
-        <ArrowRight className="h-4 w-4 text-gray-300 transition-transform group-hover:translate-x-0.5 group-hover:text-iconic-primary" aria-hidden="true" />
-      </span>
-      <span className="text-sm font-medium leading-tight text-iconic-ink">{label}</span>
-    </Link>
-  );
-}
 
 /**
  * Tarjeta de pendiente/alerta con estado vacío premium. `count`:
@@ -133,12 +112,30 @@ function AlertCard({
   );
 }
 
-/** Métrica plana del centro de mando (tira hairline; sin caja navy). */
-function DashMetric({ label, value, sub }: { label: string; value: string; sub?: string }) {
+/** Métrica plana (tira hairline; sin caja). Tono semántico opcional en el valor. */
+function DashMetric({
+  label,
+  value,
+  sub,
+  tone = 'default',
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  tone?: 'default' | 'ok' | 'warn' | 'danger';
+}) {
+  const valueColor =
+    tone === 'warn'
+      ? 'text-amber-700 dark:text-amber-300'
+      : tone === 'danger'
+        ? 'text-red-700 dark:text-red-300'
+        : tone === 'ok'
+          ? 'text-green-700 dark:text-green-300'
+          : 'text-content';
   return (
     <div className="bg-surface p-4">
       <p className="text-[10px] font-medium uppercase tracking-wide text-content-muted">{label}</p>
-      <p className="mt-1 font-display text-lg font-bold tabular-nums text-content">{value}</p>
+      <p className={`mt-1 font-display text-lg font-bold tabular-nums ${valueColor}`}>{value}</p>
       {sub && <p className="mt-0.5 text-[10px] text-content-muted">{sub}</p>}
     </div>
   );
@@ -362,110 +359,120 @@ export default async function DashboardPage() {
       {/* ------------------------------------------------------------------ */}
       {/* ZONA 2 — Operación / estado de módulos                               */}
       {/* ------------------------------------------------------------------ */}
-      <section aria-label="Operación" className="mt-2">
-        <h2 className="mb-4 font-display text-base font-semibold tracking-tight text-gray-900">Operación</h2>
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          {/* Insight card — personalidad propia (capítulo de mayor peso) */}
-          {topSlice && (
-            <SurfaceCard variant="primary" className="col-span-2 p-4">
-              <div className="flex items-start gap-3">
-                <IconChip icon={TrendingUp} tone="active" shape="capsule" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-iconic-primary">Capítulo de mayor peso</p>
-                  <p className="mt-0.5 truncate text-sm font-bold text-iconic-ink dark:text-content">
-                    <span className="font-mono text-xs text-iconic-graphite/60 dark:text-content-muted">{topSlice.code}</span> {topSlice.name}
-                  </p>
-                  <div className="mt-2 flex items-center gap-2">
-                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-iconic-soft-blue/40 dark:bg-surface-muted" aria-hidden="true">
-                      <span className="block h-full rounded-full bg-gradient-to-r from-iconic-primary to-iconic-cyan" style={{ width: `${Math.min(100, Math.round(Number(topSlice.share) * 100))}%` }} />
+      <section aria-label="Operación" className="mt-2 space-y-4">
+        <h2 className="font-display text-base font-semibold tracking-tight text-content">Operación</h2>
+
+        {/* Fila B — panel Operación unificado (2/3) + Notas rápidas (1/3) */}
+        <div className="grid gap-4 lg:grid-cols-3">
+          <SurfaceCard variant="primary" className="overflow-hidden p-0 lg:col-span-2">
+            <div className="grid divide-y divide-line sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+              {/* Capítulo de mayor peso */}
+              <div className="p-4">
+                <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-content-muted">
+                  <TrendingUp className="h-3.5 w-3.5 text-iconic-primary/70" aria-hidden="true" />
+                  Capítulo de mayor peso
+                </p>
+                {topSlice ? (
+                  <>
+                    <p className="mt-2 truncate text-sm font-bold text-content">
+                      <span className="font-mono text-xs text-content-muted">{topSlice.code}</span> {topSlice.name}
+                    </p>
+                    <div className="mt-2 flex items-center gap-2">
+                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-muted" aria-hidden="true">
+                        <span className="block h-full rounded-full bg-gradient-to-r from-iconic-primary to-iconic-cyan" style={{ width: `${Math.min(100, Math.round(Number(topSlice.share) * 100))}%` }} />
+                      </div>
+                      <span className="shrink-0 font-display text-sm font-bold tabular-nums text-iconic-primary">{Math.round(Number(topSlice.share) * 100)}%</span>
                     </div>
-                    <span className="shrink-0 text-sm font-bold tabular-nums text-iconic-primary">{Math.round(Number(topSlice.share) * 100)}%</span>
-                  </div>
-                  <p className="mt-1 text-[11px] text-iconic-graphite/55 dark:text-content-muted">del costo directo del presupuesto activo</p>
+                    <p className="mt-1 text-[11px] text-content-muted">del costo directo</p>
+                  </>
+                ) : (
+                  <p className="mt-2 text-sm text-content-muted">Sin capítulos todavía.</p>
+                )}
+              </div>
+
+              {/* Versiones emitidas */}
+              <div className="p-4">
+                <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-content-muted">
+                  <Send className="h-3.5 w-3.5 text-iconic-primary/70" aria-hidden="true" />
+                  Versiones emitidas
+                </p>
+                <p className="mt-2 font-display text-2xl font-bold tabular-nums text-content">
+                  {issuedVersionCount === null ? '—' : issuedVersionCount}
+                </p>
+                <p className="mt-1 text-[11px] text-content-muted">Snapshots inmutables entregados</p>
+              </div>
+
+              {/* Precios por revisar */}
+              <div className="p-4">
+                <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-content-muted">
+                  <Tags className="h-3.5 w-3.5 text-iconic-primary/70" aria-hidden="true" />
+                  Precios por revisar
+                </p>
+                <p className={`mt-2 font-display text-2xl font-bold tabular-nums ${pendingPriceCount && pendingPriceCount > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-content'}`}>
+                  {pendingPriceCount === null ? '—' : pendingPriceCount}
+                </p>
+                {isAuthorizedForSavings ? (
+                  <Link href="/catalog/prices/review" className="mt-1 inline-block text-[11px] font-medium text-iconic-primary hover:underline">
+                    Abrir revisión masiva →
+                  </Link>
+                ) : (
+                  <p className="mt-1 text-[11px] text-content-muted">Observaciones pendientes</p>
+                )}
+              </div>
+            </div>
+          </SurfaceCard>
+
+          <NotesCard />
+        </div>
+
+        {/* Fila C — Monitoreo automático de precios (panel consolidado + subzona de tiempo) */}
+        {isAuthorizedForSavings && monitoringSummary && (
+          <SurfaceCard variant="primary" className="overflow-hidden p-0">
+            <div className="flex flex-col lg:flex-row">
+              <div className="flex-1 p-4">
+                <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-content-muted">
+                  <Radar className="h-3.5 w-3.5 text-iconic-primary/70" aria-hidden="true" />
+                  Monitoreo automático de precios
+                </p>
+                <div className="mt-3 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-4">
+                  <DashMetric label="Fuentes monitoreadas" value={String(monitoringSummary.monitoredCount)} sub={`${monitoringSummary.activeCount} activas · ${monitoringSummary.pausedCount} pausadas`} />
+                  <DashMetric label="Cambios pendientes" value={String(monitoringSummary.pendingChangesCount)} tone={monitoringSummary.pendingChangesCount > 0 ? 'warn' : 'ok'} sub="por revisar" />
+                  <DashMetric label="Fuentes con error" value={String(monitoringSummary.erroredCount)} tone={monitoringSummary.erroredCount > 0 ? 'danger' : 'ok'} sub="3+ fallos" />
+                  <DashMetric label="Fuentes vencidas" value={String(monitoringSummary.overdueCount)} tone={monitoringSummary.overdueCount > 0 ? 'warn' : 'ok'} sub="próxima revisión" />
                 </div>
               </div>
-            </SurfaceCard>
-          )}
-          <KpiCard
-            title="Versiones emitidas"
-            value={issuedVersionCount === null ? '—' : String(issuedVersionCount)}
-            description="Snapshots inmutables entregados"
-            accent="navy"
-            icon={<Send className="h-4 w-4 text-iconic-ink" />}
-            iconBg="bg-iconic-soft-blue/40"
-          />
-          {isAuthorizedForSavings && (
-            <Link
-              href="/catalog/prices/review"
-              aria-label="Abrir el centro de revisión de precios"
-              className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iconic-primary"
-            >
-              <KpiCard
-                title="Precios por revisar"
-                value={pendingPriceCount === null ? '—' : String(pendingPriceCount)}
-                description="Observaciones pendientes — abrir revisión masiva"
-                accent={pendingPriceCount && pendingPriceCount > 0 ? 'amber' : 'green'}
-                valueColor={pendingPriceCount && pendingPriceCount > 0 ? 'text-amber-700' : 'text-iconic-ink'}
-                icon={<Tags className="h-4 w-4 text-amber-700" />}
-                iconBg="bg-amber-50"
-              />
-            </Link>
-          )}
-        </div>
 
-        {/* 🔒 Monitoreo automático de precios (Fase 4A) — solo management/internal */}
-        {isAuthorizedForSavings && monitoringSummary && (
-          <div className="mt-4">
-            <h3 className="mb-3 text-sm font-semibold text-gray-700">Monitoreo automático de precios</h3>
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-              <KpiCard
-                title="Fuentes monitoreadas"
-                value={String(monitoringSummary.monitoredCount)}
-                description={`${monitoringSummary.activeCount} activas · ${monitoringSummary.pausedCount} pausadas`}
-                accent="primary"
-                icon={<Radar className="h-4 w-4 text-iconic-primary" />}
-                iconBg="bg-brand-50"
-              />
-              <KpiCard
-                title="Cambios de precio pendientes"
-                value={String(monitoringSummary.pendingChangesCount)}
-                description="Detectados por el monitor, por revisar"
-                accent={monitoringSummary.pendingChangesCount > 0 ? 'amber' : 'green'}
-                valueColor={monitoringSummary.pendingChangesCount > 0 ? 'text-amber-700' : undefined}
-                icon={<TrendingUp className="h-4 w-4 text-amber-700" />}
-                iconBg="bg-amber-50"
-              />
-              <KpiCard
-                title="Fuentes con error"
-                value={String(monitoringSummary.erroredCount)}
-                description="3+ fallos consecutivos"
-                accent={monitoringSummary.erroredCount > 0 ? 'red' : 'green'}
-                valueColor={monitoringSummary.erroredCount > 0 ? 'text-red-700' : undefined}
-                icon={<AlertTriangle className="h-4 w-4 text-red-700" />}
-                iconBg="bg-red-50"
-              />
-              <KpiCard
-                title="Fuentes vencidas"
-                value={String(monitoringSummary.overdueCount)}
-                description="Pendientes de la próxima revisión"
-                accent="navy"
-                icon={<Clock className="h-4 w-4 text-iconic-ink" />}
-                iconBg="bg-iconic-soft-blue/40"
-              />
+              {/* Subzona de tiempo — Última / Próxima revisión (programada, sin countdown fabricado) */}
+              <div className="flex items-center gap-3 border-t border-line p-4 lg:w-72 lg:border-l lg:border-t-0">
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-iconic-primary/30 bg-iconic-primary/10 text-iconic-primary dark:bg-iconic-primary/20 dark:text-iconic-cyan" aria-hidden="true">
+                  <Clock className="h-5 w-5" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-content-muted">Última revisión</p>
+                  <p className="truncate text-sm font-semibold text-content">
+                    {monitoringSummary.lastRunAt ? formatDateTime(monitoringSummary.lastRunAt) : 'Sin corridas todavía'}
+                  </p>
+                  <p className="mt-1 text-[11px] text-content-muted">Próxima revisión: automática (programada)</p>
+                </div>
+              </div>
             </div>
-          </div>
+          </SurfaceCard>
         )}
 
-        {/* Accesos rápidos */}
-        <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-6">
-          <QuickLink href="/quote" label="Cotizar con asistente" icon={<Sparkles className="h-4 w-4" aria-hidden="true" />} />
-          <QuickLink href="/projects" label="Proyectos" icon={<FolderOpen className="h-4 w-4" aria-hidden="true" />} />
-          <QuickLink href="/catalog" label="Catálogo" icon={<Package className="h-4 w-4" aria-hidden="true" />} />
-          <QuickLink href="/catalog/providers" label="Proveedores" icon={<Truck className="h-4 w-4" aria-hidden="true" />} />
-          <QuickLink href="/catalog" label="Inteligencia de precios" icon={<Tags className="h-4 w-4" aria-hidden="true" />} />
-          <QuickLink href="/catalog/monitoring" label="Monitoreo de precios" icon={<Radar className="h-4 w-4" aria-hidden="true" />} />
-          <QuickLink href="/catalog/prices/review" label="Revisión de precios" icon={<ClipboardCheck className="h-4 w-4" aria-hidden="true" />} />
-        </div>
+        {/* Fila D — Workflow strip (reemplaza las cards de acceso rápido) */}
+        <SurfaceCard variant="metric" className="px-3 py-4">
+          <WorkflowStrip
+            steps={[
+              { href: '/quote', label: 'Cotizar con asistente', icon: Sparkles, current: true },
+              { href: '/projects', label: 'Proyectos', icon: FolderOpen },
+              { href: '/catalog', label: 'Catálogo', icon: Package },
+              { href: '/catalog/providers', label: 'Proveedores', icon: Truck },
+              { href: '/catalog', label: 'Inteligencia de precios', icon: Tags },
+              { href: '/catalog/monitoring', label: 'Monitoreo de precios', icon: Radar },
+              { href: '/catalog/prices/review', label: 'Revisión de precios', icon: ClipboardCheck },
+            ]}
+          />
+        </SurfaceCard>
       </section>
 
       {/* ------------------------------------------------------------------ */}

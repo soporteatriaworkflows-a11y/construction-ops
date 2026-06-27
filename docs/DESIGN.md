@@ -438,6 +438,18 @@ Quality floor: `prefers-reduced-motion` respetado (globals.css). Audacia concent
 - **Accesos al Asistente**: solo **topbar** + **CTA del AppRail**. El **launcher flotante derecho fue eliminado**
   (redundante); el companion cerrado no renderiza UI y abre por evento `quote-companion:open`.
 
+## 12.j Dashboard IA (V4.2.7)
+
+Arquitectura del Dashboard en **paneles consolidados** (menos cards sueltas):
+- **Superior**: Centro de mando (2/3) + Distribución compacta (1/3).
+- **Operación**: UN panel con 3 columnas (Capítulo de mayor peso · Versiones emitidas · Precios por revisar)
+  con divisores `divide-x`; + card **Notas rápidas** (`notes-card.tsx`, UI shell con ejemplos, sin backend).
+- **Monitoreo**: UN panel (4 indicadores en tira hairline + subzona de tiempo con anillo: Última revisión real +
+  "Próxima: automática"; sin countdown fabricado).
+- **Workflow strip** (`workflow-strip.tsx`): franja horizontal de nodos navegables (reemplaza las cards de acceso),
+  primer hito "Actual". Patrón reusable para flujos.
+Regla: preferir paneles consolidados con divisores sutiles sobre colecciones de mini-cards iguales.
+
 ## 13. Roadmap visual
 
 | Fase | Módulo | Foco |

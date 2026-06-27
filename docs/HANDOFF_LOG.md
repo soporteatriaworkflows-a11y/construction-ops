@@ -1,5 +1,25 @@
 # Handoff Log
 
+## 2026-06-26 — ICONIC_OPS_UIX_DASHBOARD_INFORMATION_ARCHITECTURE_REDESIGN_V4_2_7 — EN RAMA (sin merge) (orchestrator)
+
+### Nota
+Imágenes A/B no llegaron visibles; se trabajó contra la estructura objetivo detallada (A–D). Misma rama `feature/uix-theme-modes-v4-2`, PR #6.
+
+### Qué cambió (solo Dashboard; sin lógica/datos)
+- **Operación unificada**: 3 cards sueltas → UN panel con 3 columnas + divisores (Capítulo de mayor peso / Versiones
+  emitidas / Precios por revisar; enlace a revisión tras `isAuthorizedForSavings`; conteo real conservado).
+- **Notas rápidas** (`components/shared/notes-card.tsx`): UI shell con ejemplos estáticos + "+" "próximamente". Sin backend/flujo falso.
+- **Monitoreo consolidado**: 4 KpiCards → UN panel (4 indicadores tira hairline con tono + subzona de tiempo:
+  anillo reloj + Última revisión real `lastRunAt` + "Próxima: automática"). **Sin countdown fabricado** (no hay next-run en el summary).
+- **Workflow strip** (`components/shared/workflow-strip.tsx`): 7 cards de acceso → franja horizontal de nodos navegables; "Cotizar con asistente" = Actual.
+- Componentes reusables nuevos: NotesCard, WorkflowStrip. `DashMetric` ahora con tono. Removidos QuickLink/KpiCard del dashboard.
+
+### QA
+- typecheck 0 · lint 0 · tests premium-system/workspace-route-config/ui-and-invariants ok · suite **2129/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio.
+- Conserva AppRail/topbar/command-palette/toggle/card-system/datos reales/companion/Workspace V3C/rutas. Sin DB/Auth/envs/cálculos/exports/datos. No `-1rqh`. **Sin merge/tag/prod.**
+
+---
+
 ## 2026-06-26 — ICONIC_OPS_UIX_FINAL_SHELL_POLISH_V4_2_6 — EN RAMA (sin merge) (orchestrator)
 
 ### Hotfix puntual de shell (misma rama `feature/uix-theme-modes-v4-2`, PR #6). [Nombre V4.2.6 reusado por la usuaria; esta entrada = el "shell polish".]

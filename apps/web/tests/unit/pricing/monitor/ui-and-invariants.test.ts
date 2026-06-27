@@ -117,7 +117,7 @@ describe('UI del monitoreo (mandato 39-44)', () => {
 
   it('T43: el dashboard muestra los 4 KPIs de monitoreo + acceso rápido', () => {
     expect(dashboard).toMatch(/Fuentes monitoreadas/);
-    expect(dashboard).toMatch(/Cambios de precio pendientes/);
+    expect(dashboard).toMatch(/Cambios pendientes/); // V4.2.7: panel consolidado (label compacto)
     expect(dashboard).toMatch(/Fuentes con error/);
     expect(dashboard).toMatch(/Fuentes vencidas/);
     expect(dashboard).toMatch(/\/catalog\/monitoring/);

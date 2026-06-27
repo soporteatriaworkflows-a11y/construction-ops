@@ -38,9 +38,9 @@ describe('V4.2.3 — sistema visual premium', () => {
     expect(nav).toContain('active:scale-[0.97]');
   });
 
-  it('Dashboard usa IconChip (iconografía consistente, sin formas decorativas)', () => {
+  it('IconChip disponible como capa central; dashboard sin formas decorativas', () => {
+    expect(read('../../../components/shared/iconic-icon.tsx')).toContain('export function IconChip');
     const dash = read('../../../app/(dashboard)/dashboard/page.tsx');
-    expect(dash).toContain('IconChip');
     expect(dash).not.toContain('rounded-full bg-iconic-cyan/10'); // círculo decorativo eliminado en V4.2.2
   });
 
@@ -88,5 +88,22 @@ describe('V4.2.3 — sistema visual premium', () => {
     expect(cp).toContain('bg-surface-soft'); // trigger theme-aware
     expect(cp).toContain('text-iconic-primary/70'); // lupa clara
     expect(cp).not.toContain('bg-iconic-ink/30'); // overlay navy reemplazado por dim neutro
+  });
+
+  it('V4.2.7: NotesCard (shell) + WorkflowStrip (timeline) existen', () => {
+    expect(read('../../../components/shared/notes-card.tsx')).toContain('export function NotesCard');
+    const ws = read('../../../components/shared/workflow-strip.tsx');
+    expect(ws).toContain('export function WorkflowStrip');
+    expect(ws).toContain("aria-current={step.current");
+  });
+
+  it('V4.2.7: dashboard — Operación unificada + Notas + monitoreo consolidado + workflow', () => {
+    const dash = read('../../../app/(dashboard)/dashboard/page.tsx');
+    expect(dash).toContain('<NotesCard');
+    expect(dash).toContain('<WorkflowStrip');
+    expect(dash).toContain('Última revisión'); // subzona de tiempo (lastRunAt real)
+    expect(dash).not.toContain('<QuickLink'); // accesos sueltos reemplazados por la franja
+    // panel Operación unificado: las 3 secciones en un solo SurfaceCard con divisores
+    expect(dash).toMatch(/sm:divide-x/);
   });
 });

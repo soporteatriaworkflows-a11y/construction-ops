@@ -297,3 +297,45 @@ Conserva: estructura del AppRail, hover-expand, pin, CTA abajo, dashboard/cards 
 
 ### QA (V4.2.6 Shell Polish)
 typecheck 0 · lint 0 · tests `premium-system`/`quote-companion-in-place` ok · suite **2127/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio.
+
+---
+
+## V4.2.7 — Dashboard Information Architecture Redesign
+
+Reorganización de la arquitectura de información del **Dashboard** (solo UI; sin lógica/datos).
+**Nota:** imágenes A/B no llegaron visibles; se trabajó contra la estructura objetivo detallada (A–D).
+
+### A. Bloque superior (se conserva de V4.2.6)
+Card PRIMARY "Centro de mando" (2/3, con métricas integradas) + card CHART compacta "Distribución por capítulo" (1/3).
+
+### B. Operación unificada + Notas
+- **Antes**: 3 cards sueltas (Capítulo de mayor peso / Versiones emitidas / Precios por revisar).
+- **Ahora**: **un solo panel** (`SurfaceCard`) dividido en 3 columnas con **divisores sutiles** (`divide-x`):
+  Capítulo de mayor peso (barra+%), Versiones emitidas (cifra), Precios por revisar (cifra + enlace al centro
+  de revisión **tras `isAuthorizedForSavings`**). El conteo real se conserva (`countPendingResourcePriceObservations`).
+- **Card "Notas rápidas"** nueva (`components/shared/notes-card.tsx`): UI shell premium con ejemplos estáticos
+  (Revisar proveedor acero · Validar AIU · Llamar a Homecenter) + "+" marcado "próximamente". **Sin backend ni flujo falso.**
+
+### C. Monitoreo automático de precios (consolidado)
+- **Antes**: 4 KpiCards sueltas. **Ahora**: **un panel** con los 4 indicadores como tira hairline
+  (Fuentes monitoreadas / Cambios pendientes / Fuentes con error / Fuentes vencidas, con tono semántico) +
+  **subzona de tiempo** a la derecha: anillo con reloj + **"Última revisión"** (real, `monitoringSummary.lastRunAt`) +
+  "Próxima revisión: automática (programada)". **No se fabricó countdown** (no existe timestamp de próxima corrida
+  en el summary; un countdown real requeriría backend fuera de alcance — honesto).
+
+### D. Workflow strip (reemplaza accesos rápidos)
+- **Antes**: 7 cards de acceso. **Ahora**: **franja horizontal** (`components/shared/workflow-strip.tsx`) con nodos
+  conectados (icono+label), navegables a rutas existentes; "Cotizar con asistente" marcado **"Actual"**.
+  Responsive con scroll horizontal en pantallas pequeñas.
+
+### Se conserva
+AppRail/topbar/command-palette, claro/oscuro/sistema, card system (SurfaceCard), navegación, datos reales
+(topSlice, versiones, precios pendientes, monitoringSummary), companion, Workspace V3C. Secciones "Pendientes
+y alertas" y ahorros NO se tocaron.
+
+### Pendiente (V5)
+- Backend real de notas (hoy shell); timestamp de "próxima corrida" para countdown real; responsive fino del
+  panel Operación/monitoreo en mobile; consolidar "Pendientes y alertas" si se desea menos repetición.
+
+### QA (V4.2.7)
+typecheck 0 · lint 0 · tests `premium-system`/`workspace-route-config`/`ui-and-invariants` ok · suite **2129/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio.
