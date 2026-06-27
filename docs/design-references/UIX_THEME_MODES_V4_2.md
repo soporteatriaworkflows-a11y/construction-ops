@@ -231,3 +231,48 @@ iconografía monoline global, OperationsHeader navy (ahora como acento), KPI hon
 ### QA (V4.2.5)
 typecheck 0 · lint 0 · tests `premium-system`/`theme-modes` ok · suite **2122/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio.
 Sin tocar lógica/DB/Auth/envs/cálculos/exports/datos · Workspace V3C/companion/Sin APU/rutas intactos · no `-1rqh`.
+
+---
+
+## V4.2.6 — Reference-driven dashboard redesign
+
+Iteración guiada por referencias (B = grid de cards con jerarquía; C/D = soft-UI + botones azules;
+F = card system; G = icon-chips cápsula). **Nota:** las imágenes no llegaron visibles; se trabajó contra
+las descripciones detalladas de cada referencia.
+
+### Tipografía (corregida)
+- **Revertida la display editorial** (Space Grotesk se sentía "documento"). Ahora **Inter es la única
+  familia UI** (limpia, tecnológica, buen peso de producto); `font-display` = Inter en peso alto + tracking
+  apretado (misma familia, no editorial). Datos en JetBrains Mono.
+
+### Dark mode (rearmado a slate-charcoal con elevación)
+- `--c-app #0d0f14` (slate-charcoal, navy profundo suave) · `--c-surface #161922` (claramente elevada) ·
+  soft `#1d212c` · muted `#262b38` · line `#2d3340` · content `#e8eaf0` · muted `#98a0af`. Más balance y
+  elevación que el neutro plano de V4.2.5; acentos azul/cian dosificados. AG Grid/glass realineados.
+
+### Dashboard (recomposición modular — refs B/F)
+- **ZONA 1 = grid `lg:grid-cols-3`**: card **PRIMARY** (resumen + Total héroe + barra de composición +
+  métricas integradas hairline) ocupa **2/3**; card **CHART compacta** (Distribución por capítulo) ocupa
+  **1/3** → el gráfico **ya no domina** la pantalla.
+- "Capítulo de mayor peso" → `SurfaceCard variant=primary` con `IconChip` en cápsula.
+
+### Card system (`components/shared/surface-card.tsx`)
+- `SurfaceCard` con variantes **primary / metric / action / chart / status** (peso visual propio) +
+  `ActionCard` (enlace con lift). Soft-UI: hairline + sombra muy suave (claro), borde fino (dark).
+
+### Botones / iconos
+- **Primario azul premium**: highlight interno (`inset`) + sombra de marca; hover eleva. (Secundario frosted
+  y ghost de V4.2.3 se conservan.)
+- **`IconChip` cápsula** (`shape="capsule"`, ref G) + ring sutil. Rail icons (V4.2.5) se conservan.
+
+### Qué se conserva
+AppRail (layout, hover-expand, pin, CTA Asistente), theme toggle, modo claro/oscuro/sistema, lógica del
+dashboard/Workspace/companion/Sin APU, rutas.
+
+### Pendiente (V5)
+- Responsive fino del nuevo grid en mobile (refs E); variantes de card en más módulos; restyle profundo de
+  tablas internas (Workspace/Catálogo) con el card system; revisar contraste Recharts en dark.
+
+### QA (V4.2.6)
+typecheck 0 · lint 0 · tests `premium-system`/`typography-system`/`theme-modes` ok · suite **2125/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio.
+Sin tocar lógica/DB/Auth/envs/cálculos/exports/datos · Workspace V3C/companion/Sin APU/rutas intactos · no `-1rqh`.

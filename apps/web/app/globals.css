@@ -34,13 +34,13 @@
      ACENTO de marca (rail, command bar, datos/estados activos) en vez de "toda la app azul".
      Capas sutiles con hairline fino; blanco suave (no quemado); secundario gris-azulado. */
   .dark {
-    --c-app: #0c0d10; /* charcoal casi-negro neutro */
-    --c-surface: #16171b; /* card */
-    --c-surface-soft: #1b1d22; /* zonas suaves */
-    --c-surface-muted: #23252b; /* realces / hover */
-    --c-line: #292b32; /* hairline fino */
-    --c-content: #eceef2; /* blanco suave (no #fff) */
-    --c-content-muted: #9a9ea8; /* gris neutro, leve frío */
+    --c-app: #0d0f14; /* slate-charcoal (navy profundo suave, sin saturar) */
+    --c-surface: #161922; /* card — claramente elevada sobre el fondo */
+    --c-surface-soft: #1d212c; /* zonas suaves */
+    --c-surface-muted: #262b38; /* realces / hover */
+    --c-line: #2d3340; /* hairline slate */
+    --c-content: #e8eaf0; /* blanco suave (no #fff) */
+    --c-content-muted: #98a0af; /* gris-azulado frío, dosificado */
   }
 
   *,
@@ -161,7 +161,7 @@ svg.lucide {
   border: 1px solid rgba(2, 1, 72, 0.08);
 }
 .dark .glass {
-  background-color: rgba(22, 23, 27, 0.66);
+  background-color: rgba(22, 25, 34, 0.66);
   border-color: rgba(255, 255, 255, 0.07);
 }
 /* Glass oscuro (sobre el rail navy): vidrio azul-noche translúcido. */
@@ -172,14 +172,14 @@ svg.lucide {
 
 /* AG Grid — variante dark (tablas BOQ legibles en modo oscuro). */
 .dark .ag-theme-alpine {
-  --ag-background-color: #16171b;
-  --ag-foreground-color: #eceef2;
-  --ag-header-background-color: #1b1d22;
-  --ag-header-foreground-color: #9a9ea8;
-  --ag-border-color: #292b32;
-  --ag-row-border-color: #212329;
-  --ag-odd-row-background-color: #181a1e;
-  --ag-selected-row-background-color: #1f2330;
+  --ag-background-color: #161922;
+  --ag-foreground-color: #e8eaf0;
+  --ag-header-background-color: #1d212c;
+  --ag-header-foreground-color: #98a0af;
+  --ag-border-color: #2d3340;
+  --ag-row-border-color: #232936;
+  --ag-odd-row-background-color: #191d26;
+  --ag-selected-row-background-color: #1f2738;
   --ag-range-selection-border-color: #2f7bff;
   --ag-input-focus-border-color: #2f7bff;
 }

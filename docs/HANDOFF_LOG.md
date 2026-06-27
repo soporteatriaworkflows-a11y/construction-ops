@@ -1,5 +1,26 @@
 # Handoff Log
 
+## 2026-06-26 — ICONIC_OPS_UIX_REFERENCE_DRIVEN_DASHBOARD_REDESIGN_V4_2_6 — EN RAMA (sin merge) (orchestrator)
+
+### Nota
+Referencias A–G no llegaron visibles (no adjuntas); se trabajó contra las descripciones detalladas. Misma rama `feature/uix-theme-modes-v4-2`, PR #6.
+
+### Qué cambió
+- **Tipografía revertida**: fuera Space Grotesk (se sentía "documento") → **Inter única familia UI**
+  (limpia/tecnológica/buen peso); `font-display`=Inter peso alto. Datos JetBrains Mono.
+- **Dark slate-charcoal con elevación**: app `#0d0f14`, surface `#161922`, soft `#1d212c`, muted `#262b38`,
+  line `#2d3340`, content `#e8eaf0`, muted `#98a0af`. Más balance/elevación que el neutro plano. AG/glass realineados.
+- **Dashboard modular (refs B/F)**: ZONA 1 = grid lg:3 → card PRIMARY (resumen+métricas) 2/3 + card CHART
+  compacta (Distribución) 1/3 → el gráfico ya no domina. "Capítulo de mayor peso" → SurfaceCard + IconChip cápsula.
+- **Card system** nuevo `components/shared/surface-card.tsx` (SurfaceCard variantes primary/metric/action/chart/status + ActionCard).
+- **Botón primario azul premium** (highlight interno + sombra marca). **IconChip cápsula** (shape="capsule", ref G).
+
+### QA
+- typecheck 0 · lint 0 · tests premium-system/typography-system/theme-modes ok · suite **2125/0 (+42 skip)** · build 0 · gm 22/22 · diff-check limpio.
+- Conserva AppRail/hover/pin/CTA/toggle. Workspace V3C/companion/Sin APU/rutas/exports intactos. Sin DB/Auth/envs/cálculos/datos. No `-1rqh`. **Sin merge/tag/prod.**
+
+---
+
 ## 2026-06-26 — ICONIC_OPS_UIX_SIGNATURE_VISUAL_REDESIGN_V4_2_5 — EN RAMA (sin merge) (orchestrator)
 
 ### Cambio de identidad (no más polish) — misma rama `feature/uix-theme-modes-v4-2`, PR #6

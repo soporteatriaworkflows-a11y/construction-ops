@@ -51,9 +51,28 @@ describe('V4.2.3 — sistema visual premium', () => {
     expect(dash).not.toContain('CommandStat'); // mini-cards navy eliminadas del hero
   });
 
-  it('V4.2.5: dark mode graphite neutro (no navy saturado de base)', () => {
+  it('V4.2.6: dark slate-charcoal con elevación (no navy saturado, no plano)', () => {
     const css = read('../../../app/globals.css');
-    expect(css).toMatch(/\.dark[\s\S]*--c-surface:\s*#16171b/i); // superficie graphite, no navy
-    expect(css).toMatch(/\.dark[\s\S]*--c-line:\s*#292b32/i); // hairline neutro
+    expect(css).toMatch(/\.dark[\s\S]*--c-app:\s*#0d0f14/i); // slate-charcoal base
+    expect(css).toMatch(/\.dark[\s\S]*--c-surface:\s*#161922/i); // surface elevada
+  });
+
+  it('V4.2.6: card system (SurfaceCard) con variantes de jerarquía', () => {
+    const sc = read('../../../components/shared/surface-card.tsx');
+    expect(sc).toContain('export function SurfaceCard');
+    expect(sc).toContain('export function ActionCard');
+    for (const v of ['primary', 'metric', 'action', 'chart', 'status']) expect(sc).toContain(`${v}:`);
+  });
+
+  it('V4.2.6: dashboard usa SurfaceCard + chart compacta (distribución no domina)', () => {
+    const dash = read('../../../app/(dashboard)/dashboard/page.tsx');
+    expect(dash).toContain('SurfaceCard');
+    expect(dash).toContain("variant=\"chart\"");
+    expect(dash).toContain('lg:col-span-2'); // hero ocupa 2/3, chart 1/3
+  });
+
+  it('V4.2.6: IconChip soporta cápsula (ref G); botón primario con highlight interno', () => {
+    expect(read('../../../components/shared/iconic-icon.tsx')).toContain("'capsule'");
+    expect(read('../../../components/ui/button.tsx')).toContain('inset_0_1px_0');
   });
 });

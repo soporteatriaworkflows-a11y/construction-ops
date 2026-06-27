@@ -19,8 +19,8 @@ describe('fundación de tema', () => {
 
   it('globals: tokens :root (light) y .dark (dark) sin negro puro', () => {
     const css = read('../../../app/globals.css');
-    expect(css).toMatch(/:root[\s\S]*--c-app:\s*#f5f6f8/i); // light off-white (V4.2.5)
-    expect(css).toMatch(/\.dark[\s\S]*--c-app:\s*#0c0d10/i); // dark graphite neutro (V4.2.5), NO #000
+    expect(css).toMatch(/:root[\s\S]*--c-app:\s*#f5f6f8/i); // light off-white
+    expect(css).toMatch(/\.dark[\s\S]*--c-app:\s*#0d0f14/i); // dark slate-charcoal (V4.2.6), NO #000
     expect(css).not.toMatch(/--c-app:\s*#000000/i);
     expect(css).toContain('.dark .ag-theme-alpine'); // tablas AG legibles en dark
   });

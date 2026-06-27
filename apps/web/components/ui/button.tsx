@@ -12,9 +12,9 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        // Primario táctil: marca + sombra suave que se eleva al hover.
+        // Primario azul premium: highlight interno sutil + sombra de marca; táctil al hover/press.
         default:
-          'bg-iconic-primary text-white shadow-sm hover:bg-brand-600 hover:shadow-md active:bg-brand-700',
+          'bg-iconic-primary text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_2px_8px_-2px_rgba(0,93,214,0.45)] hover:bg-brand-600 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_6px_18px_-4px_rgba(0,93,214,0.55)] active:bg-brand-700',
         destructive:
           'bg-red-600 text-white shadow-sm hover:bg-red-700 hover:shadow-md active:bg-red-800',
         // Secundario "glass/frosted": superficie translúcida + borde sutil (claro/oscuro).

@@ -9,17 +9,17 @@ import { fileURLToPath } from 'node:url';
 const read = (rel: string) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
 
 describe('V4.2.4 — tipografía deliberada (self-hosted, next/font)', () => {
-  it('layout carga Inter (cuerpo) + Space Grotesk (display) + JetBrains Mono (datos)', () => {
+  it('layout carga Inter (UI única) + JetBrains Mono (datos); sin display editorial (V4.2.6)', () => {
     const layout = read('../../../app/layout.tsx');
     expect(layout).toContain('next/font/google');
-    expect(layout).toMatch(/Inter|Space_Grotesk|JetBrains_Mono/);
-    expect(layout).toContain('Space_Grotesk');
-    expect(layout).toContain('--font-display');
+    expect(layout).toContain('Inter');
+    expect(layout).toContain('JetBrains_Mono');
+    expect(layout).not.toContain('Space_Grotesk'); // revertido: la display editorial se sentía "documento"
   });
 
-  it('tailwind expone font-display (var) además de sans/mono', () => {
+  it('tailwind: font-display = Inter (misma familia UI), sans/mono por variable', () => {
     const tw = read('../../../tailwind.config.ts');
-    expect(tw).toMatch(/display:\s*\[['"]var\(--font-display\)/);
+    expect(tw).toMatch(/display:\s*\[['"]var\(--font-inter\)/);
     expect(tw).toMatch(/sans:\s*\[['"]var\(--font-inter\)/);
   });
 

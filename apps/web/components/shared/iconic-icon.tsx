@@ -55,16 +55,25 @@ export function IconChip({
   icon: Icon,
   tone = 'default',
   size = 'md',
+  shape = 'rounded',
   className,
 }: {
   icon: LucideIcon;
   tone?: IconTone;
   size?: keyof typeof CHIP_BOX;
+  /** `rounded` = esquinas suaves; `capsule` = círculo (ref G, icon-chip). */
+  shape?: 'rounded' | 'capsule';
   className?: string;
 }) {
   return (
     <span
-      className={cn('inline-flex shrink-0 items-center justify-center rounded-xl', CHIP_BOX[size], CHIP_TONE[tone], className)}
+      className={cn(
+        'inline-flex shrink-0 items-center justify-center ring-1 ring-inset ring-black/[0.04] dark:ring-white/[0.06]',
+        shape === 'capsule' ? 'rounded-full' : 'rounded-xl',
+        CHIP_BOX[size],
+        CHIP_TONE[tone],
+        className,
+      )}
       aria-hidden="true"
     >
       <Icon width={CHIP_ICON[size]} height={CHIP_ICON[size]} />

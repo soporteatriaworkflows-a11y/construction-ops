@@ -47,8 +47,8 @@ const config: Config = {
       },
       fontFamily: {
         sans: ['var(--font-inter)', 'Inter', 'system-ui', 'sans-serif'],
-        // Display técnica (títulos, eyebrows, cifras-héroe). Personalidad de la marca.
-        display: ['var(--font-display)', 'Space Grotesk', 'var(--font-inter)', 'system-ui', 'sans-serif'],
+        // Display = Inter (misma familia UI); el peso/tracking lo da la clase (font-bold tracking-tight).
+        display: ['var(--font-inter)', 'Inter', 'system-ui', 'sans-serif'],
         mono: ['var(--font-mono)', 'JetBrains Mono', 'Consolas', 'monospace'],
       },
       borderRadius: {

@@ -40,6 +40,7 @@ import {
 } from 'lucide-react';
 import { OperationsHeader } from '@/components/shared/operations-header';
 import { IconChip } from '@/components/shared/iconic-icon';
+import { SurfaceCard } from '@/components/shared/surface-card';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Button } from '@/components/ui/button';
 import { KpiCard } from '@/modules/dashboard/kpi-card';
@@ -288,71 +289,74 @@ export default async function DashboardPage() {
 
   return (
     <div>
-      {/* ZONA 1 — Centro de mando (editorial; superficies de tema, navy SOLO como acento) */}
-      <section aria-label="Centro de mando" className="mb-8">
-        <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
-          <div className="min-w-0">
-            <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-iconic-primary dark:text-iconic-cyan">
-              <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
-              Centro de mando
-            </p>
-            <p className="mt-2.5 text-[11px] font-medium uppercase tracking-wide text-content-muted">
-              Total presupuesto · <span className="text-content">{statusLabel}</span>
-            </p>
-            <p className="font-display text-[2.75rem] font-bold leading-none tracking-tight tabular-nums text-content">
-              {formatCOP(summary.budget)}
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button asChild size="sm">
-              <Link href={`/projects/${projectId}`}>Ver proyecto</Link>
-            </Button>
-            <Button asChild size="sm" variant="outline">
-              <Link href="/planning"><CalendarRange className="h-4 w-4" aria-hidden="true" />Cronograma</Link>
-            </Button>
-            <Button asChild size="sm" variant="outline">
-              <Link href="/catalog"><Package className="h-4 w-4" aria-hidden="true" />Catálogo</Link>
-            </Button>
-          </div>
-        </div>
-
-        {/* Composición de costo — instrumento firma (específico de obra) */}
-        {split.directPct + split.indirectPct > 0 && (
-          <div className="mt-5 max-w-xl">
-            <div className="flex h-2 w-full overflow-hidden rounded-full bg-surface-muted" aria-hidden="true">
-              <span className="block h-full bg-iconic-primary" style={{ width: `${split.directPct}%` }} />
-              <span className="block h-full bg-iconic-cyan/70" style={{ width: `${split.indirectPct}%` }} />
+      {/* ZONA 1 — Centro de mando (grid modular de cards; navy SOLO como acento) */}
+      <section aria-label="Centro de mando" className="mb-6 grid gap-4 lg:grid-cols-3">
+        {/* Card PRIMARY: resumen + métricas integradas */}
+        <SurfaceCard variant="primary" className="lg:col-span-2">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-iconic-primary dark:text-iconic-cyan">
+                <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
+                Centro de mando
+              </p>
+              <p className="mt-2.5 text-[11px] font-medium uppercase tracking-wide text-content-muted">
+                Total presupuesto · <span className="text-content">{statusLabel}</span>
+              </p>
+              <p className="font-display text-[2.5rem] font-bold leading-none tracking-tight tabular-nums text-content">
+                {formatCOP(summary.budget)}
+              </p>
             </div>
-            <div className="mt-2 flex gap-5 text-[11px] text-content-muted">
-              <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-iconic-primary" aria-hidden="true" />Directos <strong className="font-semibold text-content">{split.directPct}%</strong></span>
-              <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-iconic-cyan/70" aria-hidden="true" />Indirectos AIU <strong className="font-semibold text-content">{split.indirectPct}%</strong></span>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild size="sm">
+                <Link href={`/projects/${projectId}`}>Ver proyecto</Link>
+              </Button>
+              <Button asChild size="sm" variant="outline">
+                <Link href="/planning"><CalendarRange className="h-4 w-4" aria-hidden="true" />Cronograma</Link>
+              </Button>
+              <Button asChild size="sm" variant="outline">
+                <Link href="/catalog"><Package className="h-4 w-4" aria-hidden="true" />Catálogo</Link>
+              </Button>
             </div>
           </div>
-        )}
 
-        {/* Tira de métricas — plana, hairline, sin cajas navy */}
-        <div className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-4">
-          <DashMetric label="Costos directos" value={formatCOP(summary.directCost)} />
-          <DashMetric label="Indirectos (AIU)" value={formatCOP(summary.indirectCost)} />
-          <DashMetric label="Proyectos" value={String(projectCount)} sub="visibles" />
-          <DashMetric label="Presupuestos activos" value={activeEstimateCount === null ? '—' : String(activeEstimateCount)} sub="vigentes" />
-        </div>
+          {/* Composición de costo — instrumento firma (específico de obra) */}
+          {split.directPct + split.indirectPct > 0 && (
+            <div className="mt-5">
+              <div className="flex h-2 w-full max-w-xl overflow-hidden rounded-full bg-surface-muted" aria-hidden="true">
+                <span className="block h-full bg-iconic-primary" style={{ width: `${split.directPct}%` }} />
+                <span className="block h-full bg-iconic-cyan/70" style={{ width: `${split.indirectPct}%` }} />
+              </div>
+              <div className="mt-2 flex gap-5 text-[11px] text-content-muted">
+                <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-iconic-primary" aria-hidden="true" />Directos <strong className="font-semibold text-content">{split.directPct}%</strong></span>
+                <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-iconic-cyan/70" aria-hidden="true" />Indirectos AIU <strong className="font-semibold text-content">{split.indirectPct}%</strong></span>
+              </div>
+            </div>
+          )}
 
-        {/* Distribución por capítulo — panel limpio */}
-        <div className="mt-4 rounded-xl border border-line bg-surface p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)] dark:shadow-none">
+          {/* Métricas integradas — tira hairline */}
+          <div className="mt-5 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-4">
+            <DashMetric label="Costos directos" value={formatCOP(summary.directCost)} />
+            <DashMetric label="Indirectos (AIU)" value={formatCOP(summary.indirectCost)} />
+            <DashMetric label="Proyectos" value={String(projectCount)} sub="visibles" />
+            <DashMetric label="Presupuestos activos" value={activeEstimateCount === null ? '—' : String(activeEstimateCount)} sub="vigentes" />
+          </div>
+        </SurfaceCard>
+
+        {/* Card CHART compacta: distribución por capítulo (ya no ocupa media pantalla) */}
+        <SurfaceCard variant="chart" className="flex flex-col">
           <div className="flex items-center justify-between">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-content-muted">Distribución por capítulo</p>
             <span className="text-[11px] text-content-muted">{sparkValues.length} cap.</span>
           </div>
           {sparkValues.length > 0 ? (
-            <div className="mt-3 h-20">
+            <div className="mt-3 h-24 flex-1">
               <Sparkbars values={sparkValues} />
             </div>
           ) : (
-            <p className="mt-4 text-sm text-content-muted">Sin capítulos para graficar todavía.</p>
+            <p className="mt-4 flex-1 text-sm text-content-muted">Sin capítulos para graficar todavía.</p>
           )}
-          <p className="mt-3 text-[11px] text-content-muted">Actualizado {formatDateTime(summary.lastUpdatedAt)}</p>
-        </div>
+          <p className="mt-3 text-[11px] text-content-muted">Peso por capítulo · {formatDateTime(summary.lastUpdatedAt)}</p>
+        </SurfaceCard>
       </section>
 
       {/* ------------------------------------------------------------------ */}
@@ -363,9 +367,9 @@ export default async function DashboardPage() {
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           {/* Insight card — personalidad propia (capítulo de mayor peso) */}
           {topSlice && (
-            <div className="col-span-2 rounded-xl border border-iconic-soft-blue/70 bg-brand-50/40 p-4 shadow-sm dark:border-line dark:bg-surface">
+            <SurfaceCard variant="primary" className="col-span-2 p-4">
               <div className="flex items-start gap-3">
-                <IconChip icon={TrendingUp} tone="active" />
+                <IconChip icon={TrendingUp} tone="active" shape="capsule" />
                 <div className="min-w-0 flex-1">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-iconic-primary">Capítulo de mayor peso</p>
                   <p className="mt-0.5 truncate text-sm font-bold text-iconic-ink dark:text-content">
@@ -380,7 +384,7 @@ export default async function DashboardPage() {
                   <p className="mt-1 text-[11px] text-iconic-graphite/55 dark:text-content-muted">del costo directo del presupuesto activo</p>
                 </div>
               </div>
-            </div>
+            </SurfaceCard>
           )}
           <KpiCard
             title="Versiones emitidas"
