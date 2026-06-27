@@ -113,10 +113,15 @@ export default async function PriceReviewCenterPage() {
         title="Revisión de precios"
         description="Revisa y aprueba en bloque las observaciones de precio pendientes. Lo aprobado se convierte en el baseline para futuras comparaciones del monitor."
         breadcrumb={
-          <Link href="/catalog" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
-            <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
-            Catálogo
-          </Link>
+          <span className="inline-flex items-center gap-3 text-sm">
+            <Link href="/catalog" className="inline-flex items-center gap-1 text-gray-500 hover:text-gray-700">
+              <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
+              Catálogo
+            </Link>
+            <Link href="/catalog/monitoring" className="text-gray-500 hover:text-iconic-primary">
+              Monitoreo
+            </Link>
+          </span>
         }
       />
 

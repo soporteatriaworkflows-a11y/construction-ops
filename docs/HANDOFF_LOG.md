@@ -1,5 +1,23 @@
 # Handoff Log
 
+## 2026-06-27 — ICONIC_OPS_PRICE_MONITORING_FILTERS_DEEPLINKS_V5_2_2B — EN RAMA (sin merge) (orchestrator)
+
+- Rama `feature/price-monitoring-filters-deeplinks-v5-2-2b` (base `origin/main = 7e9cb8d`). Filtros por estado +
+  deep-links en `/catalog/monitoring`, **server-side**, datos existentes. Sin backend, sin tocar cron/actions, sin isla client.
+- Helper neutro `lib/pricing/monitor-ui.ts` extendido: `MonitorFilterStatus`, `parseMonitorStatus` (fallback all),
+  `MONITOR_FILTER_LABELS`, `filterTargetsByStatus`, `getMonitorStatusCounts` (PUROS, tolerantes).
+- `monitoring/page.tsx` (Server): lee `searchParams.status`, filtra targets, **pills `<Link>`** (Todos/Saludables/
+  Atrasados/Con error/Pausados + conteos + activo), empty state filtrado; KPIs Atrasadas/Pausadas/Con error → `?status=`;
+  Cambios pendientes → review. Cross-links: `/catalog → monitoring` (acción header) y `review → monitoring` (breadcrumb). Acciones intactas.
+- **Server/client safe (lección P0)**: filtrado 100% server, pills `<Link>` sin isla client; page no importa helpers de
+  `monitor-controls`. Guard en tests + checks de deep-links.
+- QA: typecheck 0 · lint 0 · tests monitor-ui 18/0 · suite verde · build 0 · gm 22/22 · diff-check limpio (solo se commitearon
+  los archivos de la fase; `globals.css`/`.codex`/`.claire`/`.gitignore` del working tree NO se tocaron ni incluyeron).
+- ⚠️ **Requiere validación manual AUTENTICADA del preview antes de merge** (no solo 307). Sin tocar cron/actions/DB/RLS/
+  read-model/cálculos/`unit_price_snapshot`/sync/`construction-ops-1rqh`. **Sin merge/tag/prod.** Pendiente V5.2.2c (corridas/historial).
+
+---
+
 ## 2026-06-27 — ICONIC_OPS_PRICE_MONITORING_PANEL_V5_2_2A — RELEASED (merge + tag + prod smoke) (orchestrator)
 
 - Usuaria **validó preview AUTENTICADO** y aprobó. **Merge `--no-ff` a main**: `origin/main` = **`d499638`**

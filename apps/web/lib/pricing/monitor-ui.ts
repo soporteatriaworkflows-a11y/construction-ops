@@ -61,3 +61,44 @@ export function formatNextCheck(iso: string | null | undefined, now: Date = new 
   if (d === -1) return 'Mañana';
   return `En ${Math.abs(d)} días`;
 }
+
+/* ── V5.2.2b: filtros por estado (server-side, sin backend) ─────────────────── */
+
+/** Estados de filtro válidos (1:1 con las keys de estado + 'all'). */
+export type MonitorFilterStatus = 'all' | MonitorTargetStatusKey;
+
+const FILTER_VALUES: readonly MonitorFilterStatus[] = ['all', 'healthy', 'overdue', 'error', 'paused'];
+
+/** Normaliza un searchParam (string | string[] | undefined) a un filtro válido; fallback 'all'. */
+export function parseMonitorStatus(raw: string | string[] | null | undefined): MonitorFilterStatus {
+  const v = Array.isArray(raw) ? raw[0] : raw;
+  return (FILTER_VALUES as readonly string[]).includes(v ?? '') ? (v as MonitorFilterStatus) : 'all';
+}
+
+/** Etiquetas humanas de cada filtro (para pills/empty states). */
+export const MONITOR_FILTER_LABELS: Record<MonitorFilterStatus, string> = {
+  all: 'Todos',
+  healthy: 'Saludables',
+  overdue: 'Atrasados',
+  error: 'Con error',
+  paused: 'Pausados',
+};
+
+type FilterableTarget = Parameters<typeof getMonitorTargetStatus>[0];
+
+/** Filtra targets por estado. PURA y tolerante (status inválido ⇒ todos). */
+export function filterTargetsByStatus<T extends FilterableTarget>(targets: readonly T[], status: MonitorFilterStatus): T[] {
+  const list = targets ?? [];
+  if (status === 'all') return [...list];
+  return list.filter((t) => getMonitorTargetStatus(t).key === status);
+}
+
+/** Conteo por estado (+ total) para mostrar en las pills. PURA y tolerante. */
+export function getMonitorStatusCounts(targets: readonly FilterableTarget[]): Record<MonitorFilterStatus, number> {
+  const counts: Record<MonitorFilterStatus, number> = { all: 0, healthy: 0, overdue: 0, error: 0, paused: 0 };
+  for (const t of targets ?? []) {
+    counts.all += 1;
+    counts[getMonitorTargetStatus(t).key] += 1;
+  }
+  return counts;
+}
