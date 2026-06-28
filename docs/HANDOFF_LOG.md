@@ -1,5 +1,21 @@
 # Handoff Log
 
+## 2026-06-27 — ICONIC_OPS_V5_4_2A_QUICK_NOTES_MIGRATION_RLS — EN RAMA (sin merge, sin db push) (orchestrator)
+
+- Rama `feature/v5-4-2a-quick-notes-migration-rls` (base `origin/main = 675ea38`). **Primera fase con DB/RLS del ciclo V5.**
+  Migración versionada `supabase/migrations/20260627090000_quick_notes.sql` + tests RLS estáticos. **NO db push remoto, NO Supabase Cloud.**
+- Tabla `quick_notes` (org/project?/estimate?/body/status/created_by/timestamps/archived_*) + constraints (status, body 1..1000,
+  consistencia archivado) + índice parcial activas + trigger updated_at. FKs **confirmadas** contra schema real (organizations/projects/estimates/profiles).
+- RLS ENABLE+FORCE; policies mirror de price_monitor_targets: SELECT org-scoped · INSERT org+created_by=app._auth_uid()+role
+  IN(admin,gerencia,presupuestos,obra,compras) [consulta NO] + project pertenece a org · UPDATE/archive creador o admin/gerencia ·
+  **DELETE sin policy = denegado**. Privacidad: sin 'client'/`true`/`anon`/SELECT público.
+- Tests `tests/regression/rls-quick-notes-static.test.ts` (12/0): schema/FKs/constraints/índice/trigger, enable+force, policies por rol, DELETE denegado, privacidad, aditividad (no toca price_monitor_targets, sin DROP/DELETE/DEFINER).
+- QA: typecheck 0 · lint 0 · suite verde · build 0 · gm 22/22 · diff-check limpio (solo migración+test+docs).
+- **NO se implementó** repository/actions/UI/fixture (V5.4.2b/c). `estimate_id` cross-org check diferido (join indirecto).
+- ⚠️ Verificación runtime RLS (cross-org/rol/DELETE) = harness RLS del proyecto **antes del release**. **Sin merge/tag/prod.** No `-1rqh`.
+
+---
+
 ## 2026-06-27 — ICONIC_OPS_V5_4_2_REAL_QUICK_NOTES_PLANNING — DOCS-ONLY (sin merge) (orchestrator)
 
 - Rama docs `feature/v5-4-2-real-quick-notes-planning` (base `origin/main = be289c3`). **Solo diagnóstico/contrato/plan** de
