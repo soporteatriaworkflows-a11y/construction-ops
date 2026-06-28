@@ -106,6 +106,33 @@ describe('quick_notes — privacidad', () => {
   });
 });
 
+describe('quick_notes — hardening pre-merge (archive-only + estimate org)', () => {
+  it('trigger BEFORE UPDATE archive-only con guardas de identidad/scope', () => {
+    expect(activeSql).toMatch(/FUNCTION app\.quick_notes_enforce_archive_only\(\)/i);
+    expect(activeSql).toMatch(/CREATE TRIGGER quick_notes_archive_only\s+BEFORE UPDATE/i);
+    // rechaza tocar nota archivada / update que no archive
+    expect(activeSql).toMatch(/OLD\.status = 'archived'[\s\S]*?quick_notes_immutable_when_archived/i);
+    expect(activeSql).toMatch(/NEW\.status IS DISTINCT FROM 'archived'[\s\S]*?quick_notes_update_archive_only/i);
+    // campos de identidad/scope inmutables
+    for (const f of ['organization_id', 'project_id', 'estimate_id', 'body', 'created_by', 'created_at']) {
+      expect(activeSql).toMatch(new RegExp(`NEW\\.${f} IS DISTINCT FROM OLD\\.${f}`, 'i'));
+    }
+    expect(activeSql).toMatch(/archived_at IS NULL OR NEW\.archived_by IS NULL[\s\S]*?quick_notes_archive_requires/i);
+  });
+
+  it('estimate_id validado contra la org (gate + consistencia con project)', () => {
+    expect(activeSql).toMatch(/FUNCTION app\.estimate_in_org\(p_estimate_id uuid\)/i);
+    expect(activeSql).toMatch(/JOIN project_scopes ps[\s\S]*?JOIN projects p[\s\S]*?p\.organization_id = app\.current_org\(\)/i);
+    const insert = activeSql.match(/CREATE POLICY quick_notes_insert_authorized[\s\S]*?\);/i)?.[0] ?? '';
+    expect(insert).toMatch(/estimate_id IS NULL OR app\.estimate_in_org\(estimate_id\)/i);
+    expect(insert).toMatch(/ps\.project_id = project_id/i);
+  });
+
+  it('archive-only no usa SECURITY DEFINER', () => {
+    expect(activeSql).not.toMatch(/SECURITY DEFINER/i);
+  });
+});
+
 describe('quick_notes — migración estrictamente aditiva', () => {
   it('sin DROP / DELETE / TRUNCATE; no toca price_monitor_targets ni otras tablas', () => {
     expect(activeSql).not.toMatch(/\bDROP TABLE\b/i);

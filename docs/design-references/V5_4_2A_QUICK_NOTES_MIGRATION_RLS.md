@@ -53,6 +53,33 @@ privacidad (sin `client`/`true`/`anon`, toda policy ata a org), aditividad (sin 
 - ⚠️ **NO se ejecutó `supabase db push`** ni se tocó Supabase Cloud / credenciales remotas. La verificación runtime real
   (cross-org/rol/DELETE en DB) se hará con el harness RLS del proyecto **antes del release** (post-aprobación).
 
+## Hardening pre-merge (cierre de los 2 riesgos del runtime)
+Tras la validación runtime (que confirmó dos riesgos), se endureció la migración **antes del merge**:
+
+### 1. Archive-only a nivel DB (trigger BEFORE UPDATE)
+`app.quick_notes_enforce_archive_only()` (SECURITY INVOKER) + trigger `quick_notes_archive_only` (corre **antes** que
+`set_updated_at` por orden alfabético). Rechaza:
+- tocar una nota ya `archived` (`quick_notes_immutable_when_archived`);
+- cualquier UPDATE cuyo `NEW.status` no sea `archived` (`quick_notes_update_archive_only`) → no hay "edición libre";
+- cambiar `id/organization_id/project_id/estimate_id/body/created_by/created_at` (`quick_notes_only_archive_fields_mutable`);
+- archivar sin `archived_at`/`archived_by` (`quick_notes_archive_requires_archived_at_by`).
+Resultado: la **única** mutación posible es `active → archived` fijando los campos de archivado. **`body` ya NO es editable
+a nivel DB** (cerrado el riesgo 1). El repo/action de V5.4.2b queda como segunda defensa, ya no como única.
+
+### 2. estimate_id cross-org (Opción A — validación DB)
+Helper STABLE `app.estimate_in_org(p_estimate_id)` (espejo de `app.estimate_version_in_org`): join
+`estimates→project_scopes→projects` con `p.organization_id = app.current_org()`. La policy INSERT ahora exige:
+- `estimate_id IS NULL OR app.estimate_in_org(estimate_id)` (estimate de otra org / inexistente ⇒ denegado);
+- consistencia: si vienen `project_id` y `estimate_id`, el estimate debe colgar de ese `project_id`.
+Cerrado el riesgo 2: **no queda cross-org latente** (verificado runtime: estimate misma org permitido; estimate fuera de la org denegado).
+
+### Validación runtime del hardening (local Supabase :54322, db reset)
+**35/0 PASS**: regresión (SELECT roles/cross-org/anon, INSERT roles/consulta/body/created_by/org, DELETE denegado) +
+archive-only (editar body denegado creador/gerencia; mutar created_by/organization_id/created_at denegado; UPDATE sin
+archivar denegado; archive sin archived_at/by denegado; desarchivar denegado; modificar nota archivada denegado) +
+estimate (misma org permitido; fuera de la org denegado). **NO db push remoto / NO Supabase Cloud.**
+Tests estáticos `rls-quick-notes-static.test.ts`: **15/0** (incluye guardas del trigger + estimate gate + sin SECURITY DEFINER).
+
 ## Cómo proceder a V5.4.2b
 Tras aprobar/mergear esta migración y aplicarla de forma controlada (db push manual + harness RLS runtime), implementar
 repository + server actions + guard de privacidad de app, en rama separada.

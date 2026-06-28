@@ -41,6 +41,58 @@ CREATE TRIGGER quick_notes_set_updated_at
   BEFORE UPDATE ON quick_notes
   FOR EACH ROW EXECUTE FUNCTION app.set_updated_at();
 
+-- ── Hardening pre-merge ────────────────────────────────────────────────────────
+-- Helper STABLE: ¿el estimate pertenece a la org actual? (estimates→project_scopes→
+-- projects). Espejo de app.estimate_version_in_org. Cierra el riesgo cross-org de estimate_id.
+CREATE OR REPLACE FUNCTION app.estimate_in_org(p_estimate_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM estimates e
+    JOIN project_scopes ps ON ps.id = e.project_scope_id
+    JOIN projects p ON p.id = ps.project_id
+    WHERE e.id = p_estimate_id
+      AND p.organization_id = app.current_org()
+  );
+$$;
+
+-- Archive-only: la única mutación permitida es archivar (active → archived). Ningún
+-- UPDATE puede cambiar body ni campos de identidad/scope, ni desarchivar, ni tocar una
+-- nota ya archivada. SECURITY INVOKER (default). Defensa DB independiente de repo/action.
+CREATE OR REPLACE FUNCTION app.quick_notes_enforce_archive_only()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF OLD.status = 'archived' THEN
+    RAISE EXCEPTION 'quick_notes_immutable_when_archived' USING ERRCODE = 'check_violation';
+  END IF;
+  IF NEW.status IS DISTINCT FROM 'archived' THEN
+    RAISE EXCEPTION 'quick_notes_update_archive_only' USING ERRCODE = 'check_violation';
+  END IF;
+  IF NEW.id IS DISTINCT FROM OLD.id
+     OR NEW.organization_id IS DISTINCT FROM OLD.organization_id
+     OR NEW.project_id IS DISTINCT FROM OLD.project_id
+     OR NEW.estimate_id IS DISTINCT FROM OLD.estimate_id
+     OR NEW.body IS DISTINCT FROM OLD.body
+     OR NEW.created_by IS DISTINCT FROM OLD.created_by
+     OR NEW.created_at IS DISTINCT FROM OLD.created_at THEN
+    RAISE EXCEPTION 'quick_notes_only_archive_fields_mutable' USING ERRCODE = 'check_violation';
+  END IF;
+  IF NEW.archived_at IS NULL OR NEW.archived_by IS NULL THEN
+    RAISE EXCEPTION 'quick_notes_archive_requires_archived_at_by' USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+-- Orden de BEFORE UPDATE (alfabético): archive_only valida ANTES que set_updated_at.
+CREATE TRIGGER quick_notes_archive_only
+  BEFORE UPDATE ON quick_notes
+  FOR EACH ROW EXECUTE FUNCTION app.quick_notes_enforce_archive_only();
+
 -- ── RLS ───────────────────────────────────────────────────────────────────────
 ALTER TABLE quick_notes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE quick_notes FORCE ROW LEVEL SECURITY;
@@ -61,11 +113,23 @@ CREATE POLICY quick_notes_insert_authorized ON quick_notes
     organization_id = app.current_org()
     AND created_by = (SELECT app._auth_uid())
     AND app.current_role() IN ('admin', 'gerencia', 'presupuestos', 'obra', 'compras')
+    -- project_id (si viene) debe pertenecer a la org
     AND (
       project_id IS NULL
       OR EXISTS (
         SELECT 1 FROM projects p
         WHERE p.id = project_id AND p.organization_id = app.current_org()
+      )
+    )
+    -- estimate_id (si viene) debe pertenecer a la org (cierra cross-org)
+    AND (estimate_id IS NULL OR app.estimate_in_org(estimate_id))
+    -- si vienen ambos, el estimate debe colgar del mismo project_id (consistencia)
+    AND (
+      project_id IS NULL OR estimate_id IS NULL
+      OR EXISTS (
+        SELECT 1 FROM estimates e
+        JOIN project_scopes ps ON ps.id = e.project_scope_id
+        WHERE e.id = estimate_id AND ps.project_id = project_id
       )
     )
   );

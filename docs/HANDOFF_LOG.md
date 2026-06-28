@@ -1,5 +1,20 @@
 # Handoff Log
 
+## 2026-06-27 — V5.4.2a HARDENING pre-merge (archive-only DB + estimate cross-org) — EN RAMA (sin merge, sin db push) (orchestrator)
+
+- Misma rama `feature/v5-4-2a-quick-notes-migration-rls` (PR #16). Endurecida la migración `20260627090000_quick_notes.sql`
+  tras la validación runtime (que detectó 2 riesgos), ANTES del merge. Sin db push remoto, sin Supabase Cloud, sin UI/repo/actions.
+- **Archive-only DB**: `app.quick_notes_enforce_archive_only()` (SECURITY INVOKER) + trigger `quick_notes_archive_only`
+  (BEFORE UPDATE, antes que set_updated_at). UPDATE solo permite active→archived; rechaza editar body / mutar
+  id/org/project/estimate/created_by/created_at / desarchivar / tocar nota ya archivada / archivar sin archived_at·by.
+- **estimate_id cross-org (Opción A)**: helper STABLE `app.estimate_in_org()` (join estimates→project_scopes→projects vs
+  current_org) + INSERT exige estimate de la org + consistencia con project_id. Cerrado el cross-org latente.
+- **Validación runtime local (Supabase :54322, db reset): 35/0 PASS** (regresión + archive-only + estimate fuera-de-org denegado).
+  Tests estáticos `rls-quick-notes-static.test.ts`: **15/0**. typecheck/lint/suite/build/gm verdes.
+- ⚠️ Verificación = local; **NO** db push remoto / Supabase Cloud. Sin merge/tag/prod. No `-1rqh`. Listo para merge (cumple criterio de hardening).
+
+---
+
 ## 2026-06-27 — ICONIC_OPS_V5_4_2A_QUICK_NOTES_MIGRATION_RLS — EN RAMA (sin merge, sin db push) (orchestrator)
 
 - Rama `feature/v5-4-2a-quick-notes-migration-rls` (base `origin/main = 675ea38`). **Primera fase con DB/RLS del ciclo V5.**
