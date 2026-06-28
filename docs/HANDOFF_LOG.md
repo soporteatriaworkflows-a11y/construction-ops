@@ -1,5 +1,36 @@
 # Handoff Log
 
+## 2026-06-27 — V5.4.2a HARDENING pre-merge (archive-only DB + estimate cross-org) — EN RAMA (sin merge, sin db push) (orchestrator)
+
+- Misma rama `feature/v5-4-2a-quick-notes-migration-rls` (PR #16). Endurecida la migración `20260627090000_quick_notes.sql`
+  tras la validación runtime (que detectó 2 riesgos), ANTES del merge. Sin db push remoto, sin Supabase Cloud, sin UI/repo/actions.
+- **Archive-only DB**: `app.quick_notes_enforce_archive_only()` (SECURITY INVOKER) + trigger `quick_notes_archive_only`
+  (BEFORE UPDATE, antes que set_updated_at). UPDATE solo permite active→archived; rechaza editar body / mutar
+  id/org/project/estimate/created_by/created_at / desarchivar / tocar nota ya archivada / archivar sin archived_at·by.
+- **estimate_id cross-org (Opción A)**: helper STABLE `app.estimate_in_org()` (join estimates→project_scopes→projects vs
+  current_org) + INSERT exige estimate de la org + consistencia con project_id. Cerrado el cross-org latente.
+- **Validación runtime local (Supabase :54322, db reset): 35/0 PASS** (regresión + archive-only + estimate fuera-de-org denegado).
+  Tests estáticos `rls-quick-notes-static.test.ts`: **15/0**. typecheck/lint/suite/build/gm verdes.
+- ⚠️ Verificación = local; **NO** db push remoto / Supabase Cloud. Sin merge/tag/prod. No `-1rqh`. Listo para merge (cumple criterio de hardening).
+
+---
+
+## 2026-06-27 — ICONIC_OPS_V5_4_2A_QUICK_NOTES_MIGRATION_RLS — EN RAMA (sin merge, sin db push) (orchestrator)
+
+- Rama `feature/v5-4-2a-quick-notes-migration-rls` (base `origin/main = 675ea38`). **Primera fase con DB/RLS del ciclo V5.**
+  Migración versionada `supabase/migrations/20260627090000_quick_notes.sql` + tests RLS estáticos. **NO db push remoto, NO Supabase Cloud.**
+- Tabla `quick_notes` (org/project?/estimate?/body/status/created_by/timestamps/archived_*) + constraints (status, body 1..1000,
+  consistencia archivado) + índice parcial activas + trigger updated_at. FKs **confirmadas** contra schema real (organizations/projects/estimates/profiles).
+- RLS ENABLE+FORCE; policies mirror de price_monitor_targets: SELECT org-scoped · INSERT org+created_by=app._auth_uid()+role
+  IN(admin,gerencia,presupuestos,obra,compras) [consulta NO] + project pertenece a org · UPDATE/archive creador o admin/gerencia ·
+  **DELETE sin policy = denegado**. Privacidad: sin 'client'/`true`/`anon`/SELECT público.
+- Tests `tests/regression/rls-quick-notes-static.test.ts` (12/0): schema/FKs/constraints/índice/trigger, enable+force, policies por rol, DELETE denegado, privacidad, aditividad (no toca price_monitor_targets, sin DROP/DELETE/DEFINER).
+- QA: typecheck 0 · lint 0 · suite verde · build 0 · gm 22/22 · diff-check limpio (solo migración+test+docs).
+- **NO se implementó** repository/actions/UI/fixture (V5.4.2b/c). `estimate_id` cross-org check diferido (join indirecto).
+- ⚠️ Verificación runtime RLS (cross-org/rol/DELETE) = harness RLS del proyecto **antes del release**. **Sin merge/tag/prod.** No `-1rqh`.
+
+---
+
 ## 2026-06-27 — ICONIC_OPS_V5_4_2_REAL_QUICK_NOTES_PLANNING — DOCS-ONLY (sin merge) (orchestrator)
 
 - Rama docs `feature/v5-4-2-real-quick-notes-planning` (base `origin/main = be289c3`). **Solo diagnóstico/contrato/plan** de
