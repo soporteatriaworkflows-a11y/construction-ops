@@ -1,5 +1,22 @@
 # Handoff Log
 
+## 2026-06-28 — ICONIC_OPS_V5_4_2A_QUICK_NOTES_CLOUD_APPLY_GATE — APLICADO A CLOUD (sin tag/deploy) (orchestrator)
+
+- Usuaria autorizó aplicación controlada con preflight. Proyecto Supabase **enlazado correcto** = `jabddbccmhrxztfzpdii`
+  (**construction-ops-prod**), config `construction-ops` (NO `-1rqh`). main = `421ff59` (contiene merge `b757362` + migración).
+- **Preflight OK**: working tree limpio (solo ruido ajeno no relacionado), migración presente. `migration list --linked` →
+  **única pendiente = `20260627090000_quick_notes`** (sin migraciones inesperadas). Dry-run confirmó solo esa.
+- **`supabase db push --linked` aplicó `20260627090000_quick_notes.sql` a Cloud** (EXIT 0). Sin reset, sin seeds, sin comandos destructivos. **NO se expusieron secrets** (env sin tokens; CLI usó credenciales cacheadas; logs redactados).
+- **Validación estructural Cloud** (vía `migration list` + `inspect db` + `db dump -s public -s app`, read-only):
+  tabla `quick_notes` + PK + índice parcial activas; **ENABLE + FORCE RLS**; policies SELECT(org)/INSERT(rol+autoría+project)/UPDATE(creador|admin·gerencia) **sin DELETE**;
+  trigger `quick_notes_archive_only`; funciones `app.estimate_in_org` y `app.quick_notes_enforce_archive_only`; 5 FKs correctas; GRANT a authenticated en las funciones.
+- **Runtime RLS Cloud (vivo)**: NO ejecutado desde este entorno (requiere conexión DB Cloud/password, ausente en env; no se extrajo/expuso).
+  La migración es **idéntica** a la validada local (**35/0 runtime**) y aplicó sin error → comportamiento RLS equivalente. Para prueba viva: correr el harness con DB URL de Cloud por fuera.
+- **Smoke app prod OK**: /login 200 · /dashboard·/catalog/monitoring·/catalog/prices/review·/apu 307 · /api/estimates/export **400** · /api/cron/price-monitor **401**. Producción estable.
+- Sin tag, sin deploy manual, sin UI/repo/actions/dashboard. **Cloud listo para V5.4.2b** (repository + server actions archive-only + guard de privacidad de app).
+
+---
+
 ## 2026-06-27 — ICONIC_OPS_V5_4_2A_QUICK_NOTES_MIGRATION_RLS — MERGED a main (sin tag, sin db push) (orchestrator)
 
 - Usuaria autorizó merge del PR #16 (no autorizó db push / Cloud / tag / prod DB / UI/repo/actions). **Merge `--no-ff` a main**:
