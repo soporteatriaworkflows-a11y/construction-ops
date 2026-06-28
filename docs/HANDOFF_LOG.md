@@ -1,6 +1,20 @@
 # Handoff Log
 
-## 2026-06-27 — V5.4.2a HARDENING pre-merge (archive-only DB + estimate cross-org) — EN RAMA (sin merge, sin db push) (orchestrator)
+## 2026-06-27 — ICONIC_OPS_V5_4_2A_QUICK_NOTES_MIGRATION_RLS — MERGED a main (sin tag, sin db push) (orchestrator)
+
+- Usuaria autorizó merge del PR #16 (no autorizó db push / Cloud / tag / prod DB / UI/repo/actions). **Merge `--no-ff` a main**:
+  `origin/main` = **`b757362`** (parents `675ea38` + `8e930a1`). **PR #16 MERGED. SIN tag.** 4 archivos (migración SQL + test RLS + 2 docs).
+- Contenido en main: migración versionada `20260627090000_quick_notes.sql` (tabla + RLS enable/force + policies por rol +
+  **trigger archive-only** + **gate estimate_in_org**) + `tests/regression/rls-quick-notes-static.test.ts` (15/0) + docs.
+- **NO se ejecutó `supabase db push`** ni se aplicó a Supabase Cloud: la migración vive en el repo; el deploy de Vercel NO
+  corre migraciones → **producción DB sin cambios**. Aplicación a un entorno = gate aparte, controlado/manual.
+- Runtime local previo (Supabase :54322): **35/0 PASS** (archive-only, estimate org gate, DELETE denegado, client/anon/cross-org sin acceso).
+- **Siguiente gate (a decidir)**: (a) aplicación controlada de la migración a un entorno (db push manual + harness RLS), o
+  (b) **V5.4.2b** (repository + server actions archive-only + guard de privacidad de app), sin tocar DB nueva. No `-1rqh`.
+
+---
+
+## 2026-06-27 — V5.4.2a HARDENING pre-merge (archive-only DB + estimate cross-org) — EN RAMA→MERGED (orchestrator)
 
 - Misma rama `feature/v5-4-2a-quick-notes-migration-rls` (PR #16). Endurecida la migración `20260627090000_quick_notes.sql`
   tras la validación runtime (que detectó 2 riesgos), ANTES del merge. Sin db push remoto, sin Supabase Cloud, sin UI/repo/actions.
