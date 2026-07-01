@@ -125,7 +125,12 @@ describe('quick_notes — hardening pre-merge (archive-only + estimate org)', ()
     expect(activeSql).toMatch(/JOIN project_scopes ps[\s\S]*?JOIN projects p[\s\S]*?p\.organization_id = app\.current_org\(\)/i);
     const insert = activeSql.match(/CREATE POLICY quick_notes_insert_authorized[\s\S]*?\);/i)?.[0] ?? '';
     expect(insert).toMatch(/estimate_id IS NULL OR app\.estimate_in_org\(estimate_id\)/i);
-    expect(insert).toMatch(/ps\.project_id = project_id/i);
+    // La subconsulta de consistencia project/estimate existe en la migración base, pero su
+    // referencia `project_id` sin calificar sufre COLUMN SHADOWING con ps.project_id (no-op).
+    // Se corrige en 20260627093000_quick_notes_project_estimate_policy_patch.sql (calificando
+    // `quick_notes.project_id`) — ver rls-quick-notes-policy-patch-static.test.ts. Aquí solo se
+    // verifica la presencia estructural del EXISTS de consistencia, no la equidad defectuosa.
+    expect(insert).toMatch(/EXISTS \(\s*SELECT 1 FROM estimates e\s*JOIN project_scopes ps/i);
   });
 
   it('archive-only no usa SECURITY DEFINER', () => {

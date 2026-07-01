@@ -80,6 +80,61 @@ archivar denegado; archive sin archived_at/by denegado; desarchivar denegado; mo
 estimate (misma org permitido; fuera de la org denegado). **NO db push remoto / NO Supabase Cloud.**
 Tests estáticos `rls-quick-notes-static.test.ts`: **15/0** (incluye guardas del trigger + estimate gate + sin SECURITY DEFINER).
 
+## Cloud runtime RLS patch — project/estimate consistency
+_(2026-06-30 · patch aditivo `20260627093000_quick_notes_project_estimate_policy_patch.sql`)_
+
+### Qué falló
+El harness RLS **vivo contra Supabase Cloud** (`construction-ops-prod`, ref `jabddbccmhrxztfzpdii`; transacciones con ROLLBACK,
+sin persistir datos) pasó **30/31**. Único FAIL: **una nota con `project_id` y un `estimate_id` de la MISMA organización pero de
+proyectos distintos fue ACEPTada** al INSERT, cuando debía rechazarse. La validación runtime local previa (35/0) no cubría este
+caso (ambos IDs presentes + inconsistentes), por eso pasó desapercibido.
+
+### Causa raíz — column shadowing
+La sub-cláusula de consistencia de `quick_notes_insert_authorized` estaba escrita con `project_id` **sin calificar**:
+```sql
+... WHERE e.id = estimate_id AND ps.project_id = project_id   -- project_id se resuelve a ps.project_id (interno)
+```
+Como `project_scopes` tiene su **propia** columna `project_id`, dentro del `EXISTS` el nombre desnudo se ligaba a `ps.project_id`
+(tabla interna), no a `quick_notes.project_id` (la NEW-row). El predicado degeneraba en `ps.project_id = ps.project_id`
+(tautología) ⇒ el guard era un **no-op**. Reproducido en Cloud: forma sin calificar ⇒ `TRUE` (incorrecto); forma calificada
+`ps.project_id = quick_notes.project_id` ⇒ `FALSE` (correcto).
+
+### Por qué NO era fuga cross-org
+El aislamiento multi-tenant **nunca** dependió de esta cláusula. `organization_id = app.current_org()`, `created_by`, el rol
+y `app.estimate_in_org()` siguen firmes (en el harness: cross-org SELECT/INSERT, estimate cross-org y project cross-org **todos
+denegados**). El defecto era de **integridad INTRA-org**: dentro de una misma organización se podía ligar un `project_id` y un
+`estimate_id` que pertenecen a proyectos distintos. No expone datos de otra organización.
+
+### Por qué sí se corrige antes de V5.4.2b
+`estimate_id`/`project_id` son columnas *forward-compat*: la UI aún no las cablea en V5.4.2a. **V5.4.2b es justo la fase que
+empieza a usarlas** (repository/server actions). Corregir ahora evita que la inconsistencia entre a producción cuando la UI
+comience a enviar ambos IDs.
+
+### Cómo se corrigió
+Migración **aditiva** (no edita `20260627090000_quick_notes.sql`, ya aplicada/mergeada): `DROP POLICY IF EXISTS` + `CREATE POLICY`
+recreando **solo** la policy INSERT, calificando **todas** las referencias a la NEW-row dentro de subconsultas con
+`quick_notes.<col>` (elimina la clase entera de shadowing, no solo la línea afectada). Contrato de negocio **sin cambios**:
+mismos roles/autoría/org; `consulta` sigue sin crear; `project_id`/`estimate_id` cross-org siguen denegados; **`project_id` NULL +
+`estimate_id` NOT NULL de la org sigue PERMITIDO** (nota ligada solo a estimate; el estimate ya implica su proyecto) — decisión
+preservada y documentada, no bloqueada.
+
+### Qué tests lo validan
+- **Estático** `apps/web/tests/regression/rls-quick-notes-policy-patch-static.test.ts` (11/0): recrea solo INSERT (DROP+CREATE);
+  usa `ps.project_id = quick_notes.project_id`; **NO** queda `ps.project_id = project_id` ni `= project_id` desnudo; gates de
+  project/estimate calificados; sin policy abierta (`true`/`TO anon`); sin DELETE; aditivo (único `DROP` = la policy que recrea).
+- **Estático base** `rls-quick-notes-static.test.ts` ajustado: documenta el shadowing de la migración base y verifica la presencia
+  estructural del `EXISTS` de consistencia (sin aseverar la equidad defectuosa).
+- **Runtime** `supabase/tests/quick_notes_rls_runtime.mjs` (out-of-band, contra base MIGRADA vía `DATABASE_URL`, ROLLBACK):
+  consistente PASS · inconsistente FAIL(42501) · estimate cross-org FAIL · project cross-org FAIL · estimate NULL PASS ·
+  project NULL + estimate in-org PASS · + regresión (consulta/anon/cross-org/archive-only/DELETE).
+
+### Estado / aplicación
+- **NO aplicado a Cloud** en esta fase (sin `db push`, sin tocar Supabase remoto). La migración vive en el repo.
+- Regresión local: typecheck 0 · lint 0 · suite 2203/0 (42 skip) · build 0 · gm 22/22 · estáticos quick_notes 26/0.
+- El runtime local no se ejecutó esta sesión (Docker/Supabase local apagado); la corrección del predicado **ya fue verificada en
+  Cloud** durante el diagnóstico (calificado ⇒ deniega el caso inconsistente). Re-correr el harness vivo **tras** aplicar el patch
+  a un entorno confirmará 31/31.
+
 ## Cómo proceder a V5.4.2b
 Tras aprobar/mergear esta migración y aplicarla de forma controlada (db push manual + harness RLS runtime), implementar
 repository + server actions + guard de privacidad de app, en rama separada.
