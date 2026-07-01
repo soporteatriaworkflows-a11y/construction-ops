@@ -257,6 +257,22 @@ export interface MonitorResultView {
   checkedAt: IsoDateTime;
 }
 
+export interface MonitorRunResultDetailView {
+  id: Uuid;
+  runId: Uuid;
+  targetId: Uuid;
+  resourceCode: string;
+  resourceName: string;
+  supplierName: string | null;
+  status: MonitorResultStatus;
+  detectedPrice: DecimalString | null;
+  currency: string | null;
+  unit: string | null;
+  warnings: string[];
+  observationId: Uuid | null;
+  checkedAt: IsoDateTime;
+}
+
 export interface MonitorRunView {
   id: Uuid;
   triggerType: MonitorTriggerType;
@@ -301,5 +317,6 @@ export interface MonitorRepository {
   updateTargetCadence(viewer: AuthenticatedViewer, targetId: Uuid, cadenceDays: number): Promise<MonitorTargetView>;
   listRecentResults(viewer: AuthenticatedViewer, targetId: Uuid, limit: number): Promise<MonitorResultView[]>;
   listRecentRuns(viewer: AuthenticatedViewer, limit: number): Promise<MonitorRunView[]>;
+  listRunResults(viewer: AuthenticatedViewer, runId: Uuid, limit: number): Promise<MonitorRunResultDetailView[]>;
   getMonitoringSummary(viewer: AuthenticatedViewer): Promise<MonitoringSummary>;
 }

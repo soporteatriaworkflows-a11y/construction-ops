@@ -16,7 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { resolveViewer, resolveAuthenticatedViewer } from '@/server/auth/resolve-viewer';
 import { resolveAuthMode } from '@/lib/supabase/env';
 import { getMonitorRepository } from '@/server/pricing/monitor';
-import type { MonitorTargetView, MonitorRunView, MonitoringSummary } from '@/server/pricing/monitor';
+import type { MonitorTargetView, MonitorRunView, MonitorRunResultDetailView, MonitoringSummary } from '@/server/pricing/monitor';
 import {
   getMonitorTargetStatus,
   formatLastChecked,
@@ -30,6 +30,10 @@ import {
   formatRunStartedRelative,
   summarizeRunCounters,
   getLatestProblemRun,
+  getResultStatusLabel,
+  getResultStatusTone,
+  getSuggestedMonitorAction,
+  formatDetectedPrice,
   MONITOR_FILTER_LABELS,
   type MonitorTone,
   type MonitorFilterStatus,
@@ -61,7 +65,15 @@ function runStatusBadge(r: MonitorRunView) {
   return <Badge variant={TONE_VARIANT[getRunStatusTone(r.status)]}>{getRunStatusLabel(r.status)}</Badge>;
 }
 
+function resultStatusBadge(status: MonitorRunResultDetailView['status']) {
+  return <Badge variant={TONE_VARIANT[getResultStatusTone(status)]}>{getResultStatusLabel(status)}</Badge>;
+}
+
 const MONITOR_FILTER_ORDER: MonitorFilterStatus[] = ['all', 'healthy', 'overdue', 'error', 'paused'];
+const RECENT_RUN_LIMIT = 5;
+const RUN_RESULT_LIMIT = 10;
+type RunResultsById = Record<string, { results: MonitorRunResultDetailView[]; hasMore: boolean }>;
+
 
 /** Pills de filtro server-rendered (`<Link>`, sin isla client). V5.2.2b. */
 function MonitorFilterPills({ status, counts }: { status: MonitorFilterStatus; counts: Record<MonitorFilterStatus, number> }) {
@@ -99,6 +111,7 @@ export default async function MonitoringCenterPage({
   let viewerRole = 'consulta';
   let targets: MonitorTargetView[] = [];
   let runs: MonitorRunView[] = [];
+  let runResultsById: RunResultsById = {};
   let summary: MonitoringSummary | null = null;
   let error: string | null = null;
 
@@ -123,9 +136,23 @@ export default async function MonitoringCenterPage({
 
     [targets, runs, summary] = await Promise.all([
       repo.listTargets(viewer),
-      repo.listRecentRuns(viewer, 5),
+      repo.listRecentRuns(viewer, RECENT_RUN_LIMIT),
       repo.getMonitoringSummary(viewer),
     ]);
+
+    const runResults = await Promise.all(
+      runs.map(async (run) => {
+        const rows = await repo.listRunResults(viewer, run.id, RUN_RESULT_LIMIT + 1);
+        return [
+          run.id,
+          {
+            results: rows.slice(0, RUN_RESULT_LIMIT),
+            hasMore: rows.length > RUN_RESULT_LIMIT,
+          },
+        ] as const;
+      }),
+    );
+    runResultsById = Object.fromEntries(runResults);
   } catch (e) {
     error = e instanceof Error ? e.message : 'Error al cargar el monitoreo';
   }
@@ -287,60 +314,112 @@ export default async function MonitoringCenterPage({
         )}
       </section>
 
-      {/* Corridas recientes — timeline ligero (V5.2.2c) */}
+      {/* Corridas recientes - detalles operativos (V5.4.3) */}
       <section aria-label="Corridas recientes">
         <h2 className="mb-3 text-sm font-semibold text-gray-700 dark:text-content">Corridas recientes</h2>
 
         {(() => {
           const problem = getLatestProblemRun(runs);
           return problem ? (
-            <InlineCallout tone="warning" title="Última corrida con incidencias" className="mb-3">
-              {getRunStatusLabel(problem.status)} · {formatRunStartedRelative(problem.startedAt)}
-              {problem.errorSummary ? ` — ${problem.errorSummary}` : ''}
+            <InlineCallout tone="warning" title="Ultima corrida con incidencias" className="mb-3">
+              {getRunStatusLabel(problem.status)} - {formatRunStartedRelative(problem.startedAt)}
+              {problem.errorSummary ? ` - ${problem.errorSummary}` : ''}
             </InlineCallout>
           ) : null;
         })()}
 
         {runs.length === 0 ? (
-          <p className="text-sm text-gray-500 dark:text-content-muted">Aún no hay corridas del monitor.</p>
+          <p className="text-sm text-gray-500 dark:text-content-muted">Aun no hay corridas del monitor.</p>
         ) : (
-          <ol className="relative space-y-3 border-l border-gray-200 pl-5 dark:border-line">
+          <div className="space-y-3">
             {runs.map((r) => {
-              const tone = getRunStatusTone(r.status);
-              const dot =
-                tone === 'success' ? 'bg-green-500' : tone === 'warn' ? 'bg-amber-500' : tone === 'danger' ? 'bg-red-500' : 'bg-gray-400';
+              const details = runResultsById[r.id] ?? { results: [], hasMore: false };
+              const fallbackAction = r.status === 'running' ? getSuggestedMonitorAction('running') : getSuggestedMonitorAction(null);
               return (
-                <li key={r.id} className="relative rounded-lg border border-gray-200 bg-white px-4 py-2.5 shadow-sm dark:border-line dark:bg-surface">
-                  <span className={`absolute -left-[1.6rem] top-3.5 h-2.5 w-2.5 rounded-full ring-2 ring-white dark:ring-surface ${dot}`} aria-hidden="true" />
-                  <div className="flex flex-wrap items-center gap-2 text-sm">
-                    {runStatusBadge(r)}
-                    <span className="text-xs text-gray-500 dark:text-content-muted">
-                      {r.triggerType === 'scheduled' ? 'Programada' : 'Manual'}
-                    </span>
-                    <span className="text-xs text-gray-500 dark:text-content-muted" title={formatDate(r.startedAt)}>
-                      {formatRunStartedRelative(r.startedAt)}
-                    </span>
-                    <span className="text-xs text-gray-400">· {formatRunDuration(r.startedAt, r.finishedAt, r.status)}</span>
+                <details
+                  key={r.id}
+                  className="group rounded-lg border border-gray-200 bg-white shadow-sm open:border-iconic-primary/40 dark:border-line dark:bg-surface"
+                >
+                  <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 px-4 py-3 marker:hidden">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2 text-sm">
+                        {runStatusBadge(r)}
+                        <span className="text-xs text-gray-500 dark:text-content-muted">
+                          {r.triggerType === 'scheduled' ? 'Programada' : 'Manual'}
+                        </span>
+                        <span className="text-xs text-gray-500 dark:text-content-muted" title={formatDate(r.startedAt)}>
+                          {formatRunStartedRelative(r.startedAt)}
+                        </span>
+                        <span className="text-xs text-gray-400">- {formatRunDuration(r.startedAt, r.finishedAt, r.status)}</span>
+                      </div>
+                      {r.errorSummary && <p className="mt-1 text-xs text-red-600 dark:text-red-300">{r.errorSummary}</p>}
+                    </div>
+                    <div className="flex flex-wrap justify-end gap-1.5">
+                      {summarizeRunCounters(r.counters).map((chip) => (
+                        <span
+                          key={String(chip.key)}
+                          className={`rounded px-1.5 py-0.5 text-[11px] tabular-nums ${
+                            chip.key === 'failed' && chip.value > 0
+                              ? 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300'
+                              : 'bg-gray-100 text-gray-600 dark:bg-surface-soft dark:text-content-muted'
+                          }`}
+                        >
+                          {chip.label} {chip.value}
+                        </span>
+                      ))}
+                    </div>
+                  </summary>
+
+                  <div className="border-t border-gray-100 px-4 py-3 dark:border-line/60">
+                    {details.results.length === 0 ? (
+                      <p className="text-sm text-gray-500 dark:text-content-muted">{fallbackAction}</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {details.results.map((result) => (
+                          <div key={result.id} className="rounded-md border border-gray-100 bg-gray-50 px-3 py-2 dark:border-line/70 dark:bg-surface-soft">
+                            <div className="flex flex-wrap items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium text-iconic-ink dark:text-content">
+                                  {result.resourceCode ? `${result.resourceCode} - ` : ''}{result.resourceName || 'Recurso sin nombre'}
+                                </p>
+                                <p className="text-xs text-gray-500 dark:text-content-muted">Proveedor: {result.supplierName ?? 'Sin proveedor'}</p>
+                              </div>
+                              {resultStatusBadge(result.status)}
+                            </div>
+                            <dl className="mt-2 grid gap-2 text-xs text-gray-600 dark:text-content-muted sm:grid-cols-2 lg:grid-cols-4">
+                              <div>
+                                <dt className="font-medium text-gray-500">Precio detectado</dt>
+                                <dd>{formatDetectedPrice(result.detectedPrice, result.currency)}</dd>
+                              </div>
+                              <div>
+                                <dt className="font-medium text-gray-500">Moneda / unidad</dt>
+                                <dd>{[result.currency, result.unit].filter(Boolean).join(' / ') || 'Sin dato'}</dd>
+                              </div>
+                              <div>
+                                <dt className="font-medium text-gray-500">Checked at</dt>
+                                <dd>{formatDate(result.checkedAt)}</dd>
+                              </div>
+                              <div>
+                                <dt className="font-medium text-gray-500">Observacion</dt>
+                                <dd>{result.observationId ? 'Vinculada' : 'Sin observacion'}</dd>
+                              </div>
+                            </dl>
+                            {result.warnings.length > 0 && (
+                              <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">Warnings: {result.warnings.join(', ')}</p>
+                            )}
+                            <p className="mt-2 text-xs font-medium text-gray-700 dark:text-content">Accion sugerida: {getSuggestedMonitorAction(result.status)}</p>
+                          </div>
+                        ))}
+                        {details.hasMore && (
+                          <p className="text-xs text-gray-500 dark:text-content-muted">Mostrando los primeros {RUN_RESULT_LIMIT} resultados de esta corrida.</p>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <div className="mt-1.5 flex flex-wrap gap-1.5">
-                    {summarizeRunCounters(r.counters).map((chip) => (
-                      <span
-                        key={String(chip.key)}
-                        className={`rounded px-1.5 py-0.5 text-[11px] tabular-nums ${
-                          chip.key === 'failed' && chip.value > 0
-                            ? 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300'
-                            : 'bg-gray-100 text-gray-600 dark:bg-surface-soft dark:text-content-muted'
-                        }`}
-                      >
-                        {chip.label} {chip.value}
-                      </span>
-                    ))}
-                  </div>
-                  {r.errorSummary && <p className="mt-1.5 text-xs text-red-600 dark:text-red-300">{r.errorSummary}</p>}
-                </li>
+                </details>
               );
             })}
-          </ol>
+          </div>
         )}
       </section>
     </div>
