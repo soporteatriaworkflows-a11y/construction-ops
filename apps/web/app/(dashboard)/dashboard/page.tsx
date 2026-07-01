@@ -57,6 +57,13 @@ import { resolveViewer } from '@/server/auth/resolve-viewer';
 import { formatCOP, formatDateTime, ESTIMATE_VERSION_STATUS_LABELS } from '@/lib/utils/format';
 import { isCreationModeEnabled } from '../projects/mode-guard';
 import { selectActiveProjectId } from './select-active-project';
+import {
+  getDashboardQuickNotes,
+  canViewQuickNotes,
+  canCreateQuickNotes,
+  type QuickNoteView,
+} from '@/server/quick-notes';
+import { createQuickNoteAction, archiveQuickNoteAction } from './notes-actions';
 
 /** Render en REQUEST-TIME (ver cabecera). Igual que `/projects` y `/projects/new`. */
 export const dynamic = 'force-dynamic';
@@ -275,6 +282,24 @@ export default async function DashboardPage() {
     }
   }
 
+  // Notas rápidas internas (V5.4.2c) — privacy-first: `client` no ve/crea/archiva
+  // (no se llama al repositorio). Lectura tolerante a fallo (no rompe el dashboard).
+  const canViewNotes = canViewQuickNotes(viewer.role);
+  const canCreateNotes = canCreateQuickNotes(viewer.role);
+  let quickNotes: QuickNoteView[] = [];
+  if (canViewNotes) {
+    try {
+      quickNotes = await getDashboardQuickNotes({
+        userId: viewer.profileId ?? viewer.organizationId,
+        profileId: viewer.profileId ?? viewer.organizationId,
+        organizationId: viewer.organizationId,
+        role: viewer.role,
+      });
+    } catch {
+      quickNotes = [];
+    }
+  }
+
   const statusLabel =
     ESTIMATE_VERSION_STATUS_LABELS[summary.estimateStatus] ?? summary.estimateStatus;
   const split = costSplitPct(summary.directCost, summary.budget);
@@ -365,7 +390,10 @@ export default async function DashboardPage() {
 
         {/* Fila B — panel Operación unificado (2/3) + Notas rápidas (1/3) */}
         <div className="grid gap-4 lg:grid-cols-3">
-          <SurfaceCard variant="primary" className="overflow-hidden p-0 lg:col-span-2">
+          <SurfaceCard
+            variant="primary"
+            className={`overflow-hidden p-0 ${canViewNotes ? 'lg:col-span-2' : 'lg:col-span-3'}`}
+          >
             <div className="grid divide-y divide-line sm:grid-cols-3 sm:divide-x sm:divide-y-0">
               {/* Capítulo de mayor peso */}
               <div className="p-4">
@@ -423,7 +451,14 @@ export default async function DashboardPage() {
             </div>
           </SurfaceCard>
 
-          <NotesCard />
+          {canViewNotes && (
+            <NotesCard
+              notes={quickNotes}
+              canCreate={canCreateNotes}
+              createAction={createQuickNoteAction}
+              archiveAction={archiveQuickNoteAction}
+            />
+          )}
         </div>
 
         {/* Fila C — Monitoreo automático de precios (panel consolidado + subzona de tiempo) */}
