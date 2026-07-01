@@ -40,14 +40,15 @@ export function getQuickNotesRepository(): QuickNotesRepository {
 }
 
 /**
- * Lectura para el dashboard con guard de privacidad de app (2ª defensa).
+ * Lectura para el dashboard con guard de privacidad de app (2Âª defensa).
  * Si el viewer es del bucket client-safe ⇒ `[]` **sin** llamar al repositorio/DB.
  */
 export async function getDashboardQuickNotes(
   viewer: AuthenticatedViewer,
   limit: number = QUICK_NOTES_DASHBOARD_LIMIT,
+  projectId?: string | null,
 ): Promise<QuickNoteView[]> {
   if (!canViewQuickNotes(viewer.role)) return [];
   const repo = getQuickNotesRepository();
-  return repo.listQuickNotes(viewer, { limit });
+  return repo.listQuickNotes(viewer, { limit, projectId });
 }

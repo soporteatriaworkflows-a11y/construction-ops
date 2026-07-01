@@ -7010,3 +7010,24 @@ muerta sin explicación.
 
 ---
 - NO merge, NO deploy, NO db push remoto en este ciclo. **STOP.**
+
+
+---
+
+## ICONIC_OPS_V5_4_2D_DASHBOARD_PROJECT_SCOPE_SELECTOR
+
+Rama: feature/v5-4-2d-dashboard-project-scope-selector. Base: origin/main = 9fb7e8b3ec426af749f1db54fe81bd556531d1e7. Sin migracion.
+
+### Cambio aplicado
+- Selector visible en /dashboard: Todos los proyectos y proyectos visibles via rm.listProjects(viewer).
+- Query param validado: /dashboard?projectId=<id> activa vista scoped solo si el proyecto es visible.
+- ProjectId invalido: fallback a global con aviso; sin crash/500.
+- Boton dinamico: global Ver proyectos -> /projects; scoped Ver proyecto -> /projects/:id.
+- Vista global no inventa total financiero multi-proyecto: el presupuesto se rotula como Proyecto destacado.
+- Quick Notes respeta alcance: global sin project_id, scoped con project_id; privacidad client intacta.
+
+### QA esperado
+- typecheck, lint, tests dashboard/quick-notes, suite si aplica, build, gm y diff-check antes de PR.
+
+### Restricciones respetadas
+- NO migraciones. NO db push. NO Supabase Cloud/RLS. NO Vercel envs. NO password reset. NO tag. NO deploy manual. NO V5.4.3.
