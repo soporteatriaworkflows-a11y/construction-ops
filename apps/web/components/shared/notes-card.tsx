@@ -26,12 +26,14 @@ export function NotesCard({
   canCreate,
   createAction,
   archiveAction,
+  projectId,
   className,
 }: {
   notes: QuickNoteView[];
   canCreate: boolean;
   createAction: QuickNoteAction;
   archiveAction: QuickNoteAction;
+  projectId?: string | null;
   className?: string;
 }) {
   return (
@@ -68,7 +70,7 @@ export function NotesCard({
         <p className="mt-3 text-sm text-content-muted">Sin notas internas activas</p>
       )}
 
-      {canCreate && <QuickNoteCreateForm action={createAction} />}
+      {canCreate && <QuickNoteCreateForm action={createAction} projectId={projectId} />}
     </SurfaceCard>
   );
 }

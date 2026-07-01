@@ -15,7 +15,7 @@
  *    UUID demo fijo. El proyecto activo se deriva ahora de los proyectos REALES
  *    visibles para el viewer; si no hay ninguno, se muestra estado vacío.
  *
- * Privacidad: campos 🔒 (projectedSaving, realizedSaving, pricingCoverage)
+ * Privacidad: campos ðŸ”’ (projectedSaving, realizedSaving, pricingCoverage)
  * solo se pasan a componentes cuando el viewer.role es management/internal.
  * Para rol `client`, esos campos no se pasan ni se renderizan.
  */
@@ -56,8 +56,13 @@ import { getMonitorRepository } from '@/server/pricing/monitor';
 import { formatCountdown } from '@/lib/pricing/monitor-ui';
 import { resolveViewer } from '@/server/auth/resolve-viewer';
 import { formatCOP, formatDateTime, ESTIMATE_VERSION_STATUS_LABELS } from '@/lib/utils/format';
+import type { ProjectListItem } from '@/lib/contracts/read-model';
 import { isCreationModeEnabled } from '../projects/mode-guard';
-import { selectActiveProjectId } from './select-active-project';
+import {
+  projectIdFromSearchParams,
+  resolveDashboardProjectScope,
+  type DashboardProjectScope,
+} from './project-scope';
 import {
   getDashboardQuickNotes,
   canViewQuickNotes,
@@ -68,6 +73,10 @@ import { createQuickNoteAction, archiveQuickNoteAction } from './notes-actions';
 
 /** Render en REQUEST-TIME (ver cabecera). Igual que `/projects` y `/projects/new`. */
 export const dynamic = 'force-dynamic';
+
+type DashboardPageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
 
 /**
  * Tarjeta de pendiente/alerta con estado vacío premium. `count`:
@@ -166,7 +175,59 @@ function DashboardError({ message }: { message: string }) {
   );
 }
 
-export default async function DashboardPage() {
+function DashboardScopeSelector({
+  projects,
+  scope,
+}: {
+  projects: ProjectListItem[];
+  scope: DashboardProjectScope;
+}) {
+  const selectedId = scope.mode === 'project' ? scope.selectedProject.id : null;
+
+  return (
+    <section aria-label="Alcance del dashboard" className="mb-5 rounded-xl border border-line bg-surface p-3">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-content-muted">
+            Alcance del dashboard
+          </p>
+          <p className="text-sm font-semibold text-content">
+            {scope.mode === 'project' ? scope.selectedProject.name : 'Todos los proyectos'}
+          </p>
+          <p className="text-xs text-content-muted">
+            {scope.mode === 'project'
+              ? 'Vista filtrada por proyecto: presupuesto, capítulos y notas rápidas usan este alcance.'
+              : 'Vista global: KPIs de organización/catálogo. El presupuesto se muestra como proyecto destacado.'}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild size="sm" variant={selectedId === null ? 'default' : 'outline'}>
+            <Link href="/dashboard">Todos los proyectos</Link>
+          </Button>
+          {projects.map((project) => (
+            <Button
+              key={project.id}
+              asChild
+              size="sm"
+              variant={selectedId === project.id ? 'default' : 'outline'}
+            >
+              <Link href={`/dashboard?projectId=${encodeURIComponent(project.id)}`}>
+                {project.name}
+              </Link>
+            </Button>
+          ))}
+        </div>
+      </div>
+      {scope.invalidProjectId && (
+        <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800" role="status">
+          El proyecto solicitado no está disponible para este usuario. Mostrando vista global.
+        </p>
+      )}
+    </section>
+  );
+}
+
+export default async function DashboardPage({ searchParams }: DashboardPageProps) {
   // Viewer por modo: supabase=autenticado (lee cookies → dinámico); demo=fixture.
   let viewer: Awaited<ReturnType<typeof resolveViewer>>;
   try {
@@ -179,13 +240,18 @@ export default async function DashboardPage() {
 
   const rm = getReadModel();
 
-  // Proyecto activo derivado de la lista REAL de proyectos visibles (sin UUID demo).
+  const requestedProjectId = projectIdFromSearchParams(await searchParams);
+
+  // Alcance derivado de la lista REAL de proyectos visibles (sin UUID demo).
+  let projects: ProjectListItem[] = [];
+  let scope: DashboardProjectScope;
   let projectId: string | null;
   let projectCount = 0;
   try {
-    const projects = await rm.listProjects(viewer);
+    projects = await rm.listProjects(viewer);
     projectCount = projects.length;
-    projectId = selectActiveProjectId(projects);
+    scope = resolveDashboardProjectScope(projects, requestedProjectId);
+    projectId = scope.highlightedProject?.id ?? null;
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Error al cargar proyectos';
     return <DashboardError message={`Error al cargar proyectos: ${msg}`} />;
@@ -201,8 +267,9 @@ export default async function DashboardPage() {
         <OperationsHeader
           eyebrow="Panel"
           title="Centro de control"
-          subtitle="Resumen financiero de la organización"
+          subtitle="Vista global de organizacion"
         />
+        <DashboardScopeSelector projects={projects} scope={scope} />
         <EmptyState
           icon={LayoutDashboard}
           title="Sin proyectos para resumir"
@@ -231,8 +298,13 @@ export default async function DashboardPage() {
     return <DashboardError message={`Error al cargar el resumen: ${msg}`} />;
   }
 
+  const selectedProjectId = scope.mode === 'project' ? scope.selectedProject.id : null;
+  const dashboardActionHref = selectedProjectId ? `/projects/${selectedProjectId}` : '/projects';
+  const dashboardActionLabel = selectedProjectId ? 'Ver proyecto' : 'Ver proyectos';
+  const scopeSubtitle = scope.mode === 'project'
+    ? `Vista de proyecto: ${scope.selectedProject.name}`
+    : 'Vista global de organizacion. KPIs de organizacion/catalogo cuando aplica.';
   const isAuthorizedForSavings = viewer.role === 'management' || viewer.role === 'internal';
-
   // ------------------------------------------------------------------
   // KPIs operativos (Oleada OPERATIONAL BUDGET UX V1) — lecturas aditivas,
   // tolerantes a fallo (null ⇒ la tarjeta no muestra valor, no rompe la página).
@@ -242,14 +314,14 @@ export default async function DashboardPage() {
   try {
     const estimatesRepo = getEstimatesWriteRepository();
     const estimates = await estimatesRepo.listVisibleEstimates(viewer);
-    activeEstimateCount = estimates.filter((e) => e.status === 'active').length;
+    activeEstimateCount = estimates.filter((e) => e.status === 'active' && (!selectedProjectId || e.projectId === selectedProjectId)).length;
     issuedVersionCount = await estimatesRepo.countIssuedEstimateVersions(viewer);
   } catch {
     activeEstimateCount = null;
     issuedVersionCount = null;
   }
 
-  // 🔒 Pendientes de revisión de precios: solo roles management/internal.
+  // ðŸ”’ Pendientes de revisión de precios: solo roles management/internal.
   let pendingPriceCount: number | null = null;
   if (isAuthorizedForSavings) {
     try {
@@ -267,7 +339,7 @@ export default async function DashboardPage() {
     }
   }
 
-  // 🔒 Monitoreo automático de precios (Fase 4A): KPIs tolerantes a fallo.
+  // ðŸ”’ Monitoreo automático de precios (Fase 4A): KPIs tolerantes a fallo.
   let monitoringSummary: import('@/server/pricing/monitor').MonitoringSummary | null = null;
   if (isAuthorizedForSavings) {
     try {
@@ -295,7 +367,7 @@ export default async function DashboardPage() {
         profileId: viewer.profileId ?? viewer.organizationId,
         organizationId: viewer.organizationId,
         role: viewer.role,
-      });
+      }, undefined, selectedProjectId);
     } catch {
       quickNotes = [];
     }
@@ -303,6 +375,9 @@ export default async function DashboardPage() {
 
   const statusLabel =
     ESTIMATE_VERSION_STATUS_LABELS[summary.estimateStatus] ?? summary.estimateStatus;
+  const budgetScopeLabel = selectedProjectId
+    ? `Total presupuesto - ${statusLabel}`
+    : `Proyecto destacado - ${scope.highlightedProject?.name ?? 'Sin proyecto'} - ${statusLabel}`;
   const split = costSplitPct(summary.directCost, summary.budget);
   const sparkValues = summary.chapterDistribution.map((s) => Number(s.share)).filter((n) => Number.isFinite(n));
   // Capítulo de mayor peso (insight) — selección sobre shares YA calculados.
@@ -313,6 +388,13 @@ export default async function DashboardPage() {
 
   return (
     <div>
+      <OperationsHeader
+        eyebrow={selectedProjectId ? 'Panel de proyecto' : 'Panel global'}
+        title="Centro de control"
+        subtitle={scopeSubtitle}
+      />
+      <DashboardScopeSelector projects={projects} scope={scope} />
+
       {/* ZONA 1 — Centro de mando (grid modular de cards; navy SOLO como acento) */}
       <section aria-label="Centro de mando" className="mb-6 grid gap-4 lg:grid-cols-3">
         {/* Card PRIMARY: resumen + métricas integradas */}
@@ -324,7 +406,7 @@ export default async function DashboardPage() {
                 Centro de mando
               </p>
               <p className="mt-2.5 text-[11px] font-medium uppercase tracking-wide text-content-muted">
-                Total presupuesto · <span className="text-content">{statusLabel}</span>
+                {budgetScopeLabel}
               </p>
               <p className="font-display text-[2.5rem] font-bold leading-none tracking-tight tabular-nums text-content">
                 {formatCOP(summary.budget)}
@@ -332,7 +414,7 @@ export default async function DashboardPage() {
             </div>
             <div className="flex flex-wrap gap-2">
               <Button asChild size="sm">
-                <Link href={`/projects/${projectId}`}>Ver proyecto</Link>
+                <Link href={dashboardActionHref}>{dashboardActionLabel}</Link>
               </Button>
               <Button asChild size="sm" variant="outline">
                 <Link href="/planning"><CalendarRange className="h-4 w-4" aria-hidden="true" />Cronograma</Link>
@@ -361,8 +443,8 @@ export default async function DashboardPage() {
           <div className="mt-5 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-4">
             <DashMetric label="Costos directos" value={formatCOP(summary.directCost)} />
             <DashMetric label="Indirectos (AIU)" value={formatCOP(summary.indirectCost)} />
-            <DashMetric label="Proyectos" value={String(projectCount)} sub="visibles" />
-            <DashMetric label="Presupuestos activos" value={activeEstimateCount === null ? '—' : String(activeEstimateCount)} sub="vigentes" />
+            <DashMetric label="Proyectos" value={String(projectCount)} sub="organizacion" />
+            <DashMetric label="Presupuestos activos" value={activeEstimateCount === null ? '—' : String(activeEstimateCount)} sub={selectedProjectId ? "proyecto" : "organizacion"} />
           </div>
         </SurfaceCard>
 
@@ -426,7 +508,7 @@ export default async function DashboardPage() {
                 <p className="mt-2 font-display text-2xl font-bold tabular-nums text-content">
                   {issuedVersionCount === null ? '—' : issuedVersionCount}
                 </p>
-                <p className="mt-1 text-[11px] text-content-muted">Snapshots inmutables entregados</p>
+                <p className="mt-1 text-[11px] text-content-muted">Snapshots inmutables entregados - organizacion</p>
               </div>
 
               {/* Precios por revisar */}
@@ -443,7 +525,7 @@ export default async function DashboardPage() {
                     Abrir revisión masiva →
                   </Link>
                 ) : (
-                  <p className="mt-1 text-[11px] text-content-muted">Observaciones pendientes</p>
+                  <p className="mt-1 text-[11px] text-content-muted">Observaciones pendientes - catalogo</p>
                 )}
               </div>
             </div>
@@ -461,6 +543,7 @@ export default async function DashboardPage() {
               <NotesCard
                 className="lg:col-span-4"
                 notes={quickNotes}
+                projectId={selectedProjectId}
                 canCreate={canCreateNotes}
                 createAction={createQuickNoteAction}
                 archiveAction={archiveQuickNoteAction}
@@ -484,10 +567,10 @@ export default async function DashboardPage() {
                   Monitoreo automático de precios
                 </p>
                 <div className="mt-3 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-4">
-                  <DashMetric label="Fuentes monitoreadas" value={String(monitoringSummary.monitoredCount)} sub={`${monitoringSummary.activeCount} activas · ${monitoringSummary.pausedCount} pausadas`} />
-                  <DashMetric label="Cambios pendientes" value={String(monitoringSummary.pendingChangesCount)} tone={monitoringSummary.pendingChangesCount > 0 ? 'warn' : 'ok'} sub="por revisar" />
-                  <DashMetric label="Fuentes con error" value={String(monitoringSummary.erroredCount)} tone={monitoringSummary.erroredCount > 0 ? 'danger' : 'ok'} sub="3+ fallos" />
-                  <DashMetric label="Fuentes vencidas" value={String(monitoringSummary.overdueCount)} tone={monitoringSummary.overdueCount > 0 ? 'warn' : 'ok'} sub="próxima revisión" />
+                  <DashMetric label="Fuentes monitoreadas" value={String(monitoringSummary.monitoredCount)} sub={`catalogo - ${monitoringSummary.activeCount} activas - ${monitoringSummary.pausedCount} pausadas`} />
+                  <DashMetric label="Cambios pendientes" value={String(monitoringSummary.pendingChangesCount)} tone={monitoringSummary.pendingChangesCount > 0 ? 'warn' : 'ok'} sub="catalogo - por revisar" />
+                  <DashMetric label="Fuentes con error" value={String(monitoringSummary.erroredCount)} tone={monitoringSummary.erroredCount > 0 ? 'danger' : 'ok'} sub="catalogo - 3+ fallos" />
+                  <DashMetric label="Fuentes vencidas" value={String(monitoringSummary.overdueCount)} tone={monitoringSummary.overdueCount > 0 ? 'warn' : 'ok'} sub="catalogo - proxima revision" />
                 </div>
               </div>
 
@@ -588,7 +671,7 @@ export default async function DashboardPage() {
       />
 
       {/* ------------------------------------------------------------------ */}
-      {/* Ahorro e indicadores internos (🔒 solo management/internal)         */}
+      {/* Ahorro e indicadores internos (ðŸ”’ solo management/internal)         */}
       {/* ------------------------------------------------------------------ */}
       {isAuthorizedForSavings && (
         <SavingsSection

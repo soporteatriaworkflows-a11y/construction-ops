@@ -21,7 +21,7 @@ type QuickNoteAction = (
   formData: FormData,
 ) => Promise<QuickNoteActionResult>;
 
-export function QuickNoteCreateForm({ action }: { action: QuickNoteAction }) {
+export function QuickNoteCreateForm({ action, projectId }: { action: QuickNoteAction; projectId?: string | null }) {
   const [state, formAction, isPending] = useActionState(action, null);
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -34,6 +34,7 @@ export function QuickNoteCreateForm({ action }: { action: QuickNoteAction }) {
 
   return (
     <form ref={formRef} action={formAction} className="mt-3 border-t border-line pt-3">
+      {projectId && <input type="hidden" name="projectId" value={projectId} />}
       <label htmlFor="quick-note-body" className="sr-only">
         Nueva nota interna
       </label>

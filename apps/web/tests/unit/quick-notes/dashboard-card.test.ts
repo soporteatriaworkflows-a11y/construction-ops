@@ -1,8 +1,6 @@
 /**
- * dashboard-card.test.ts — NotesCard conectado + subcomponentes client + wiring del
- * dashboard (V5.4.2c). Stack node: checks de FUENTE (presentacional, sin jsdom), igual
- * que inline-callout/premium-system. La lógica conductual (repository/actions/errores
- * curados) está cubierta por tests/unit/quick-notes/{repository,action-result}.test.ts.
+ * dashboard-card.test.ts - NotesCard conectado + wiring del dashboard.
+ * Checks de fuente sin jsdom; conducta repository/actions cubierta por tests dedicados.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -17,12 +15,12 @@ const CREATE = read('../../../components/shared/quick-note-create-form.tsx');
 const ARCHIVE = read('../../../components/shared/quick-note-archive-button.tsx');
 const TIMELINE = read('../../../components/shared/operations-timeline-card.tsx');
 const PAGE = read('../../../app/(dashboard)/dashboard/page.tsx');
+const QUICK_NOTES_INDEX = read('../../../server/quick-notes/index.ts');
 
-/** No debe filtrarse ningún tecnicismo de Postgres/RLS en la UI. */
 const TECHNICAL = /(42501|23514|row-level security|SQLSTATE|pg_policies|violates|permission denied|quick_notes_insert|current_role\(\))/i;
 
-describe('NotesCard — Server Component conectado', () => {
-  it('dejó de ser estático: sin EXAMPLE_NOTES; es Server Component (sin "use client")', () => {
+describe('NotesCard - Server Component conectado', () => {
+  it('dejo de ser estatico: sin EXAMPLE_NOTES; es Server Component (sin use client)', () => {
     expect(CARD).not.toContain('EXAMPLE_NOTES');
     expect(CARD).not.toContain("'use client'");
     expect(CARD).toContain('export function NotesCard');
@@ -34,7 +32,7 @@ describe('NotesCard — Server Component conectado', () => {
     expect(CARD).toContain('formatDate(note.createdAt)');
   });
 
-  it('estado vacío honesto, sin datos fake', () => {
+  it('estado vacio honesto, sin datos fake', () => {
     expect(CARD).toContain('Sin notas internas activas');
     expect(CARD).toMatch(/notes\.length > 0\s*\?/);
   });
@@ -46,6 +44,11 @@ describe('NotesCard — Server Component conectado', () => {
     expect(CARD).toContain('archiveAction');
   });
 
+  it('recibe projectId opcional y lo pasa al form de creacion', () => {
+    expect(CARD).toContain('projectId?: string | null');
+    expect(CARD).toContain('projectId={projectId}');
+  });
+
   it('NO edita body: lo muestra de solo lectura (sin input/textarea en el card)', () => {
     expect(CARD).not.toContain('<textarea');
     expect(CARD).not.toContain('<input');
@@ -53,31 +56,37 @@ describe('NotesCard — Server Component conectado', () => {
   });
 });
 
-describe('QuickNoteCreateForm — client aislado', () => {
-  it("es 'use client' y usa useActionState con la action por prop", () => {
+describe('QuickNoteCreateForm - client aislado', () => {
+  it('es use client y usa useActionState con la action por prop', () => {
     expect(CREATE).toContain("'use client'");
     expect(CREATE).toContain('useActionState(action');
   });
 
-  it('textarea name="body" con maxLength; deshabilita mientras guarda (sin doble submit)', () => {
+  it('textarea name body con maxLength; deshabilita mientras guarda', () => {
     expect(CREATE).toContain('name="body"');
     expect(CREATE).toContain('QUICK_NOTE_BODY_MAX');
     expect(CREATE).toMatch(/disabled=\{isPending\}/);
   });
 
-  it('muestra errores CURADOS (fieldErrors/error), sin tecnicismos', () => {
+  it('incluye projectId oculto solo cuando el dashboard esta scoped', () => {
+    expect(CREATE).toContain('projectId?: string | null');
+    expect(CREATE).toContain('name="projectId"');
+    expect(CREATE).toContain('value={projectId}');
+  });
+
+  it('muestra errores curados, sin tecnicismos', () => {
     expect(CREATE).toMatch(/fieldErrors\?\.body\s*\?\?\s*state\?\.error/);
     expect(TECHNICAL.test(CREATE)).toBe(false);
   });
 
-  it("NO importa el barrel '@/server/quick-notes' (arrastraría server-only al bundle cliente)", () => {
+  it('NO importa el barrel server de quick-notes en cliente', () => {
     expect(CREATE).not.toMatch(/from '@\/server\/quick-notes'/);
     expect(ARCHIVE).not.toMatch(/from '@\/server\/quick-notes'/);
   });
 });
 
-describe('QuickNoteArchiveButton — client aislado', () => {
-  it("es 'use client', useActionState, noteId oculto y deshabilita mientras archiva", () => {
+describe('QuickNoteArchiveButton - client aislado', () => {
+  it('usa useActionState, noteId oculto y deshabilita mientras archiva', () => {
     expect(ARCHIVE).toContain("'use client'");
     expect(ARCHIVE).toContain('useActionState(action');
     expect(ARCHIVE).toContain('name="noteId"');
@@ -90,7 +99,7 @@ describe('QuickNoteArchiveButton — client aislado', () => {
   });
 });
 
-describe('Dashboard page — wiring + privacidad', () => {
+describe('Dashboard page - wiring + privacidad + project scope', () => {
   it('importa guard y lectura de notas + las server actions', () => {
     expect(PAGE).toContain('getDashboardQuickNotes');
     expect(PAGE).toContain('canViewQuickNotes');
@@ -101,16 +110,21 @@ describe('Dashboard page — wiring + privacidad', () => {
   });
 
   it('privacidad: solo llama al repositorio y renderiza el card si canViewNotes (client no)', () => {
-    // el fetch ocurre dentro del guard canViewNotes
     expect(PAGE).toMatch(/if \(canViewNotes\)\s*\{[\s\S]*getDashboardQuickNotes/);
-    // el card SOLO se renderiza bajo canViewNotes
     expect(PAGE).toMatch(/canViewNotes && \(\s*<NotesCard/);
   });
 
-  it('pasa notas + canCreate + actions al card', () => {
-    expect(PAGE).toMatch(/<NotesCard[\s\S]*notes=\{quickNotes\}[\s\S]*canCreate=\{canCreateNotes\}/);
+  it('pasa notas + projectId + canCreate + actions al card', () => {
+    expect(PAGE).toMatch(/<NotesCard[\s\S]*notes=\{quickNotes\}[\s\S]*projectId=\{selectedProjectId\}[\s\S]*canCreate=\{canCreateNotes\}/);
     expect(PAGE).toMatch(/createAction=\{createQuickNoteAction\}/);
     expect(PAGE).toMatch(/archiveAction=\{archiveQuickNoteAction\}/);
+  });
+
+  it('filtra Quick Notes por proyecto solo en modo scoped', () => {
+    expect(PAGE).toContain("const selectedProjectId = scope.mode === 'project'");
+    expect(PAGE).toMatch(/getDashboardQuickNotes\([\s\S]*undefined, selectedProjectId\)/);
+    expect(QUICK_NOTES_INDEX).toContain('projectId?: string | null');
+    expect(QUICK_NOTES_INDEX).toContain('repo.listQuickNotes(viewer, { limit, projectId })');
   });
 
   it('lectura tolerante a fallo (no rompe el dashboard)', () => {
@@ -118,10 +132,9 @@ describe('Dashboard page — wiring + privacidad', () => {
   });
 });
 
-describe('Layout patch — Quick Notes NO estira los KPIs', () => {
-  it('el panel de KPIs (Fila B) ya NO comparte grid con Quick Notes (sin col-span condicional)', () => {
+describe('Layout patch - Quick Notes NO estira los KPIs', () => {
+  it('el panel de KPIs ya NO comparte grid con Quick Notes', () => {
     expect(PAGE).not.toMatch(/canViewNotes \? 'lg:col-span-2' : 'lg:col-span-3'/);
-    // Quick Notes se movió a una sección inferior "Pulso operativo"
     expect(PAGE).toContain('Pulso operativo');
   });
 
@@ -131,15 +144,14 @@ describe('Layout patch — Quick Notes NO estira los KPIs', () => {
     expect(PAGE).toMatch(/canViewNotes \? 'lg:col-span-8' : 'lg:col-span-12'/);
   });
 
-  it('pieza longitudinal derecha: OperationsTimelineCard como shell honesto (sin datos fake)', () => {
+  it('pieza longitudinal derecha: OperationsTimelineCard como shell honesto', () => {
     expect(PAGE).toContain('<OperationsTimelineCard');
-    expect(TIMELINE).toContain('Línea de tiempo operativa');
-    expect(TIMELINE).toContain('Próximamente');
-    // solo consume datos ya disponibles por prop; no crea queries ni toca el server
+    expect(TIMELINE).toMatch(/L.nea de tiempo operativa/);
+    expect(TIMELINE).toMatch(/Pr.ximamente/);
     expect(TIMELINE).not.toMatch(/createClient|getDashboard|from '@\/server\//);
   });
 
-  it('NotesCard compacto: lista con altura máxima + scroll interno (no estira)', () => {
+  it('NotesCard compacto: lista con altura maxima + scroll interno', () => {
     expect(CARD).toMatch(/max-h-\d+/);
     expect(CARD).toContain('overflow-y-auto');
   });
