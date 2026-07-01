@@ -1,5 +1,41 @@
 # Handoff Log
 
+## 2026-07-01 — ICONIC_OPS_V5_4_2C_QUICK_NOTES_DASHBOARD_LAYOUT_PATCH — EN RAMA / PR #19 (sin merge) (agent-dashboard)
+
+- Patch visual sobre la misma rama `feature/v5-4-2c-quick-notes-dashboard-card` (PR #19). **Problema:** Quick Notes en la grilla
+  "Fila B" estiraba la altura de los KPIs (capítulos/versiones/precios). **Fix aprobado:** sacar Quick Notes de la grilla superior.
+- **KPIs (Fila B)**: panel Operación a **ancho completo** (sin col-span condicional). Ya NO se estiran por las notas.
+- **Nueva sección "Pulso operativo"** (grid `lg:grid-cols-12`, debajo de los KPIs): **Quick Notes angosto** (`col-span-4`, más
+  compacto: lista densa `text-[13px]` + `line-clamp-3` + `max-h-56 overflow-y-auto` scroll interno, máx 5) + **`OperationsTimelineCard`**
+  (`col-span-8`) — shell honesto "Línea de tiempo operativa" (estado "Próximamente" + anclas con datos ya disponibles `lastUpdatedAt`/`lastRunAt`,
+  sin queries nuevas; base para V5.4.3, sin datos fake). Responsive: apila en móvil (notas arriba, timeline abajo).
+- **Funcionalidad de Quick Notes intacta** (notas reales, crear, archivar, pending, errores curados, **client no ve/crea/archiva**,
+  sin edición de body). **Privacidad intacta** (client no se renderiza; timeline a ancho completo sin notas).
+- **Tests** `dashboard-card.test.ts` (19/0, +5 layout; módulo quick-notes 47/0); `premium-system.test.ts` verde.
+- **QA**: typecheck 0 · lint 0 · suite **2250/0** (42 skip) · build 0 · gm **22/22** · diff-check limpio.
+- **STOP: sin merge/tag/deploy.** Push a PR #19 para preview. No `-1rqh`. No V5.4.3.
+
+---
+
+## 2026-07-01 — ICONIC_OPS_V5_4_2C_QUICK_NOTES_DASHBOARD_CARD — EN RAMA (sin merge/tag/deploy) (agent-dashboard/frontend)
+
+- Base `origin/main = 58e8cfd` (V5.4.2b mergeado). Rama `feature/v5-4-2c-quick-notes-dashboard-card`. Conecta la UI usando la lógica de V5.4.2b.
+  **Sin migraciones · sin db push · sin Cloud/RLS · sin Vercel envs · sin password reset · sin `-1rqh` · sin rediseñar el dashboard.**
+- **NotesCard conectado** (`components/shared/notes-card.tsx`): dejó de ser shell estático (fuera `EXAMPLE_NOTES`); Server Component
+  con props `notes`/`canCreate`/`createAction`/`archiveAction`. Recibe las actions **por prop** (shared desacoplado de la ruta).
+  Subcomponentes client aislados (regla P0): `quick-note-create-form.tsx` + `quick-note-archive-button.tsx` (`useActionState`,
+  deshabilitados mientras guardan → sin doble submit, errores CURADOS).
+- **Bundle fix (P0)**: los client components importan de módulos PUROS (`@/server/quick-notes/types` · `/action-result`), **no del barrel**
+  (que arrastra `db-repository → createClient → next/headers`, server-only). Detectado por build; test de regresión añadido.
+- **Dashboard page**: lectura vía `getDashboardQuickNotes(viewer)` **tolerante a fallo** (→ `[]`, no rompe el panel); render de `NotesCard`
+  SOLO si `canViewQuickNotes` (privacy-first: `client` no ve/crea/archiva, no se llama al repo, y el panel Operación ocupa `lg:col-span-3`).
+- **Estados**: con notas (≤5, recientes, body solo lectura + fecha) · vacío ("Sin notas internas activas", sin fake) · error curado · pending (disabled+spinner). Autor NO se muestra (solo hay UUID; sin nombre seguro).
+- **Tests** `tests/unit/quick-notes/dashboard-card.test.ts` (15/0; módulo 43/0) + `premium-system.test.ts` sigue verde.
+- **QA**: typecheck 0 · lint 0 · suite **2246/0** (42 skip) · build 0 · gm **22/22** · diff-check limpio.
+- **STOP: sin merge/tag/deploy/producción; sin iniciar V5.4.3.** Espera autorización. Docs: `V5_4_2C_QUICK_NOTES_DASHBOARD_CARD.md`.
+
+---
+
 ## 2026-07-01 — ICONIC_OPS_V5_4_2B_QUICK_NOTES_REPOSITORY_ACTIONS — EN RAMA (sin merge/tag/deploy) (agent-cost-domain/frontend)
 
 - Base `origin/main = 0913bf5`. Rama `feature/v5-4-2b-quick-notes-repository-actions`. Consume `quick_notes` (V5.4.2a, RLS 31/31 en Cloud).
