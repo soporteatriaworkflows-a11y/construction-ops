@@ -47,13 +47,16 @@ export function NotesCard({
       </div>
 
       {notes.length > 0 ? (
-        <ul className="mt-3 space-y-2.5" role="list">
+        // Lista densa con altura máxima + scroll interno: muchas notas no estiran el card.
+        <ul className="mt-3 max-h-56 space-y-1.5 overflow-y-auto pr-1" role="list">
           {notes.map((note) => (
             <li key={note.id} className="flex items-start justify-between gap-2">
-              <div className="flex min-w-0 items-start gap-2.5">
-                <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-iconic-primary" aria-hidden="true" />
+              <div className="flex min-w-0 items-start gap-2">
+                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-iconic-primary" aria-hidden="true" />
                 <div className="min-w-0">
-                  <p className="break-words text-sm text-content">{note.body}</p>
+                  <p className="line-clamp-3 break-words text-[13px] leading-snug text-content" title={note.body}>
+                    {note.body}
+                  </p>
                   <p className="mt-0.5 text-[10px] text-content-muted">{formatDate(note.createdAt)}</p>
                 </div>
               </div>

@@ -15,6 +15,7 @@ function read(rel: string): string {
 const CARD = read('../../../components/shared/notes-card.tsx');
 const CREATE = read('../../../components/shared/quick-note-create-form.tsx');
 const ARCHIVE = read('../../../components/shared/quick-note-archive-button.tsx');
+const TIMELINE = read('../../../components/shared/operations-timeline-card.tsx');
 const PAGE = read('../../../app/(dashboard)/dashboard/page.tsx');
 
 /** No debe filtrarse ningún tecnicismo de Postgres/RLS en la UI. */
@@ -114,5 +115,32 @@ describe('Dashboard page — wiring + privacidad', () => {
 
   it('lectura tolerante a fallo (no rompe el dashboard)', () => {
     expect(PAGE).toMatch(/try \{[\s\S]*getDashboardQuickNotes[\s\S]*\} catch \{[\s\S]*quickNotes = \[\]/);
+  });
+});
+
+describe('Layout patch — Quick Notes NO estira los KPIs', () => {
+  it('el panel de KPIs (Fila B) ya NO comparte grid con Quick Notes (sin col-span condicional)', () => {
+    expect(PAGE).not.toMatch(/canViewNotes \? 'lg:col-span-2' : 'lg:col-span-3'/);
+    // Quick Notes se movió a una sección inferior "Pulso operativo"
+    expect(PAGE).toContain('Pulso operativo');
+  });
+
+  it('Quick Notes es angosto (col-span-4) en un grid de 12; timeline ocupa el resto', () => {
+    expect(PAGE).toMatch(/lg:grid-cols-12/);
+    expect(PAGE).toMatch(/<NotesCard\s+className="lg:col-span-4"/);
+    expect(PAGE).toMatch(/canViewNotes \? 'lg:col-span-8' : 'lg:col-span-12'/);
+  });
+
+  it('pieza longitudinal derecha: OperationsTimelineCard como shell honesto (sin datos fake)', () => {
+    expect(PAGE).toContain('<OperationsTimelineCard');
+    expect(TIMELINE).toContain('Línea de tiempo operativa');
+    expect(TIMELINE).toContain('Próximamente');
+    // solo consume datos ya disponibles por prop; no crea queries ni toca el server
+    expect(TIMELINE).not.toMatch(/createClient|getDashboard|from '@\/server\//);
+  });
+
+  it('NotesCard compacto: lista con altura máxima + scroll interno (no estira)', () => {
+    expect(CARD).toMatch(/max-h-\d+/);
+    expect(CARD).toContain('overflow-y-auto');
   });
 });

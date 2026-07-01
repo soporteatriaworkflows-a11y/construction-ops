@@ -41,6 +41,7 @@ import {
 import { OperationsHeader } from '@/components/shared/operations-header';
 import { SurfaceCard } from '@/components/shared/surface-card';
 import { NotesCard } from '@/components/shared/notes-card';
+import { OperationsTimelineCard } from '@/components/shared/operations-timeline-card';
 import { WorkflowStrip } from '@/components/shared/workflow-strip';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Button } from '@/components/ui/button';
@@ -388,12 +389,9 @@ export default async function DashboardPage() {
       <section aria-label="Operación" className="mt-2 space-y-4">
         <h2 className="font-display text-base font-semibold tracking-tight text-content">Operación</h2>
 
-        {/* Fila B — panel Operación unificado (2/3) + Notas rápidas (1/3) */}
-        <div className="grid gap-4 lg:grid-cols-3">
-          <SurfaceCard
-            variant="primary"
-            className={`overflow-hidden p-0 ${canViewNotes ? 'lg:col-span-2' : 'lg:col-span-3'}`}
-          >
+        {/* Fila B — panel Operación unificado: KPIs compactos a ancho completo. Quick Notes
+            se movió a "Pulso operativo" (abajo) para NO estirar la altura de estos KPIs. */}
+        <SurfaceCard variant="primary" className="overflow-hidden p-0">
             <div className="grid divide-y divide-line sm:grid-cols-3 sm:divide-x sm:divide-y-0">
               {/* Capítulo de mayor peso */}
               <div className="p-4">
@@ -449,16 +447,31 @@ export default async function DashboardPage() {
                 )}
               </div>
             </div>
-          </SurfaceCard>
+        </SurfaceCard>
 
-          {canViewNotes && (
-            <NotesCard
-              notes={quickNotes}
-              canCreate={canCreateNotes}
-              createAction={createQuickNoteAction}
-              archiveAction={archiveQuickNoteAction}
+        {/* Pulso operativo — franja inferior: Quick Notes (angosto 4/12) + línea de tiempo
+            operativa longitudinal (8/12). Aislado de los KPIs de arriba: no los estira.
+            En móvil se apila (Notas arriba, timeline abajo). `client` no ve Quick Notes. */}
+        <div>
+          <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-content-muted">
+            Pulso operativo
+          </h3>
+          <div className="grid gap-4 lg:grid-cols-12">
+            {canViewNotes && (
+              <NotesCard
+                className="lg:col-span-4"
+                notes={quickNotes}
+                canCreate={canCreateNotes}
+                createAction={createQuickNoteAction}
+                archiveAction={archiveQuickNoteAction}
+              />
+            )}
+            <OperationsTimelineCard
+              className={canViewNotes ? 'lg:col-span-8' : 'lg:col-span-12'}
+              lastUpdatedAt={summary.lastUpdatedAt}
+              lastRunAt={monitoringSummary?.lastRunAt ?? null}
             />
-          )}
+          </div>
         </div>
 
         {/* Fila C — Monitoreo automático de precios (panel consolidado + subzona de tiempo) */}

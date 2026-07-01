@@ -1,5 +1,22 @@
 # Handoff Log
 
+## 2026-07-01 — ICONIC_OPS_V5_4_2C_QUICK_NOTES_DASHBOARD_LAYOUT_PATCH — EN RAMA / PR #19 (sin merge) (agent-dashboard)
+
+- Patch visual sobre la misma rama `feature/v5-4-2c-quick-notes-dashboard-card` (PR #19). **Problema:** Quick Notes en la grilla
+  "Fila B" estiraba la altura de los KPIs (capítulos/versiones/precios). **Fix aprobado:** sacar Quick Notes de la grilla superior.
+- **KPIs (Fila B)**: panel Operación a **ancho completo** (sin col-span condicional). Ya NO se estiran por las notas.
+- **Nueva sección "Pulso operativo"** (grid `lg:grid-cols-12`, debajo de los KPIs): **Quick Notes angosto** (`col-span-4`, más
+  compacto: lista densa `text-[13px]` + `line-clamp-3` + `max-h-56 overflow-y-auto` scroll interno, máx 5) + **`OperationsTimelineCard`**
+  (`col-span-8`) — shell honesto "Línea de tiempo operativa" (estado "Próximamente" + anclas con datos ya disponibles `lastUpdatedAt`/`lastRunAt`,
+  sin queries nuevas; base para V5.4.3, sin datos fake). Responsive: apila en móvil (notas arriba, timeline abajo).
+- **Funcionalidad de Quick Notes intacta** (notas reales, crear, archivar, pending, errores curados, **client no ve/crea/archiva**,
+  sin edición de body). **Privacidad intacta** (client no se renderiza; timeline a ancho completo sin notas).
+- **Tests** `dashboard-card.test.ts` (19/0, +5 layout; módulo quick-notes 47/0); `premium-system.test.ts` verde.
+- **QA**: typecheck 0 · lint 0 · suite **2250/0** (42 skip) · build 0 · gm **22/22** · diff-check limpio.
+- **STOP: sin merge/tag/deploy.** Push a PR #19 para preview. No `-1rqh`. No V5.4.3.
+
+---
+
 ## 2026-07-01 — ICONIC_OPS_V5_4_2C_QUICK_NOTES_DASHBOARD_CARD — EN RAMA (sin merge/tag/deploy) (agent-dashboard/frontend)
 
 - Base `origin/main = 58e8cfd` (V5.4.2b mergeado). Rama `feature/v5-4-2c-quick-notes-dashboard-card`. Conecta la UI usando la lógica de V5.4.2b.
