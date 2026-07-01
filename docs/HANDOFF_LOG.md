@@ -1,5 +1,28 @@
 # Handoff Log
 
+## 2026-06-30 — ICONIC_OPS_V5_4_2A_QUICK_NOTES_POLICY_PATCH_PROJECT_ESTIMATE_CONSISTENCY — EN RAMA PATCH (sin merge/tag/db push) (agent-db-rls)
+
+- **Origen:** harness RLS **vivo contra Supabase Cloud** (`construction-ops-prod`, ref `jabddbccmhrxztfzpdii`) pasó **30/31**
+  (tx con ROLLBACK, sin persistir). Único FAIL: nota con `project_id` + `estimate_id` de la **misma org pero distinto proyecto**
+  fue **aceptada** al INSERT. **Causa: column shadowing** — en la sub-cláusula de consistencia, `project_id` sin calificar se ligaba
+  a `project_scopes.project_id` (interno) ⇒ `ps.project_id = ps.project_id` (tautología, no-op).
+- **NO es fuga cross-org** (org/created_by/rol/`estimate_in_org` firmes; cross-org y estimate/project cross-org siguen denegados en
+  el harness). Es **integridad INTRA-org**. Se corrige **antes de V5.4.2b** porque esa fase empieza a cablear `estimate_id`/`project_id`.
+- **Patch ADITIVO** `supabase/migrations/20260627093000_quick_notes_project_estimate_policy_patch.sql`: `DROP POLICY IF EXISTS` +
+  `CREATE POLICY` recreando **solo** `quick_notes_insert_authorized`, calificando **todas** las refs a la NEW-row en subconsultas
+  con `quick_notes.<col>` (clave: `ps.project_id = quick_notes.project_id`). **NO edita** la migración base `20260627090000_quick_notes.sql`.
+  Contrato sin cambios (roles/autoría/org; `consulta` no crea; cross-org denegado; **project NULL + estimate in-org sigue PERMITIDO**).
+- **Tests:** estático nuevo `rls-quick-notes-policy-patch-static.test.ts` (11/0: usa `quick_notes.project_id`, sin patrón ambiguo
+  `= project_id`, sin policy abierta, sin DELETE, aditivo); base `rls-quick-notes-static.test.ts` ajustado (documenta el shadowing);
+  runtime out-of-band `supabase/tests/quick_notes_rls_runtime.mjs` (consistente/inconsistente/cross-org/estimate-null + regresión, ROLLBACK).
+- **Regresión:** typecheck 0 · lint 0 · suite **2203/0** (42 skip) · build 0 · gm **22/22** · estáticos quick_notes **26/0**.
+- ⚠️ **NO se aplicó a Cloud** (sin `db push`, sin tocar Supabase remoto/credenciales). El archivo local `.cloud-db-url` fue
+  **eliminado** (no tracked/staged). Runtime local no se ejecutó (Docker/Supabase local apagado); el predicado corregido **ya fue
+  verificado en Cloud** durante el diagnóstico. Re-correr el harness vivo post-apply confirmará 31/31.
+- **Sin merge/tag/deploy. Sin UI/repository/server actions/dashboard. No `-1rqh`.** Rama patch lista para revisión/PR.
+
+---
+
 ## 2026-06-28 — ICONIC_OPS_V5_4_2A_QUICK_NOTES_CLOUD_APPLY_GATE — APLICADO A CLOUD (sin tag/deploy) (orchestrator)
 
 - Usuaria autorizó aplicación controlada con preflight. Proyecto Supabase **enlazado correcto** = `jabddbccmhrxztfzpdii`
