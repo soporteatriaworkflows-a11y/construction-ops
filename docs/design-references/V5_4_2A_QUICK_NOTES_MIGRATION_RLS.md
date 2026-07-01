@@ -129,12 +129,19 @@ preservada y documentada, no bloqueada.
   project NULL + estimate in-org PASS · + regresión (consulta/anon/cross-org/archive-only/DELETE).
 
 ### Estado / aplicación
-- **NO aplicado a Cloud** en esta fase (sin `db push`, sin tocar Supabase remoto). La migración vive en el repo.
 - Regresión local: typecheck 0 · lint 0 · suite 2203/0 (42 skip) · build 0 · gm 22/22 · estáticos quick_notes 26/0.
-- El runtime local no se ejecutó esta sesión (Docker/Supabase local apagado); la corrección del predicado **ya fue verificada en
-  Cloud** durante el diagnóstico (calificado ⇒ deniega el caso inconsistente). Re-correr el harness vivo **tras** aplicar el patch
-  a un entorno confirmará 31/31.
+- La corrección del predicado fue verificada en Cloud durante el diagnóstico (calificado ⇒ deniega el caso inconsistente).
+
+### Cierre V5.4.2a — 31/31 en Cloud ✅ (2026-06-30 / 07-01)
+- **Patch aplicado a Cloud** (`construction-ops-prod`, `db push --linked`, EXIT 0; única migración pendiente = `20260627093000`).
+- **Policy activa validada** (deparse real de `pg_policies`): la consistencia usa `ps.project_id = quick_notes.project_id`
+  (calificado); sin patrón ambiguo. Shadowing corregido y vivo en Cloud.
+- **Harness RLS vivo Cloud: 31/31 PASS** (tx con ROLLBACK, 0 filas residuales). El bloque **project/estimate inconsistente**
+  ahora **DENEGADO** (`ok=false code=42501`); estimate same-org permitido; estimate/project cross-org denegado; archive-only, DELETE
+  denegado, anon/cross-org sin acceso — todo verde. Smoke prod sano (login/dashboard/catalog/apu 200; export 400; sin errores DB).
+- **V5.4.2a CERRADO al 100%.** `.cloud-db-url` eliminado (no tracked/staged); sin secrets expuestos; sin tag/deploy.
 
 ## Cómo proceder a V5.4.2b
-Tras aprobar/mergear esta migración y aplicarla de forma controlada (db push manual + harness RLS runtime), implementar
-repository + server actions + guard de privacidad de app, en rama separada.
+Implementado en `feature/v5-4-2b-quick-notes-repository-actions`: repository (`listQuickNotes`/`createQuickNote`/`archiveQuickNote`)
++ server actions (`createQuickNoteAction`/`archiveQuickNoteAction`) + guard de privacidad de app + tests. La UI real de `NotesCard`
+queda para **V5.4.2c**. Ver `docs/design-references/V5_4_2B_QUICK_NOTES_REPOSITORY_ACTIONS.md`.

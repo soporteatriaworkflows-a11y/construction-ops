@@ -1,5 +1,26 @@
 # Handoff Log
 
+## 2026-07-01 — ICONIC_OPS_V5_4_2B_QUICK_NOTES_REPOSITORY_ACTIONS — EN RAMA (sin merge/tag/deploy) (agent-cost-domain/frontend)
+
+- Base `origin/main = 0913bf5`. Rama `feature/v5-4-2b-quick-notes-repository-actions`. Consume `quick_notes` (V5.4.2a, RLS 31/31 en Cloud).
+  **Sin migraciones · sin db push · sin Supabase/RLS · sin Vercel envs · sin password reset · sin `-1rqh` · sin UI grande · sin rediseñar NotesCard.**
+- **Módulo `apps/web/server/quick-notes/`**: `types`, `errors`, `validation` (body 1..1000 + trim), `guard` (privacy por ViewerRole),
+  `db-repository` (Supabase SSR, RLS-bound), `fixture-repository` (demo lectura), `action-result` (mappers puros sin tecnicismos),
+  `index` (factory + `getDashboardQuickNotes`). **Server actions** `app/(dashboard)/dashboard/notes-actions.ts`:
+  `createQuickNoteAction` / `archiveQuickNoteAction`.
+- **Repository**: `listQuickNotes` (activas, org-scoped, created_at DESC, máx 5, project/estimate nullable) · `createQuickNote`
+  (org/created_by server-side, body validado) · `archiveQuickNote` (**archive-only**: solo status/archived_at/archived_by, **nunca body**).
+- **Privacidad (decisión, ver AskUserQuestion)**: mapeo congelado `consulta → ViewerRole 'client'`. **Privacy-first**: `client` NO ve/crea/archiva
+  en app-layer (doble defensa: RLS 1ª, guard app 2ª). Crear = internal/management/site (admin/gerencia/presupuestos/obra/compras); `consulta`/`client` no.
+  Archivar = app deny client + RLS impone creador|admin/gerencia. **Sin tocar AUTH_CONTRACT** (no se añadió ProfileRole al viewer).
+- **Errores controlados**: nunca se filtran mensajes técnicos de Postgres/RLS (mappers curados; test lo verifica).
+- **Tests** `tests/unit/quick-notes/` (28/0): validación, guard, repository (list/create/archive, RLS-denegado, client-guard, sin edición de body), fixture, action-result.
+- **QA**: typecheck 0 · lint 0 · suite **2231/0** (42 skip) · build 0 · gm **22/22** · diff-check limpio.
+- **NotesCard sin tocar** (shell estático) → UI real en **V5.4.2c**. Docs: `V5_4_2B_QUICK_NOTES_REPOSITORY_ACTIONS.md` + cierre 31/31 en el doc de V5.4.2a.
+- **STOP: sin merge/tag/deploy/producción.** Espera autorización. No `-1rqh`.
+
+---
+
 ## 2026-06-30 — ICONIC_OPS_V5_4_2A_QUICK_NOTES_POLICY_PATCH_PROJECT_ESTIMATE_CONSISTENCY — EN RAMA PATCH (sin merge/tag/db push) (agent-db-rls)
 
 - **Origen:** harness RLS **vivo contra Supabase Cloud** (`construction-ops-prod`, ref `jabddbccmhrxztfzpdii`) pasó **30/31**
