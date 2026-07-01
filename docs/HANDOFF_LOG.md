@@ -7031,3 +7031,16 @@ Rama: feature/v5-4-2d-dashboard-project-scope-selector. Base: origin/main = 9fb7
 
 ### Restricciones respetadas
 - NO migraciones. NO db push. NO Supabase Cloud/RLS. NO Vercel envs. NO password reset. NO tag. NO deploy manual. NO V5.4.3.
+
+---
+
+## 2026-07-01 - ICONIC_OPS_V5_4_3_MONITORING_RUNS_DETAILS - EN RAMA (sin merge/tag/deploy)
+
+- Rama `feature/v5-4-3-monitoring-runs-details`, base `origin/main = e89140de8af7e90dc7c68ffab48e03ab0aa426b7`. Sin migracion.
+- Repository aditivo: `listRunResults(viewer, runId, limit)` en `MonitorRepository`, con `MonitorRunResultDetailView` y lectura DB RLS-bound (`organization_id` + `run_id`).
+- `/catalog/monitoring`: seccion `Corridas recientes` ahora usa `<details>` server-rendered por corrida; muestra estado, fecha, duracion, trigger, counters, error summary y resultados al expandir.
+- Resultados por corrida: recurso, proveedor, estado, precio detectado, moneda/unidad, warnings, observacion vinculada, checkedAt y accion sugerida.
+- Limites: 5 runs recientes; 10 resultados visibles por run; si hay mas, copy de primeros 10.
+- Fixtures actualizados: run exitoso, run fallido, run parcial con `pending_created`/`changed`, run sin resultados.
+- Tests especificos: monitor-ui/repository/ui-invariants 61/61 PASS. Typecheck PASS.
+- Restricciones respetadas: NO migraciones, NO Supabase Cloud/db push/RLS, NO cron/actions logic, NO Quick Notes, NO Dashboard Project Scope Selector, NO Vercel/env/password, NO tag/deploy, NO BOQ/APU/exports, NO aprobacion/rechazo existente.

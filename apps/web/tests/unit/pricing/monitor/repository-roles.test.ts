@@ -4,6 +4,8 @@
  * client/site) + fixture read-only.
  */
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { DbMonitorRepository } from '@/server/pricing/monitor/db-repository';
 import { FixtureMonitorRepository } from '@/server/pricing/monitor/fixture-repository';
 import { validateCreateTargetInput, isValidCadence } from '@/server/pricing/monitor/validation';
@@ -106,5 +108,60 @@ describe('modo fixture — lectura demo, sin mutaciones', () => {
     await expect(repo.setTargetEnabled()).rejects.toBeInstanceOf(
       PriceIntelligenceWriteNotSupportedError,
     );
+  });
+});
+
+describe('V5.4.3 - detalles de corridas', () => {
+  const repo = new FixtureMonitorRepository();
+  const viewer: AuthenticatedViewer = {
+    userId: 'demo',
+    profileId: 'demo',
+    organizationId: 'org-demo',
+    role: 'internal',
+  };
+
+  it('fixture cubre run exitoso, run con error, pending/changed y run sin resultados', async () => {
+    const runs = await repo.listRecentRuns(viewer, 5);
+    expect(runs).toHaveLength(4);
+    expect(runs.some((r) => r.status === 'completed')).toBe(true);
+    expect(runs.some((r) => r.status === 'failed' && r.errorSummary)).toBe(true);
+
+    const partial = runs.find((r) => r.status === 'partial');
+    expect(partial).toBeTruthy();
+    const changedResults = await repo.listRunResults(viewer, partial!.id, 10);
+    expect(changedResults.map((r) => r.status).sort()).toEqual(['changed', 'pending_created']);
+    expect(changedResults[0]).toEqual(
+      expect.objectContaining({
+        runId: partial!.id,
+        targetId: expect.any(String),
+        resourceCode: expect.any(String),
+        resourceName: expect.any(String),
+        supplierName: expect.anything(),
+        detectedPrice: expect.any(String),
+        checkedAt: expect.any(String),
+      }),
+    );
+
+    const emptyRun = runs.find((r) => r.counters.checked === 0);
+    expect(emptyRun).toBeTruthy();
+    await expect(repo.listRunResults(viewer, emptyRun!.id, 10)).resolves.toEqual([]);
+  });
+
+  it('respeta limite solicitado sin fabricar filas', async () => {
+    const runs = await repo.listRecentRuns(viewer, 5);
+    const partial = runs.find((r) => r.status === 'partial')!;
+    await expect(repo.listRunResults(viewer, partial.id, 1)).resolves.toHaveLength(1);
+    await expect(repo.listRunResults(viewer, 'run-inexistente', 10)).resolves.toEqual([]);
+  });
+
+  it('db repository filtra por organization_id y run_id al listar resultados', () => {
+    const src = readFileSync(fileURLToPath(new URL('../../../../server/pricing/monitor/db-repository.ts', import.meta.url)), 'utf8');
+    const method = src.slice(src.indexOf('async listRunResults'), src.indexOf('async getMonitoringSummary'));
+    expect(method).toContain(".from('price_monitor_results')");
+    expect(method).toContain(".eq('organization_id', viewer.organizationId)");
+    expect(method).toContain(".eq('run_id', runId)");
+    expect(method).toContain('price_monitor_targets');
+    expect(method).toContain('resources ( code, name )');
+    expect(method).toContain('suppliers ( name )');
   });
 });

@@ -8,7 +8,7 @@
  * módulos `'use client'`. El `import type` es solo de tipos (se borra en runtime) → no
  * crea acoplamiento server/client.
  */
-import type { MonitorTargetView, MonitorRunView, MonitorRunStatus } from '@/server/pricing/monitor';
+import type { MonitorTargetView, MonitorRunView, MonitorRunStatus, MonitorResultStatus } from '@/server/pricing/monitor';
 
 /** Counters de una corrida (derivado de la vista; el tipo no está en el barrel). */
 type MonitorRunCounters = NonNullable<MonitorRunView['counters']>;
@@ -203,6 +203,79 @@ export function getLatestProblemRun<T extends Pick<MonitorRunView, 'status' | 'e
   return null;
 }
 
+
+/* --- V5.4.3: resultados por corrida. Puro, sin DB/actions/cron --- */
+
+export function getResultStatusLabel(status: MonitorResultStatus | string | null | undefined): string {
+  switch (status) {
+    case 'unchanged':
+      return 'Sin cambio';
+    case 'changed':
+      return 'Cambio detectado';
+    case 'pending_created':
+      return 'Pendiente creado';
+    case 'unreachable':
+      return 'No alcanzable';
+    case 'blocked':
+      return 'Bloqueado';
+    case 'parse_failed':
+      return 'Parse fallido';
+    case 'invalid_response':
+      return 'Respuesta invalida';
+    default:
+      return 'Desconocido';
+  }
+}
+
+export function getResultStatusTone(status: MonitorResultStatus | string | null | undefined): MonitorTone {
+  switch (status) {
+    case 'unchanged':
+      return 'success';
+    case 'changed':
+    case 'pending_created':
+      return 'warn';
+    case 'unreachable':
+    case 'blocked':
+    case 'parse_failed':
+    case 'invalid_response':
+      return 'danger';
+    default:
+      return 'muted';
+  }
+}
+
+export function getSuggestedMonitorAction(status: MonitorResultStatus | MonitorRunStatus | string | null | undefined): string {
+  switch (status) {
+    case 'pending_created':
+    case 'changed':
+      return 'Revisar cambios en Price Review';
+    case 'unreachable':
+    case 'blocked':
+    case 'parse_failed':
+    case 'invalid_response':
+      return 'Revisar URL/proveedor/fuente';
+    case 'running':
+      return 'Esperar o revisar luego';
+    default:
+      return 'Sin resultados disponibles';
+  }
+}
+
+export function formatDetectedPrice(price: string | null | undefined, currency: string | null | undefined): string {
+  if (!price) return 'Sin precio detectado';
+  const n = Number(price);
+  const code = currency ?? '';
+  if (!Number.isFinite(n)) return code ? `${price} ${code}` : price;
+  try {
+    return new Intl.NumberFormat('es-CO', {
+      style: code ? 'currency' : 'decimal',
+      currency: code || undefined,
+      maximumFractionDigits: 2,
+    }).format(n);
+  } catch {
+    return code ? `${price} ${code}` : price;
+  }
+}
 /* ── V5.4.1: countdown real de próxima revisión (dashboard). PURO, sin backend ── */
 
 /**

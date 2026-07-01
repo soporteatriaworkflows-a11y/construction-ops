@@ -18,6 +18,7 @@ import type {
   CreateTargetInput,
   MonitorRepository,
   MonitorResultView,
+  MonitorRunResultDetailView,
   MonitorRunView,
   MonitorTargetView,
   MonitoringSummary,
@@ -53,6 +54,29 @@ const TARGET_COLUMNS = `
   resources ( code, name, unit ),
   suppliers ( name )
 `;
+
+interface RunResultDetailRow {
+  id: string;
+  run_id: string;
+  target_id: string;
+  status: string;
+  detected_price: string | number | null;
+  currency: string | null;
+  unit: string | null;
+  warnings: unknown;
+  observation_id: string | null;
+  checked_at: string;
+  price_monitor_targets:
+    | {
+        resources: { code: string | null; name: string | null } | Array<{ code: string | null; name: string | null }> | null;
+        suppliers: { name: string | null } | Array<{ name: string | null }> | null;
+      }
+    | Array<{
+        resources: { code: string | null; name: string | null } | Array<{ code: string | null; name: string | null }> | null;
+        suppliers: { name: string | null } | Array<{ name: string | null }> | null;
+      }>
+    | null;
+}
 
 interface TargetRow {
   id: string;
@@ -237,6 +261,46 @@ export class DbMonitorRepository implements MonitorRepository {
       counters: (row.counters ?? {}) as MonitorRunView['counters'],
       errorSummary: (row.error_summary as string | null) ?? null,
     }));
+  }
+  async listRunResults(viewer: AuthenticatedViewer, runId: Uuid, limit: number): Promise<MonitorRunResultDetailView[]> {
+    const supabase = await this.clientFactory();
+    const { data, error } = await supabase
+      .from('price_monitor_results')
+      .select(
+        `
+          id, run_id, target_id, status, detected_price, currency, unit, warnings, observation_id, checked_at,
+          price_monitor_targets (
+            resources ( code, name ),
+            suppliers ( name )
+          )
+        `,
+      )
+      .eq('organization_id', viewer.organizationId)
+      .eq('run_id', runId)
+      .order('checked_at', { ascending: false })
+      .limit(limit);
+    if (error) throw new Error(`monitor_run_results_list_failed: ${error.code ?? 'unknown'}`);
+
+    return ((data ?? []) as unknown as RunResultDetailRow[]).map((row) => {
+      const target = one(row.price_monitor_targets);
+      const resource = one(target?.resources ?? null);
+      const supplier = one(target?.suppliers ?? null);
+      return {
+        id: row.id,
+        runId: row.run_id,
+        targetId: row.target_id,
+        resourceCode: resource?.code ?? '',
+        resourceName: resource?.name ?? '',
+        supplierName: supplier?.name ?? null,
+        status: row.status as MonitorRunResultDetailView['status'],
+        detectedPrice: row.detected_price === null ? null : String(row.detected_price),
+        currency: row.currency ?? null,
+        unit: row.unit ?? null,
+        warnings: Array.isArray(row.warnings) ? (row.warnings as string[]) : [],
+        observationId: row.observation_id ?? null,
+        checkedAt: row.checked_at,
+      };
+    });
   }
 
   async getMonitoringSummary(viewer: AuthenticatedViewer): Promise<MonitoringSummary> {

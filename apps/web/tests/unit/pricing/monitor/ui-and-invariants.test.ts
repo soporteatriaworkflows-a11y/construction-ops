@@ -139,6 +139,21 @@ describe('UI del monitoreo (mandato 39-44)', () => {
     expect(actions).toMatch(/await validatePublicUrl\(sourceUrl\)/);
   });
 
+
+  it('V5.4.3: Corridas recientes usa details server-rendered y conserva limites', () => {
+    expect(monitoringPage).toContain('<details');
+    expect(monitoringPage).toContain('RUN_RESULT_LIMIT = 10');
+    expect(monitoringPage).toContain('RECENT_RUN_LIMIT = 5');
+    expect(monitoringPage).toContain('listRunResults');
+    expect(monitoringPage).toContain('Mostrando los primeros');
+    expect(monitoringPage).toContain('getSuggestedMonitorAction(null)');
+    expect(monitoringPage).not.toContain("'use client'");
+  });
+
+  it('V5.4.3: no cambia actions ni cron logic desde la page', () => {
+    expect(monitoringPage).not.toMatch(/runScheduledMonitor|runManualMonitor|createPendingObservation|recordResult/);
+    expect(actions).toMatch(/runManualMonitor/);
+  });
   it('vercel.json declara el cron diario 11:00 UTC hacia el endpoint protegido', () => {
     const vercel = JSON.parse(read('vercel.json')) as {
       crons: Array<{ path: string; schedule: string }>;

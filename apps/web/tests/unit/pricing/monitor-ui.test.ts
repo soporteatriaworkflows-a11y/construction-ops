@@ -19,6 +19,10 @@ import {
   formatRunStartedRelative,
   summarizeRunCounters,
   getLatestProblemRun,
+  getResultStatusLabel,
+  getResultStatusTone,
+  getSuggestedMonitorAction,
+  formatDetectedPrice,
   formatCountdown,
   formatTimeUntil,
 } from '../../../lib/pricing/monitor-ui';
@@ -151,6 +155,34 @@ describe('V5.2.2c — lectura de corridas (runs)', () => {
   });
 });
 
+describe('V5.4.3 - resultados por corrida', () => {
+  it('accion sugerida por status', () => {
+    expect(getSuggestedMonitorAction('pending_created')).toBe('Revisar cambios en Price Review');
+    expect(getSuggestedMonitorAction('changed')).toBe('Revisar cambios en Price Review');
+    expect(getSuggestedMonitorAction('unreachable')).toBe('Revisar URL/proveedor/fuente');
+    expect(getSuggestedMonitorAction('blocked')).toBe('Revisar URL/proveedor/fuente');
+    expect(getSuggestedMonitorAction('parse_failed')).toBe('Revisar URL/proveedor/fuente');
+    expect(getSuggestedMonitorAction('invalid_response')).toBe('Revisar URL/proveedor/fuente');
+    expect(getSuggestedMonitorAction('running')).toBe('Esperar o revisar luego');
+    expect(getSuggestedMonitorAction('unchanged')).toBe('Sin resultados disponibles');
+  });
+
+  it('labels y tonos de resultado cubren estados conocidos', () => {
+    expect(getResultStatusLabel('pending_created')).toBe('Pendiente creado');
+    expect(getResultStatusTone('pending_created')).toBe('warn');
+    expect(getResultStatusTone('changed')).toBe('warn');
+    expect(getResultStatusTone('blocked')).toBe('danger');
+    expect(getResultStatusTone('unchanged')).toBe('success');
+    expect(getResultStatusLabel('boom')).toBe('Desconocido');
+  });
+
+  it('formatea precio detectado sin inventar datos', () => {
+    expect(formatDetectedPrice(null, 'COP')).toBe('Sin precio detectado');
+    expect(formatDetectedPrice('abc', 'COP')).toBe('abc COP');
+    expect(formatDetectedPrice('1200', null)).toBe('1.200');
+    expect(formatDetectedPrice('1200', 'COP')).toContain('1.200');
+  });
+});
 describe('V5.4.1 — countdown real (formatCountdown/formatTimeUntil)', () => {
   const NOW3 = new Date('2026-06-27T12:00:00Z');
 

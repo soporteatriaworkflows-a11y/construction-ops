@@ -17,6 +17,7 @@ export type {
   MonitorTargetView,
   MonitorTargetRecord,
   MonitorResultView,
+  MonitorRunResultDetailView,
   MonitorRunView,
   MonitoringSummary,
   MonitorResultStatus,
