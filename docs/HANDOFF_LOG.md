@@ -1,5 +1,19 @@
 # Handoff Log
 
+## 2026-07-02 - ICONIC_OPS_V5_6_1D_INVITE_ACCEPT_MEMBERSHIP_PATCH - EN RAMA (sin PR/merge/tag/deploy) (agent-auth/access)
+
+- Base `origin/main = 406042166a95fe605db5cacd2aadc5b2b4fa6838`. Rama `feature/v5-6-1d-invite-accept-membership-patch`.
+- Diagnóstico: con Supabase email confirmation activo, `signUp` no entregaba sesión inmediata; el usuario confirmaba correo, volvía al dashboard y `accept_invitation` no se ejecutaba, dejando Auth user sin `profiles`/membresía.
+- Patch mínimo en `/invite/accept`: si la invitación está pending y hay sesión SSR, el formulario entra en modo `autoAccept`, llama RPC `accept_invitation` con hash del token y redirige a `/dashboard`.
+- `signUp` ahora usa `emailRedirectTo` a `/auth/callback?next=/invite/accept?token=...`, de modo que la confirmación de correo vuelve al flujo de invitación y completa membresía sin editar DB manualmente.
+- Usuario existente confirmado: el flujo conserva `signInWithPassword` y luego ejecuta la misma RPC; token inválido/expirado/usado mantiene mensajes claros.
+- Seguridad: sin writes directos a `profiles`, sin `token_hash` expuesto, sin service_role, sin cambios en RPC/RLS, sin crear organización/rol desde cliente.
+- `/auth/callback` no cambia comportamiento funcional; sigue intercambiando PKCE y sanitizando `next`.
+- Sin migraciones, sin db push, sin Supabase Cloud, sin RLS, sin Vercel env/password/SMTP, sin deploy/tag, sin tocar usuarios reales ni DB manual.
+- Docs: `docs/design-references/V5_6_1D_INVITE_ACCEPT_MEMBERSHIP_PATCH.md`.
+- STOP: no PR/merge/tag/deploy. Espera autorización.
+
+---
 ## 2026-07-01 - ICONIC_OPS_V5_5_1A_OPERATIONAL_REVIEW_CONSOLE - EN RAMA (sin PR/merge/tag/deploy) (agent-pricing/frontend)
 
 - Base `origin/main = 777706a974e8c8c6dc05aaabffef07cd09c9d798`. Rama `feature/v5-5-1a-operational-review-console`.

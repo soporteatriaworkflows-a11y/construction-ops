@@ -16,6 +16,7 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { hashToken } from '@/server/access';
+import { getSessionClaims } from '@/server/auth/session';
 import { AuthCard } from '@/components/auth/auth-card';
 import { AcceptInvitationForm } from './_components/accept-form';
 import { roleLabel } from '@/app/(dashboard)/settings/access/labels';
@@ -52,6 +53,7 @@ export default async function AcceptInvitationPage({
 }) {
   const { token } = await searchParams;
   const result = await peek(token);
+  const hasSession = result.status === 'pending' ? Boolean(await getSessionClaims()) : false;
 
   if (result.status === 'pending' && token && result.email && result.role) {
     return (
@@ -63,6 +65,7 @@ export default async function AcceptInvitationPage({
           token={token}
           email={result.email}
           fullName={result.fullName ?? null}
+          autoAccept={hasSession}
         />
       </AuthCard>
     );

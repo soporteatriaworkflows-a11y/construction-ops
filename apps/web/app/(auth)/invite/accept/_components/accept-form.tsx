@@ -9,12 +9,12 @@
  *     plano NUNCA se envía a la base, solo su hash, igual que en el servidor.
  *  4. Éxito → al panel. Errores → mensaje claro en español.
  *
- * Si el proyecto Supabase exige confirmación de correo, signUp no crea sesión:
- * se informa al invitado que confirme su correo (fallback documentado).
+ * Si el proyecto Supabase exige confirmación de correo, signUp redirige de vuelta
+ * al enlace de invitación para completar `accept_invitation` con sesión activa.
  */
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -24,6 +24,14 @@ import { FormError } from '@/components/auth/form-error';
 import { FormSuccess } from '@/components/auth/form-success';
 import { isValidPasswordLength } from '@/components/auth/auth-helpers';
 import { createClient } from '@/lib/supabase/client';
+import {
+  ACCESS_ACTIVATED_MESSAGE,
+  AUTO_ACCEPT_MESSAGE,
+  CONFIRM_EMAIL_RETURN_MESSAGE,
+  buildInviteConfirmationRedirect,
+  isAlreadyRegisteredMessage,
+  mapAcceptError,
+} from '../invite-accept-flow';
 
 /** SHA-256 hex con Web Crypto (equivalente a node:crypto sha256 hex). */
 async function sha256Hex(value: string): Promise<string> {
@@ -32,24 +40,6 @@ async function sha256Hex(value: string): Promise<string> {
   return Array.from(new Uint8Array(digest))
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
-}
-
-const ACCEPT_ERRORS: Record<string, string> = {
-  invitation_invalid: 'La invitación no es válida.',
-  invitation_revoked: 'Esta invitación fue revocada.',
-  invitation_used: 'Esta invitación ya fue utilizada.',
-  invitation_expired: 'Esta invitación ha expirado. Solicita una nueva.',
-  email_mismatch: 'El correo de tu cuenta no coincide con el de la invitación.',
-  already_member: 'Ya eres miembro de una organización.',
-  no_session: 'No se pudo iniciar tu sesión. Intenta de nuevo.',
-};
-
-function mapAcceptError(message: string | undefined): string {
-  const raw = (message ?? '').toLowerCase();
-  for (const [key, msg] of Object.entries(ACCEPT_ERRORS)) {
-    if (raw.includes(key)) return msg;
-  }
-  return 'No se pudo aceptar la invitación. Intenta de nuevo.';
 }
 
 interface FormState {
@@ -65,12 +55,15 @@ export function AcceptInvitationForm({
   token,
   email,
   fullName,
+  autoAccept = false,
 }: {
   token: string;
   email: string;
   fullName: string | null;
+  autoAccept?: boolean;
 }) {
   const router = useRouter();
+  const autoStartedRef = useRef(false);
   const [form, setForm] = useState<FormState>({
     password: '',
     confirm: '',
@@ -79,6 +72,45 @@ export function AcceptInvitationForm({
     success: null,
     loading: false,
   });
+
+  const acceptWithActiveSession = useCallback(async (currentFullName: string) => {
+    const supabase = createClient();
+    const tokenHash = await sha256Hex(token);
+    const { error } = await supabase.rpc('accept_invitation', {
+      p_token_hash: tokenHash,
+      p_email: email,
+      p_full_name: currentFullName.trim() || null,
+    });
+    if (error) return mapAcceptError(error.message);
+    return null;
+  }, [email, token]);
+
+  useEffect(() => {
+    if (!autoAccept || autoStartedRef.current) return;
+    autoStartedRef.current = true;
+
+    void Promise.resolve()
+      .then(() => {
+        setForm((p) => ({ ...p, loading: true, error: null, success: AUTO_ACCEPT_MESSAGE }));
+        return acceptWithActiveSession(form.fullName);
+      })
+      .then((error) => {
+        if (error) {
+          setForm((p) => ({ ...p, loading: false, success: null, error }));
+          return;
+        }
+        setForm((p) => ({ ...p, loading: false, success: ACCESS_ACTIVATED_MESSAGE }));
+        router.replace('/dashboard');
+      })
+      .catch(() => {
+        setForm((p) => ({
+          ...p,
+          loading: false,
+          success: null,
+          error: 'Ocurrió un error inesperado. Intenta de nuevo.',
+        }));
+      });
+  }, [acceptWithActiveSession, autoAccept, form.fullName, router]);
 
   function change(e: React.ChangeEvent<HTMLInputElement>) {
     setForm((p) => ({ ...p, [e.target.name]: e.target.value, error: null }));
@@ -100,11 +132,17 @@ export function AcceptInvitationForm({
       const supabase = createClient();
 
       // 1) Crear la cuenta (o iniciar sesión si ya existe).
-      const signUp = await supabase.auth.signUp({ email, password: form.password });
+      const signUp = await supabase.auth.signUp({
+        email,
+        password: form.password,
+        options: {
+          emailRedirectTo: buildInviteConfirmationRedirect(window.location.origin, token),
+        },
+      });
       let hasSession = Boolean(signUp.data.session);
 
       if (signUp.error) {
-        const already = signUp.error.message.toLowerCase().includes('already');
+        const already = isAlreadyRegisteredMessage(signUp.error.message);
         if (!already) {
           setForm((p) => ({ ...p, loading: false, error: 'No se pudo crear la cuenta. Intenta de nuevo.' }));
           return;
@@ -126,25 +164,19 @@ export function AcceptInvitationForm({
         setForm((p) => ({
           ...p,
           loading: false,
-          success:
-            'Te enviamos un correo para confirmar tu cuenta. Confírmalo y vuelve a abrir este enlace para finalizar.',
+          success: CONFIRM_EMAIL_RETURN_MESSAGE,
         }));
         return;
       }
 
       // 2) Aceptar la invitación con la sesión activa.
-      const tokenHash = await sha256Hex(token);
-      const { error } = await supabase.rpc('accept_invitation', {
-        p_token_hash: tokenHash,
-        p_email: email,
-        p_full_name: form.fullName.trim() || null,
-      });
+      const error = await acceptWithActiveSession(form.fullName);
       if (error) {
-        setForm((p) => ({ ...p, loading: false, error: mapAcceptError(error.message) }));
+        setForm((p) => ({ ...p, loading: false, error }));
         return;
       }
 
-      setForm((p) => ({ ...p, loading: false, success: 'Acceso activado. Redirigiendo…' }));
+      setForm((p) => ({ ...p, loading: false, success: ACCESS_ACTIVATED_MESSAGE }));
       router.replace('/dashboard');
     } catch {
       setForm((p) => ({ ...p, loading: false, error: 'Ocurrió un error inesperado. Intenta de nuevo.' }));
@@ -217,7 +249,7 @@ export function AcceptInvitationForm({
       <FormError id="accept-error" message={form.error} />
 
       <Button type="submit" className="w-full" disabled={form.loading} aria-busy={form.loading}>
-        {form.loading ? 'Activando…' : 'Aceptar y activar acceso'}
+        {form.loading ? 'Activando...' : 'Aceptar y activar acceso'}
       </Button>
     </form>
   );
