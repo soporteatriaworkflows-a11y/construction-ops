@@ -8,24 +8,22 @@
  *  - Botones aprobar/rechazar solo a admin/gerencia.
  */
 import Link from 'next/link';
-import { ArrowLeft, TrendingDown, Clock, CheckCircle, XCircle, Calculator } from 'lucide-react';
+import { ArrowLeft, Calculator, History } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
 import { Button } from '@/components/ui/button';
 import { isCreationModeEnabled } from '@/app/(dashboard)/projects/mode-guard';
 import { EmptyState } from '@/components/shared/empty-state';
-import { Badge } from '@/components/ui/badge';
 import { resolveViewer } from '@/server/auth/resolve-viewer';
 import { resolveAuthenticatedViewer } from '@/server/auth/resolve-viewer';
 import { resolveAuthMode } from '@/lib/supabase/env';
 import { getObservationRepository, getProviderRepository } from '@/server/pricing';
-import type { ResourcePriceObservationView } from '@/server/pricing';
-import { formatCOP } from '@/lib/utils/format';
+import type { ResourcePriceHistoryRow } from '@/server/pricing';
 import { getMonitorRepository } from '@/server/pricing/monitor';
 import type { MonitorTargetView, MonitorResultView } from '@/server/pricing/monitor';
 import { ObservationForm } from './_components/observation-form';
-import { ApproveButton, RejectButton } from './_components/observation-review-buttons';
 import { UrlValidationPanel } from './_components/url-validation-panel';
 import { MonitoringSection } from './_components/monitoring-section';
+import { PriceHistoryTable } from './_components/price-history-table';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,25 +32,29 @@ const INTERNAL_ROLES = ['internal', 'management'];
 const APPROVE_ROLES = ['internal', 'management'];
 const CREATE_ROLES = ['internal', 'management'];
 
-const STATUS_CONFIG: Record<string, { label: string; variant: 'success' | 'warning' | 'destructive' | 'outline' | 'secondary' }> = {
-  approved: { label: 'Aprobada', variant: 'success' },
-  pending: { label: 'Pendiente', variant: 'warning' },
-  rejected: { label: 'Rechazada', variant: 'destructive' },
-  expired: { label: 'Expirada', variant: 'outline' },
-};
+const PRICE_HISTORY_LIMIT = 25;
 
-function statusBadge(status: string, isStale: boolean) {
-  const cfg = STATUS_CONFIG[status] ?? { label: status, variant: 'outline' as const };
-  return (
-    <span className="inline-flex items-center gap-1">
-      <Badge variant={cfg.variant}>{cfg.label}</Badge>
-      {isStale && <Badge variant="outline" className="text-orange-600 border-orange-300">Vencida</Badge>}
-    </span>
-  );
-}
-
-function formatDate(iso: string) {
-  return new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso));
+function redactHistoryRows(rows: ResourcePriceHistoryRow[]): ResourcePriceHistoryRow[] {
+  return rows.map((row) => ({
+    ...row,
+    supplierId: null,
+    supplierName: null,
+    observedPrice: null,
+    discountPercent: null,
+    suggestedNetPrice: null,
+    currency: null,
+    unit: null,
+    sourceType: null,
+    sourceReference: null,
+    rejectionReason: null,
+    notes: null,
+    importBatchLabel: null,
+    importBatchSourceReference: null,
+    monitorWarnings: [],
+    previousApprovedPrice: null,
+    deltaAbs: null,
+    deltaPct: null,
+  }));
 }
 
 interface PageProps {
@@ -62,7 +64,8 @@ interface PageProps {
 export default async function PriceIntelligencePage({ params }: PageProps) {
   const { resourceId } = await params;
 
-  let observations: ResourcePriceObservationView[] = [];
+  let historyRows: ResourcePriceHistoryRow[] = [];
+  let historyHasMore = false;
   let viewerRole = 'consulta';
   let canCreate = false;
   let canApprove = false;
@@ -96,7 +99,9 @@ export default async function PriceIntelligencePage({ params }: PageProps) {
       viewerRole = effectiveViewer.role;
     }
 
-    observations = await obsRepo.listResourcePriceObservations(effectiveViewer, resourceId);
+    const rawHistoryRows = await obsRepo.listResourcePriceHistory(effectiveViewer, resourceId, PRICE_HISTORY_LIMIT + 1);
+    historyRows = rawHistoryRows.slice(0, PRICE_HISTORY_LIMIT);
+    historyHasMore = rawHistoryRows.length > PRICE_HISTORY_LIMIT;
     providers = await provRepo.listProviders(effectiveViewer);
     const summary = await obsRepo.getResourcePriceIntelligenceSummary(effectiveViewer, resourceId);
     if (summary) {
@@ -139,6 +144,7 @@ export default async function PriceIntelligencePage({ params }: PageProps) {
   // CTA: iniciar un APU a partir de este recurso (no crea nada automáticamente;
   // preselecciona el material en el constructor). Solo roles internos + modo db.
   const canBuildApu = canCreate && isCreationModeEnabled();
+  const visibleHistoryRows = showInternalFields ? historyRows : redactHistoryRows(historyRows);
 
   return (
     <div>
@@ -199,107 +205,33 @@ export default async function PriceIntelligencePage({ params }: PageProps) {
         canMutate={canCreate}
       />
 
-      {/* Historial de observaciones */}
-      <section aria-label="Historial de observaciones">
+      {/* Historico y fuentes */}
+      <section aria-label="Historico y fuentes" className="mt-8">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-gray-700">
-            Historial ({observations.length})
-          </h2>
-          {/* Acceso al Centro de Revisión (revisión masiva) — solo roles con aprobación */}
-          {canApprove && observations.some((o) => o.status === 'pending') && (
+          <div>
+            <h2 className="text-sm font-semibold text-gray-700 dark:text-content">Historico y fuentes</h2>
+            {historyHasMore && (
+              <p className="mt-1 text-xs text-gray-500 dark:text-content-muted">Mostrando las ultimas 25 observaciones</p>
+            )}
+          </div>
+          {canApprove && historyRows.some((o) => o.status === 'pending') && (
             <Link
               href="/catalog/prices/review"
               className="text-xs font-medium text-iconic-primary hover:underline"
             >
-              Revisar pendientes en bloque →
+              Revisar pendientes en bloque -&gt;
             </Link>
           )}
         </div>
 
-        {observations.length === 0 ? (
+        {visibleHistoryRows.length === 0 ? (
           <EmptyState
-            icon={TrendingDown}
-            title="Sin observaciones"
-            description="No hay observaciones de precio registradas para este recurso."
+            icon={History}
+            title="Sin historico de precios"
+            description="Aun no hay observaciones registradas para este recurso."
           />
         ) : (
-          <div className="space-y-3">
-            {observations.map((obs) => (
-              <div
-                key={obs.id}
-                className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
-                aria-label={`Observación ${obs.id.slice(0, 8)} — ${obs.status}`}
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 space-y-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {statusBadge(obs.status, obs.isStale)}
-                      {obs.supplierName && (
-                        <span className="text-xs text-gray-500">{obs.supplierName}</span>
-                      )}
-                      <span className="text-xs text-gray-400">
-                        {formatDate(obs.observedAt)}
-                      </span>
-                    </div>
-
-                    {/* Campos 🔒 — solo roles internos */}
-                    {showInternalFields && (
-                      <div className="flex items-center gap-4 mt-1">
-                        <span className="text-sm font-semibold tabular-nums text-gray-900">
-                          {formatCOP(obs.observedPrice)}
-                          <span className="ml-1 text-xs font-normal text-gray-500">/{obs.unit}</span>
-                        </span>
-                        {Number(obs.discountPercent) > 0 && (
-                          <span className="text-xs text-emerald-600">
-                            −{Number(obs.discountPercent).toFixed(2)}% → {formatCOP(obs.suggestedNetPrice)}
-                          </span>
-                        )}
-                      </div>
-                    )}
-
-                    <div className="flex items-center gap-3 text-xs text-gray-500">
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {obs.sourceType}
-                      </span>
-                      {obs.sourceReference && (
-                        <span className="truncate max-w-[200px]">{obs.sourceReference}</span>
-                      )}
-                      {obs.validUntil && (
-                        <span className="text-orange-600">Hasta {formatDate(obs.validUntil)}</span>
-                      )}
-                    </div>
-
-                    {obs.notes && (
-                      <p className="text-xs text-gray-600 mt-1">{obs.notes}</p>
-                    )}
-
-                    {obs.status === 'rejected' && obs.rejectionReason && (
-                      <div className="mt-1 flex items-start gap-1 text-xs text-red-700">
-                        <XCircle className="h-3 w-3 mt-0.5 shrink-0" />
-                        <span>{obs.rejectionReason}</span>
-                      </div>
-                    )}
-
-                    {obs.status === 'approved' && obs.approvedAt && (
-                      <div className="mt-1 flex items-start gap-1 text-xs text-green-700">
-                        <CheckCircle className="h-3 w-3 mt-0.5 shrink-0" />
-                        <span>Aprobada el {formatDate(obs.approvedAt)}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Acciones de revisión — solo admin/gerencia para observaciones pending */}
-                  {canApprove && obs.status === 'pending' && (
-                    <div className="flex items-center gap-2 shrink-0">
-                      <ApproveButton observationId={obs.id} resourceId={resourceId} />
-                      <RejectButton observationId={obs.id} resourceId={resourceId} />
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
+          <PriceHistoryTable rows={visibleHistoryRows} showInternalFields={showInternalFields} />
         )}
       </section>
     </div>

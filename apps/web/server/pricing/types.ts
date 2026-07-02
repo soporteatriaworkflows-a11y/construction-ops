@@ -16,6 +16,7 @@ import type { AuthenticatedViewer } from '@/server/auth/types';
 export type { Uuid, IsoDateTime, DecimalString, PriceSourceType, SupplierType, AuthenticatedViewer };
 
 export type ObservationStatus = 'pending' | 'approved' | 'rejected' | 'expired';
+export type PriceHistoryOrigin = 'manual' | 'batch' | 'monitor';
 
 // ---------------------------------------------------------------------------
 // Providers (Suppliers — extended view)
@@ -86,6 +87,36 @@ export interface ResourcePriceObservationView {
   rejectionReason: string | null;
 }
 
+export interface ResourcePriceHistoryRow {
+  id: Uuid;
+  resourceId: Uuid;
+  supplierId: Uuid | null;
+  supplierName: string | null;
+  observedPrice: DecimalString | null;
+  discountPercent: DecimalString | null;
+  suggestedNetPrice: DecimalString | null;
+  currency: string | null;
+  unit: string | null;
+  status: ObservationStatus;
+  sourceType: PriceSourceType | null;
+  sourceReference: string | null;
+  observedAt: IsoDateTime;
+  validUntil: IsoDateTime | null;
+  approvedAt: IsoDateTime | null;
+  rejectionReason: string | null;
+  notes: string | null;
+  importBatchId: Uuid | null;
+  importBatchLabel: string | null;
+  importBatchSourceReference: string | null;
+  monitorResultId: Uuid | null;
+  monitorResultStatus: string | null;
+  monitorCheckedAt: IsoDateTime | null;
+  monitorWarnings: string[];
+  previousApprovedPrice: DecimalString | null;
+  deltaAbs: DecimalString | null;
+  deltaPct: DecimalString | null;
+  origin: PriceHistoryOrigin;
+}
 /** Input de creación de observación (campos que acepta el cliente). */
 export interface CreateObservationInput {
   resourceId: Uuid;
@@ -150,6 +181,11 @@ export interface PriceObservationRepository {
     viewer: AuthenticatedViewer,
     resourceId: Uuid,
   ): Promise<ResourcePriceObservationView[]>;
+  listResourcePriceHistory(
+    viewer: AuthenticatedViewer,
+    resourceId: Uuid,
+    limit: number,
+  ): Promise<ResourcePriceHistoryRow[]>;
   createResourcePriceObservation(
     viewer: AuthenticatedViewer,
     input: CreateObservationInput,
