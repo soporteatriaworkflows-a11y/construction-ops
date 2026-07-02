@@ -58,7 +58,13 @@ const ICONS: Record<CommandIcon, LucideIcon> = {
   workspace: PanelsTopLeft,
 };
 
-export function CommandPalette({ canManageAccess }: { canManageAccess: boolean }) {
+export function CommandPalette({
+  canManageAccess,
+  profileRole = null,
+}: {
+  canManageAccess: boolean;
+  profileRole?: string | null;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -66,7 +72,7 @@ export function CommandPalette({ canManageAccess }: { canManageAccess: boolean }
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  const items = useMemo(() => buildCommandItems(canManageAccess), [canManageAccess]);
+  const items = useMemo(() => buildCommandItems(canManageAccess, profileRole), [canManageAccess, profileRole]);
   const filtered = useMemo(() => filterCommands(items, query), [items, query]);
   const sections = useMemo(() => groupCommands(filtered), [filtered]);
 

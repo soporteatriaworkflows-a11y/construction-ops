@@ -1,21 +1,21 @@
-/**
- * Dashboard principal — endurecido 4B.1+.
+﻿/**
+ * Dashboard principal â€” endurecido 4B.1+.
  *
  * Server Component. Propiedad: agent-dashboard.
  *
- * CERO cálculo financiero en React: los valores llegan como DecimalString
- * ya calculados por cost-domain (vía read-model: fixture o Drizzle/Postgres).
+ * CERO cÃ¡lculo financiero en React: los valores llegan como DecimalString
+ * ya calculados por cost-domain (vÃ­a read-model: fixture o Drizzle/Postgres).
  *
- * Render REQUEST-TIME (no prerender estático):
- *  - `export const dynamic = 'force-dynamic'` (flag explícito).
- *  - Señal dinámica intrínseca: resuelve el viewer (que en modo `supabase` lee
+ * Render REQUEST-TIME (no prerender estÃ¡tico):
+ *  - `export const dynamic = 'force-dynamic'` (flag explÃ­cito).
+ *  - SeÃ±al dinÃ¡mica intrÃ­nseca: resuelve el viewer (que en modo `supabase` lee
  *    `cookies()`), igual que `/projects`. Esto evita que Next prerenderice la
- *    página durante el build y la ejecute contra la base — comportamiento que,
- *    en modo `db` con base vacía, lanzaba `ProjectNotFoundError` al resolver un
+ *    pÃ¡gina durante el build y la ejecute contra la base â€” comportamiento que,
+ *    en modo `db` con base vacÃ­a, lanzaba `ProjectNotFoundError` al resolver un
  *    UUID demo fijo. El proyecto activo se deriva ahora de los proyectos REALES
- *    visibles para el viewer; si no hay ninguno, se muestra estado vacío.
+ *    visibles para el viewer; si no hay ninguno, se muestra estado vacÃ­o.
  *
- * Privacidad: campos ðŸ”’ (projectedSaving, realizedSaving, pricingCoverage)
+ * Privacidad: campos Ã°Å¸â€â€™ (projectedSaving, realizedSaving, pricingCoverage)
  * solo se pasan a componentes cuando el viewer.role es management/internal.
  * Para rol `client`, esos campos no se pasan ni se renderizan.
  */
@@ -55,6 +55,9 @@ import { getObservationRepository } from '@/server/pricing';
 import { getMonitorRepository } from '@/server/pricing/monitor';
 import { formatCountdown } from '@/lib/pricing/monitor-ui';
 import { resolveViewer } from '@/server/auth/resolve-viewer';
+import { resolveAccessActor } from '@/server/access';
+import { canAccessModule, isAccessModule, type AccessModule } from '@/server/access/module-access';
+import { canUseQuoteAssistant } from '@/lib/access/surface-visibility';
 import { AuthError } from '@/server/auth/errors';
 import { InviteMembershipRecovery } from '@/components/auth/invite-membership-recovery';
 import { formatCOP, formatDateTime, ESTIMATE_VERSION_STATUS_LABELS } from '@/lib/utils/format';
@@ -72,6 +75,7 @@ import {
   type QuickNoteView,
 } from '@/server/quick-notes';
 import { createQuickNoteAction, archiveQuickNoteAction } from './notes-actions';
+import { DeniedModuleCallout } from './denied-module-callout';
 
 /** Render en REQUEST-TIME (ver cabecera). Igual que `/projects` y `/projects/new`. */
 export const dynamic = 'force-dynamic';
@@ -81,10 +85,10 @@ type DashboardPageProps = {
 };
 
 /**
- * Tarjeta de pendiente/alerta con estado vacío premium. `count`:
- *  - `null`   → dato no disponible (neutro).
- *  - `0`      → "todo al día" (verde, sin acción).
- *  - `> 0`    → requiere acción (tono ámbar/rojo + enlace).
+ * Tarjeta de pendiente/alerta con estado vacÃ­o premium. `count`:
+ *  - `null`   â†’ dato no disponible (neutro).
+ *  - `0`      â†’ "todo al dÃ­a" (verde, sin acciÃ³n).
+ *  - `> 0`    â†’ requiere acciÃ³n (tono Ã¡mbar/rojo + enlace).
  */
 function AlertCard({
   href,
@@ -118,10 +122,10 @@ function AlertCard({
       <div className="min-w-0 flex-1">
         <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</p>
         {count === null ? (
-          <p className="text-sm font-semibold text-gray-400">—</p>
+          <p className="text-sm font-semibold text-gray-400">â€”</p>
         ) : actionable ? (
           <p className={`text-sm font-semibold ${toneText}`}>
-            <span className="tabular-nums">{count}</span> · {actionLabel}
+            <span className="tabular-nums">{count}</span> Â· {actionLabel}
           </p>
         ) : (
           <p className="text-sm font-semibold text-green-700">{clearLabel}</p>
@@ -132,7 +136,7 @@ function AlertCard({
   );
 }
 
-/** Métrica plana (tira hairline; sin caja). Tono semántico opcional en el valor. */
+/** MÃ©trica plana (tira hairline; sin caja). Tono semÃ¡ntico opcional en el valor. */
 function DashMetric({
   label,
   value,
@@ -161,7 +165,7 @@ function DashMetric({
   );
 }
 
-/** Bloque de error amable reutilizable (mismo patrón que `/projects`). */
+/** Bloque de error amable reutilizable (mismo patrÃ³n que `/projects`). */
 function DashboardError({ message }: { message: string }) {
   return (
     <div>
@@ -198,8 +202,8 @@ function DashboardScopeSelector({
           </p>
           <p className="text-xs text-content-muted">
             {scope.mode === 'project'
-              ? 'Vista filtrada por proyecto: presupuesto, capítulos y notas rápidas usan este alcance.'
-              : 'Vista global: KPIs de organización/catálogo. El presupuesto se muestra como proyecto destacado.'}
+              ? 'Vista filtrada por proyecto: presupuesto, capÃ­tulos y notas rÃ¡pidas usan este alcance.'
+              : 'Vista global: KPIs de organizaciÃ³n/catÃ¡logo. El presupuesto se muestra como proyecto destacado.'}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -222,7 +226,7 @@ function DashboardScopeSelector({
       </div>
       {scope.invalidProjectId && (
         <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800" role="status">
-          El proyecto solicitado no está disponible para este usuario. Mostrando vista global.
+          El proyecto solicitado no estÃ¡ disponible para este usuario. Mostrando vista global.
         </p>
       )}
     </section>
@@ -230,26 +234,36 @@ function DashboardScopeSelector({
 }
 
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
-  // Viewer por modo: supabase=autenticado (lee cookies → dinámico); demo=fixture.
+  // Viewer por modo: supabase=autenticado (lee cookies â†’ dinÃ¡mico); demo=fixture.
   let viewer: Awaited<ReturnType<typeof resolveViewer>>;
   try {
     viewer = await resolveViewer();
   } catch (e) {
-    // Usuario Auth CONFIRMADO pero sin `profiles`: casi siempre una invitación
-    // cuyo cierre no llegó a ejecutarse. En vez de dejarlo sin salida, intenta
-    // finalizar la invitación (token persistido en su navegador) y sólo recarga
+    // Usuario Auth CONFIRMADO pero sin `profiles`: casi siempre una invitaciÃ³n
+    // cuyo cierre no llegÃ³ a ejecutarse. En vez de dejarlo sin salida, intenta
+    // finalizar la invitaciÃ³n (token persistido en su navegador) y sÃ³lo recarga
     // al panel tras un cierre confirmado por el RPC (deny-by-default).
     if (e instanceof AuthError && e.reason === 'no_membership') {
       return <InviteMembershipRecovery />;
     }
-    // Sin sesión en modo supabase: el Proxy redirige a /login antes de llegar.
-    const msg = e instanceof Error ? e.message : 'Error al resolver la sesión.';
+    // Sin sesiÃ³n en modo supabase: el Proxy redirige a /login antes de llegar.
+    const msg = e instanceof Error ? e.message : 'Error al resolver la sesiÃ³n.';
     return <DashboardError message={msg} />;
   }
 
   const rm = getReadModel();
 
-  const requestedProjectId = projectIdFromSearchParams(await searchParams);
+  const params = await searchParams;
+  const requestedProjectId = projectIdFromSearchParams(params);
+  const deniedParam = typeof params.denied === 'string' ? params.denied : null;
+  const deniedModule = isAccessModule(deniedParam) ? deniedParam : null;
+
+  let profileRole: string | null = null;
+  try {
+    profileRole = (await resolveAccessActor()).profileRole;
+  } catch {
+    profileRole = null;
+  }
 
   // Alcance derivado de la lista REAL de proyectos visibles (sin UUID demo).
   let projects: ProjectListItem[] = [];
@@ -269,7 +283,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const canCreate = isCreationModeEnabled();
   const isFixtureMode = resolveSource(process.env.READ_MODEL_SOURCE) === 'fixture';
 
-  // Base sin proyectos (p. ej. organización productiva recién creada): estado vacío.
+  // Base sin proyectos (p. ej. organizaciÃ³n productiva reciÃ©n creada): estado vacÃ­o.
   if (!projectId) {
     return (
       <div>
@@ -278,11 +292,12 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           title="Centro de control"
           subtitle="Vista global de organizacion"
         />
-        <DashboardScopeSelector projects={projects} scope={scope} />
+        {deniedModule && <DeniedModuleCallout module={deniedModule} />}
+      <DashboardScopeSelector projects={projects} scope={scope} />
         <EmptyState
           icon={LayoutDashboard}
           title="Sin proyectos para resumir"
-          description="Aún no hay proyectos en esta organización. Crea el primero para ver el resumen financiero."
+          description="AÃºn no hay proyectos en esta organizaciÃ³n. Crea el primero para ver el resumen financiero."
           action={
             canCreate ? (
               <Button asChild size="sm">
@@ -314,9 +329,14 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     ? `Vista de proyecto: ${scope.selectedProject.name}`
     : 'Vista global de organizacion. KPIs de organizacion/catalogo cuando aplica.';
   const isAuthorizedForSavings = viewer.role === 'management' || viewer.role === 'internal';
+  const canOpenModule = (module: AccessModule) => canAccessModule(profileRole, module);
+  const canOpenAssistant = canUseQuoteAssistant(profileRole);
+  const canReviewPrices = canOpenModule('operational-review');
+  const canMonitorPrices = canOpenModule('monitoring');
+  const canViewPricingInsights = canOpenModule('price-intelligence');
   // ------------------------------------------------------------------
-  // KPIs operativos (Oleada OPERATIONAL BUDGET UX V1) — lecturas aditivas,
-  // tolerantes a fallo (null ⇒ la tarjeta no muestra valor, no rompe la página).
+  // KPIs operativos (Oleada OPERATIONAL BUDGET UX V1) â€” lecturas aditivas,
+  // tolerantes a fallo (null â‡’ la tarjeta no muestra valor, no rompe la pÃ¡gina).
   // ------------------------------------------------------------------
   let activeEstimateCount: number | null = null;
   let issuedVersionCount: number | null = null;
@@ -330,9 +350,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     issuedVersionCount = null;
   }
 
-  // ðŸ”’ Pendientes de revisión de precios: solo roles management/internal.
+  // Ã°Å¸â€â€™ Pendientes de revisiÃ³n de precios: solo roles management/internal.
   let pendingPriceCount: number | null = null;
-  if (isAuthorizedForSavings) {
+  if (isAuthorizedForSavings && canReviewPrices) {
     try {
       const pricingViewer = {
         userId: viewer.profileId ?? viewer.organizationId,
@@ -348,9 +368,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     }
   }
 
-  // ðŸ”’ Monitoreo automático de precios (Fase 4A): KPIs tolerantes a fallo.
+  // Ã°Å¸â€â€™ Monitoreo automÃ¡tico de precios (Fase 4A): KPIs tolerantes a fallo.
   let monitoringSummary: import('@/server/pricing/monitor').MonitoringSummary | null = null;
-  if (isAuthorizedForSavings) {
+  if (isAuthorizedForSavings && canMonitorPrices) {
     try {
       const pricingViewer = {
         userId: viewer.profileId ?? viewer.organizationId,
@@ -364,7 +384,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     }
   }
 
-  // Notas rápidas internas (V5.4.2c) — privacy-first: `client` no ve/crea/archiva
+  // Notas rÃ¡pidas internas (V5.4.2c) â€” privacy-first: `client` no ve/crea/archiva
   // (no se llama al repositorio). Lectura tolerante a fallo (no rompe el dashboard).
   const canViewNotes = canViewQuickNotes(viewer.role);
   const canCreateNotes = canCreateQuickNotes(viewer.role);
@@ -389,11 +409,55 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     : `Proyecto destacado - ${scope.highlightedProject?.name ?? 'Sin proyecto'} - ${statusLabel}`;
   const split = costSplitPct(summary.directCost, summary.budget);
   const sparkValues = summary.chapterDistribution.map((s) => Number(s.share)).filter((n) => Number.isFinite(n));
-  // Capítulo de mayor peso (insight) — selección sobre shares YA calculados.
+  // CapÃ­tulo de mayor peso (insight) â€” selecciÃ³n sobre shares YA calculados.
   const topSlice = summary.chapterDistribution.reduce<(typeof summary.chapterDistribution)[number] | null>(
     (best, s) => (best === null || Number(s.share) > Number(best.share) ? s : best),
     null,
   );
+
+  const workflowSteps = [
+    { href: '/quote', label: 'Cotizar con asistente', icon: Sparkles, module: 'estimates' as const, requiresAssistant: true },
+    { href: '/projects', label: 'Proyectos', icon: FolderOpen, module: 'projects' as const },
+    { href: '/catalog', label: 'Catálogo', icon: Package, module: 'catalog' as const },
+    { href: '/catalog/providers', label: 'Proveedores', icon: Truck, module: 'catalog' as const },
+    { href: '/catalog', label: 'Inteligencia de precios', icon: Tags, module: 'price-intelligence' as const },
+    { href: '/catalog/monitoring', label: 'Monitoreo de precios', icon: Radar, module: 'monitoring' as const },
+    { href: '/catalog/prices/review', label: 'Revisión de precios', icon: ClipboardCheck, module: 'operational-review' as const },
+  ].filter((step) => (step.requiresAssistant ? canOpenAssistant : canOpenModule(step.module)));
+
+  const alertCards = [
+    canReviewPrices
+      ? {
+          href: '/catalog/prices/review',
+          label: 'Precios por revisar',
+          count: pendingPriceCount,
+          actionLabel: 'observaciones por revisar',
+          clearLabel: 'Sin precios pendientes',
+          icon: <Tags className="h-5 w-5" aria-hidden="true" />,
+        }
+      : null,
+    canMonitorPrices
+      ? {
+          href: '/catalog/monitoring',
+          label: 'Cambios de precio detectados',
+          count: monitoringSummary ? monitoringSummary.pendingChangesCount : null,
+          actionLabel: 'cambios por revisar',
+          clearLabel: 'Sin cambios pendientes',
+          icon: <TrendingUp className="h-5 w-5" aria-hidden="true" />,
+        }
+      : null,
+    canMonitorPrices
+      ? {
+          href: '/catalog/monitoring',
+          label: 'Fuentes con error',
+          count: monitoringSummary ? monitoringSummary.erroredCount : null,
+          actionLabel: 'fuentes con fallos',
+          clearLabel: 'Sin fuentes con error',
+          icon: <AlertTriangle className="h-5 w-5" aria-hidden="true" />,
+          tone: 'red' as const,
+        }
+      : null,
+  ].filter((card): card is NonNullable<typeof card> => card !== null);
 
   return (
     <div>
@@ -402,11 +466,12 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         title="Centro de control"
         subtitle={scopeSubtitle}
       />
+      {deniedModule && <DeniedModuleCallout module={deniedModule} />}
       <DashboardScopeSelector projects={projects} scope={scope} />
 
-      {/* ZONA 1 — Centro de mando (grid modular de cards; navy SOLO como acento) */}
+      {/* ZONA 1 â€” Centro de mando (grid modular de cards; navy SOLO como acento) */}
       <section aria-label="Centro de mando" className="mb-6 grid gap-4 lg:grid-cols-3">
-        {/* Card PRIMARY: resumen + métricas integradas */}
+        {/* Card PRIMARY: resumen + mÃ©tricas integradas */}
         <SurfaceCard variant="primary" className="lg:col-span-2">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
@@ -425,16 +490,20 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               <Button asChild size="sm">
                 <Link href={dashboardActionHref}>{dashboardActionLabel}</Link>
               </Button>
-              <Button asChild size="sm" variant="outline">
-                <Link href="/planning"><CalendarRange className="h-4 w-4" aria-hidden="true" />Cronograma</Link>
-              </Button>
-              <Button asChild size="sm" variant="outline">
-                <Link href="/catalog"><Package className="h-4 w-4" aria-hidden="true" />Catálogo</Link>
-              </Button>
+              {canOpenModule('planning') && (
+                <Button asChild size="sm" variant="outline">
+                  <Link href="/planning"><CalendarRange className="h-4 w-4" aria-hidden="true" />Cronograma</Link>
+                </Button>
+              )}
+              {canOpenModule('catalog') && (
+                <Button asChild size="sm" variant="outline">
+                  <Link href="/catalog"><Package className="h-4 w-4" aria-hidden="true" />Catálogo</Link>
+                </Button>
+              )}
             </div>
           </div>
 
-          {/* Composición de costo — instrumento firma (específico de obra) */}
+          {/* ComposiciÃ³n de costo â€” instrumento firma (especÃ­fico de obra) */}
           {split.directPct + split.indirectPct > 0 && (
             <div className="mt-5">
               <div className="flex h-2 w-full max-w-xl overflow-hidden rounded-full bg-surface-muted" aria-hidden="true">
@@ -448,19 +517,19 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             </div>
           )}
 
-          {/* Métricas integradas — tira hairline */}
+          {/* MÃ©tricas integradas â€” tira hairline */}
           <div className="mt-5 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-4">
             <DashMetric label="Costos directos" value={formatCOP(summary.directCost)} />
             <DashMetric label="Indirectos (AIU)" value={formatCOP(summary.indirectCost)} />
             <DashMetric label="Proyectos" value={String(projectCount)} sub="organizacion" />
-            <DashMetric label="Presupuestos activos" value={activeEstimateCount === null ? '—' : String(activeEstimateCount)} sub={selectedProjectId ? "proyecto" : "organizacion"} />
+            <DashMetric label="Presupuestos activos" value={activeEstimateCount === null ? 'â€”' : String(activeEstimateCount)} sub={selectedProjectId ? "proyecto" : "organizacion"} />
           </div>
         </SurfaceCard>
 
-        {/* Card CHART compacta: distribución por capítulo (ya no ocupa media pantalla) */}
+        {/* Card CHART compacta: distribuciÃ³n por capÃ­tulo (ya no ocupa media pantalla) */}
         <SurfaceCard variant="chart" className="flex flex-col">
           <div className="flex items-center justify-between">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-content-muted">Distribución por capítulo</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-content-muted">DistribuciÃ³n por capÃ­tulo</p>
             <span className="text-[11px] text-content-muted">{sparkValues.length} cap.</span>
           </div>
           {sparkValues.length > 0 ? (
@@ -468,27 +537,27 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               <Sparkbars values={sparkValues} />
             </div>
           ) : (
-            <p className="mt-4 flex-1 text-sm text-content-muted">Sin capítulos para graficar todavía.</p>
+            <p className="mt-4 flex-1 text-sm text-content-muted">Sin capÃ­tulos para graficar todavÃ­a.</p>
           )}
-          <p className="mt-3 text-[11px] text-content-muted">Peso por capítulo · {formatDateTime(summary.lastUpdatedAt)}</p>
+          <p className="mt-3 text-[11px] text-content-muted">Peso por capÃ­tulo Â· {formatDateTime(summary.lastUpdatedAt)}</p>
         </SurfaceCard>
       </section>
 
       {/* ------------------------------------------------------------------ */}
-      {/* ZONA 2 — Operación / estado de módulos                               */}
+      {/* ZONA 2 â€” OperaciÃ³n / estado de mÃ³dulos                               */}
       {/* ------------------------------------------------------------------ */}
-      <section aria-label="Operación" className="mt-2 space-y-4">
-        <h2 className="font-display text-base font-semibold tracking-tight text-content">Operación</h2>
+      <section aria-label="OperaciÃ³n" className="mt-2 space-y-4">
+        <h2 className="font-display text-base font-semibold tracking-tight text-content">OperaciÃ³n</h2>
 
-        {/* Fila B — panel Operación unificado: KPIs compactos a ancho completo. Quick Notes
-            se movió a "Pulso operativo" (abajo) para NO estirar la altura de estos KPIs. */}
+        {/* Fila B â€” panel OperaciÃ³n unificado: KPIs compactos a ancho completo. Quick Notes
+            se moviÃ³ a "Pulso operativo" (abajo) para NO estirar la altura de estos KPIs. */}
         <SurfaceCard variant="primary" className="overflow-hidden p-0">
             <div className="grid divide-y divide-line sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-              {/* Capítulo de mayor peso */}
+              {/* CapÃ­tulo de mayor peso */}
               <div className="p-4">
                 <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-content-muted">
                   <TrendingUp className="h-3.5 w-3.5 text-iconic-primary/70" aria-hidden="true" />
-                  Capítulo de mayor peso
+                  CapÃ­tulo de mayor peso
                 </p>
                 {topSlice ? (
                   <>
@@ -504,7 +573,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                     <p className="mt-1 text-[11px] text-content-muted">del costo directo</p>
                   </>
                 ) : (
-                  <p className="mt-2 text-sm text-content-muted">Sin capítulos todavía.</p>
+                  <p className="mt-2 text-sm text-content-muted">Sin capÃ­tulos todavÃ­a.</p>
                 )}
               </div>
 
@@ -515,34 +584,32 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                   Versiones emitidas
                 </p>
                 <p className="mt-2 font-display text-2xl font-bold tabular-nums text-content">
-                  {issuedVersionCount === null ? '—' : issuedVersionCount}
+                  {issuedVersionCount === null ? 'â€”' : issuedVersionCount}
                 </p>
                 <p className="mt-1 text-[11px] text-content-muted">Snapshots inmutables entregados - organizacion</p>
               </div>
 
               {/* Precios por revisar */}
-              <div className="p-4">
-                <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-content-muted">
-                  <Tags className="h-3.5 w-3.5 text-iconic-primary/70" aria-hidden="true" />
-                  Precios por revisar
-                </p>
-                <p className={`mt-2 font-display text-2xl font-bold tabular-nums ${pendingPriceCount && pendingPriceCount > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-content'}`}>
-                  {pendingPriceCount === null ? '—' : pendingPriceCount}
-                </p>
-                {isAuthorizedForSavings ? (
+              {canReviewPrices && (
+                <div className="p-4">
+                  <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-content-muted">
+                    <Tags className="h-3.5 w-3.5 text-iconic-primary/70" aria-hidden="true" />
+                    Precios por revisar
+                  </p>
+                  <p className={`mt-2 font-display text-2xl font-bold tabular-nums ${pendingPriceCount && pendingPriceCount > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-content'}`}>
+                    {pendingPriceCount === null ? '—' : pendingPriceCount}
+                  </p>
                   <Link href="/catalog/prices/review" className="mt-1 inline-block text-[11px] font-medium text-iconic-primary hover:underline">
-                    Abrir revisión masiva →
+                    Abrir revisión masiva
                   </Link>
-                ) : (
-                  <p className="mt-1 text-[11px] text-content-muted">Observaciones pendientes - catalogo</p>
-                )}
-              </div>
+                </div>
+              )}
             </div>
         </SurfaceCard>
 
-        {/* Pulso operativo — franja inferior: Quick Notes (angosto 4/12) + línea de tiempo
+        {/* Pulso operativo â€” franja inferior: Quick Notes (angosto 4/12) + lÃ­nea de tiempo
             operativa longitudinal (8/12). Aislado de los KPIs de arriba: no los estira.
-            En móvil se apila (Notas arriba, timeline abajo). `client` no ve Quick Notes. */}
+            En mÃ³vil se apila (Notas arriba, timeline abajo). `client` no ve Quick Notes. */}
         <div>
           <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-content-muted">
             Pulso operativo
@@ -566,14 +633,14 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           </div>
         </div>
 
-        {/* Fila C — Monitoreo automático de precios (panel consolidado + subzona de tiempo) */}
-        {isAuthorizedForSavings && monitoringSummary && (
+        {/* Fila C â€” Monitoreo automÃ¡tico de precios (panel consolidado + subzona de tiempo) */}
+        {canMonitorPrices && monitoringSummary && (
           <SurfaceCard variant="primary" className="overflow-hidden p-0">
             <div className="flex flex-col lg:flex-row">
               <div className="flex-1 p-4">
                 <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-content-muted">
                   <Radar className="h-3.5 w-3.5 text-iconic-primary/70" aria-hidden="true" />
-                  Monitoreo automático de precios
+                  Monitoreo automÃ¡tico de precios
                 </p>
                 <div className="mt-3 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-4">
                   <DashMetric label="Fuentes monitoreadas" value={String(monitoringSummary.monitoredCount)} sub={`catalogo - ${monitoringSummary.activeCount} activas - ${monitoringSummary.pausedCount} pausadas`} />
@@ -583,9 +650,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                 </div>
               </div>
 
-              {/* Subzona de tiempo — anillo countdown (estilo target) + Última revisión real */}
+              {/* Subzona de tiempo â€” anillo countdown (estilo target) + Ãšltima revisiÃ³n real */}
               <div className="flex items-center gap-4 border-t border-line p-4 lg:w-72 lg:border-l lg:border-t-0">
-                {/* Anillo de "próxima revisión" — decorativo; el tiempo real (nextReviewAt) se muestra al lado. */}
+                {/* Anillo de "prÃ³xima revisiÃ³n" â€” decorativo; el tiempo real (nextReviewAt) se muestra al lado. */}
                 <div className="relative h-16 w-16 shrink-0" aria-hidden="true">
                   <svg viewBox="0 0 36 36" className="h-16 w-16 -rotate-90">
                     <circle cx="18" cy="18" r="15.5" fill="none" strokeWidth="3" className="stroke-surface-muted" />
@@ -595,13 +662,13 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                       className="stroke-iconic-primary dark:stroke-iconic-cyan"
                     />
                   </svg>
-                  {/* Centro limpio: solo un ícono (el tiempo vive afuera, sin duplicar). */}
+                  {/* Centro limpio: solo un Ã­cono (el tiempo vive afuera, sin duplicar). */}
                   <span className="absolute inset-0 flex items-center justify-center text-iconic-primary dark:text-iconic-cyan">
                     <CalendarClock className="h-5 w-5" />
                   </span>
                 </div>
                 <div className="min-w-0">
-                  <p className="text-[10px] font-medium uppercase tracking-wide text-content-muted">Próxima revisión</p>
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-content-muted">PrÃ³xima revisiÃ³n</p>
                   <p className="font-display text-base font-bold tabular-nums text-content">
                     {formatCountdown(monitoringSummary.nextReviewAt)}
                   </p>
@@ -611,7 +678,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                     </p>
                   )}
                   <p className="mt-1 truncate text-[11px] text-content-muted">
-                    Última: {monitoringSummary.lastRunAt ? formatDateTime(monitoringSummary.lastRunAt) : 'sin corridas'}
+                    Ãšltima: {monitoringSummary.lastRunAt ? formatDateTime(monitoringSummary.lastRunAt) : 'sin corridas'}
                   </p>
                 </div>
               </div>
@@ -619,60 +686,30 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           </SurfaceCard>
         )}
 
-        {/* Fila D — Workflow strip (reemplaza las cards de acceso rápido) */}
-        <SurfaceCard variant="metric" className="px-3 py-4">
-          <WorkflowStrip
-            steps={[
-              { href: '/quote', label: 'Cotizar con asistente', icon: Sparkles, current: true },
-              { href: '/projects', label: 'Proyectos', icon: FolderOpen },
-              { href: '/catalog', label: 'Catálogo', icon: Package },
-              { href: '/catalog/providers', label: 'Proveedores', icon: Truck },
-              { href: '/catalog', label: 'Inteligencia de precios', icon: Tags },
-              { href: '/catalog/monitoring', label: 'Monitoreo de precios', icon: Radar },
-              { href: '/catalog/prices/review', label: 'Revisión de precios', icon: ClipboardCheck },
-            ]}
-          />
-        </SurfaceCard>
+        {/* Fila D â€” Workflow strip (reemplaza las cards de acceso rÃ¡pido) */}
+        {workflowSteps.length > 0 && (
+          <SurfaceCard variant="metric" className="px-3 py-4">
+            <WorkflowStrip steps={workflowSteps.map((step, index) => ({ ...step, current: index === 0 }))} />
+          </SurfaceCard>
+        )}
       </section>
 
       {/* ------------------------------------------------------------------ */}
-      {/* Pendientes y alertas — qué requiere acción (datos ya disponibles)    */}
+      {/* Pendientes y alertas â€” quÃ© requiere acciÃ³n (datos ya disponibles)    */}
       {/* ------------------------------------------------------------------ */}
-      {isAuthorizedForSavings && (
+      {alertCards.length > 0 && (
         <section aria-label="Pendientes y alertas" className="mt-6">
           <h2 className="mb-4 text-base font-semibold text-gray-900">Pendientes y alertas</h2>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <AlertCard
-              href="/catalog/prices/review"
-              label="Precios por revisar"
-              count={pendingPriceCount}
-              actionLabel="observaciones por revisar"
-              clearLabel="Sin precios pendientes"
-              icon={<Tags className="h-5 w-5" aria-hidden="true" />}
-            />
-            <AlertCard
-              href="/catalog/monitoring"
-              label="Cambios de precio detectados"
-              count={monitoringSummary ? monitoringSummary.pendingChangesCount : null}
-              actionLabel="cambios por revisar"
-              clearLabel="Sin cambios pendientes"
-              icon={<TrendingUp className="h-5 w-5" aria-hidden="true" />}
-            />
-            <AlertCard
-              href="/catalog/monitoring"
-              label="Fuentes con error"
-              count={monitoringSummary ? monitoringSummary.erroredCount : null}
-              actionLabel="fuentes con fallos"
-              clearLabel="Sin fuentes con error"
-              icon={<AlertTriangle className="h-5 w-5" aria-hidden="true" />}
-              tone="red"
-            />
+            {alertCards.map((card) => (
+              <AlertCard key={card.href + card.label} {...card} />
+            ))}
           </div>
         </section>
       )}
 
       {/* ------------------------------------------------------------------ */}
-      {/* Distribución por capítulo (Recharts)                                 */}
+      {/* DistribuciÃ³n por capÃ­tulo (Recharts)                                 */}
       {/* ------------------------------------------------------------------ */}
       <ChapterDistributionSection
         chapterDistribution={summary.chapterDistribution}
@@ -680,9 +717,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       />
 
       {/* ------------------------------------------------------------------ */}
-      {/* Ahorro e indicadores internos (ðŸ”’ solo management/internal)         */}
+      {/* Ahorro e indicadores internos (Ã°Å¸â€â€™ solo management/internal)         */}
       {/* ------------------------------------------------------------------ */}
-      {isAuthorizedForSavings && (
+      {isAuthorizedForSavings && canViewPricingInsights && (
         <SavingsSection
           projectedSaving={summary.projectedSaving}
           realizedSaving={summary.realizedSaving}
@@ -700,9 +737,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           aria-live="polite"
         >
           <strong>Modo fixture.</strong> Los valores mostrados provienen del golden
-          master sanitizado (ENTRE PATIOS — Primer Piso). En modo{' '}
+          master sanitizado (ENTRE PATIOS â€” Primer Piso). En modo{' '}
           <code className="font-mono text-xs">db</code> los datos provienen de la
-          base productiva vía read-model.
+          base productiva vÃ­a read-model.
         </div>
       )}
     </div>

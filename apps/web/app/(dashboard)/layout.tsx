@@ -11,6 +11,7 @@ import { FloatingWorkflowDock } from '@/components/shared/floating-workflow-dock
 import { AppTopbar } from '@/components/shared/app-topbar';
 import { ContextualNav } from '@/components/shared/contextual-nav';
 import { resolveAccessActor, canManageAccess } from '@/server/access';
+import { canUseQuoteAssistant } from '@/lib/access/surface-visibility';
 import { QuoteCompanion } from './_components/quote-companion';
 
 /**
@@ -45,6 +46,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   const mode = readModelModeLabel();
   const ws = getActiveWorkspace();
   const actor = await resolveShellActor();
+  const quoteAssistantAvailable = canUseQuoteAssistant(actor.role);
   return (
     <div className="flex min-h-screen bg-app">
       {/* Rail de navegación flotante (compacto + hover-expand + pin). */}
@@ -65,6 +67,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
           role={actor.role}
           workspaceName={ws.workspaceName}
           canManageAccess={actor.canManageAccess}
+          quoteAssistantAvailable={quoteAssistantAvailable}
         />
 
         {/* Navegación contextual del módulo activo (solo si aplica) */}
@@ -76,10 +79,10 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       </div>
 
       {/* Asistente acompañante de cotización (aditivo, fixed, no afecta el flujo) */}
-      <QuoteCompanion />
+      {quoteAssistantAvailable && <QuoteCompanion />}
 
       {/* Workflow companion flotante (compacto) — fuera del dashboard. Se auto-oculta en /dashboard. */}
-      <FloatingWorkflowDock />
+      <FloatingWorkflowDock profileRole={actor.role} />
     </div>
   );
 }

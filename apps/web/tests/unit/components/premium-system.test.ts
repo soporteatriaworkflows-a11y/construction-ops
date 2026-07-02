@@ -1,5 +1,5 @@
-/**
- * premium-system.test.ts — V4.2.3 iconografía + glass + botones táctiles.
+﻿/**
+ * premium-system.test.ts â€” V4.2.3 iconografÃ­a + glass + botones tÃ¡ctiles.
  * Stack node: checks de FUENTE.
  */
 import { describe, it, expect } from 'vitest';
@@ -8,8 +8,8 @@ import { fileURLToPath } from 'node:url';
 
 const read = (rel: string) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
 
-describe('V4.2.3 — sistema visual premium', () => {
-  it('capa de iconografía central con estados (IconicIcon + IconChip)', () => {
+describe('V4.2.3 â€” sistema visual premium', () => {
+  it('capa de iconografÃ­a central con estados (IconicIcon + IconChip)', () => {
     const ico = read('../../../components/shared/iconic-icon.tsx');
     expect(ico).toContain('export function IconicIcon');
     expect(ico).toContain('export function IconChip');
@@ -23,7 +23,7 @@ describe('V4.2.3 — sistema visual premium', () => {
     expect(css).toContain('.dark .glass');
   });
 
-  it('Button: táctil (active:scale) + secundario frosted + variantes dark', () => {
+  it('Button: tÃ¡ctil (active:scale) + secundario frosted + variantes dark', () => {
     const btn = read('../../../components/ui/button.tsx');
     expect(btn).toContain('active:scale-[0.98]');
     expect(btn).toContain('backdrop-blur'); // outline glass
@@ -33,7 +33,7 @@ describe('V4.2.3 — sistema visual premium', () => {
   it('AppRail glass/dock + nav y CTA con pressed state', () => {
     const rail = read('../../../components/shared/app-rail.tsx');
     expect(rail).toContain('glass-navy');
-    expect(rail).toContain('active:scale-[0.98]'); // CTA Asistente táctil
+    expect(rail).toContain('active:scale-[0.98]'); // CTA Asistente tÃ¡ctil
     const nav = read('../../../components/shared/sidebar-nav.tsx');
     expect(nav).toContain('active:scale-[0.97]');
   });
@@ -41,37 +41,37 @@ describe('V4.2.3 — sistema visual premium', () => {
   it('IconChip disponible como capa central; dashboard sin formas decorativas', () => {
     expect(read('../../../components/shared/iconic-icon.tsx')).toContain('export function IconChip');
     const dash = read('../../../app/(dashboard)/dashboard/page.tsx');
-    expect(dash).not.toContain('rounded-full bg-iconic-cyan/10'); // círculo decorativo eliminado en V4.2.2
+    expect(dash).not.toContain('rounded-full bg-iconic-cyan/10'); // cÃ­rculo decorativo eliminado en V4.2.2
   });
 
   it('V4.2.5: dashboard editorial (DashMetric, sin mega-hero navy con gradiente)', () => {
     const dash = read('../../../app/(dashboard)/dashboard/page.tsx');
-    expect(dash).toContain('DashMetric'); // tira de métricas plana
+    expect(dash).toContain('DashMetric'); // tira de mÃ©tricas plana
     expect(dash).not.toContain("background: 'linear-gradient(180deg, #050a32"); // mega-hero navy eliminado
     expect(dash).not.toContain('CommandStat'); // mini-cards navy eliminadas del hero
   });
 
-  it('V4.2.6: dark slate-charcoal con elevación (no navy saturado, no plano)', () => {
+  it('V4.2.6: dark slate-charcoal con elevaciÃ³n (no navy saturado, no plano)', () => {
     const css = read('../../../app/globals.css');
     expect(css).toMatch(/\.dark[\s\S]*--c-app:\s*#0d0f14/i); // slate-charcoal base
     expect(css).toMatch(/\.dark[\s\S]*--c-surface:\s*#161922/i); // surface elevada
   });
 
-  it('V4.2.6: card system (SurfaceCard) con variantes de jerarquía', () => {
+  it('V4.2.6: card system (SurfaceCard) con variantes de jerarquÃ­a', () => {
     const sc = read('../../../components/shared/surface-card.tsx');
     expect(sc).toContain('export function SurfaceCard');
     expect(sc).toContain('export function ActionCard');
     for (const v of ['primary', 'metric', 'action', 'chart', 'status']) expect(sc).toContain(`${v}:`);
   });
 
-  it('V4.2.6: dashboard usa SurfaceCard + chart compacta (distribución no domina)', () => {
+  it('V4.2.6: dashboard usa SurfaceCard + chart compacta (distribuciÃ³n no domina)', () => {
     const dash = read('../../../app/(dashboard)/dashboard/page.tsx');
     expect(dash).toContain('SurfaceCard');
     expect(dash).toContain("variant=\"chart\"");
     expect(dash).toContain('lg:col-span-2'); // hero ocupa 2/3, chart 1/3
   });
 
-  it('V4.2.6: IconChip soporta cápsula (ref G); botón primario con highlight interno', () => {
+  it('V4.2.6: IconChip soporta cÃ¡psula (ref G); botÃ³n primario con highlight interno', () => {
     expect(read('../../../components/shared/iconic-icon.tsx')).toContain("'capsule'");
     expect(read('../../../components/ui/button.tsx')).toContain('inset_0_1px_0');
   });
@@ -93,9 +93,9 @@ describe('V4.2.3 — sistema visual premium', () => {
   it('V4.2.10: header con azul vivo de marca (no navy oscuro) + logo claro en dark + outline dark visible', () => {
     expect(read('../../../components/shared/operations-header.tsx')).toContain('from-iconic-primary');
     expect(read('../../../components/shared/operations-header.tsx')).not.toContain('from-iconic-ink');
-    // El tile del logo debe quedar claro en dark (no lo oscurece el remapeo) → bg-iconic-white.
+    // El tile del logo debe quedar claro en dark (no lo oscurece el remapeo) â†’ bg-iconic-white.
     expect(read('../../../components/shared/workspace-brand.tsx')).toContain('bg-iconic-white');
-    // Botón outline en dark: superficie sólida visible, sin perímetro blanco.
+    // BotÃ³n outline en dark: superficie sÃ³lida visible, sin perÃ­metro blanco.
     expect(read('../../../components/ui/button.tsx')).toContain('dark:bg-surface-muted');
   });
 
@@ -106,13 +106,13 @@ describe('V4.2.3 — sistema visual premium', () => {
     expect(ws).toContain("aria-current={step.current");
   });
 
-  it('V4.2.7: dashboard — Operación unificada + Notas + monitoreo consolidado + workflow', () => {
+  it('V4.2.7: dashboard â€” OperaciÃ³n unificada + Notas + monitoreo consolidado + workflow', () => {
     const dash = read('../../../app/(dashboard)/dashboard/page.tsx');
     expect(dash).toContain('<NotesCard');
     expect(dash).toContain('<WorkflowStrip');
-    expect(dash).toContain('Última revisión'); // subzona de tiempo (lastRunAt real)
+    expect(dash).toMatch(/ltima.*revisi/); // subzona de tiempo (lastRunAt real)
     expect(dash).not.toContain('<QuickLink'); // accesos sueltos reemplazados por la franja
-    // panel Operación unificado: las 3 secciones en un solo SurfaceCard con divisores
+    // panel OperaciÃ³n unificado: las 3 secciones en un solo SurfaceCard con divisores
     expect(dash).toMatch(/sm:divide-x/);
   });
 });

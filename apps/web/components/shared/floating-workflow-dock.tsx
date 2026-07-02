@@ -25,22 +25,26 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
+import { canAccessModule, type AccessModule } from '@/server/access/module-access';
+import { canUseQuoteAssistant } from '@/lib/access/surface-visibility';
 
 interface DockStep {
   href: string;
   label: string;
   short: string;
   icon: LucideIcon;
+  module: AccessModule;
+  requiresAssistant?: boolean;
 }
 
 const STEPS: DockStep[] = [
-  { href: '/quote', label: 'Cotizar con asistente', short: 'Cotizar', icon: Sparkles },
-  { href: '/projects', label: 'Proyectos', short: 'Proyectos', icon: FolderOpen },
-  { href: '/catalog', label: 'Catálogo', short: 'Catálogo', icon: Package },
-  { href: '/catalog/providers', label: 'Proveedores', short: 'Proveedores', icon: Truck },
-  { href: '/catalog', label: 'Inteligencia de precios', short: 'Inteligencia', icon: Tags },
-  { href: '/catalog/monitoring', label: 'Monitoreo de precios', short: 'Monitoreo', icon: Radar },
-  { href: '/catalog/prices/review', label: 'Revisión de precios', short: 'Revisión', icon: ClipboardCheck },
+  { href: '/quote', label: 'Cotizar con asistente', short: 'Cotizar', icon: Sparkles, module: 'estimates', requiresAssistant: true },
+  { href: '/projects', label: 'Proyectos', short: 'Proyectos', icon: FolderOpen, module: 'projects' },
+  { href: '/catalog', label: 'Catálogo', short: 'Catálogo', icon: Package, module: 'catalog' },
+  { href: '/catalog/providers', label: 'Proveedores', short: 'Proveedores', icon: Truck, module: 'catalog' },
+  { href: '/catalog', label: 'Inteligencia de precios', short: 'Inteligencia', icon: Tags, module: 'price-intelligence' },
+  { href: '/catalog/monitoring', label: 'Monitoreo de precios', short: 'Monitoreo', icon: Radar, module: 'monitoring' },
+  { href: '/catalog/prices/review', label: 'Revisión de precios', short: 'Revisión', icon: ClipboardCheck, module: 'operational-review' },
 ];
 
 const COLLAPSE_KEY = 'iconic-workflow-dock-collapsed';
@@ -66,14 +70,21 @@ function readCollapsed(): boolean {
   }
 }
 
-export function FloatingWorkflowDock() {
+export function FloatingWorkflowDock({ profileRole = null }: { profileRole?: string | null }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState<boolean>(readCollapsed);
 
   // En el Dashboard ya está la barra grande → no duplicar.
   if (pathname.startsWith('/dashboard')) return null;
 
-  const active = activeStepIndex(pathname);
+  const visibleSteps = STEPS.filter((step) =>
+    step.requiresAssistant
+      ? canUseQuoteAssistant(profileRole)
+      : canAccessModule(profileRole, step.module),
+  );
+  if (visibleSteps.length === 0) return null;
+
+  const activeHref = STEPS[activeStepIndex(pathname)]?.href ?? null;
 
   function setCollapsedPersist(next: boolean) {
     setCollapsed(next);
@@ -106,9 +117,9 @@ export function FloatingWorkflowDock() {
       className="glass fixed bottom-4 left-1/2 z-30 hidden w-[min(56rem,calc(100vw-8rem))] -translate-x-1/2 items-center gap-1 rounded-2xl px-2 py-1.5 shadow-iconic lg:flex"
     >
       <ol role="list" className="flex flex-1 items-center gap-0.5 overflow-x-auto">
-        {STEPS.map((step, i) => {
+        {visibleSteps.map((step) => {
           const Icon = step.icon;
-          const isActive = i === active;
+          const isActive = step.href === activeHref;
           return (
             <li key={step.href + step.label} className="min-w-0 flex-1">
               <Link

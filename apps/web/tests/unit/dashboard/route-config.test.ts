@@ -1,4 +1,4 @@
-/**
+﻿/**
  * route-config.test.ts - Guarda de regresion del render de `/dashboard`.
  *
  * V5.4.2D congela que el dashboard es request-time, valida el projectId de query
@@ -32,7 +32,8 @@ describe('dashboard - configuracion de render y alcance', () => {
 
   it('usa searchParams de Next 16 y valida projectId contra listProjects', () => {
     expect(source).toMatch(/searchParams:\s*Promise/);
-    expect(source).toMatch(/projectIdFromSearchParams\(await searchParams\)/);
+    expect(source).toMatch(/const params = await searchParams/);
+    expect(source).toMatch(/projectIdFromSearchParams\(params\)/);
     expect(source).toMatch(/listProjects\(/);
     expect(source).toMatch(/resolveDashboardProjectScope\(projects, requestedProjectId\)/);
     expect(source).not.toMatch(/selectActiveProjectId\(/);
