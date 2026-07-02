@@ -1,5 +1,5 @@
 /**
- * page.tsx — Enviar cantidades al presupuesto (preview obligatorio).
+ * page.tsx - Sincronizar mediciones con presupuesto (preview obligatorio).
  * Server Component: carga el grupo, sus líneas y las versiones editables.
  */
 import Link from 'next/link';
@@ -46,14 +46,14 @@ export default async function SyncPage({
         description="Previsualiza antes de crear o actualizar ítems del BOQ"
         actions={
           <Button asChild size="sm" variant="outline">
-            <Link href="/quantities/workspace">Volver</Link>
+            <Link href="/quantities/workspace">Volver a Mediciones</Link>
           </Button>
         }
       />
 
       {!canSync ? (
         <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800" role="note">
-          El envío al presupuesto requiere modo Supabase con datos reales y rol de presupuestos.
+          El envío al presupuesto requiere modo Supabase con datos reales y rol autorizado.
         </div>
       ) : (
         <SyncPanel

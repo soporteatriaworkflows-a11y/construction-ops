@@ -1,7 +1,5 @@
 /**
- * filter-pills.test.ts — Anti-regresión del control segmentado compartido y su
- * adopción en Workspace y Catálogo (ICONIC_OPS_UIX_VISUAL_SYSTEM_ROLLOUT_V2).
- * Stack node: checks de FUENTE (presentacional, sin jsdom).
+ * filter-pills.test.ts - Static regression checks for the shared segmented control.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -23,7 +21,7 @@ describe('FilterPills', () => {
   });
 });
 
-describe('adopción', () => {
+describe('adopcion', () => {
   it('Workspace usa FilterPills para Estado y APU (sin perder los filtros)', () => {
     const ws = read('../../../app/(dashboard)/projects/[id]/scopes/[scopeId]/estimates/[estimateId]/workspace/boq-workspace.tsx');
     expect(ws).toContain("from '@/components/shared/filter-pills'");
@@ -33,7 +31,16 @@ describe('adopción', () => {
     expect(ws).toContain('setFilter(v as WorkspaceFilter)');
   });
 
-  it('Catálogo usa FilterPills para el estado de precio', () => {
+  it('Cantidades usa tabs con estilo de FilterPills para Mediciones, Memorias importadas y Sincronizacion', () => {
+    const quantities = read('../../../app/(dashboard)/quantities/_components/quantities-shell.tsx');
+    expect(quantities).toContain('Mediciones');
+    expect(quantities).toContain('Memorias importadas');
+    expect(quantities).toContain('Sincronización');
+    expect(quantities).toContain('bg-iconic-primary text-white');
+    expect(quantities).toContain("aria-current={active ? 'page' : undefined}");
+  });
+
+  it('Catalogo usa FilterPills para el estado de precio', () => {
     const cat = read('../../../app/(dashboard)/catalog/catalog-explorer.tsx');
     expect(cat).toContain("from '@/components/shared/filter-pills'");
     expect(cat).toContain('<FilterPills');
