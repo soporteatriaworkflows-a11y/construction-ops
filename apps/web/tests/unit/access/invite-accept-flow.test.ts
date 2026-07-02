@@ -1,6 +1,7 @@
 /**
  * invite-accept-flow.test.ts — invariantes del cierre de membresía por invitación.
- * No toca red ni base de datos.
+ * No toca red ni base de datos. Verifica la corrección V5.6.1E: el cierre ya NO
+ * depende de que el token vuelva por la URL tras confirmar el correo.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -18,6 +19,9 @@ const ROOT = process.cwd();
 const ACCEPT_FORM = join(ROOT, 'app/(auth)/invite/accept/_components/accept-form.tsx');
 const ACCEPT_PAGE = join(ROOT, 'app/(auth)/invite/accept/page.tsx');
 const CALLBACK_ROUTE = join(ROOT, 'app/(auth)/auth/callback/route.ts');
+const FINALIZE = join(ROOT, 'app/(auth)/invite/accept/finalize-invitation.ts');
+const RECOVERY = join(ROOT, 'components/auth/invite-membership-recovery.tsx');
+const DASHBOARD_PAGE = join(ROOT, 'app/(dashboard)/dashboard/page.tsx');
 
 describe('invite accept membership flow', () => {
   it('redirige la confirmación de email de vuelta al link de invitación', () => {
@@ -46,28 +50,60 @@ describe('invite accept membership flow', () => {
     expect(mapAcceptError('token_hash SECRET')).not.toContain('token_hash');
   });
 
-  it('detecta cuenta existente para hacer signIn + accept_invitation', () => {
+  it('detecta cuenta existente para hacer signIn + finalizar invitación', () => {
     expect(isAlreadyRegisteredMessage('User already registered')).toBe(true);
     expect(isAlreadyRegisteredMessage('invalid password')).toBe(false);
   });
 
-  it('el componente llama accept_invitation y nunca escribe profiles directo', () => {
+  it('el formulario persiste el token y finaliza vía helper, nunca escribe profiles', () => {
     const source = readFileSync(ACCEPT_FORM, 'utf8');
 
-    expect(source).toContain("supabase.rpc('accept_invitation'");
+    // El cierre ya NO depende del token en la URL: se persiste antes del signUp.
+    expect(source).toContain('storePendingInviteToken(token)');
+    expect(source).toContain('finalizeInviteAcceptance(');
+    // Higiene: fallo terminal de signUp limpia el token persistido.
+    expect(source).toContain('clearPendingInviteToken()');
+    // Sigue creando cuenta / iniciando sesión y guiando la confirmación de correo.
     expect(source).toContain('emailRedirectTo');
     expect(source).toContain('buildInviteConfirmationRedirect(window.location.origin, token)');
     expect(source).toContain('signInWithPassword');
     expect(source).toContain('autoAccept');
+    // Nunca escribe profiles ni expone el token plano.
     expect(source).not.toContain(".from('profiles')");
     expect(source).not.toContain('.from("profiles")');
     expect(source).not.toContain('token_hash SECRET');
   });
 
+  it('el helper de cierre usa el RPC como autoridad y no escribe profiles', () => {
+    const source = readFileSync(FINALIZE, 'utf8');
+
+    expect(source).toContain("supabase.rpc('accept_invitation'");
+    // Deriva el usuario Auth SIN exigir profile (un Auth user sin membresía debe poder cerrar).
+    expect(source).toContain('supabase.auth.getUser()');
+    // El token se hashea (SHA-256); el token plano nunca va al RPC ni a la URL.
+    expect(source).toContain('sha256Hex(token)');
+    expect(source).toContain('p_token_hash');
+    expect(source).not.toContain(".from('profiles')");
+    expect(source).not.toContain('.from("profiles")');
+  });
+
+  it('el helper aplica higiene del token: TTL + limpieza en éxito/terminal', () => {
+    const source = readFileSync(FINALIZE, 'utf8');
+
+    // TTL para no dejar el token indefinidamente.
+    expect(source).toContain('PENDING_INVITE_TOKEN_TTL_MS');
+    // Clasificación de errores terminales y limpieza centralizada.
+    expect(source).toContain('isTerminalAcceptError');
+    expect(source).toContain('clearPendingInviteToken()');
+  });
+
   it('la página pública usa sesión SSR solo para auto-finalizar invitación pendiente', () => {
     const source = readFileSync(ACCEPT_PAGE, 'utf8');
 
+    // Usa claims de sesión directamente — NO el viewer (que exigiría profile).
     expect(source).toContain('getSessionClaims');
+    expect(source).not.toContain('resolveViewer');
+    expect(source).not.toContain('resolveAuthenticatedViewer');
     expect(source).toContain("result.status === 'pending'");
     expect(source).toContain('autoAccept={hasSession}');
     expect(source).toContain('peek_invitation');
@@ -81,5 +117,25 @@ describe('invite accept membership flow', () => {
     expect(source).not.toContain('accept_invitation');
     expect(source).not.toContain(".from('profiles')");
     expect(source).not.toContain('.from("profiles")');
+  });
+
+  it('la recuperación de membresía finaliza y sólo navega al panel tras cierre confirmado', () => {
+    const source = readFileSync(RECOVERY, 'utf8');
+
+    expect(source).toContain('readPendingInviteToken()');
+    expect(source).toContain('finalizeInviteAcceptance(');
+    // Sólo recarga a /dashboard dentro del camino de éxito (result.ok).
+    const okIdx = source.indexOf('result.ok');
+    const assignIdx = source.indexOf("window.location.assign('/dashboard')");
+    expect(okIdx).toBeGreaterThan(-1);
+    expect(assignIdx).toBeGreaterThan(okIdx);
+    expect(source).not.toContain(".from('profiles')");
+  });
+
+  it('el dashboard enruta no_membership a la recuperación (no callejón sin salida)', () => {
+    const source = readFileSync(DASHBOARD_PAGE, 'utf8');
+
+    expect(source).toContain("e.reason === 'no_membership'");
+    expect(source).toContain('<InviteMembershipRecovery />');
   });
 });

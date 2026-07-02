@@ -55,6 +55,8 @@ import { getObservationRepository } from '@/server/pricing';
 import { getMonitorRepository } from '@/server/pricing/monitor';
 import { formatCountdown } from '@/lib/pricing/monitor-ui';
 import { resolveViewer } from '@/server/auth/resolve-viewer';
+import { AuthError } from '@/server/auth/errors';
+import { InviteMembershipRecovery } from '@/components/auth/invite-membership-recovery';
 import { formatCOP, formatDateTime, ESTIMATE_VERSION_STATUS_LABELS } from '@/lib/utils/format';
 import type { ProjectListItem } from '@/lib/contracts/read-model';
 import { isCreationModeEnabled } from '../projects/mode-guard';
@@ -233,6 +235,13 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   try {
     viewer = await resolveViewer();
   } catch (e) {
+    // Usuario Auth CONFIRMADO pero sin `profiles`: casi siempre una invitación
+    // cuyo cierre no llegó a ejecutarse. En vez de dejarlo sin salida, intenta
+    // finalizar la invitación (token persistido en su navegador) y sólo recarga
+    // al panel tras un cierre confirmado por el RPC (deny-by-default).
+    if (e instanceof AuthError && e.reason === 'no_membership') {
+      return <InviteMembershipRecovery />;
+    }
     // Sin sesión en modo supabase: el Proxy redirige a /login antes de llegar.
     const msg = e instanceof Error ? e.message : 'Error al resolver la sesión.';
     return <DashboardError message={msg} />;

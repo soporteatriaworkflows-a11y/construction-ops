@@ -1,5 +1,27 @@
 # Handoff Log
 
+## 2026-07-02 - ICONIC_OPS_V5_6_1E_INVITE_MEMBERSHIP_FINAL_FIX_TOKEN_HYGIENE - PATCH sobre PR #25 (sin merge/tag/deploy) (agent-auth/access)
+
+- Finding P1 (Codex) sobre PR #25: el token de invitación en `localStorage` podía quedar persistido indefinidamente; había limpieza en éxito pero no garantizada en errores terminales.
+- Patch mínimo (solo `finalize-invitation.ts` + `accept-form.tsx` + tests + docs; NO reescribe flujo/arquitectura/RPC/Supabase): TTL 24h (`PENDING_INVITE_TOKEN_TTL_MS`), `store` guarda `{token,exp}`, `read` limpia y devuelve null si vencido/malformado/vacío. Limpieza centralizada en `finalizeInviteAcceptance`: éxito/`already_member`/error terminal (`isTerminalAcceptError`: invitation_invalid/revoked/used/expired, email_mismatch) → limpia; `no_session`/transitorio → conserva (recuperable, acotado por TTL); `FinalizeResult` de error añade `terminal:boolean`. `accept-form`: fallo terminal de signUp → limpia; contraseña incorrecta → conserva; confirmación de correo → conserva. Nunca guarda password ni secretos (payload solo token+exp).
+- QA: typecheck 0, lint 0, suite 2319 passed/42 skipped (10 tests nuevos de higiene: limpieza en éxito/terminal, conserva en recuperable, TTL vencido ignorado+limpiado, malformado limpiado, no guarda password), build 0, gm:regression 22/22, `git diff --check` limpio.
+- Sin migraciones, sin Supabase/RLS/Vercel/envs/SMTP/DATABASE_URL, sin service_role, sin writes directos a `profiles`, sin usuarios reales, sin aplicar stash `wip-unrelated-v561e`, sin tocar módulos fuera de invite/recovery/tests/docs.
+- STOP: commit sobre PR #25, SIN merge/tag/deploy. Espera autorización.
+
+---
+## 2026-07-02 - ICONIC_OPS_V5_6_1E_INVITE_MEMBERSHIP_FINAL_FIX - EN RAMA + PR (sin merge/tag/deploy) (agent-auth/access)
+
+- Base `origin/main = e3c1f4d` (PR #24 merged). Rama `feature/v5-6-1e-invite-membership-final-fix`.
+- Diagnóstico: V5.6.1D asumía que el token de invitación volvía por la URL tras confirmar el correo; en producción ese ida-y-vuelta no lo entrega confiable (allow-list/Site URL de Supabase, escáneres de enlaces, o el usuario inicia sesión en vez de reabrir el enlace). Resultado: Auth user autenticado sin `profiles` → `resolveViewer()` lanza `no_membership` → dashboard mostraba "El usuario no tiene membresía." sin salida.
+- Causa raíz: `accept_invitation` (correcto e idempotente) **nunca se llamaba** en el camino real de confirmación de correo. El cierre dependía de un dato frágil (token en la URL de retorno).
+- Fix app-layer (sin DB): nuevo `finalize-invitation.ts` (helper `finalizeInviteAcceptance` que deriva el email del **usuario Auth** vía `auth.getUser()` — NO el viewer que exige profile — hashea el token y llama al RPC como autoridad; `already_member`=éxito; persiste el token en `localStorage` del invitado para sobrevivir al ida-y-vuelta). `accept-form.tsx` persiste el token antes del signUp y finaliza vía el helper. Nuevo `invite-membership-recovery.tsx`: si un Auth user aterriza sin profile, lee el token persistido, finaliza ("Finalizando invitación…") y **solo recarga a `/dashboard` tras cierre confirmado por el RPC**; sin token → instrucción clara (no callejón sin salida). `dashboard/page.tsx`: branch `no_membership` renderiza la recuperación (no toca scope selector ni Quick Notes).
+- Garantías: Auth user sin profile puede cerrar (getUser+RPC, no viewer); no se navega al panel sin membresía (deny-by-default, solo tras `result.ok`); RPC = autoridad, sin writes a `profiles` ni service_role en cliente; email lo aporta el usuario Auth (evita mismatch por casing).
+- QA: typecheck 0, lint 0, suite 2309 passed/42 skipped (incluye 8 nuevos de `finalize-invitation.test.ts` + `invite-accept-flow.test.ts` actualizado), build 0, gm:regression 22/22, `git diff --check` limpio.
+- Sin migraciones, sin db push, sin Supabase Cloud, sin RLS, sin Vercel env/password/SMTP, sin deploy/tag, sin tocar usuarios reales ni DB manual, sin tocar Price Intelligence/BOQ/APU/exports.
+- Docs: `docs/design-references/V5_6_1E_INVITE_MEMBERSHIP_FINAL_FIX.md`.
+- STOP: PR abierto contra main, SIN merge/tag/deploy. Espera autorización.
+
+---
 ## 2026-07-02 - ICONIC_OPS_V5_6_1D_INVITE_ACCEPT_MEMBERSHIP_PATCH - EN RAMA (sin PR/merge/tag/deploy) (agent-auth/access)
 
 - Base `origin/main = 406042166a95fe605db5cacd2aadc5b2b4fa6838`. Rama `feature/v5-6-1d-invite-accept-membership-patch`.

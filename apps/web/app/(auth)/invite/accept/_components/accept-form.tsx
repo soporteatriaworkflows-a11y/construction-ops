@@ -3,14 +3,18 @@
  *
  * Flujo (cliente Supabase del invitado):
  *  1. El invitado define su contraseña.
- *  2. signUp({ email, password }); si ya existe, signInWithPassword.
- *  3. Con la sesión activa, llama a la RPC `accept_invitation` (RLS-bound,
- *     authenticated). El token se hashea con Web Crypto (SHA-256) — el token
- *     plano NUNCA se envía a la base, solo su hash, igual que en el servidor.
- *  4. Éxito → al panel. Errores → mensaje claro en español.
+ *  2. Se PERSISTE el token en su navegador (para sobrevivir al ida-y-vuelta de
+ *     confirmación de correo aunque la URL lo pierda — ver finalize-invitation).
+ *  3. signUp({ email, password }); si ya existe, signInWithPassword.
+ *  4. Con la sesión activa, `finalizeInviteAcceptance` llama al RPC
+ *     `accept_invitation` (autoridad única; el token se hashea con Web Crypto —
+ *     el token plano NUNCA se envía a la base, solo su hash).
+ *  5. Éxito → al panel (la membresía ya existe). Errores → mensaje claro.
  *
  * Si el proyecto Supabase exige confirmación de correo, signUp redirige de vuelta
- * al enlace de invitación para completar `accept_invitation` con sesión activa.
+ * al enlace de invitación; además el token queda persistido, de modo que la
+ * recuperación de membresía puede cerrar la invitación aunque el usuario aterrice
+ * autenticado en otra ruta (deny-by-default: nunca se navega al panel sin cierre).
  */
 'use client';
 
@@ -30,17 +34,12 @@ import {
   CONFIRM_EMAIL_RETURN_MESSAGE,
   buildInviteConfirmationRedirect,
   isAlreadyRegisteredMessage,
-  mapAcceptError,
 } from '../invite-accept-flow';
-
-/** SHA-256 hex con Web Crypto (equivalente a node:crypto sha256 hex). */
-async function sha256Hex(value: string): Promise<string> {
-  const bytes = new TextEncoder().encode(value);
-  const digest = await crypto.subtle.digest('SHA-256', bytes);
-  return Array.from(new Uint8Array(digest))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
-}
+import {
+  clearPendingInviteToken,
+  finalizeInviteAcceptance,
+  storePendingInviteToken,
+} from '../finalize-invitation';
 
 interface FormState {
   password: string;
@@ -75,15 +74,13 @@ export function AcceptInvitationForm({
 
   const acceptWithActiveSession = useCallback(async (currentFullName: string) => {
     const supabase = createClient();
-    const tokenHash = await sha256Hex(token);
-    const { error } = await supabase.rpc('accept_invitation', {
-      p_token_hash: tokenHash,
-      p_email: email,
-      p_full_name: currentFullName.trim() || null,
-    });
-    if (error) return mapAcceptError(error.message);
+    // `finalizeInviteAcceptance` centraliza la higiene del token: limpia en éxito
+    // y en error terminal (invitación usada/expirada/mismatch/inválida); conserva
+    // solo en errores recuperables (acotado por el TTL). Aquí no se limpia aparte.
+    const result = await finalizeInviteAcceptance(supabase, token, currentFullName);
+    if (!result.ok) return result.error;
     return null;
-  }, [email, token]);
+  }, [token]);
 
   useEffect(() => {
     if (!autoAccept || autoStartedRef.current) return;
@@ -131,6 +128,11 @@ export function AcceptInvitationForm({
     try {
       const supabase = createClient();
 
+      // 0) Persistir el token en ESTE navegador antes de crear la cuenta. Así el
+      //    cierre sobrevive al ida-y-vuelta de confirmación de correo aunque la
+      //    URL de retorno pierda el token (recuperación de membresía lo usa).
+      storePendingInviteToken(token);
+
       // 1) Crear la cuenta (o iniciar sesión si ya existe).
       const signUp = await supabase.auth.signUp({
         email,
@@ -144,11 +146,16 @@ export function AcceptInvitationForm({
       if (signUp.error) {
         const already = isAlreadyRegisteredMessage(signUp.error.message);
         if (!already) {
+          // Fallo terminal de creación de cuenta: el flujo no continúa con este
+          // token → higiene, se limpia el token persistido.
+          clearPendingInviteToken();
           setForm((p) => ({ ...p, loading: false, error: 'No se pudo crear la cuenta. Intenta de nuevo.' }));
           return;
         }
         const signIn = await supabase.auth.signInWithPassword({ email, password: form.password });
         if (signIn.error || !signIn.data.session) {
+          // Recuperable (contraseña incorrecta): se conserva el token (el reintento
+          // lo re-guarda de todos modos y el TTL lo acota) para no bloquear el cierre.
           setForm((p) => ({
             ...p,
             loading: false,
