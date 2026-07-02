@@ -1,5 +1,5 @@
 /**
- * actions.ts — Server Actions de gestión de accesos (OPERATIONAL_ACCESS_V1).
+ * actions.ts - Server Actions de gestión de accesos (OPERATIONAL_ACCESS_V1).
  *
  * Propiedad: agent-orchestrator. Contrato:
  * `docs/OPERATIONAL_ACCESS_AND_SMTP_V1_CONTRACT.md §3,§7`.
@@ -31,8 +31,29 @@ export interface AccessActionResult {
   message?: string;
   /** Enlace de aceptación cuando no hay envío real de correo (fallback dev). */
   inviteLink?: string;
+  deliveryStatus?: 'sent' | 'logged' | 'failed';
+  deliveryLabel?: 'Enviado' | 'No enviado, usar enlace' | 'Falló, usar enlace';
 }
 
+function deliveryLabel(status: 'sent' | 'logged' | 'failed'): AccessActionResult['deliveryLabel'] {
+  if (status === 'sent') return 'Enviado';
+  if (status === 'failed') return 'Falló, usar enlace';
+  return 'No enviado, usar enlace';
+}
+
+function invitationActionResult(issued: Awaited<ReturnType<typeof createInvitation>> | Awaited<ReturnType<typeof resendInvitation>>, verb: 'creada' | 'reenviada'): AccessActionResult {
+  const status = issued.emailDelivery.status;
+  const fallback = status !== 'sent';
+  return {
+    success: true,
+    message: fallback
+      ? 'El correo no se envió automáticamente. Comparte este enlace con la persona invitada.'
+      : `Invitación ${verb} y enviada a ${issued.email}.`,
+    inviteLink: fallback ? issued.acceptUrl : undefined,
+    deliveryStatus: status,
+    deliveryLabel: deliveryLabel(status),
+  };
+}
 const DEMO_MSG =
   'La gestión de accesos requiere modo de operación real (APP_AUTH_MODE=supabase). ' +
   'En modo demostración solo se puede visualizar.';
@@ -78,11 +99,7 @@ export async function inviteUserAction(
   try {
     const issued = await createInvitation(guard.actor, { email, role, fullName, message });
     revalidatePath('/settings/access');
-    return {
-      success: true,
-      message: `Invitación creada para ${issued.email}.`,
-      inviteLink: issued.emailFallback ? issued.acceptUrl : undefined,
-    };
+    return invitationActionResult(issued, 'creada');
   } catch (e) {
     return { success: false, error: toMessage(e) };
   }
@@ -99,11 +116,7 @@ export async function resendInvitationAction(
   try {
     const issued = await resendInvitation(guard.actor, invitationId);
     revalidatePath('/settings/access');
-    return {
-      success: true,
-      message: `Invitación reenviada a ${issued.email}.`,
-      inviteLink: issued.emailFallback ? issued.acceptUrl : undefined,
-    };
+    return invitationActionResult(issued, 'reenviada');
   } catch (e) {
     return { success: false, error: toMessage(e) };
   }

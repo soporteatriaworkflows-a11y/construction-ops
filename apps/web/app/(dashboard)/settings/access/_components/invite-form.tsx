@@ -1,5 +1,5 @@
 /**
- * invite-form.tsx — Formulario "Invitar usuario" (Client Component).
+ * invite-form.tsx - Formulario "Invitar usuario" (Client Component).
  *
  * - useActionState (React 19). Validación mínima de email en cliente.
  * - El rol se elige SOLO de la lista permitida (assignableRoles del actor).
@@ -9,7 +9,7 @@
 'use client';
 
 import { useActionState, useState } from 'react';
-import { Loader2, UserPlus, Link2 } from 'lucide-react';
+import { Loader2, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,6 +18,7 @@ import { FormError } from '@/components/auth/form-error';
 import { FormSuccess } from '@/components/auth/form-success';
 import { inviteUserAction, type AccessActionResult } from '../actions';
 import { roleLabel } from '../labels';
+import { InviteFallbackNotice } from './invite-fallback-notice';
 
 const INITIAL: AccessActionResult | null = null;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -50,16 +51,11 @@ export function InviteForm({ assignableRoles }: { assignableRoles: string[] }) {
         <FormSuccess id="invite-success" message={state.message} />
       )}
       {state?.success && state.inviteLink && (
-        <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-          <Link2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-          <div className="min-w-0">
-            <p className="font-medium">Sin envío de correo configurado</p>
-            <p className="mb-1">Comparte este enlace de invitación de forma segura:</p>
-            <code className="block break-all rounded bg-white/70 px-2 py-1 text-xs text-amber-900">
-              {state.inviteLink}
-            </code>
-          </div>
-        </div>
+        <InviteFallbackNotice
+          inviteLink={state.inviteLink}
+          deliveryStatus={state.deliveryStatus}
+          deliveryLabel={state.deliveryLabel}
+        />
       )}
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -116,7 +112,7 @@ export function InviteForm({ assignableRoles }: { assignableRoles: string[] }) {
             name="message"
             rows={2}
             maxLength={500}
-            placeholder="Mensaje breve para la persona invitada…"
+            placeholder="Mensaje breve para la persona invitada⬦"
             disabled={isPending}
             className="flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iconic-primary focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50"
           />
@@ -129,7 +125,7 @@ export function InviteForm({ assignableRoles }: { assignableRoles: string[] }) {
         ) : (
           <UserPlus className="h-4 w-4" aria-hidden="true" />
         )}
-        {isPending ? 'Enviando…' : 'Invitar usuario'}
+        {isPending ? 'Enviando⬦' : 'Invitar usuario'}
       </Button>
     </form>
   );

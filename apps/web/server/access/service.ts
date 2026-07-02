@@ -1,5 +1,5 @@
 /**
- * service.ts — Casos de uso del acceso operativo (server-side).
+ * service.ts - Casos de uso del acceso operativo (server-side).
  *
  * Propiedad: agent-orchestrator. Contrato:
  * `docs/OPERATIONAL_ACCESS_AND_SMTP_V1_CONTRACT.md §2-6`.
@@ -17,10 +17,12 @@ import {
   renderInvitationEmail,
   renderAccessRevokedEmail,
   sendTransactionalEmail,
+  getEmailDeliveryHealth,
+  type EmailDeliveryHealth,
   type EmailMessage,
   type EmailSendResult,
 } from '@/server/email';
-import { canAssignRole, evaluateRoleChange } from './permissions';
+import { canAssignRole, canManageAccess, evaluateRoleChange } from './permissions';
 import { generateInvitationToken } from './token';
 import { AccessError, mapRpcError } from './errors';
 import { getOrganizationName, listInvitations, listMembers } from './read-repository';
@@ -57,6 +59,40 @@ function buildAcceptUrl(token: string): string {
   return `${buildAppPublicUrl()}/invite/accept?token=${encodeURIComponent(token)}`;
 }
 
+function maskEmail(email: string): string {
+  const [local = '', domain = ''] = email.split('@');
+  if (!local || !domain) return '***';
+  return `${local.slice(0, 1)}***@${domain}`;
+}
+
+function logInvitationEmailAttempt(params: {
+  provider: EmailSendResult['provider'];
+  result: EmailSendResult['status'];
+  recipient: string;
+  invitationId: string;
+  messageId?: string;
+  errorCode?: string;
+}): void {
+  const parts = [
+    'event=invitation_email',
+    `provider=${params.provider}`,
+    `result=${params.result}`,
+    `recipient_masked=${maskEmail(params.recipient)}`,
+    `invitation_id=${params.invitationId}`,
+  ];
+  if (params.messageId) parts.push(`messageId=${params.messageId}`);
+  if (params.errorCode) parts.push(`error_code=${params.errorCode}`);
+  console.info(parts.join(' '));
+}
+
+function toIssuedEmailDelivery(sent: EmailSendResult): InvitationIssued['emailDelivery'] {
+  return {
+    status: sent.status,
+    provider: sent.provider,
+    messageId: sent.messageId,
+    errorCode: sent.errorCode,
+  };
+}
 function expiresLabel(iso: string): string {
   try {
     return new Date(iso).toLocaleString('es-CO', {
@@ -116,6 +152,14 @@ export async function createInvitation(
     message: input.message,
   });
   const sent = await (deps.sendEmail ?? sendTransactionalEmail)(message);
+  logInvitationEmailAttempt({
+    provider: sent.provider,
+    result: sent.status,
+    recipient: email,
+    invitationId: result.invitationId,
+    messageId: sent.messageId,
+    errorCode: sent.errorCode,
+  });
 
   return {
     invitationId: result.invitationId,
@@ -123,7 +167,8 @@ export async function createInvitation(
     role: input.role as ProfileRole,
     acceptUrl,
     expiresAt: result.expiresAt,
-    emailFallback: !sent.delivered || sent.provider === 'log',
+    emailDelivery: toIssuedEmailDelivery(sent),
+    emailFallback: sent.status !== 'sent',
   };
 }
 
@@ -162,6 +207,14 @@ export async function resendInvitation(
     resent: true,
   });
   const sent = await (deps.sendEmail ?? sendTransactionalEmail)(message);
+  logInvitationEmailAttempt({
+    provider: sent.provider,
+    result: sent.status,
+    recipient: invitation.email,
+    invitationId,
+    messageId: sent.messageId,
+    errorCode: sent.errorCode,
+  });
 
   return {
     invitationId,
@@ -169,10 +222,20 @@ export async function resendInvitation(
     role: invitation.role,
     acceptUrl,
     expiresAt: result.expiresAt,
-    emailFallback: !sent.delivered || sent.provider === 'log',
+    emailDelivery: toIssuedEmailDelivery(sent),
+    emailFallback: sent.status !== 'sent',
   };
 }
 
+export function getInvitationEmailDeliveryHealth(
+  actor: AccessActor,
+  env: NodeJS.ProcessEnv = process.env,
+): EmailDeliveryHealth {
+  if (!canManageAccess(actor.profileRole)) {
+    throw new AccessError('insufficient_role', 'No tienes permisos para consultar el estado de correo.');
+  }
+  return getEmailDeliveryHealth(env);
+}
 /** Revoca una invitación pendiente (y notifica al invitado, best-effort). */
 export async function revokeInvitation(
   actor: AccessActor,

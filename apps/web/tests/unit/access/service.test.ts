@@ -1,5 +1,5 @@
 /**
- * service.test.ts — Casos de uso de acceso con dependencias inyectadas
+ * service.test.ts - Casos de uso de acceso con dependencias inyectadas
  * (FASE 9: 4,6,7,8,11,12,13,19,20). No toca base ni red.
  */
 import { describe, expect, it, vi } from 'vitest';
@@ -9,6 +9,7 @@ import {
   changeMemberRole,
   acceptInvitationWithSession,
   AccessError,
+  getInvitationEmailDeliveryHealth,
 } from '@/server/access';
 import { hashToken } from '@/server/access/token';
 import type { AccessActor } from '@/server/access';
@@ -32,7 +33,7 @@ function emailCapture() {
   const sent: EmailMessage[] = [];
   const sendEmail = async (m: EmailMessage): Promise<EmailSendResult> => {
     sent.push(m);
-    return { delivered: true, provider: 'log' };
+    return { status: 'logged', delivered: false, provider: 'log' };
   };
   return { sent, sendEmail };
 }
@@ -60,10 +61,12 @@ describe('createInvitation (4,13,19)', () => {
     const token = new URL(issued.acceptUrl).searchParams.get('token')!;
     expect(captured.p_token_hash).toBe(hashToken(token));
     expect(captured.p_email).toBe('nuevo@iconic.test');
+    expect(String(captured.p_token_hash)).not.toContain(token);
     // 19: correo de invitación renderizado.
     expect(sent).toHaveLength(1);
     expect(sent[0]?.kind).toBe('invitation');
-    expect(issued.emailFallback).toBe(true); // provider log ⇒ fallback
+    expect(issued.emailDelivery).toMatchObject({ status: 'logged', provider: 'log' });
+    expect(issued.emailFallback).toBe(true); // provider log => fallback
   });
 
   it('6: rechaza rol inválido antes de tocar la RPC', async () => {
@@ -106,7 +109,7 @@ describe('revokeInvitation (8)', () => {
     const res = await revokeInvitation(
       ADMIN,
       '00000000-0000-0000-0000-0000000000e1',
-      { clientFactory: async () => client, sendEmail: async () => ({ delivered: true, provider: 'log' }) },
+      { clientFactory: async () => client, sendEmail: async () => ({ status: 'logged', delivered: false, provider: 'log' }) },
     );
     expect(res.status).toBe('revoked');
   });
@@ -155,5 +158,64 @@ describe('acceptInvitationWithSession (11,12)', () => {
     await expect(
       acceptInvitationWithSession({ tokenHash: 'abc', email: 'x@iconic.test' }, { clientFactory: async () => client }),
     ).rejects.toMatchObject({ code: 'invitation_expired' });
+  });
+});
+
+describe('invitation email delivery health and logs (V5.6.3A)', () => {
+  it('admin/gerencia pueden consultar health sin secretos', () => {
+    const env = {
+      EMAIL_PROVIDER: 'smtp',
+      SMTP_HOST: 'smtp.iconic.test',
+      SMTP_PORT: '587',
+      SMTP_USER: 'alerts@iconic.test',
+      SMTP_PASSWORD: 'SUPER_SECRET_PASSWORD',
+      SMTP_FROM: 'ICONIC <alerts@iconic.test>',
+      DATABASE_URL: 'postgres://secret',
+    } as unknown as NodeJS.ProcessEnv;
+
+    expect(getInvitationEmailDeliveryHealth(ADMIN, env)).toEqual({
+      providerName: 'smtp',
+      isRealSender: true,
+      deliveryMode: 'sent-capable',
+    });
+    expect(getInvitationEmailDeliveryHealth(GERENCIA, {} as NodeJS.ProcessEnv)).toEqual({
+      providerName: 'log',
+      isRealSender: false,
+      deliveryMode: 'logged',
+    });
+    const serialized = JSON.stringify(getInvitationEmailDeliveryHealth(ADMIN, env));
+    expect(serialized).not.toContain('SUPER_SECRET_PASSWORD');
+    expect(serialized).not.toContain('alerts@iconic.test');
+    expect(serialized).not.toContain('postgres://secret');
+  });
+
+  it('consulta no puede consultar health de delivery', () => {
+    const consulta = { ...ADMIN, userId: 'consulta-1', profileRole: 'consulta' as const };
+    expect(() => getInvitationEmailDeliveryHealth(consulta, {} as NodeJS.ProcessEnv)).toThrow(AccessError);
+  });
+
+  it('log de invitacion queda sanitizado y no contiene token/link/correo completo', async () => {
+    const spy = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    const client = fakeClient(() => ({ data: { invitationId: 'inv-log-1', expiresAt: '2026-06-21T09:00:00.000Z' } }));
+
+    const issued = await createInvitation(
+      ADMIN,
+      { email: 'Persona@Iconic.test', role: 'obra' },
+      { clientFactory: async () => client, sendEmail: async () => ({ status: 'failed', delivered: false, provider: 'smtp', errorCode: 'smtp_send_failed' }) },
+    );
+
+    const token = new URL(issued.acceptUrl).searchParams.get('token')!;
+    const logged = spy.mock.calls.map((c) => c.join(' ')).join('\n');
+    expect(logged).toContain('event=invitation_email');
+    expect(logged).toContain('provider=smtp');
+    expect(logged).toContain('result=failed');
+    expect(logged).toContain('recipient_masked=p***@iconic.test');
+    expect(logged).toContain('invitation_id=inv-log-1');
+    expect(logged).toContain('error_code=smtp_send_failed');
+    expect(logged).not.toContain(token);
+    expect(logged).not.toContain(issued.acceptUrl);
+    expect(logged).not.toContain('persona@iconic.test');
+    expect(logged).not.toContain('SMTP_PASSWORD');
+    expect(logged).not.toContain('DATABASE_URL');
   });
 });
