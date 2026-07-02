@@ -13,6 +13,7 @@
 import { revalidatePath } from 'next/cache';
 import { resolveAuthenticatedViewer } from '@/server/auth/resolve-viewer';
 import { AuthError } from '@/server/auth/errors';
+import { checkModuleAccess } from '@/server/access';
 import { isCreationModeEnabled } from '@/app/(dashboard)/projects/mode-guard';
 import {
   getResourceRepository,
@@ -50,6 +51,12 @@ export async function createResourceAction(
       success: false,
       error: 'Creacion no disponible en modo demostracion.',
     };
+  }
+  // V5.6.2: guard de módulo `catalog` (admin/gerencia/presupuestos/compras) por
+  // profiles.role — defensa en profundidad app-layer; RLS es el backstop real.
+  const gate = await checkModuleAccess('catalog');
+  if (!gate.ok) {
+    return { success: false, error: 'Tu rol no permite crear recursos del catálogo.' };
   }
 
   let viewer: Awaited<ReturnType<typeof resolveAuthenticatedViewer>>;

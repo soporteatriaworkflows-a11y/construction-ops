@@ -15,6 +15,7 @@
 import { revalidatePath } from 'next/cache';
 import { resolveAuthenticatedViewer } from '@/server/auth/resolve-viewer';
 import { AuthError } from '@/server/auth/errors';
+import { checkModuleAccess } from '@/server/access';
 import { parseReadModelSource } from '@/lib/supabase/env';
 import {
   getObservationRepository,
@@ -47,6 +48,18 @@ function isWriteModeEnabled(): boolean {
   }
 }
 
+/**
+ * V5.6.2 — Guard de módulo `price-intelligence` (defensa en profundidad,
+ * server-side). Deny-by-default por `profiles.role`: solo admin/gerencia/compras.
+ * Devuelve un shape mínimo compatible con todos los *ActionResult del archivo.
+ * El guard ViewerRole existente sigue vigente; RLS es el backstop real.
+ */
+async function denyIfModuleForbidden(): Promise<{ success: false; error: string } | null> {
+  const gate = await checkModuleAccess('price-intelligence');
+  if (gate.ok) return null;
+  return { success: false, error: 'Tu rol no permite gestionar la inteligencia de precios.' };
+}
+
 function handleAuthError(e: unknown): ObservationActionResult {
   if (e instanceof AuthError) {
     const msgs: Record<string, string> = {
@@ -67,6 +80,8 @@ export async function createObservationAction(
   if (!isWriteModeEnabled()) {
     return { success: false, error: 'Creación no disponible en modo demostración.' };
   }
+  const denied = await denyIfModuleForbidden();
+  if (denied) return denied;
 
   let viewer: Awaited<ReturnType<typeof resolveAuthenticatedViewer>>;
   try {
@@ -123,6 +138,8 @@ export async function approveObservationAction(
   if (!isWriteModeEnabled()) {
     return { success: false, error: 'Aprobación no disponible en modo demostración.' };
   }
+  const denied = await denyIfModuleForbidden();
+  if (denied) return denied;
 
   let viewer: Awaited<ReturnType<typeof resolveAuthenticatedViewer>>;
   try {
@@ -161,6 +178,8 @@ export async function rejectObservationAction(
   if (!isWriteModeEnabled()) {
     return { success: false, error: 'Rechazo no disponible en modo demostración.' };
   }
+  const denied = await denyIfModuleForbidden();
+  if (denied) return denied;
 
   let viewer: Awaited<ReturnType<typeof resolveAuthenticatedViewer>>;
   try {
@@ -215,6 +234,8 @@ export async function validatePublicUrlAction(
   if (!isWriteModeEnabled()) {
     return { success: false, error: 'Validación no disponible en modo demostración.' };
   }
+  const denied = await denyIfModuleForbidden();
+  if (denied) return denied;
 
   let viewer: Awaited<ReturnType<typeof resolveAuthenticatedViewer>>;
   try {
@@ -255,6 +276,8 @@ export async function confirmProposalAction(
   if (!isWriteModeEnabled()) {
     return { success: false, error: 'Confirmación no disponible en modo demostración.' };
   }
+  const denied = await denyIfModuleForbidden();
+  if (denied) return denied;
 
   let viewer: Awaited<ReturnType<typeof resolveAuthenticatedViewer>>;
   try {

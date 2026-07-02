@@ -14,6 +14,7 @@
 import { revalidatePath } from 'next/cache';
 import { resolveAuthenticatedViewer } from '@/server/auth/resolve-viewer';
 import { AuthError } from '@/server/auth/errors';
+import { checkModuleAccess } from '@/server/access';
 import { isCreationModeEnabled } from '@/app/(dashboard)/projects/mode-guard';
 import { InsufficientRoleError, PriceIntelligenceWriteNotSupportedError } from '@/server/pricing';
 import {
@@ -80,6 +81,12 @@ async function runBulkAction(
 ): Promise<BulkReviewActionResult> {
   if (!isCreationModeEnabled()) {
     return { ok: false, error: 'La revisión masiva requiere APP_AUTH_MODE=supabase y READ_MODEL_SOURCE=db.' };
+  }
+  // V5.6.2: guard de módulo `operational-review` (decisión admin/gerencia) por
+  // profiles.role — defensa en profundidad app-layer; RLS es el backstop real.
+  const gate = await checkModuleAccess('operational-review');
+  if (!gate.ok) {
+    return { ok: false, error: 'Tu rol no permite aprobar ni rechazar observaciones en bloque.' };
   }
 
   const observationIds = parseObservationIds(formData.get('observationIds'));

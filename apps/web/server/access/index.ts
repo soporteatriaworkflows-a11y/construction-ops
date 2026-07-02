@@ -6,7 +6,9 @@
  */
 export * from './types';
 export * from './permissions';
+export * from './module-access';
 export * from './errors';
+export { requireModuleAccess, checkModuleAccess, type ModuleAccessCheck } from './guard';
 export { generateInvitationToken, hashToken } from './token';
 export { resolveAccessActor } from './actor';
 export {

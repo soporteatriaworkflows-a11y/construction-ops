@@ -15,6 +15,7 @@ import { KpiCard, KpiBand } from '@/components/shared/kpi-card';
 import { Badge } from '@/components/ui/badge';
 import { resolveViewer, resolveAuthenticatedViewer } from '@/server/auth/resolve-viewer';
 import { resolveAuthMode } from '@/lib/supabase/env';
+import { requireModuleAccess } from '@/server/access';
 import { getMonitorRepository } from '@/server/pricing/monitor';
 import type { MonitorTargetView, MonitorRunView, MonitorRunResultDetailView, MonitoringSummary } from '@/server/pricing/monitor';
 import {
@@ -107,6 +108,8 @@ export default async function MonitoringCenterPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  // V5.6.2: guard de módulo server-side. `monitoring` = admin/gerencia/compras.
+  await requireModuleAccess('monitoring');
   const status = parseMonitorStatus((await searchParams).status);
   let viewerRole = 'consulta';
   let targets: MonitorTargetView[] = [];

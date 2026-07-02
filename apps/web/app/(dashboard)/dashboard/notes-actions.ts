@@ -15,6 +15,7 @@
 import { revalidatePath } from 'next/cache';
 import { resolveAuthenticatedViewer } from '@/server/auth/resolve-viewer';
 import { AuthError } from '@/server/auth/errors';
+import { checkModuleAccess } from '@/server/access';
 import { parseReadModelSource } from '@/lib/supabase/env';
 import {
   getQuickNotesRepository,
@@ -54,7 +55,14 @@ async function resolveViewerOrFailure(): Promise<
     return { failure: { success: false, error: 'Las notas no están disponibles en modo demostración.' } };
   }
   try {
-    return { viewer: await resolveAuthenticatedViewer() };
+    const viewer = await resolveAuthenticatedViewer();
+    // V5.6.2: guard de módulo `quick-notes` (internos; `consulta`/client no) por
+    // profiles.role — defensa en profundidad app-layer; RLS es el backstop real.
+    const gate = await checkModuleAccess('quick-notes');
+    if (!gate.ok) {
+      return { failure: { success: false, error: 'No tienes permiso para gestionar notas.' } };
+    }
+    return { viewer };
   } catch (e) {
     return { failure: handleAuthError(e) };
   }

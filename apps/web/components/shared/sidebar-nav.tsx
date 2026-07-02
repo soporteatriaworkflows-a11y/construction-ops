@@ -20,15 +20,16 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
+import { canAccessModule, type AccessModule } from '@/server/access/module-access';
 
-const NAV_ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/projects', label: 'Proyectos', icon: FolderOpen },
-  { href: '/estimates', label: 'Presupuestos', icon: ClipboardList },
-  { href: '/apu', label: 'APU', icon: Calculator },
-  { href: '/catalog', label: 'Catálogo', icon: BookOpen },
-  { href: '/quantities', label: 'Cantidades', icon: Hash },
-  { href: '/planning', label: 'Cronograma', icon: CalendarRange },
+const NAV_ITEMS: { href: string; label: string; icon: LucideIcon; module: AccessModule }[] = [
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, module: 'dashboard' },
+  { href: '/projects', label: 'Proyectos', icon: FolderOpen, module: 'projects' },
+  { href: '/estimates', label: 'Presupuestos', icon: ClipboardList, module: 'estimates' },
+  { href: '/apu', label: 'APU', icon: Calculator, module: 'apu' },
+  { href: '/catalog', label: 'Catálogo', icon: BookOpen, module: 'catalog' },
+  { href: '/quantities', label: 'Cantidades', icon: Hash, module: 'quantities' },
+  { href: '/planning', label: 'Cronograma', icon: CalendarRange, module: 'planning' },
 ];
 
 /** Entrada de gestión de accesos: solo visible para roles de gestión. */
@@ -91,13 +92,22 @@ function NavLink({
 
 export function SidebarNav({
   canManageAccess = false,
+  profileRole = null,
   expanded = true,
 }: {
   canManageAccess?: boolean;
+  /**
+   * `profiles.role` resuelto server-side. Filtra los módulos visibles por
+   * `canAccessModule` (deny-by-default: rol nulo/ausente ⇒ no ve módulos).
+   * Ocultar el link NO es la barrera: los route/action guards revalidan
+   * server-side (V5.6.2).
+   */
+  profileRole?: string | null;
   expanded?: boolean;
 }) {
   const pathname = usePathname();
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+  const visibleItems = NAV_ITEMS.filter((it) => canAccessModule(profileRole, it.module));
   return (
     <nav className="flex-1 overflow-y-auto overflow-x-hidden py-3">
       {expanded && (
@@ -106,8 +116,15 @@ export function SidebarNav({
         </p>
       )}
       <ul role="list" className="space-y-0.5 px-2.5">
-        {NAV_ITEMS.map((it) => (
-          <NavLink key={it.href} {...it} active={isActive(it.href)} expanded={expanded} />
+        {visibleItems.map((it) => (
+          <NavLink
+            key={it.href}
+            href={it.href}
+            label={it.label}
+            icon={it.icon}
+            active={isActive(it.href)}
+            expanded={expanded}
+          />
         ))}
       </ul>
       {canManageAccess && (

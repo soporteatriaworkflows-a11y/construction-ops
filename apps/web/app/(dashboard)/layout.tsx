@@ -50,6 +50,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       {/* Rail de navegación flotante (compacto + hover-expand + pin). */}
       <AppRail
         canManageAccess={actor.canManageAccess}
+        profileRole={actor.role}
         productName={ws.productName}
         workspaceName={ws.workspaceName}
         logoSymbol={ws.logoSymbol}
