@@ -70,3 +70,37 @@ se le llamaba** en el camino real de confirmación de correo.
 Sin migraciones, sin db push, sin Supabase Cloud, sin RLS, sin Vercel env/password/SMTP,
 sin deploy/tag, sin tocar usuarios reales ni `profiles` manual, sin tocar Price
 Intelligence / BOQ / APU / exports / Quick Notes / Dashboard Project Scope Selector.
+
+---
+
+## Adenda: Token Hygiene (`…_TOKEN_HYGIENE`)
+
+Finding P1 (Codex) sobre PR #25: el token en `localStorage` podía quedar persistido
+indefinidamente; había limpieza en éxito pero no garantizada en errores terminales.
+
+Patch mínimo (solo `finalize-invitation.ts`, `accept-form.tsx`, tests):
+
+- **TTL** `PENDING_INVITE_TOKEN_TTL_MS = 24 h`. El token guardado es solo un puente
+  para el ida-y-vuelta de confirmación de correo; 24 h cubre al usuario que confirma al
+  día siguiente pero acota la persistencia. `storePendingInviteToken` guarda
+  `{ token, exp }`; `readPendingInviteToken` **limpia y devuelve null** si está vencido,
+  malformado o vacío. Nunca se guarda password ni secretos (payload = solo `token`+`exp`).
+- **Limpieza centralizada** en `finalizeInviteAcceptance` (único punto de cierre):
+  - éxito → limpia;
+  - `already_member` (éxito) → limpia;
+  - error **terminal** (`invitation_invalid`/`invitation_revoked`/`invitation_used`/
+    `invitation_expired`/`email_mismatch`, vía `isTerminalAcceptError`) → limpia;
+  - `no_session` o error transitorio/desconocido → **conserva** (recuperable, acotado por
+    el TTL) para permitir reintento. `FinalizeResult` de error lleva `terminal: boolean`.
+- **`accept-form`**: fallo terminal de `signUp` (no "already registered") → limpia el
+  token. Contraseña incorrecta en cuenta existente → conserva (recuperable; el reintento
+  lo re-guarda). Ruta de confirmación de correo (sin sesión) → conserva (lo necesita la
+  recuperación). La limpieza redundante en éxito se retiró (la centraliza el helper).
+- **Recovery**: `readPendingInviteToken` ya limpia el token vencido → cae al estado
+  "sin token" con instrucción de reabrir/solicitar nueva invitación.
+
+Errores que **conservan** token (justificado): `no_session` y transitorios/desconocidos —
+recuperables por reintento y acotados por el TTL de 24 h. Todo lo demás limpia.
+
+QA adenda: typecheck 0, lint 0, suite **2319** passed (10 tests nuevos de higiene),
+build 0, gm 22/22, `git diff --check` limpio.

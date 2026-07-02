@@ -61,6 +61,8 @@ describe('invite accept membership flow', () => {
     // El cierre ya NO depende del token en la URL: se persiste antes del signUp.
     expect(source).toContain('storePendingInviteToken(token)');
     expect(source).toContain('finalizeInviteAcceptance(');
+    // Higiene: fallo terminal de signUp limpia el token persistido.
+    expect(source).toContain('clearPendingInviteToken()');
     // Sigue creando cuenta / iniciando sesión y guiando la confirmación de correo.
     expect(source).toContain('emailRedirectTo');
     expect(source).toContain('buildInviteConfirmationRedirect(window.location.origin, token)');
@@ -83,6 +85,16 @@ describe('invite accept membership flow', () => {
     expect(source).toContain('p_token_hash');
     expect(source).not.toContain(".from('profiles')");
     expect(source).not.toContain('.from("profiles")');
+  });
+
+  it('el helper aplica higiene del token: TTL + limpieza en éxito/terminal', () => {
+    const source = readFileSync(FINALIZE, 'utf8');
+
+    // TTL para no dejar el token indefinidamente.
+    expect(source).toContain('PENDING_INVITE_TOKEN_TTL_MS');
+    // Clasificación de errores terminales y limpieza centralizada.
+    expect(source).toContain('isTerminalAcceptError');
+    expect(source).toContain('clearPendingInviteToken()');
   });
 
   it('la página pública usa sesión SSR solo para auto-finalizar invitación pendiente', () => {

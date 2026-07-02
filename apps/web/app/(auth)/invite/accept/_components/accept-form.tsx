@@ -74,10 +74,11 @@ export function AcceptInvitationForm({
 
   const acceptWithActiveSession = useCallback(async (currentFullName: string) => {
     const supabase = createClient();
+    // `finalizeInviteAcceptance` centraliza la higiene del token: limpia en éxito
+    // y en error terminal (invitación usada/expirada/mismatch/inválida); conserva
+    // solo en errores recuperables (acotado por el TTL). Aquí no se limpia aparte.
     const result = await finalizeInviteAcceptance(supabase, token, currentFullName);
     if (!result.ok) return result.error;
-    // Cierre confirmado por el RPC (membresía existe): limpia el token pendiente.
-    clearPendingInviteToken();
     return null;
   }, [token]);
 
@@ -145,11 +146,16 @@ export function AcceptInvitationForm({
       if (signUp.error) {
         const already = isAlreadyRegisteredMessage(signUp.error.message);
         if (!already) {
+          // Fallo terminal de creación de cuenta: el flujo no continúa con este
+          // token → higiene, se limpia el token persistido.
+          clearPendingInviteToken();
           setForm((p) => ({ ...p, loading: false, error: 'No se pudo crear la cuenta. Intenta de nuevo.' }));
           return;
         }
         const signIn = await supabase.auth.signInWithPassword({ email, password: form.password });
         if (signIn.error || !signIn.data.session) {
+          // Recuperable (contraseña incorrecta): se conserva el token (el reintento
+          // lo re-guarda de todos modos y el TTL lo acota) para no bloquear el cierre.
           setForm((p) => ({
             ...p,
             loading: false,

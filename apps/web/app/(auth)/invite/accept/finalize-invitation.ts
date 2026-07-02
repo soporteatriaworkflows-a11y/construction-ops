@@ -27,9 +27,38 @@ import { mapAcceptError } from './invite-accept-flow';
 /**
  * Clave de almacenamiento del token pendiente en el navegador del invitado.
  * Es su propio secreto de invitación, en su propio dispositivo: nunca viaja en
- * la URL de destino ni se registra. Se limpia en cuanto la invitación cierra.
+ * la URL de destino ni se registra. Se limpia en cuanto la invitación cierra o
+ * ante cualquier error terminal, y expira por TTL (nunca queda indefinidamente).
  */
 export const PENDING_INVITE_TOKEN_KEY = 'iconic.invite.pendingToken';
+
+/**
+ * TTL del token guardado (24 h). El token en `localStorage` solo es un puente
+ * para sobrevivir al ida-y-vuelta de confirmación de correo; 24 h cubre al
+ * usuario que confirma al día siguiente pero acota la persistencia (higiene:
+ * nunca queda indefinidamente). La invitación real sigue expirando en el RPC.
+ */
+export const PENDING_INVITE_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Códigos de error del RPC `accept_invitation` que son TERMINALES: conservar el
+ * token ya no tiene sentido (la invitación no se puede cerrar con él). Se limpia.
+ * `no_session` y errores transitorios/desconocidos NO son terminales: se
+ * conservan (acotados por el TTL) para permitir reintento cuando haya sesión.
+ */
+const TERMINAL_ACCEPT_CODES = [
+  'invitation_invalid',
+  'invitation_revoked',
+  'invitation_used',
+  'invitation_expired',
+  'email_mismatch',
+] as const;
+
+/** ¿El mensaje del RPC corresponde a un error terminal de aceptación? */
+export function isTerminalAcceptError(message: string | undefined): boolean {
+  const raw = (message ?? '').toLowerCase();
+  return TERMINAL_ACCEPT_CODES.some((code) => raw.includes(code));
+}
 
 /** SHA-256 hex con Web Crypto (equivalente a node:crypto sha256 hex). */
 export async function sha256Hex(value: string): Promise<string> {
@@ -40,28 +69,52 @@ export async function sha256Hex(value: string): Promise<string> {
     .join('');
 }
 
-/** Guarda el token pendiente (no-op fuera del navegador o si falla storage). */
+/**
+ * Guarda el token pendiente con marca de expiración (no-op fuera del navegador
+ * o si falla storage). Solo el token de invitación — NUNCA password ni secretos.
+ */
 export function storePendingInviteToken(token: string): void {
   if (typeof window === 'undefined' || !token) return;
   try {
-    window.localStorage.setItem(PENDING_INVITE_TOKEN_KEY, token);
+    const payload = JSON.stringify({ token, exp: Date.now() + PENDING_INVITE_TOKEN_TTL_MS });
+    window.localStorage.setItem(PENDING_INVITE_TOKEN_KEY, payload);
   } catch {
     /* storage bloqueado (modo privado/cuota): degrada a la ruta por URL. */
   }
 }
 
-/** Lee el token pendiente guardado (o `null`). */
+/**
+ * Lee el token pendiente guardado (o `null`). Higiene: si está vencido por TTL,
+ * malformado o vacío, se LIMPIA el storage y se devuelve `null` (nunca queda
+ * un token expirado persistido).
+ */
 export function readPendingInviteToken(): string | null {
   if (typeof window === 'undefined') return null;
   try {
-    const token = window.localStorage.getItem(PENDING_INVITE_TOKEN_KEY);
-    return token && token.length > 0 ? token : null;
+    const raw = window.localStorage.getItem(PENDING_INVITE_TOKEN_KEY);
+    if (!raw) return null;
+
+    let parsed: { token?: unknown; exp?: unknown };
+    try {
+      parsed = JSON.parse(raw) as { token?: unknown; exp?: unknown };
+    } catch {
+      clearPendingInviteToken();
+      return null;
+    }
+
+    const token = typeof parsed.token === 'string' ? parsed.token : '';
+    const exp = typeof parsed.exp === 'number' ? parsed.exp : 0;
+    if (!token || !exp || Date.now() > exp) {
+      clearPendingInviteToken();
+      return null;
+    }
+    return token;
   } catch {
     return null;
   }
 }
 
-/** Limpia el token pendiente (tras cerrar la invitación con éxito). */
+/** Limpia el token pendiente (tras cerrar la invitación o error terminal). */
 export function clearPendingInviteToken(): void {
   if (typeof window === 'undefined') return;
   try {
@@ -73,7 +126,7 @@ export function clearPendingInviteToken(): void {
 
 export type FinalizeResult =
   | { ok: true; alreadyMember: boolean }
-  | { ok: false; error: string; code: 'no_session' | 'accept_failed' };
+  | { ok: false; error: string; code: 'no_session' | 'accept_failed'; terminal: boolean };
 
 /**
  * Finaliza la aceptación con la sesión activa del invitado.
@@ -86,6 +139,11 @@ export type FinalizeResult =
  *  - El RPC `accept_invitation` es la ÚNICA autoridad: crea el `profiles` y marca
  *    la invitación. Aquí NUNCA se escribe `profiles` ni se usa service_role.
  *  - `already_member` se trata como éxito: ya existe membresía.
+ *
+ * Higiene del token (este es el único punto de cierre, así que centraliza la
+ * limpieza): en ÉXITO y en ERROR TERMINAL se limpia el token persistido. En
+ * `no_session` o errores transitorios/desconocidos se conserva (acotado por el
+ * TTL) para permitir reintento.
  */
 export async function finalizeInviteAcceptance(
   supabase: SupabaseClient,
@@ -96,9 +154,11 @@ export async function finalizeInviteAcceptance(
   const { data, error: userError } = await supabase.auth.getUser();
   const user = data?.user ?? null;
   if (userError || !user) {
+    // Recuperable: sin sesión válida aún. Se conserva el token (TTL lo acota).
     return {
       ok: false,
       code: 'no_session',
+      terminal: false,
       error: 'No se pudo verificar tu sesión. Inicia sesión e intenta de nuevo.',
     };
   }
@@ -111,12 +171,18 @@ export async function finalizeInviteAcceptance(
     p_full_name: fullName && fullName.trim() ? fullName.trim() : null,
   });
 
-  if (!error) return { ok: true, alreadyMember: false };
+  if (!error) {
+    clearPendingInviteToken();
+    return { ok: true, alreadyMember: false };
+  }
 
   // Ya tiene profile: la membresía existe. No es un fallo del cierre.
   if ((error.message ?? '').toLowerCase().includes('already_member')) {
+    clearPendingInviteToken();
     return { ok: true, alreadyMember: true };
   }
 
-  return { ok: false, code: 'accept_failed', error: mapAcceptError(error.message) };
+  const terminal = isTerminalAcceptError(error.message);
+  if (terminal) clearPendingInviteToken();
+  return { ok: false, code: 'accept_failed', terminal, error: mapAcceptError(error.message) };
 }

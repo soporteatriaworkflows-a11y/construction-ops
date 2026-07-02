@@ -1,5 +1,14 @@
 # Handoff Log
 
+## 2026-07-02 - ICONIC_OPS_V5_6_1E_INVITE_MEMBERSHIP_FINAL_FIX_TOKEN_HYGIENE - PATCH sobre PR #25 (sin merge/tag/deploy) (agent-auth/access)
+
+- Finding P1 (Codex) sobre PR #25: el token de invitación en `localStorage` podía quedar persistido indefinidamente; había limpieza en éxito pero no garantizada en errores terminales.
+- Patch mínimo (solo `finalize-invitation.ts` + `accept-form.tsx` + tests + docs; NO reescribe flujo/arquitectura/RPC/Supabase): TTL 24h (`PENDING_INVITE_TOKEN_TTL_MS`), `store` guarda `{token,exp}`, `read` limpia y devuelve null si vencido/malformado/vacío. Limpieza centralizada en `finalizeInviteAcceptance`: éxito/`already_member`/error terminal (`isTerminalAcceptError`: invitation_invalid/revoked/used/expired, email_mismatch) → limpia; `no_session`/transitorio → conserva (recuperable, acotado por TTL); `FinalizeResult` de error añade `terminal:boolean`. `accept-form`: fallo terminal de signUp → limpia; contraseña incorrecta → conserva; confirmación de correo → conserva. Nunca guarda password ni secretos (payload solo token+exp).
+- QA: typecheck 0, lint 0, suite 2319 passed/42 skipped (10 tests nuevos de higiene: limpieza en éxito/terminal, conserva en recuperable, TTL vencido ignorado+limpiado, malformado limpiado, no guarda password), build 0, gm:regression 22/22, `git diff --check` limpio.
+- Sin migraciones, sin Supabase/RLS/Vercel/envs/SMTP/DATABASE_URL, sin service_role, sin writes directos a `profiles`, sin usuarios reales, sin aplicar stash `wip-unrelated-v561e`, sin tocar módulos fuera de invite/recovery/tests/docs.
+- STOP: commit sobre PR #25, SIN merge/tag/deploy. Espera autorización.
+
+---
 ## 2026-07-02 - ICONIC_OPS_V5_6_1E_INVITE_MEMBERSHIP_FINAL_FIX - EN RAMA + PR (sin merge/tag/deploy) (agent-auth/access)
 
 - Base `origin/main = e3c1f4d` (PR #24 merged). Rama `feature/v5-6-1e-invite-membership-final-fix`.
