@@ -7044,3 +7044,16 @@ Rama: feature/v5-4-2d-dashboard-project-scope-selector. Base: origin/main = 9fb7
 - Fixtures actualizados: run exitoso, run fallido, run parcial con `pending_created`/`changed`, run sin resultados.
 - Tests especificos: monitor-ui/repository/ui-invariants 61/61 PASS. Typecheck PASS.
 - Restricciones respetadas: NO migraciones, NO Supabase Cloud/db push/RLS, NO cron/actions logic, NO Quick Notes, NO Dashboard Project Scope Selector, NO Vercel/env/password, NO tag/deploy, NO BOQ/APU/exports, NO aprobacion/rechazo existente.
+
+---
+
+## 2026-07-02 - ICONIC_OPS_V5_4_4A_PRICE_INTELLIGENCE_SOURCE_HISTORY - EN RAMA (sin PR/merge/tag/deploy)
+
+- Rama `feature/v5-4-4a-price-intelligence-source-history`, base `origin/main = 533978b1d7bbf5ebb566eb2fa84f4aa7dd12f41a`.
+- Repository read-only: `listResourcePriceHistory(viewer, resourceId, limit)` en Price Observation Repository, org-scoped por `organization_id` y `resource_id`.
+- `/catalog/resources/[resourceId]/price-intelligence`: la ultima seccion evoluciona a `Historico y fuentes`; PageHeader, disclaimer, formulario, Validar URL y MonitoringSection quedan en su sitio.
+- UI: tabla densa desktop y cards mobile/tablet, con `<details>` por registro, filtros client-side estado/origen/proveedor, contador `N de M` y `Limpiar filtros`.
+- Comparacion derivada calculada server-side contra ultima observacion approved anterior del recurso; rotulo literal `Comparación derivada (referencial no es baseline histórica exacta)`.
+- Origen derivado sin inventar datos: monitor via `price_monitor_results.observation_id`, lote via `import_batch_id`, manual si no hay vinculo.
+- Privacidad: sanitizacion server-side antes de pasar filas al client component para roles no internos.
+- Restricciones: NO migraciones, NO Supabase Cloud/db push/RLS, NO Vercel/env/password, NO tag/deploy, NO V5.4.3/monitoring, NO Quick Notes, NO Dashboard Project Scope Selector, NO BOQ/APU/exports, NO approval/rejection workflow.

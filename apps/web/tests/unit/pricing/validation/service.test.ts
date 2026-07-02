@@ -80,6 +80,7 @@ function makeMockRepo(overrides: Partial<PriceObservationRepository> = {}): Pric
   return {
     source: 'fixture',
     listResourcePriceObservations: vi.fn().mockResolvedValue([]),
+    listResourcePriceHistory: vi.fn().mockResolvedValue([]),
     createResourcePriceObservation: vi.fn().mockResolvedValue(makePendingObs()),
     approveResourcePriceObservation: vi.fn().mockResolvedValue(makePendingObs()),
     rejectResourcePriceObservation: vi.fn().mockResolvedValue(makePendingObs()),

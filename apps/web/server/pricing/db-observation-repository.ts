@@ -16,6 +16,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type {
   AuthenticatedViewer,
   ResourcePriceObservationView,
+  ResourcePriceHistoryRow,
   CreateObservationInput,
   ApproveObservationInput,
   RejectObservationInput,
@@ -39,6 +40,56 @@ const OBS_COLUMNS = `
   suppliers ( name )
 `;
 
+
+const HISTORY_COLUMNS = `
+  id, resource_id, supplier_id,
+  observed_price, discount_percent, suggested_net_price,
+  unit, currency, source_type, source_reference,
+  observed_at, valid_until, status, notes,
+  created_at, approved_at, rejection_reason, import_batch_id,
+  suppliers ( name ),
+  price_observation_batches ( label, source_reference )
+`;
+
+interface HistoryObsRow extends ObsRow {
+  import_batch_id: string | null;
+  price_observation_batches:
+    | { label: string | null; source_reference: string | null }
+    | Array<{ label: string | null; source_reference: string | null }>
+    | null;
+}
+
+interface MonitorHistoryRow {
+  id: string;
+  observation_id: string | null;
+  status: string;
+  checked_at: string;
+  warnings: unknown;
+}
+
+function one<T>(rel: T | T[] | null): T | null {
+  if (rel === null) return null;
+  return Array.isArray(rel) ? (rel[0] ?? null) : rel;
+}
+
+function toDecimalString(value: number): string {
+  if (!Number.isFinite(value)) return '0';
+  return value.toFixed(2);
+}
+
+function computeDelta(current: string, previous: string | null): { abs: string | null; pct: string | null } {
+  if (!previous) return { abs: null, pct: null };
+  const currentNumber = Number(current);
+  const previousNumber = Number(previous);
+  if (!Number.isFinite(currentNumber) || !Number.isFinite(previousNumber) || previousNumber === 0) {
+    return { abs: null, pct: null };
+  }
+  const abs = currentNumber - previousNumber;
+  return {
+    abs: toDecimalString(abs),
+    pct: toDecimalString((abs / previousNumber) * 100),
+  };
+}
 interface ObsRow {
   id: string;
   resource_id: string;
@@ -126,6 +177,93 @@ export class DbObservationRepository implements PriceObservationRepository {
 
     if (error) throw new Error(`observation_list_failed: ${error.code ?? 'unknown'}`);
     return ((data as unknown) as ObsRow[]).map(toView);
+  }
+
+  async listResourcePriceHistory(
+    viewer: AuthenticatedViewer,
+    resourceId: Uuid,
+    limit: number,
+  ): Promise<ResourcePriceHistoryRow[]> {
+    const supabase = await this.clientFactory();
+    const safeLimit = Math.max(1, Math.min(limit, 50));
+    const { data, error } = await supabase
+      .from('resource_price_observations')
+      .select(HISTORY_COLUMNS)
+      .eq('organization_id', viewer.organizationId)
+      .eq('resource_id', resourceId)
+      .order('observed_at', { ascending: false })
+      .limit(safeLimit);
+
+    if (error) throw new Error(`price_history_list_failed: ${error.code ?? 'unknown'}`);
+    const rows = ((data ?? []) as unknown) as HistoryObsRow[];
+    if (rows.length === 0) return [];
+
+    const { data: approvedData, error: approvedError } = await supabase
+      .from('resource_price_observations')
+      .select('id, observed_at, suggested_net_price')
+      .eq('organization_id', viewer.organizationId)
+      .eq('resource_id', resourceId)
+      .eq('status', 'approved')
+      .order('observed_at', { ascending: false })
+      .limit(200);
+    if (approvedError) throw new Error(`price_history_approved_failed: ${approvedError.code ?? 'unknown'}`);
+
+    const observationIds = rows.map((r) => r.id);
+    const monitorByObservation = new Map<string, MonitorHistoryRow>();
+    const { data: monitorData, error: monitorError } = await supabase
+      .from('price_monitor_results')
+      .select('id, observation_id, status, checked_at, warnings')
+      .eq('organization_id', viewer.organizationId)
+      .in('observation_id', observationIds);
+    if (monitorError) throw new Error(`price_history_monitor_failed: ${monitorError.code ?? 'unknown'}`);
+    for (const monitor of ((monitorData ?? []) as unknown) as MonitorHistoryRow[]) {
+      if (monitor.observation_id) monitorByObservation.set(monitor.observation_id, monitor);
+    }
+
+    const approvedRows = (((approvedData ?? []) as unknown) as Array<{ id: string; observed_at: string; suggested_net_price: string }>);
+
+    return rows.map((row) => {
+      const supplier = one(row.suppliers);
+      const batch = one(row.price_observation_batches);
+      const monitor = monitorByObservation.get(row.id) ?? null;
+      const previous = approvedRows.find((candidate) => {
+        if (candidate.id === row.id) return false;
+        return new Date(candidate.observed_at).getTime() < new Date(row.observed_at).getTime();
+      }) ?? null;
+      const delta = computeDelta(String(row.suggested_net_price), previous ? String(previous.suggested_net_price) : null);
+      const origin = monitor ? 'monitor' : row.import_batch_id ? 'batch' : 'manual';
+
+      return {
+        id: row.id,
+        resourceId: row.resource_id,
+        supplierId: row.supplier_id,
+        supplierName: supplier?.name ?? null,
+        observedPrice: String(row.observed_price),
+        discountPercent: String(row.discount_percent),
+        suggestedNetPrice: String(row.suggested_net_price),
+        currency: row.currency,
+        unit: row.unit,
+        status: row.status as ResourcePriceHistoryRow['status'],
+        sourceType: row.source_type as ResourcePriceHistoryRow['sourceType'],
+        sourceReference: row.source_reference,
+        observedAt: row.observed_at,
+        validUntil: row.valid_until,
+        approvedAt: row.approved_at,
+        rejectionReason: row.rejection_reason,
+        notes: row.notes,
+        importBatchId: row.import_batch_id,
+        importBatchLabel: batch?.label ?? null,
+        importBatchSourceReference: batch?.source_reference ?? null,
+        monitorResultId: monitor?.id ?? null,
+        monitorResultStatus: monitor?.status ?? null,
+        monitorCheckedAt: monitor?.checked_at ?? null,
+        monitorWarnings: Array.isArray(monitor?.warnings) ? (monitor.warnings as string[]) : [],
+        previousApprovedPrice: previous ? String(previous.suggested_net_price) : null,
+        deltaAbs: delta.abs,
+        deltaPct: delta.pct,
+        origin,
+      };
+    });
   }
 
   async createResourcePriceObservation(

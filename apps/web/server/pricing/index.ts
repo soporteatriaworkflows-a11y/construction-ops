@@ -15,6 +15,8 @@ export type {
   ProviderCreateInput,
   ProviderUpdateInput,
   ResourcePriceObservationView,
+  ResourcePriceHistoryRow,
+  PriceHistoryOrigin,
   CreateObservationInput,
   ApproveObservationInput,
   RejectObservationInput,
