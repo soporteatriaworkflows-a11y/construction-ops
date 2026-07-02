@@ -8,6 +8,7 @@ import type {
   AuthenticatedViewer,
   BulkActionRecord,
   PendingReviewObservationView,
+  OperationalReviewConsole,
   PriceReviewRepository,
   ReviewBatchView,
   Uuid,
@@ -25,6 +26,36 @@ export class FixturePriceReviewRepository implements PriceReviewRepository {
 
   async listBatches(_viewer: AuthenticatedViewer): Promise<ReviewBatchView[]> {
     return [];
+  }
+  async getOperationalReviewConsole(): Promise<OperationalReviewConsole> {
+    return {
+      kpis: {
+        pendingCount: 0,
+        pendingWithWarningsCount: 0,
+        monitorPendingCount: 0,
+        resourcesWithoutApprovedCount: 0,
+        staleApprovedCount: 0,
+        failingOrOverdueTargetsCount: 0,
+      },
+      urgent: [],
+      coverage: [],
+      sourceHealth: [],
+      recentActivity: [],
+      limits: {
+        urgent: 6,
+        coverage: 6,
+        sourceHealth: 6,
+        recentActivity: 6,
+        resourceScan: 200,
+      },
+      hasMore: {
+        urgent: false,
+        coverage: false,
+        sourceHealth: false,
+        recentActivity: false,
+      },
+      notes: ['Modo demo: la consola operativa solo se calcula con READ_MODEL_SOURCE=db.'],
+    };
   }
 
   async getObservationStatuses(

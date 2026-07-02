@@ -90,16 +90,14 @@ describe('T27-T30 — BOQ, AIU, exports y monitor intactos', () => {
     expect(reviewSources).not.toMatch(/@\/server\/exports|@\/modules\/exports/);
   });
 
-  it('T30: NO escribe tablas del monitor (solo SELECT del flag de origen)', () => {
-    // Permitido: .from('price_monitor_results') con .select(...) para marcar
-    // observaciones del monitor. Prohibido: insert/update/delete sobre él.
-    const monitorBlocks = dbRepo.match(/\.from\('price_monitor_results'\)[\s\S]*?;/g) ?? [];
+  it('T30: NO escribe tablas del monitor (solo SELECT para origen y consola)', () => {
+    const monitorBlocks = dbRepo.match(/\.from\('price_monitor_(results|targets)'\)[\s\S]*?;/g) ?? [];
     expect(monitorBlocks.length).toBeGreaterThan(0);
     for (const b of monitorBlocks) {
       expect(b).toMatch(/\.select\(/);
       expect(b).not.toMatch(/\.insert\(|\.update\(|\.delete\(/);
     }
-    expect(reviewSources).not.toMatch(/price_monitor_targets|price_monitor_runs/);
+    expect(reviewSources).not.toMatch(/price_monitor_runs/);
   });
 
   it('solo tablas autorizadas en el repositorio de revisión', () => {
@@ -109,6 +107,8 @@ describe('T27-T30 — BOQ, AIU, exports y monitor intactos', () => {
       'price_observation_batches',
       'price_observation_bulk_actions',
       'price_monitor_results',
+      'price_monitor_targets',
+      'resources',
     ]);
     for (const t of tables) {
       expect(allowed.has(t!), `tabla inesperada en review SQL: ${t}`).toBe(true);

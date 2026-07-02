@@ -36,11 +36,11 @@ export interface PendingReviewObservationView {
   resourceUnit: string;
   supplierId: Uuid | null;
   supplierName: string | null;
-  /** 🔒 precio público observado */
+  /** ðŸ”’ precio público observado */
   observedPrice: DecimalString;
-  /** 🔒 descuento % (0–100) */
+  /** ðŸ”’ descuento % (0–100) */
   discountPercent: DecimalString;
-  /** 🔒 precio neto sugerido (DB-computed) */
+  /** ðŸ”’ precio neto sugerido (DB-computed) */
   suggestedNetPrice: DecimalString;
   /** Unidad RAW de la observación (se preserva siempre). */
   unit: string;
@@ -79,6 +79,81 @@ export interface ReviewSummary {
   supplierCount: number;
   batchCount: number;
   monitorPendingCount: number;
+}
+export type OperationalReviewSeverity = 'action_required' | 'warning' | 'informational';
+export type OperationalReviewOrigin = 'manual' | 'batch' | 'monitor' | 'catalog';
+export type OperationalReviewSignal =
+  | 'pending_warning'
+  | 'monitor_change'
+  | 'high_delta'
+  | 'missing_supplier'
+  | 'missing_approved_price'
+  | 'stale_price'
+  | 'target_overdue'
+  | 'target_failing'
+  | 'monitor_warning'
+  | 'recent_approved'
+  | 'recent_rejected';
+
+export interface OperationalReviewKpis {
+  pendingCount: number;
+  pendingWithWarningsCount: number;
+  monitorPendingCount: number;
+  resourcesWithoutApprovedCount: number;
+  staleApprovedCount: number;
+  failingOrOverdueTargetsCount: number;
+}
+
+export interface OperationalReviewItem {
+  id: string;
+  signal: OperationalReviewSignal;
+  severity: OperationalReviewSeverity;
+  resourceId: Uuid | null;
+  resourceCode: string;
+  resourceName: string;
+  supplierName: string | null;
+  statusLabel: string;
+  priceLabel: string | null;
+  previousApprovedPrice: DecimalString | null;
+  deltaAbs: DecimalString | null;
+  deltaPct: DecimalString | null;
+  origin: OperationalReviewOrigin;
+  date: IsoDateTime | null;
+  reason: string;
+  suggestedAction: string;
+  href: string;
+}
+
+export interface OperationalReviewConsole {
+  kpis: OperationalReviewKpis;
+  urgent: OperationalReviewItem[];
+  coverage: OperationalReviewItem[];
+  sourceHealth: OperationalReviewItem[];
+  recentActivity: OperationalReviewItem[];
+  limits: {
+    urgent: number;
+    coverage: number;
+    sourceHealth: number;
+    recentActivity: number;
+    resourceScan: number;
+  };
+  hasMore: {
+    urgent: boolean;
+    coverage: boolean;
+    sourceHealth: boolean;
+    recentActivity: boolean;
+  };
+  notes: string[];
+}
+
+export interface OperationalReviewConsoleLimits {
+  urgent?: number;
+  coverage?: number;
+  sourceHealth?: number;
+  recentActivity?: number;
+  resourceScan?: number;
+  pendingScan?: number;
+  recentScan?: number;
 }
 
 /** Input de acción masiva (la selección SIEMPRE es explícita). */
@@ -140,6 +215,12 @@ export interface PriceReviewRepository {
 
   /** Lotes con observaciones de la org del viewer. */
   listBatches(viewer: AuthenticatedViewer): Promise<ReviewBatchView[]>;
+
+  /** Consola operativa read-only de Price Intelligence. */
+  getOperationalReviewConsole(
+    viewer: AuthenticatedViewer,
+    limits?: OperationalReviewConsoleLimits,
+  ): Promise<OperationalReviewConsole>;
 
   /** Lee estado actual de los IDs seleccionados (solo de la org del viewer). */
   getObservationStatuses(
