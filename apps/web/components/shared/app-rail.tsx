@@ -30,6 +30,7 @@ function readPinned(): boolean {
 
 export function AppRail({
   canManageAccess,
+  profileRole = null,
   productName,
   workspaceName,
   logoSymbol,
@@ -37,6 +38,8 @@ export function AppRail({
   isFixture,
 }: {
   canManageAccess: boolean;
+  /** `profiles.role` server-side; filtra módulos visibles del sidebar (V5.6.2). */
+  profileRole?: string | null;
   productName: string;
   workspaceName: string;
   logoSymbol: string;
@@ -112,7 +115,7 @@ export function AppRail({
         <div className="h-px bg-white/10" aria-hidden="true" />
 
         {/* Navegación (íconos siempre; etiquetas al expandir) */}
-        <SidebarNav canManageAccess={canManageAccess} expanded={expanded} />
+        <SidebarNav canManageAccess={canManageAccess} profileRole={profileRole} expanded={expanded} />
 
         {/* Pie: CTA Asistente + indicador de modo sutil */}
         <div className="mt-auto space-y-2 p-3">

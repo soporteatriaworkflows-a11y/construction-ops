@@ -17,6 +17,7 @@
 import { revalidatePath } from 'next/cache';
 import { resolveAuthenticatedViewer } from '@/server/auth/resolve-viewer';
 import { AuthError } from '@/server/auth/errors';
+import { checkModuleAccess } from '@/server/access';
 import { parseReadModelSource } from '@/lib/supabase/env';
 import { validatePublicUrl } from '@/server/pricing/validation/validate-url';
 import { UrlValidationError } from '@/server/pricing/validation/types';
@@ -83,6 +84,14 @@ async function resolveAuthorizedViewer(): Promise<
     return { failure: handleAuthError(e) };
   }
   if (!(MUTATION_ROLES as readonly string[]).includes(viewer.role)) {
+    return {
+      failure: { success: false, error: 'No tienes permiso para gestionar el monitoreo de precios.' },
+    };
+  }
+  // V5.6.2: guard de módulo `monitoring` (admin/gerencia/compras) por
+  // profiles.role — defensa en profundidad app-layer; RLS es el backstop.
+  const gate = await checkModuleAccess('monitoring');
+  if (!gate.ok) {
     return {
       failure: { success: false, error: 'No tienes permiso para gestionar el monitoreo de precios.' },
     };

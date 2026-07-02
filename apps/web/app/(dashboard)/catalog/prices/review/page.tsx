@@ -16,6 +16,7 @@ import { InlineCallout } from '@/components/shared/inline-callout';
 import { EmptyState } from '@/components/shared/empty-state';
 import { resolveViewer, resolveAuthenticatedViewer } from '@/server/auth/resolve-viewer';
 import { resolveAuthMode } from '@/lib/supabase/env';
+import { requireModuleAccess } from '@/server/access';
 import {
   getReviewRepository,
   computeReviewSummary,
@@ -59,6 +60,10 @@ function SummaryCard({
 }
 
 export default async function PriceReviewCenterPage() {
+  // V5.6.2: guard de módulo server-side. `operational-review` = decisión
+  // admin/gerencia (deny-by-default para el resto). El subárbol /catalog ya
+  // filtra obra/consulta en catalog/layout.tsx.
+  await requireModuleAccess('operational-review');
   let viewerRole = 'consulta';
   let observations: PendingReviewObservationView[] = [];
   let batches: ReviewBatchView[] = [];

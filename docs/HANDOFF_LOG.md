@@ -7109,3 +7109,22 @@ Rama: feature/v5-4-2d-dashboard-project-scope-selector. Base: origin/main = 9fb7
 - Origen derivado sin inventar datos: monitor via `price_monitor_results.observation_id`, lote via `import_batch_id`, manual si no hay vinculo.
 - Privacidad: sanitizacion server-side antes de pasar filas al client component para roles no internos.
 - Restricciones: NO migraciones, NO Supabase Cloud/db push/RLS, NO Vercel/env/password, NO tag/deploy, NO V5.4.3/monitoring, NO Quick Notes, NO Dashboard Project Scope Selector, NO BOQ/APU/exports, NO approval/rejection workflow.
+
+---
+
+## 2026-07-02 - ICONIC_OPS_V5_6_2_ROLE_ACCESS_MATRIX_HARDENING - EN RAMA (sin merge/tag/deploy)
+
+- Rama `feature/v5-6-2-role-access-matrix-hardening`, base `origin/main = 2829e9c` (incluye PR #25 / V5.6.1E). Sin migracion.
+- Endurecimiento app-layer por MODULO para los 6 roles reales. La capa de datos (RLS + proyeccion por rol del read-model + role-map congelado) NO cambia; es defensa en profundidad de superficie.
+- Fuente unica pura `apps/web/server/access/module-access.ts`: `AccessModule`, `canAccessModule(profileRole, module)`, `visibleModulesFor`, `assertCanAccessModule`, `isAccessModule`. Deny-by-default (rol invalido/ausente o modulo desconocido => denegado).
+- Guards server-side `apps/web/server/access/guard.ts`: `requireModuleAccess` (paginas => redirect /login|/dashboard) y `checkModuleAccess` (actions => {ok} sin redirigir).
+- Route guards: `catalog/layout.tsx` (modulo catalog, deny obra/consulta en todo /catalog) + per-page price-intelligence/monitoring/operational-review. `settings/access` conserva su guard preexistente.
+- Server action guards (checkModuleAccess, antes de tocar datos): catalog/actions, catalog/monitoring/actions, catalog/prices/review/actions (runBulkAction), price-intelligence/actions (5 actions), dashboard/notes-actions. Guards ViewerRole existentes intactos; RLS backstop.
+- Sidebar filtering: `sidebar-nav.tsx` filtra NAV_ITEMS por `canAccessModule(profileRole, module)`; layout pasa `profileRole={actor.role}` via AppRail. `consulta` no ve Catalogo; obra no ve Catalogo/APU; compras ve Catalogo; ACCESS_ITEM sigue gateado por canManageAccess.
+- Bloqueado consulta: catalog, price-intelligence, monitoring, operational-review, quick-notes, settings-access, exports != client, escritura.
+- Bloqueado obra: catalog, apu, price-intelligence, monitoring, operational-review, settings-access.
+- Bloqueado compras: estimates, apu, quantities, planning, operational-review, settings-access.
+- Bloqueado presupuestos: price-intelligence, monitoring, operational-review, settings-access. (Decision a confirmar: presupuestos/compras endurecidos vs su ViewerRole=internal previo; reversible en 1 linea.)
+- Tests: `tests/unit/access/module-access.test.ts` (matriz 6 roles x modulos, deny-by-default, visibleModulesFor, assertCanAccessModule, regresion role-map + anti-escalamiento exports) + `tests/unit/access/module-access-wiring.test.ts` (guards route/action/sidebar cableados via analisis estatico). sidebar-access.test.ts preexistente intacto.
+- Docs: `docs/design-references/V5_6_2_ROLE_ACCESS_MATRIX_HARDENING.md`.
+- Restricciones respetadas: NO migraciones, NO Supabase Cloud/db push/RLS, NO Vercel envs, NO SMTP, NO DATABASE_URL, NO deploy/tag, NO tocar construction-ops-1rqh, NO tocar invitaciones/correos, NO role-map (congelado), NO exports salvo consumir, NO roles cliente/contratista, NO modulos futuros.
