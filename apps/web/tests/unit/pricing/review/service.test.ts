@@ -27,6 +27,7 @@ import { InsufficientRoleError } from '@/server/pricing/errors';
 import type {
   AuthenticatedViewer,
   BulkActionRecord,
+  OperationalReviewConsole,
   PendingReviewObservationView,
   PriceReviewRepository,
   ReviewBatchView,
@@ -113,6 +114,25 @@ class MemRepo implements PriceReviewRepository {
     return [];
   }
 
+  async getOperationalReviewConsole(): Promise<OperationalReviewConsole> {
+    return {
+      kpis: {
+        pendingCount: 0,
+        pendingWithWarningsCount: 0,
+        monitorPendingCount: 0,
+        resourcesWithoutApprovedCount: 0,
+        staleApprovedCount: 0,
+        failingOrOverdueTargetsCount: 0,
+      },
+      urgent: [],
+      coverage: [],
+      sourceHealth: [],
+      recentActivity: [],
+      limits: { urgent: 6, coverage: 6, sourceHealth: 6, recentActivity: 6, resourceScan: 200 },
+      hasMore: { urgent: false, coverage: false, sourceHealth: false, recentActivity: false },
+      notes: [],
+    };
+  }
   async getObservationStatuses(
     _viewer: AuthenticatedViewer,
     ids: Uuid[],

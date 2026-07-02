@@ -1,5 +1,21 @@
 # Handoff Log
 
+## 2026-07-01 - ICONIC_OPS_V5_5_1A_OPERATIONAL_REVIEW_CONSOLE - EN RAMA (sin PR/merge/tag/deploy) (agent-pricing/frontend)
+
+- Base `origin/main = 777706a974e8c8c6dc05aaabffef07cd09c9d798`. Rama `feature/v5-5-1a-operational-review-console`.
+- Agrega consola read-only en `/catalog/prices/review`, antes del resumen y la tabla existente. La tabla de revision y sus acciones de aprobar/rechazar quedan abajo y sin cambios funcionales.
+- Read-model `getOperationalReviewConsole(viewer, limits)` en pricing/review: RLS-bound, org-scoped con `organization_id = viewer.organizationId`, limites internos y consultas separadas para pending, recursos, targets y warnings de monitor.
+- KPIs: pendientes, pendientes con warnings, pendientes del monitor, recursos sin approved, stale, fuentes vencidas/fallando. Cobertura acotada por `resourceScan` para evitar cargar catalogo completo.
+- Listas: Revision urgente, Cobertura de catalogo, Salud de fuentes y Actividad reciente. Deltas server-side contra ultimo approved anterior; fallback `Sin precio anterior aprobado` y rotulo `Comparacion derivada`.
+- Filtros MVP client-side: severidad, proveedor y busqueda por recurso. Status/origen quedan documentados fuera del MVP para no ampliar la fase.
+- CTAs solo navegacion/read-only: Price Review, historico de recurso, monitoring/fuente. Sin nuevos botones de aprobar/rechazar.
+- Privacidad: se mantiene guard internal/management; client/site no cargan datos sensibles ni consola.
+- Sin migraciones, sin db push, sin Supabase Cloud, sin RLS, sin Vercel env/password, sin tag/deploy, sin BOQ/APU/exports, sin V5.6/Auth.
+- QA: typecheck 0, lint 0, tests focales review/monitor 163/0, suite completa 2290/0 (42 skip), build 0, gm 22/0, diff-check staged limpio.
+- STOP: no PR/merge/tag/deploy. Espera autorizacion.
+
+---
+
 ## 2026-07-01 â€” ICONIC_OPS_V5_4_2C_QUICK_NOTES_DASHBOARD_LAYOUT_PATCH â€” EN RAMA / PR #19 (sin merge) (agent-dashboard)
 
 - Patch visual sobre la misma rama `feature/v5-4-2c-quick-notes-dashboard-card` (PR #19). **Problema:** Quick Notes en la grilla
@@ -7053,7 +7069,7 @@ Rama: feature/v5-4-2d-dashboard-project-scope-selector. Base: origin/main = 9fb7
 - Repository read-only: `listResourcePriceHistory(viewer, resourceId, limit)` en Price Observation Repository, org-scoped por `organization_id` y `resource_id`.
 - `/catalog/resources/[resourceId]/price-intelligence`: la ultima seccion evoluciona a `Historico y fuentes`; PageHeader, disclaimer, formulario, Validar URL y MonitoringSection quedan en su sitio.
 - UI: tabla densa desktop y cards mobile/tablet, con `<details>` por registro, filtros client-side estado/origen/proveedor, contador `N de M` y `Limpiar filtros`.
-- Comparacion derivada calculada server-side contra ultima observacion approved anterior del recurso; rotulo literal `Comparación derivada (referencial no es baseline histórica exacta)`.
+- Comparacion derivada calculada server-side contra ultima observacion approved anterior del recurso; rotulo literal `Comparaciï¿½n derivada (referencial no es baseline histï¿½rica exacta)`.
 - Origen derivado sin inventar datos: monitor via `price_monitor_results.observation_id`, lote via `import_batch_id`, manual si no hay vinculo.
 - Privacidad: sanitizacion server-side antes de pasar filas al client component para roles no internos.
 - Restricciones: NO migraciones, NO Supabase Cloud/db push/RLS, NO Vercel/env/password, NO tag/deploy, NO V5.4.3/monitoring, NO Quick Notes, NO Dashboard Project Scope Selector, NO BOQ/APU/exports, NO approval/rejection workflow.

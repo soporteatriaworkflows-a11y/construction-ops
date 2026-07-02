@@ -25,8 +25,10 @@ import {
 import type {
   PendingReviewObservationView,
   ReviewBatchView,
+  OperationalReviewConsole as OperationalReviewConsoleData,
   ReviewSummary,
 } from '@/server/pricing/review';
+import { OperationalReviewConsole } from './_components/operational-review-console';
 import { ReviewTable } from './_components/review-table';
 
 export const dynamic = 'force-dynamic';
@@ -61,6 +63,7 @@ export default async function PriceReviewCenterPage() {
   let observations: PendingReviewObservationView[] = [];
   let batches: ReviewBatchView[] = [];
   let summary: ReviewSummary | null = null;
+  let operationalConsole: OperationalReviewConsoleData | null = null;
   let error: string | null = null;
 
   const mode = resolveAuthMode();
@@ -84,9 +87,10 @@ export default async function PriceReviewCenterPage() {
     // Privacidad backend-first: solo roles autorizados cargan datos 🔒.
     if (REVIEW_ROLES.includes(viewerRole)) {
       const repo = getReviewRepository();
-      [observations, batches] = await Promise.all([
+      [observations, batches, operationalConsole] = await Promise.all([
         repo.listPendingObservations(viewer, REVIEW_LIST_LIMIT),
         repo.listBatches(viewer),
+        repo.getOperationalReviewConsole(viewer),
       ]);
       summary = computeReviewSummary(observations, batches);
     }
@@ -147,6 +151,8 @@ export default async function PriceReviewCenterPage() {
               (APP_AUTH_MODE=supabase y READ_MODEL_SOURCE=db).
             </div>
           )}
+
+          {operationalConsole && <OperationalReviewConsole consoleData={operationalConsole} />}
 
           {summary && (
             <section aria-label="Resumen de revisión" className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
