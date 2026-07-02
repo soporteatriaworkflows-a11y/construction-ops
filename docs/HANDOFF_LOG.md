@@ -1,5 +1,18 @@
 # Handoff Log
 
+## 2026-07-02 - ICONIC_OPS_V5_6_3A_INVITATION_EMAIL_FALLBACK_UX - EN RAMA + PR (agent-auth/access)
+
+- Base esperada: origin/main con V5.6.1E y V5.6.2. Objetivo: hacer honesto el flujo de invitaciones cuando el provider real de email no esta configurado.
+- Email delivery tipado: EmailSendResult.status = sent|logged|failed; LogEmailProvider devuelve logged y delivered:false; SMTP exitoso devuelve sent; SMTP fallido devuelve failed sin fallback silencioso a log.
+- UI /settings/access: create/resend muestran banner visible, estado de entrega y enlace fallback con boton copiar cuando la server action devuelve inviteLink. No se dice enviado cuando el resultado es logged o failed.
+- Seguridad: no se guarda token plano en DB, no se reconstruyen links antiguos desde token_hash, no se expone token_hash, no se loguea token/link/correo completo/secretos/DATABASE_URL.
+- Health-check server helper: getInvitationEmailDeliveryHealth para admin/gerencia con providerName, isRealSender, deliveryMode; sin user/pass/API keys/secrets.
+- Docs: docs/design-references/V5_6_3A_INVITATION_EMAIL_FALLBACK_UX.md. V5.6.3B queda para SMTP real controlado; V5.6.3C para Resend/Postmark opcional; nunca tocar DATABASE_URL para esta configuracion.
+- QA local: focal email/access/fallback 29/29; auth/access/sidebar 232/232; typecheck 0; lint 0; build 0; gm:regression 22/22; suite completa 2441 passed/42 skipped; git diff --check limpio. CI construction-ops pendiente tras PR.
+- Restricciones vigentes: sin Supabase Cloud/db push/RLS/migraciones/Vercel envs/SMTP real/deploy/tag/usuarios reales; sin tocar roles V5.6.2 ni acceptance V5.6.1E.
+- STOP: PR/CI antes de merge; post-merge smoke solo si CI queda verde.
+
+---
 ## 2026-07-02 - ICONIC_OPS_V5_6_1E_INVITE_MEMBERSHIP_FINAL_FIX_TOKEN_HYGIENE - PATCH sobre PR #25 (sin merge/tag/deploy) (agent-auth/access)
 
 - Finding P1 (Codex) sobre PR #25: el token de invitación en `localStorage` podía quedar persistido indefinidamente; había limpieza en éxito pero no garantizada en errores terminales.

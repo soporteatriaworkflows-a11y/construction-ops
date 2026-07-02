@@ -1,5 +1,5 @@
 /**
- * invitations-table.tsx — Invitaciones pendientes/históricas + reenviar/revocar.
+ * invitations-table.tsx - Invitaciones pendientes/históricas + reenviar/revocar.
  *
  * Reenviar/Revocar solo se ofrecen para invitaciones aún pendientes. El backstop
  * real es la RPC SQL. Si el reenvío no envía correo, muestra el enlace.
@@ -7,7 +7,7 @@
 'use client';
 
 import { useActionState } from 'react';
-import { Loader2, RefreshCw, Ban, Link2 } from 'lucide-react';
+import { Loader2, RefreshCw, Ban } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   resendInvitationAction,
@@ -16,6 +16,7 @@ import {
 } from '../actions';
 import type { InvitationStatus } from '@/server/access';
 import { roleLabel, invitationStatusLabel, invitationStatusClasses } from '../labels';
+import { InviteFallbackNotice } from './invite-fallback-notice';
 
 export interface InvitationRow {
   id: string;
@@ -42,7 +43,7 @@ function RowActions({ invitation }: { invitation: InvitationRow }) {
 
   const isPending = invitation.effectiveStatus === 'pending';
   if (!isPending) {
-    return <span className="text-xs text-iconic-graphite/50">—</span>;
+    return <span className="text-xs text-iconic-graphite/50">-</span>;
   }
 
   return (
@@ -68,10 +69,12 @@ function RowActions({ invitation }: { invitation: InvitationRow }) {
       )}
       {revokeState?.success && <p className="text-xs text-emerald-600">{revokeState.message}</p>}
       {resendState?.success && resendState.inviteLink && (
-        <p className="flex items-start gap-1 text-xs text-amber-700">
-          <Link2 className="mt-0.5 h-3 w-3 shrink-0" />
-          <code className="break-all">{resendState.inviteLink}</code>
-        </p>
+        <InviteFallbackNotice
+          inviteLink={resendState.inviteLink}
+          deliveryStatus={resendState.deliveryStatus}
+          deliveryLabel={resendState.deliveryLabel}
+          compact
+        />
       )}
       {resendState?.success && !resendState.inviteLink && (
         <p className="text-xs text-emerald-600">{resendState.message}</p>

@@ -1,5 +1,5 @@
 /**
- * email.test.ts — Email transaccional (FASE 9: 18,19,20,21,22).
+ * email.test.ts - Email transaccional (FASE 9: 18,19,20,21,22).
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -48,7 +48,7 @@ describe('plantillas (19,20)', () => {
   it('recuperación: asunto y enlace de reset', () => {
     const msg = renderPasswordResetEmail({ to: 'p@iconic.test', resetUrl: '{{ .ConfirmationURL }}' });
     expect(msg.kind).toBe('password_reset');
-    expect(msg.subject.toLowerCase()).toContain('contraseña');
+    expect(msg.subject.toLowerCase()).toContain('contrase');
     expect(msg.html).toContain('{{ .ConfirmationURL }}');
   });
 
@@ -83,7 +83,7 @@ describe('LogEmailProvider (18,21: dev no envía real; sin secretos en logs)', (
       text: 'token https://app.test/invite/accept?token=SECRET',
       kind: 'invitation',
     });
-    expect(res).toMatchObject({ delivered: true, provider: 'log' });
+    expect(res).toMatchObject({ status: 'logged', delivered: false, provider: 'log' });
     expect(log.outbox).toHaveLength(1);
   });
 
@@ -100,11 +100,13 @@ describe('LogEmailProvider (18,21: dev no envía real; sin secretos en logs)', (
     const logged = spy.mock.calls.map((c) => c.join(' ')).join('\n');
     expect(logged).not.toContain('SUPERSECRETTOKEN');
     expect(logged).toContain('invitation');
+    expect(logged).not.toContain('p@iconic.test');
+    expect(logged).toContain('p***@iconic.test');
   });
 });
 
-describe('SmtpEmailProvider (22: ausencia de dependencia → fallback)', () => {
-  it('sin nodemailer instalado, no entrega y marca fallback', async () => {
+describe('SmtpEmailProvider (22: ausencia de dependencia => failed)', () => {
+  it('sin nodemailer instalado, no entrega y marca failed', async () => {
     const smtp = new SmtpEmailProvider({
       host: 'smtp.test',
       port: 587,
@@ -120,15 +122,16 @@ describe('SmtpEmailProvider (22: ausencia de dependencia → fallback)', () => {
       text: 't',
       kind: 'invitation',
     });
-    // nodemailer no está instalado en el entorno de test ⇒ delivered:false.
+    // nodemailer no está instalado en el entorno de test => delivered:false.
     expect(res.delivered).toBe(false);
-    expect(res.fallback).toBe(true);
+    expect(res.status).toBe('failed');
+    expect(['smtp_dependency_missing', 'smtp_send_failed']).toContain(res.errorCode);
     expect(res.provider).toBe('smtp');
   });
 });
 
 describe('resolveEmailProvider / readSmtpConfigFromEnv', () => {
-  it('sin SMTP_* ⇒ Log', () => {
+  it('sin SMTP_* => Log', () => {
     expect(resolveEmailProvider({} as NodeJS.ProcessEnv).id).toBe('log');
   });
   it('EMAIL_PROVIDER=log fuerza Log aun con SMTP_*', () => {
@@ -138,20 +141,20 @@ describe('resolveEmailProvider / readSmtpConfigFromEnv', () => {
     } as unknown as NodeJS.ProcessEnv;
     expect(resolveEmailProvider(env).id).toBe('log');
   });
-  it('SMTP_* completas ⇒ smtp', () => {
+  it('SMTP_* completas => smtp', () => {
     const env = {
       SMTP_HOST: 'h', SMTP_PORT: '465', SMTP_USER: 'u', SMTP_PASSWORD: 'p', SMTP_FROM: 'f',
     } as unknown as NodeJS.ProcessEnv;
     expect(resolveEmailProvider(env).id).toBe('smtp');
-    expect(readSmtpConfigFromEnv(env)?.secure).toBe(true); // 465 ⇒ secure
+    expect(readSmtpConfigFromEnv(env)?.secure).toBe(true); // 465 => secure
   });
-  it('SMTP incompleto ⇒ null config', () => {
+  it('SMTP incompleto => null config', () => {
     expect(readSmtpConfigFromEnv({ SMTP_HOST: 'h' } as unknown as NodeJS.ProcessEnv)).toBeNull();
   });
 });
 
-describe('sendTransactionalEmail (fallback SMTP→Log)', () => {
-  it('si SMTP no entrega, cae a Log sin romper el flujo', async () => {
+describe('sendTransactionalEmail (resultado tipado sin fallback silencioso)', () => {
+  it('si SMTP no entrega, devuelve failed sin marcar enviado', async () => {
     const env = {
       SMTP_HOST: 'h', SMTP_PORT: '587', SMTP_USER: 'u', SMTP_PASSWORD: 'p', SMTP_FROM: 'f',
     } as unknown as NodeJS.ProcessEnv;
@@ -159,8 +162,9 @@ describe('sendTransactionalEmail (fallback SMTP→Log)', () => {
       { to: 'p@iconic.test', subject: 's', html: 'h', text: 't', kind: 'invitation' },
       env,
     );
-    // SMTP falla (sin nodemailer) ⇒ fallback a log entregado.
-    expect(res.delivered).toBe(true);
-    expect(res.fallback).toBe(true);
+    // SMTP falla (sin nodemailer) => failed; no se marca como enviado real.
+    expect(res.delivered).toBe(false);
+    expect(res.status).toBe('failed');
+    expect(res.provider).toBe('smtp');
   });
 });

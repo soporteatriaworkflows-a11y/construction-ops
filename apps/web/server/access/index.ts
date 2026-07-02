@@ -25,5 +25,6 @@ export {
   revokeInvitation,
   changeMemberRole,
   acceptInvitationWithSession,
+  getInvitationEmailDeliveryHealth,
   type AccessServiceDeps,
 } from './service';

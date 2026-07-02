@@ -1,5 +1,5 @@
 /**
- * smtp-provider.ts — Proveedor SMTP corporativo (producción).
+ * smtp-provider.ts - Proveedor SMTP corporativo (producción).
  *
  * Propiedad: agent-orchestrator. Contrato:
  * `docs/OPERATIONAL_ACCESS_AND_SMTP_V1_CONTRACT.md §6`.
@@ -45,7 +45,7 @@ export class SmtpEmailProvider implements EmailProvider {
     try {
       // webpackIgnore: true suprime el warning de Webpack/Turbopack cuando
       // nodemailer no está instalado. La dependencia es OPCIONAL: si no existe
-      // el catch devuelve delivered:false y el llamador cae al LogEmailProvider.
+      // el catch devuelve failed sin exponer secretos.
       const moduleName = 'nodemailer';
       const mod = (await import(/* webpackIgnore: true */ moduleName)) as {
         createTransport: (opts: unknown) => MinimalTransport;
@@ -57,39 +57,30 @@ export class SmtpEmailProvider implements EmailProvider {
         auth: { user: this.config.user, pass: this.config.password },
       });
     } catch {
-      // nodemailer no instalado en este entorno → fallback controlado a Log.
-      return {
-        delivered: false,
-        provider: 'smtp',
-        fallback: true,
-        detail: 'nodemailer no disponible; configure la dependencia para SMTP real',
-      };
+      // nodemailer no instalado en este entorno: fallo tipado sin secretos.
+      return { status: 'failed', delivered: false, provider: 'smtp', errorCode: 'smtp_dependency_missing', detail: 'nodemailer no disponible; configure la dependencia para SMTP real' };
     }
 
     try {
-      await transport.sendMail({
+      const info = await transport.sendMail({
         from: this.config.from,
         to: message.to,
         subject: message.subject,
         text: message.text,
         html: message.html,
       });
-      return { delivered: true, provider: 'smtp' };
+      const messageId = typeof info === 'object' && info && 'messageId' in info ? String((info as { messageId?: unknown }).messageId ?? '') : undefined;
+      return { status: 'sent', delivered: true, provider: 'smtp', messageId: messageId || undefined };
     } catch {
       // Error de envío (host/credenciales/red). NUNCA exponer secretos.
-      return {
-        delivered: false,
-        provider: 'smtp',
-        fallback: true,
-        detail: 'fallo de envío SMTP; revise configuración de host/credenciales',
-      };
+      return { status: 'failed', delivered: false, provider: 'smtp', errorCode: 'smtp_send_failed', detail: 'fallo de envio SMTP; revise configuracion de host/credenciales' };
     }
   }
 }
 
 /**
  * Lee la configuración SMTP de env. Devuelve `null` si falta alguna variable
- * obligatoria (⇒ el factory usa LogEmailProvider).
+ * obligatoria (=> el factory usa LogEmailProvider).
  */
 export function readSmtpConfigFromEnv(
   env: NodeJS.ProcessEnv = process.env,

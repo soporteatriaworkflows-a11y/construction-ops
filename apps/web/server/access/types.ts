@@ -1,13 +1,14 @@
 /**
- * types.ts — Tipos del dominio de acceso operativo.
+ * types.ts  Tipos del dominio de acceso operativo.
  *
  * Propiedad: agent-orchestrator. Contrato:
- * `docs/OPERATIONAL_ACCESS_AND_SMTP_V1_CONTRACT.md §1-3`.
+ * `docs/OPERATIONAL_ACCESS_AND_SMTP_V1_CONTRACT.md ?1-3`.
  */
 import type { ProfileRole } from '@/server/auth/types';
+import type { EmailDeliveryStatus, EmailProviderId } from '@/server/email';
 import type { Uuid } from '@/lib/contracts/read-model';
 
-/** Actor server-side de las operaciones de acceso (jamás desde el navegador). */
+/** Actor server-side de las operaciones de acceso (jamas desde el navegador). */
 export interface AccessActor {
   userId: Uuid;
   organizationId: Uuid;
@@ -15,7 +16,7 @@ export interface AccessActor {
   email?: string;
 }
 
-/** Miembro activo de la organización (fila de profiles). */
+/** Miembro activo de la organizacion (fila de profiles). */
 export interface MemberView {
   userId: Uuid;
   fullName: string;
@@ -26,14 +27,14 @@ export interface MemberView {
 
 export type InvitationStatus = 'pending' | 'accepted' | 'revoked' | 'expired';
 
-/** Invitación, proyectada para la UI (NUNCA incluye token ni su hash). */
+/** Invitacion, proyectada para la UI (NUNCA incluye token ni su hash). */
 export interface InvitationView {
   id: Uuid;
   email: string;
   fullName: string | null;
   role: ProfileRole;
   status: InvitationStatus;
-  /** Estado efectivo: 'pending' vencida ⇒ se muestra como vencida. */
+  /** Estado efectivo: 'pending' vencida ? se muestra como vencida. */
   effectiveStatus: InvitationStatus;
   invitedAt: string;
   expiresAt: string;
@@ -48,13 +49,19 @@ export interface CreateInvitationInput {
   message?: string | null;
 }
 
-/** Resultado de crear/reenviar invitación: incluye el enlace (con token plano). */
+/** Resultado de crear/reenviar invitacion: incluye el enlace (con token plano). */
 export interface InvitationIssued {
   invitationId: Uuid;
   email: string;
   role: ProfileRole;
   acceptUrl: string;
   expiresAt: string;
-  /** true si el correo NO se entregó de verdad (dev/log o fallback). */
+  emailDelivery: {
+    status: EmailDeliveryStatus;
+    provider: EmailProviderId;
+    messageId?: string;
+    errorCode?: string;
+  };
+  /** true si el correo NO se entrego de verdad (log o failed). */
   emailFallback: boolean;
 }
