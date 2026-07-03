@@ -71,6 +71,9 @@ describe('ExportService — validación perfil×formato', () => {
         organizationId: ORG_ID,
       requestedBy: REQUESTED_BY,
         requestedAt: REQUESTED_AT,
+      // V5.6.4: el route handler SIEMPRE fija projectGrants server-side
+      // (demo ⇒ 'all'); aquí se replica. El scope real se prueba aparte.
+      projectGrants: 'all',
       }),
     ).rejects.toBeInstanceOf(ExportProfileFormatMismatchError);
   });
@@ -85,6 +88,9 @@ describe('ExportService — xlsx-client', () => {
       organizationId: ORG_ID,
       requestedBy: REQUESTED_BY,
       requestedAt: REQUESTED_AT,
+      // V5.6.4: el route handler SIEMPRE fija projectGrants server-side
+      // (demo ⇒ 'all'); aquí se replica. El scope real se prueba aparte.
+      projectGrants: 'all',
     });
 
     expect(res.contentType).toBe(FORMAT_CONTENT_TYPE['xlsx-client']);
@@ -110,6 +116,9 @@ describe('ExportService — xlsx-client', () => {
       organizationId: ORG_ID,
       requestedBy: REQUESTED_BY,
       requestedAt: REQUESTED_AT,
+      // V5.6.4: el route handler SIEMPRE fija projectGrants server-side
+      // (demo ⇒ 'all'); aquí se replica. El scope real se prueba aparte.
+      projectGrants: 'all',
     });
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(toArrayBuffer(res.buffer));
@@ -139,6 +148,9 @@ describe('ExportService — xlsx-internal', () => {
       organizationId: ORG_ID,
       requestedBy: REQUESTED_BY,
       requestedAt: REQUESTED_AT,
+      // V5.6.4: el route handler SIEMPRE fija projectGrants server-side
+      // (demo ⇒ 'all'); aquí se replica. El scope real se prueba aparte.
+      projectGrants: 'all',
     });
     expect(res.contentType).toBe(FORMAT_CONTENT_TYPE['xlsx-internal']);
     expect(res.fileName).toMatch(/^presupuesto_interno_.*\.xlsx$/);
@@ -160,6 +172,9 @@ describe('ExportService — PDF', () => {
       organizationId: ORG_ID,
       requestedBy: REQUESTED_BY,
       requestedAt: REQUESTED_AT,
+      // V5.6.4: el route handler SIEMPRE fija projectGrants server-side
+      // (demo ⇒ 'all'); aquí se replica. El scope real se prueba aparte.
+      projectGrants: 'all',
     });
     expect(res.contentType).toBe('application/pdf');
     expect(res.fileName).toMatch(/\.pdf$/);
@@ -177,6 +192,9 @@ describe('ExportService — PDF', () => {
       organizationId: ORG_ID,
       requestedBy: REQUESTED_BY,
       requestedAt: REQUESTED_AT,
+      // V5.6.4: el route handler SIEMPRE fija projectGrants server-side
+      // (demo ⇒ 'all'); aquí se replica. El scope real se prueba aparte.
+      projectGrants: 'all',
     });
     expect(res.contentType).toBe('application/pdf');
     const magic = Buffer.from(res.buffer.subarray(0, 5)).toString('latin1');
@@ -193,6 +211,9 @@ describe('ExportService — csv-schedule', () => {
       organizationId: ORG_ID,
       requestedBy: REQUESTED_BY,
       requestedAt: REQUESTED_AT,
+      // V5.6.4: el route handler SIEMPRE fija projectGrants server-side
+      // (demo ⇒ 'all'); aquí se replica. El scope real se prueba aparte.
+      projectGrants: 'all',
     });
     expect(res.contentType).toBe('text/csv; charset=utf-8');
     expect(res.fileName).toMatch(/^cronograma_.*\.csv$/);
@@ -212,6 +233,9 @@ describe('ExportService — csv-schedule', () => {
       organizationId: ORG_ID,
       requestedBy: REQUESTED_BY,
       requestedAt: REQUESTED_AT,
+      // V5.6.4: el route handler SIEMPRE fija projectGrants server-side
+      // (demo ⇒ 'all'); aquí se replica. El scope real se prueba aparte.
+      projectGrants: 'all',
     });
     const text = Buffer.from(res.buffer).toString('utf-8');
     const header = text.split(/\r?\n/)[0];
@@ -228,6 +252,9 @@ describe('ExportService — csv-schedule', () => {
       organizationId: ORG_ID,
       requestedBy: REQUESTED_BY,
       requestedAt: REQUESTED_AT,
+      // V5.6.4: el route handler SIEMPRE fija projectGrants server-side
+      // (demo ⇒ 'all'); aquí se replica. El scope real se prueba aparte.
+      projectGrants: 'all',
     });
     const text = Buffer.from(res.buffer).toString('utf-8').toLowerCase();
     for (const token of FORBIDDEN_CLIENT) {
@@ -251,6 +278,9 @@ describe('ExportService — aislamiento por organización (P1-A / M-02)', () => 
         organizationId: FOREIGN_ORG,
         requestedBy: REQUESTED_BY,
         requestedAt: REQUESTED_AT,
+      // V5.6.4: el route handler SIEMPRE fija projectGrants server-side
+      // (demo ⇒ 'all'); aquí se replica. El scope real se prueba aparte.
+      projectGrants: 'all',
       }),
     ).rejects.toThrow();
   });
@@ -263,6 +293,9 @@ describe('ExportService — aislamiento por organización (P1-A / M-02)', () => 
       organizationId: ORG_ID,
       requestedBy: REQUESTED_BY,
       requestedAt: REQUESTED_AT,
+      // V5.6.4: el route handler SIEMPRE fija projectGrants server-side
+      // (demo ⇒ 'all'); aquí se replica. El scope real se prueba aparte.
+      projectGrants: 'all',
     });
     expect(res.sizeBytes).toBeGreaterThan(0);
   });

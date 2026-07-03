@@ -48,7 +48,8 @@ const EXPECTED: Record<AccessModule, ProfileRole[]> = {
   dashboard: ['admin', 'gerencia', 'presupuestos', 'compras', 'obra', 'consulta'],
   projects: ['admin', 'gerencia', 'presupuestos', 'compras', 'obra', 'consulta'],
   estimates: ['admin', 'gerencia', 'presupuestos', 'obra', 'consulta'],
-  apu: ['admin', 'gerencia', 'presupuestos', 'consulta'],
+  // V5.6.4: consulta retirado de apu (biblioteca org-wide, no project-scoped).
+  apu: ['admin', 'gerencia', 'presupuestos'],
   quantities: ['admin', 'gerencia', 'presupuestos', 'obra', 'consulta'],
   planning: ['admin', 'gerencia', 'presupuestos', 'obra', 'consulta'],
   catalog: ['admin', 'gerencia', 'presupuestos', 'compras'],
@@ -110,10 +111,12 @@ describe('module-access — qué queda BLOQUEADO por rol', () => {
     }
   });
 
-  it('consulta: SÍ ve lectura client-safe', () => {
-    for (const m of ['dashboard', 'projects', 'estimates', 'apu', 'quantities', 'planning', 'settings', 'exports'] as AccessModule[]) {
+  it('consulta: SÍ ve lectura client-safe (sin apu desde V5.6.4)', () => {
+    for (const m of ['dashboard', 'projects', 'estimates', 'quantities', 'planning', 'settings', 'exports'] as AccessModule[]) {
       expect(canAccessModule('consulta', m)).toBe(true);
     }
+    // V5.6.4: la biblioteca APU es org-wide (no project-scoped) ⇒ consulta NO.
+    expect(canAccessModule('consulta', 'apu')).toBe(false);
   });
 
   it('obra: bloqueado en pricing/review/access (y catalog/apu no listados)', () => {

@@ -72,6 +72,7 @@ import {
   projectPriceStatusForRole,
   type PriceObservationRow,
 } from '@/server/catalog/price-status';
+import { filterGrantedProjects, isProjectGranted } from './project-grants';
 
 /** Normaliza un valor de fecha/hora de Drizzle a ISO string. */
 function toIso(value: Date | string): string {
@@ -136,6 +137,33 @@ export class DrizzleReadModelRepository implements ReadModelPort {
       // (select/from/where); el cast es seguro en runtime.
       this.als.run(new DrizzleReadRepository(scopedDb as unknown as ReadDb), fn),
     );
+  }
+
+  /**
+   * CHOKE POINT V5.6.4 (CLIENT_PROJECT_SCOPE): proyectos visibles para el
+   * viewer. Para `client`, intersecta con `viewer.projectGrants`
+   * (deny-by-default); el resto de roles conserva el alcance por organización.
+   * TODO acceso a `repo.projects(...)` debe pasar por aquí.
+   */
+  private async visibleProjects(
+    viewer: ViewerContext,
+  ): Promise<Awaited<ReturnType<DrizzleReadRepository['projects']>>> {
+    const projects = await this.repo.projects(viewer.organizationId);
+    return [...filterGrantedProjects(viewer, projects)];
+  }
+
+  /**
+   * CHOKE POINT V5.6.4: proyecto por id dentro del alcance del viewer.
+   * Anti-fuga de existencia: fuera del alcance ⇒ `null`, EXACTAMENTE igual que
+   * un id inexistente o de otra organización (el caller lanza el mismo
+   * not-found). TODO acceso a `repo.projectById(...)` debe pasar por aquí.
+   */
+  private async visibleProjectById(
+    viewer: ViewerContext,
+    projectId: Uuid,
+  ): Promise<Awaited<ReturnType<DrizzleReadRepository['projectById']>>> {
+    if (!isProjectGranted(viewer, projectId)) return null;
+    return this.repo.projectById(viewer.organizationId, projectId);
   }
 
   /** Construye la entrada de cómputo de una versión a partir de filas Drizzle. */
@@ -230,7 +258,7 @@ export class DrizzleReadModelRepository implements ReadModelPort {
 
   async listProjects(viewer: ViewerContext): Promise<ProjectListItem[]> {
     return this.read(viewer, async () => {
-    const projects = await this.repo.projects(viewer.organizationId);
+    const projects = await this.visibleProjects(viewer);
     if (projects.length === 0) return [];
 
     const projectIds = projects.map((p) => p.id);
@@ -270,7 +298,7 @@ export class DrizzleReadModelRepository implements ReadModelPort {
     projectId: Uuid,
   ): Promise<ProjectOverview> {
     return this.read(viewer, async () => {
-    const project = await this.repo.projectById(viewer.organizationId, projectId);
+    const project = await this.visibleProjectById(viewer, projectId);
     if (!project) throw new ProjectNotFoundError(projectId);
 
     const scopes = await this.repo.scopesByProject(projectId);
@@ -308,10 +336,10 @@ export class DrizzleReadModelRepository implements ReadModelPort {
   ): Promise<EstimateSummary[]> {
     return this.read(viewer, async () => {
     const projects = projectId
-      ? [await this.repo.projectById(viewer.organizationId, projectId)].filter(
+      ? [await this.visibleProjectById(viewer, projectId)].filter(
           (p): p is NonNullable<typeof p> => p !== null,
         )
-      : await this.repo.projects(viewer.organizationId);
+      : await this.visibleProjects(viewer);
     if (projects.length === 0) return [];
 
     const scopes = await this.repo.scopesByProjects(projects.map((p) => p.id));
@@ -348,7 +376,10 @@ export class DrizzleReadModelRepository implements ReadModelPort {
     if (!estimate) throw new EstimateVersionNotFoundError(estimateVersionId);
     const scope = await this.repo.scopeById(estimate.projectScopeId);
     if (!scope) throw new EstimateVersionNotFoundError(estimateVersionId);
-    const project = await this.repo.projectById(viewer.organizationId, scope.projectId);
+    // V5.6.4: la cadena versión→estimate→scope→proyecto converge aquí; un
+    // proyecto fuera del alcance del viewer produce el MISMO not-found que un
+    // id inexistente (anti-fuga de existencia).
+    const project = await this.visibleProjectById(viewer, scope.projectId);
     if (!project) throw new EstimateVersionNotFoundError(estimateVersionId);
 
     const input = await this.loadComputationInput(
@@ -518,7 +549,7 @@ export class DrizzleReadModelRepository implements ReadModelPort {
   ): Promise<QuantityGroupView[]> {
     return this.read(viewer, async () => {
     // Restringir a alcances de la organización del viewer.
-    const projects = await this.repo.projects(viewer.organizationId);
+    const projects = await this.visibleProjects(viewer);
     const scopes = await this.repo.scopesByProjects(projects.map((p) => p.id));
     const allowedScopeIds = new Set(scopes.map((s) => s.id));
     const scopeIds = projectScopeId
@@ -555,7 +586,7 @@ export class DrizzleReadModelRepository implements ReadModelPort {
     projectScopeId?: Uuid,
   ): Promise<WorkspaceGroupView[]> {
     return this.read(viewer, async () => {
-    const projects = await this.repo.projects(viewer.organizationId);
+    const projects = await this.visibleProjects(viewer);
     const scopes = await this.repo.scopesByProjects(projects.map((p) => p.id));
     const allowedScopeIds = new Set(scopes.map((s) => s.id));
     const scopeIds = projectScopeId
@@ -648,7 +679,7 @@ export class DrizzleReadModelRepository implements ReadModelPort {
     projectId: Uuid,
   ): Promise<DashboardSummary> {
     return this.read(viewer, async () => {
-    const project = await this.repo.projectById(viewer.organizationId, projectId);
+    const project = await this.visibleProjectById(viewer, projectId);
     if (!project) throw new ProjectNotFoundError(projectId);
 
     const input = await this.resolveCurrentVersionInput(viewer.organizationId, projectId);
@@ -677,7 +708,7 @@ export class DrizzleReadModelRepository implements ReadModelPort {
     return this.read(viewer, async () => {
     // El proyecto debe pertenecer a la organización del viewer (defensa en
     // profundidad además de RLS, que es la barrera real en runtime).
-    const project = await this.repo.projectById(viewer.organizationId, projectId);
+    const project = await this.visibleProjectById(viewer, projectId);
     if (!project) throw new ProjectNotFoundError(projectId);
 
     const [taskRows, depRows] = await Promise.all([
@@ -717,7 +748,7 @@ export class DrizzleReadModelRepository implements ReadModelPort {
     taskId?: Uuid,
   ): Promise<ProgressEntryView[]> {
     return this.read(viewer, async () => {
-    const project = await this.repo.projectById(viewer.organizationId, projectId);
+    const project = await this.visibleProjectById(viewer, projectId);
     if (!project) throw new ProjectNotFoundError(projectId);
 
     const rows = await this.repo.progressEntriesByProject(
@@ -745,7 +776,7 @@ export class DrizzleReadModelRepository implements ReadModelPort {
     taskId?: Uuid,
   ): Promise<ResourceAssignmentView[]> {
     return this.read(viewer, async () => {
-    const project = await this.repo.projectById(viewer.organizationId, projectId);
+    const project = await this.visibleProjectById(viewer, projectId);
     if (!project) throw new ProjectNotFoundError(projectId);
 
     const rows = await this.repo.resourceAssignmentsByProject(

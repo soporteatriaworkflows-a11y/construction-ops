@@ -11,7 +11,7 @@
  *  - Organización y rol SIEMPRE server-side; nunca desde el navegador.
  *  - Sin fallback silencioso entre modos.
  */
-import type { ViewerContext } from '@/lib/contracts/read-model';
+import type { ProjectGrants, ViewerContext } from '@/lib/contracts/read-model';
 import { getDemoViewer } from '@/server/read-model';
 import { createClient } from '@/lib/supabase/server';
 import { resolveAuthMode, type AppAuthMode } from '@/lib/supabase/env';
@@ -51,18 +51,62 @@ export async function resolveAuthenticatedViewer(): Promise<AuthenticatedViewer>
     throw new AuthError('no_membership', 'El perfil no tiene organización.');
   }
 
+  // V5.6.4 (CLIENT_PROJECT_SCOPE): solo `client` queda restringido por
+  // proyecto; sus grants se leen RLS-bound (fila propia). Deny-by-default:
+  // ante cualquier error de lectura (p. ej. migración aún no aplicada) el
+  // alcance es la lista vacía (0 proyectos), nunca fail-open.
+  const projectGrants: ProjectGrants =
+    role === 'client'
+      ? await resolveClientProjectGrants(supabase, data.id as string)
+      : 'all';
+
   return {
     userId: session.userId,
     profileId: data.id as string,
     organizationId: data.organization_id as string,
     role,
     email: (data.email as string | undefined) ?? session.email,
+    projectGrants,
   };
 }
 
-/** Proyecta un `AuthenticatedViewer` al `ViewerContext` del read-model. */
+/**
+ * Proyectos asignados (`project_access_grants`) del profile `client`. La RLS
+ * de la tabla limita el SELECT a las filas propias. Fail-closed: error ⇒ [].
+ */
+async function resolveClientProjectGrants(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  profileId: string,
+): Promise<readonly string[]> {
+  const { data, error } = await supabase
+    .from('project_access_grants')
+    .select('project_id')
+    .eq('profile_id', profileId);
+  if (error || !data) {
+    console.warn(
+      '[auth] lectura de project_access_grants falló; alcance client fail-closed (0 proyectos).',
+    );
+    return [];
+  }
+  return data
+    .map((row) => (row as { project_id: string | null }).project_id)
+    .filter((id): id is string => !!id);
+}
+
+/**
+ * Proyecta un `AuthenticatedViewer` al `ViewerContext` del read-model.
+ * Acarrea `profileId` (claim `sub` de las lecturas RLS-scoped: la política
+ * project-scoped de `projects` lo necesita) y `projectGrants` (choke point
+ * app-layer del read-model). Doble barrera coherente.
+ */
 export function toViewerContext(v: AuthenticatedViewer): ViewerContext {
-  return { organizationId: v.organizationId, role: v.role };
+  return {
+    organizationId: v.organizationId,
+    profileId: v.profileId,
+    role: v.role,
+    // Normalización fail-closed: un viewer `client` sin grants resueltos ⇒ [].
+    projectGrants: v.projectGrants ?? (v.role === 'client' ? [] : 'all'),
+  };
 }
 
 /**

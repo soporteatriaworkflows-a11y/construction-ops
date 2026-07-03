@@ -20,10 +20,13 @@ export const VIEWER_MANAGEMENT: ViewerContext = {
 };
 
 /** Contexto de viewer con rol client (NO puede ver campos 🔒). */
+// `projectGrants: 'all'`: estos tests validan la PROYECCIÓN por rol, no el
+// alcance por proyecto (V5.6.4; el scope se prueba en project-grants.test.ts).
 export const VIEWER_CLIENT: ViewerContext = {
   organizationId: '00000000-0000-4000-8000-000000000001',
   profileId: '00000000-0000-4000-8000-000000000003',
   role: 'client',
+  projectGrants: 'all',
 };
 
 /** Contexto de viewer con rol site (obra — NO puede ver campos 🔒). */

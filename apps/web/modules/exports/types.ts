@@ -11,7 +11,7 @@
  *  - Generar en memoria; sin temporales sensibles en disco.
  */
 
-import type { Uuid, IsoDateTime } from '@/lib/contracts/read-model';
+import type { ProjectGrants, Uuid, IsoDateTime } from '@/lib/contracts/read-model';
 
 /* ---------------------------------------------------------------------------
  * ExportProfile — 1:1 con ViewerRole
@@ -82,6 +82,14 @@ export interface ExportRequest {
   requestedBy: Uuid;
   /** Timestamp de la solicitud (ISO 8601). */
   requestedAt: IsoDateTime;
+  /**
+   * Alcance de proyectos del usuario AUTENTICADO (V5.6.4 CLIENT_PROJECT_SCOPE),
+   * derivado SERVER-SIDE — no del perfil solicitado: un interno exportando con
+   * proyección `client` conserva `'all'`; un `consulta` real lleva su lista de
+   * grants. Deny-by-default: si falta y el perfil es `client`, el read-model
+   * no expone ningún proyecto (fail-closed).
+   */
+  projectGrants?: ProjectGrants;
 }
 
 /* ---------------------------------------------------------------------------

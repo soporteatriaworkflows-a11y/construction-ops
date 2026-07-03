@@ -38,6 +38,11 @@ const MESSAGES: Record<string, string> = {
   invitation_used: 'Esta invitación ya fue utilizada.',
   invitation_expired: 'Esta invitación ha expirado. Solicita una nueva.',
   email_mismatch: 'El correo de tu cuenta no coincide con el de la invitación.',
+  // V5.6.4 — grants de proyecto (grant/revoke_project_access):
+  grants_only_for_consulta:
+    'Solo los usuarios con rol Consulta usan proyectos asignados; los roles internos ya ven todos los proyectos.',
+  grant_not_found: 'Ese usuario no tiene asignado ese proyecto.',
+  project_not_found: 'No se encontró el proyecto en tu organización.',
 };
 
 /** Extrae un código de error conocido del mensaje de error de Postgres/Supabase. */

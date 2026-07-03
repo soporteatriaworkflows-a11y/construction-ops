@@ -283,8 +283,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const canCreate = isCreationModeEnabled();
   const isFixtureMode = resolveSource(process.env.READ_MODEL_SOURCE) === 'fixture';
 
-  // Base sin proyectos (p. ej. organización productiva recién creada): estado vacío.
+  // Base sin proyectos: organización recién creada, o (V5.6.4) un usuario
+  // consulta sin proyectos asignados — estado deliberado, nunca un error.
   if (!projectId) {
+    const isConsulta = profileRole === 'consulta';
     return (
       <div>
         <OperationsHeader
@@ -296,10 +298,14 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       <DashboardScopeSelector projects={projects} scope={scope} />
         <EmptyState
           icon={LayoutDashboard}
-          title="Sin proyectos para resumir"
-          description="Aún no hay proyectos en esta organización. Crea el primero para ver el resumen financiero."
+          title={isConsulta ? 'Aún no tienes proyectos asignados' : 'Sin proyectos para resumir'}
+          description={
+            isConsulta
+              ? 'La persona que administra tu acceso puede asignarte proyectos desde Accesos. Cuando lo haga, verás aquí su resumen.'
+              : 'Aún no hay proyectos en esta organización. Crea el primero para ver el resumen financiero.'
+          }
           action={
-            canCreate ? (
+            isConsulta ? undefined : canCreate ? (
               <Button asChild size="sm">
                 <Link href="/projects/new">Crear primer proyecto</Link>
               </Button>

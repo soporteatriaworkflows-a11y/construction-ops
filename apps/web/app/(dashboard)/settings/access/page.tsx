@@ -17,7 +17,10 @@ import {
   assignableRoles,
   listMembers,
   listInvitations,
+  listProjectGrants,
 } from '@/server/access';
+import { getReadModel } from '@/server/read-model';
+import { resolveViewer } from '@/server/auth/resolve-viewer';
 import { InlineCallout } from '@/components/shared/inline-callout';
 import { OperationsHeader } from '@/components/shared/operations-header';
 import { InviteForm } from './_components/invite-form';
@@ -40,10 +43,32 @@ export default async function AccessSettingsPage() {
     );
   }
 
-  const [members, invitations] = await Promise.all([
+  const [members, invitations, grants] = await Promise.all([
     listMembers(actor.organizationId),
     listInvitations(actor.organizationId),
+    // V5.6.4: asignaciones usuario↔proyecto (RLS-bound; fixture ⇒ []).
+    listProjectGrants(),
   ]);
+
+  // Proyectos activos de la organización para el diálogo de asignación. El
+  // actor es admin/gerencia ⇒ el read-model devuelve todos los de su org.
+  let grantableProjects: { id: string; name: string }[] = [];
+  try {
+    const viewer = await resolveViewer();
+    grantableProjects = (await getReadModel().listProjects(viewer)).map((p) => ({
+      id: p.id,
+      name: p.name,
+    }));
+  } catch {
+    grantableProjects = [];
+  }
+
+  const grantsByProfile = new Map<string, string[]>();
+  for (const g of grants) {
+    const bucket = grantsByProfile.get(g.profileId) ?? [];
+    bucket.push(g.projectId);
+    grantsByProfile.set(g.profileId, bucket);
+  }
 
   const roles = assignableRoles(actor.profileRole);
 
@@ -55,6 +80,7 @@ export default async function AccessSettingsPage() {
     editable:
       m.userId !== actor.userId &&
       (actor.profileRole === 'admin' || m.role !== 'admin'),
+    grantedProjectIds: grantsByProfile.get(m.userId) ?? [],
   }));
 
   const invitationRows: InvitationRow[] = invitations.map((i) => ({
@@ -89,6 +115,11 @@ export default async function AccessSettingsPage() {
           abajo y compártelo manualmente con la persona (p. ej. tu equipo). El enlace permite definir la
           contraseña y entrar con el rol asignado.
         </InlineCallout>
+        <InlineCallout tone="info" title="Rol Consulta: proyectos asignados" className="mt-3">
+          Un usuario con rol <strong>Consulta</strong> no verá <strong>ningún proyecto</strong> hasta
+          que le asignes uno en la columna Proyectos de la tabla de usuarios. Los proyectos nuevos no
+          se asignan automáticamente.
+        </InlineCallout>
       </section>
 
       {/* Usuarios activos */}
@@ -102,7 +133,12 @@ export default async function AccessSettingsPage() {
             </span>
           </h2>
         </div>
-        <MembersTable members={memberRows} assignableRoles={roles} />
+        <MembersTable
+          members={memberRows}
+          assignableRoles={roles}
+          projects={grantableProjects}
+          canManageGrants
+        />
       </section>
 
       {/* Invitaciones */}

@@ -4,7 +4,7 @@
  * Propiedad: orquestador. Contrato: `docs/AUTH_RUNTIME_CONTRACT.md` +
  * `docs/AUTH_CONTRACT.md §2`.
  */
-import type { Uuid, ViewerRole } from '@/lib/contracts/read-model';
+import type { ProjectGrants, Uuid, ViewerRole } from '@/lib/contracts/read-model';
 
 /** Rol interno de `profiles` (DB). */
 export type ProfileRole =
@@ -25,4 +25,13 @@ export interface AuthenticatedViewer {
   organizationId: Uuid;
   role: ViewerRole;
   email?: string;
+  /**
+   * Alcance de proyectos (V5.6.4 CLIENT_PROJECT_SCOPE): `'all'` para roles no
+   * restringidos; lista de proyectos asignados (`project_access_grants`) para
+   * `client`. Resuelto SIEMPRE server-side por `resolveAuthenticatedViewer`.
+   * Opcional SOLO para los literales demo existentes (roles internos):
+   * `undefined` + rol `client` se normaliza a `[]` (deny-by-default) en
+   * `toViewerContext` y en los route handlers de exports.
+   */
+  projectGrants?: ProjectGrants;
 }
