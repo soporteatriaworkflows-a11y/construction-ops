@@ -52,6 +52,7 @@ const SCOPE_B = '00000000-0000-0000-0000-0000000000d2'; // alcance de B (creado 
 // real: se fija request.jwt.claims.sub = id del profile, SIN organization_id ni
 // user_role, forzando a app.current_org()/current_role() a leer profiles.
 const USER_A_OBRA = '00000000-0000-0000-0000-0000000000b4'; // role 'obra' (site)
+const USER_A_CONSULTA = '00000000-0000-0000-0000-0000000000b6'; // role 'consulta' (client) — seed 0001
 const USER_B_GERENCIA = '00000000-0000-0000-0000-0000000000b8'; // role 'gerencia'
 // Usuario autenticado SIN membresía (auth.users sin profile) — seed 0004.
 const USER_NO_PROFILE = '00000000-0000-0000-0000-0000000000bf';
@@ -183,7 +184,8 @@ async function main(): Promise<void> {
   // 38 tras QUANTITY_WORKSPACE_AND_BOQ_SYNC_V1 (+quantity_workspace_groups/lines).
   // 40 tras OPERATIONAL_ACCESS_LAYER_V1 (+organization_invitations/access_audit_log).
   // 41 tras SCHEDULE_FROM_BOQ_V1 (+planning_schedules).
-  check('Pre-flight: 41 tablas con RLS FORCE', rlsTables === '41', `rlsTables=${rlsTables}`);
+  // 42 tras V5_6_4_CLIENT_PROJECT_SCOPE (+project_access_grants).
+  check('Pre-flight: 42 tablas con RLS FORCE', rlsTables === '42', `rlsTables=${rlsTables}`);
 
   const [{ count: taskCount }] = await sql<{ count: string }[]>`
     SELECT count(*)::text AS count FROM schedule_tasks WHERE id = ${TASK_A}`;
@@ -3177,6 +3179,223 @@ async function main(): Promise<void> {
     await q.unsafe('ROLLBACK TO SAVEPOINT sp_sched_rpc_role');
   });
   check('schedule: RPC rechaza rol no autorizado (insufficient_role)', schedRpcRole);
+
+  // ==========================================================================
+  // [GR] V5_6_4_CLIENT_PROJECT_SCOPE — grants por proyecto para consulta.
+  //      Contrato: docs/design-references/V5_6_4_CLIENT_PROJECT_SCOPE.md.
+  //      NOTA: en el harness las migraciones corren ANTES que los seeds, por lo
+  //      que el backfill de la migración es no-op aquí: la consulta sembrada
+  //      (USER_A_CONSULTA) empieza SIN grants (deny-by-default verificable).
+  // ==========================================================================
+
+  const claimsAConsulta: Claims = {
+    organization_id: ORG_A,
+    user_role: 'consulta',
+    sub: USER_A_CONSULTA,
+  };
+  // Paridad con las lecturas RLS-scoped del read-model: el claim user_role de
+  // la app lleva el ViewerRole ('client'), no el profiles.role.
+  const claimsAClientViewer: Claims = {
+    organization_id: ORG_A,
+    user_role: 'client',
+    sub: USER_A_CONSULTA,
+  };
+  // Segundo proyecto de org A (efímero, dentro de transacciones con ROLLBACK)
+  // para probar el scoping DENTRO de la misma organización.
+  const PROJECT_A2 = '0e000000-0000-0000-0000-0000000000c5';
+  const seedProjectA2 = async (q: postgres.ReservedSql): Promise<void> => {
+    await q`INSERT INTO projects (id, organization_id, code, name, status)
+            VALUES (${PROJECT_A2}, ${ORG_A}, 'PROY-A2-GR', 'Proyecto A2 (grants)', 'active')
+            ON CONFLICT (id) DO NOTHING`;
+  };
+  const seedGrantA = async (q: postgres.ReservedSql): Promise<void> => {
+    await seedProjectA2(q);
+    await q`INSERT INTO project_access_grants (organization_id, profile_id, project_id)
+            VALUES (${ORG_A}, ${USER_A_CONSULTA}, ${PROJECT_A})
+            ON CONFLICT (profile_id, project_id) DO NOTHING`;
+  };
+
+  // GR1) Deny-by-default: consulta SIN grants no ve NINGÚN proyecto.
+  const grNoGrants = await asUser(claimsAConsulta, async (q) => {
+    const rows = await q<{ id: string }[]>`SELECT id FROM projects`;
+    return rows.length;
+  }, seedProjectA2);
+  check('grants: consulta sin grants ve 0 proyectos (deny-by-default)', grNoGrants === 0,
+    `count=${grNoGrants}`);
+
+  // GR2) Con grant: ve SOLO el proyecto asignado (ni A2 de su org, ni B).
+  const grGranted = await asUser(claimsAConsulta, async (q) => {
+    const rows = await q<{ id: string }[]>`SELECT id FROM projects`;
+    return rows.map((r) => r.id);
+  }, seedGrantA);
+  check('grants: consulta con grant ve el proyecto asignado', grGranted.includes(PROJECT_A));
+  check('grants: consulta NO ve otro proyecto de su misma org', !grGranted.includes(PROJECT_A2));
+  check('grants: consulta NO ve proyectos de otra org', !grGranted.includes(PROJECT_B));
+
+  // GR3) Paridad claim 'client' (lecturas RLS-scoped del read-model).
+  const grClientViewer = await asUser(claimsAClientViewer, async (q) => {
+    const rows = await q<{ id: string }[]>`SELECT id FROM projects`;
+    return rows.map((r) => r.id);
+  }, seedGrantA);
+  check('grants: claim user_role=client también queda project-scoped',
+    grClientViewer.includes(PROJECT_A) && !grClientViewer.includes(PROJECT_A2));
+
+  // GR4) Cascada por JOIN: alcances/versiones del proyecto asignado visibles;
+  //      los del proyecto NO asignado, invisibles.
+  const grCascade = await asUser(claimsAConsulta, async (q) => {
+    const scopes = await q<{ id: string; project_id: string }[]>`
+      SELECT id, project_id FROM project_scopes`;
+    const versions = await q<{ id: string }[]>`SELECT id FROM estimate_versions`;
+    return { scopes, versionCount: versions.length };
+  }, async (q) => {
+    await seedGrantA(q);
+    await q`INSERT INTO project_scopes (id, project_id, code, name, scope_type, status)
+            VALUES ('0e000000-0000-0000-0000-0000000000d5', ${PROJECT_A2}, 'S-A2', 'Alcance A2', 'stage', 'active')`;
+  });
+  check('grants: cascada — consulta ve alcances del proyecto asignado',
+    grCascade.scopes.some((s) => s.project_id === PROJECT_A));
+  check('grants: cascada — consulta NO ve alcances del proyecto no asignado',
+    !grCascade.scopes.some((s) => s.project_id === PROJECT_A2));
+  check('grants: cascada — consulta ve versiones del presupuesto asignado',
+    grCascade.versionCount > 0, `versions=${grCascade.versionCount}`);
+
+  // GR5) Roles internos SIN cambio: admin A sigue viendo todos los de su org.
+  const grAdminSees = await asUser(claimsA, async (q) => {
+    const rows = await q<{ id: string }[]>`SELECT id FROM projects`;
+    return rows.map((r) => r.id);
+  }, seedProjectA2);
+  check('grants: admin sigue viendo todos los proyectos de su org (sin regresión)',
+    grAdminSees.includes(PROJECT_A) && grAdminSees.includes(PROJECT_A2));
+
+  // GR6) La tabla de grants NO admite escrituras directas (solo RPC).
+  let grInsertDenied = false;
+  try {
+    await asUser(claimsAConsulta, async (q) => {
+      await q`INSERT INTO project_access_grants (organization_id, profile_id, project_id)
+              VALUES (${ORG_A}, ${USER_A_CONSULTA}, ${PROJECT_A})`;
+    });
+  } catch {
+    grInsertDenied = true;
+  }
+  check('grants: INSERT directo denegado (escrituras solo vía RPC)', grInsertDenied);
+
+  let grDeleteZero: number | null = null;
+  grDeleteZero = await asUser(claimsAConsulta, async (q) => {
+    const res = await q`DELETE FROM project_access_grants WHERE profile_id = ${USER_A_CONSULTA}`;
+    return res.count;
+  }, seedGrantA);
+  check('grants: DELETE directo no borra filas (0 afectadas)', grDeleteZero === 0,
+    `count=${grDeleteZero}`);
+
+  // GR7) Visibilidad de la propia asignación: consulta ve SUS grants, no los
+  //      de terceros; admin ve todos los de la org.
+  const grSelfSelect = await asUser(claimsAConsulta, async (q) => {
+    const rows = await q<{ profile_id: string }[]>`SELECT profile_id FROM project_access_grants`;
+    return rows;
+  }, async (q) => {
+    await seedGrantA(q);
+    await q`INSERT INTO project_access_grants (organization_id, profile_id, project_id)
+            VALUES (${ORG_A}, ${USER_A_OBRA}, ${PROJECT_A})`;
+  });
+  check('grants: consulta ve solo sus propias asignaciones',
+    grSelfSelect.length === 1 && grSelfSelect[0]!.profile_id === USER_A_CONSULTA,
+    `rows=${grSelfSelect.length}`);
+
+  // GR8) RPC grant_project_access: admin asigna a consulta → fila + auditoría.
+  const grRpcGrant = await asUser(claimsA, async (q) => {
+    const r = await q<{ res: { status?: string } }[]>`
+      SELECT public.grant_project_access(${USER_A_CONSULTA}, ${PROJECT_A}) AS res`;
+    const cnt = await q<{ c: number }[]>`
+      SELECT count(*)::int AS c FROM project_access_grants
+      WHERE profile_id = ${USER_A_CONSULTA} AND project_id = ${PROJECT_A}`;
+    const audit = await q<{ c: number }[]>`
+      SELECT count(*)::int AS c FROM access_audit_log
+      WHERE action = 'project_grant_created' AND target_user_id = ${USER_A_CONSULTA}`;
+    return { status: r[0]?.res?.status, rows: cnt[0]!.c, audit: audit[0]!.c };
+  });
+  check('grants: RPC asigna proyecto (status=granted, fila y auditoría)',
+    grRpcGrant.status === 'granted' && grRpcGrant.rows === 1 && grRpcGrant.audit === 1,
+    JSON.stringify(grRpcGrant));
+
+  // GR8b) Idempotencia: repetir devuelve already_granted sin duplicar audit.
+  const grRpcTwice = await asUser(claimsA, async (q) => {
+    await q`SELECT public.grant_project_access(${USER_A_CONSULTA}, ${PROJECT_A})`;
+    const r = await q<{ res: { status?: string } }[]>`
+      SELECT public.grant_project_access(${USER_A_CONSULTA}, ${PROJECT_A}) AS res`;
+    const audit = await q<{ c: number }[]>`
+      SELECT count(*)::int AS c FROM access_audit_log
+      WHERE action = 'project_grant_created' AND target_user_id = ${USER_A_CONSULTA}`;
+    return { status: r[0]?.res?.status, audit: audit[0]!.c };
+  });
+  check('grants: RPC idempotente (already_granted, sin audit duplicado)',
+    grRpcTwice.status === 'already_granted' && grRpcTwice.audit === 1,
+    JSON.stringify(grRpcTwice));
+
+  // GR9) RPC rechaza destinatario que no es consulta.
+  let grOnlyConsulta = false;
+  await asUser(claimsA, async (q) => {
+    await q.unsafe('SAVEPOINT sp_gr_only_consulta');
+    try {
+      await q`SELECT public.grant_project_access(${USER_A_OBRA}, ${PROJECT_A})`;
+    } catch (e) {
+      grOnlyConsulta = e instanceof Error && e.message.includes('grants_only_for_consulta');
+    }
+    await q.unsafe('ROLLBACK TO SAVEPOINT sp_gr_only_consulta');
+  });
+  check('grants: RPC rechaza destinatario no-consulta (grants_only_for_consulta)', grOnlyConsulta);
+
+  // GR10) RPC rechaza actor sin rol de gestión (obra).
+  let grActorDenied = false;
+  await asUser(claimsAObra, async (q) => {
+    await q.unsafe('SAVEPOINT sp_gr_actor');
+    try {
+      await q`SELECT public.grant_project_access(${USER_A_CONSULTA}, ${PROJECT_A})`;
+    } catch {
+      grActorDenied = true;
+    }
+    await q.unsafe('ROLLBACK TO SAVEPOINT sp_gr_actor');
+  });
+  check('grants: RPC rechaza actor sin gestión (insufficient_role)', grActorDenied);
+
+  // GR11) RPC rechaza proyecto de otra organización (sin fuga de existencia:
+  //       mismo error que un proyecto inexistente).
+  let grCrossOrg = false;
+  await asUser(claimsA, async (q) => {
+    await q.unsafe('SAVEPOINT sp_gr_cross');
+    try {
+      await q`SELECT public.grant_project_access(${USER_A_CONSULTA}, ${PROJECT_B})`;
+    } catch (e) {
+      grCrossOrg = e instanceof Error && e.message.includes('project_not_found');
+    }
+    await q.unsafe('ROLLBACK TO SAVEPOINT sp_gr_cross');
+  });
+  check('grants: RPC rechaza proyecto cross-org (project_not_found)', grCrossOrg);
+
+  // GR12) RPC revoke_project_access: retira y audita; consulta vuelve a 0.
+  const grRevoke = await asUser(claimsA, async (q) => {
+    await q`SELECT public.grant_project_access(${USER_A_CONSULTA}, ${PROJECT_A})`;
+    const r = await q<{ res: { status?: string } }[]>`
+      SELECT public.revoke_project_access(${USER_A_CONSULTA}, ${PROJECT_A}) AS res`;
+    const cnt = await q<{ c: number }[]>`
+      SELECT count(*)::int AS c FROM project_access_grants
+      WHERE profile_id = ${USER_A_CONSULTA}`;
+    const audit = await q<{ c: number }[]>`
+      SELECT count(*)::int AS c FROM access_audit_log
+      WHERE action = 'project_grant_revoked' AND target_user_id = ${USER_A_CONSULTA}`;
+    return { status: r[0]?.res?.status, rows: cnt[0]!.c, audit: audit[0]!.c };
+  });
+  check('grants: RPC revoca (status=revoked, 0 filas, auditoría)',
+    grRevoke.status === 'revoked' && grRevoke.rows === 0 && grRevoke.audit === 1,
+    JSON.stringify(grRevoke));
+
+  // GR13) Identidad real (sin claims de org/rol): sub → profiles → consulta
+  //       queda scoped igual por PostgREST (JWT real no trae user_role).
+  const grRealJwt = await asUser({ sub: USER_A_CONSULTA }, async (q) => {
+    const rows = await q<{ id: string }[]>`SELECT id FROM projects`;
+    return rows.map((r) => r.id);
+  }, seedGrantA);
+  check('grants: JWT real (solo sub) también queda project-scoped',
+    grRealJwt.includes(PROJECT_A) && !grRealJwt.includes(PROJECT_A2) && !grRealJwt.includes(PROJECT_B));
 
   // --- Resumen ---
   console.log(`\nRESULTADO RLS RUNTIME: ${pass} PASS / ${fail} FAIL`);
