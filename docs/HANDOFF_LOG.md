@@ -7133,7 +7133,7 @@ Rama: feature/v5-4-2d-dashboard-project-scope-selector. Base: origin/main = 9fb7
 - Repository read-only: `listResourcePriceHistory(viewer, resourceId, limit)` en Price Observation Repository, org-scoped por `organization_id` y `resource_id`.
 - `/catalog/resources/[resourceId]/price-intelligence`: la ultima seccion evoluciona a `Historico y fuentes`; PageHeader, disclaimer, formulario, Validar URL y MonitoringSection quedan en su sitio.
 - UI: tabla densa desktop y cards mobile/tablet, con `<details>` por registro, filtros client-side estado/origen/proveedor, contador `N de M` y `Limpiar filtros`.
-- Comparacion derivada calculada server-side contra ultima observacion approved anterior del recurso; rotulo literal `Comparaci�n derivada (referencial no es baseline hist�rica exacta)`.
+- Comparacion derivada calculada server-side contra ultima observacion approved anterior del recurso; rotulo literal `Comparación derivada (referencial no es baseline histórica exacta)`.
 - Origen derivado sin inventar datos: monitor via `price_monitor_results.observation_id`, lote via `import_batch_id`, manual si no hay vinculo.
 - Privacidad: sanitizacion server-side antes de pasar filas al client component para roles no internos.
 - Restricciones: NO migraciones, NO Supabase Cloud/db push/RLS, NO Vercel/env/password, NO tag/deploy, NO V5.4.3/monitoring, NO Quick Notes, NO Dashboard Project Scope Selector, NO BOQ/APU/exports, NO approval/rejection workflow.

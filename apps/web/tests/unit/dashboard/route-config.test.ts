@@ -1,4 +1,4 @@
-﻿/**
+/**
  * route-config.test.ts - Guarda de regresion del render de `/dashboard`.
  *
  * V5.4.2D congela que el dashboard es request-time, valida el projectId de query
