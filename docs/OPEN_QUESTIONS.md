@@ -356,17 +356,48 @@ _Sin blockers activos._
   proyectos (seguro pero disruptivo para consultas internas existentes).
 
 ### Deudas registradas (no bloqueantes de V5.6.4, sí de cuentas cliente reales)
-- **`V5_6_5_CLIENT_RLS_FULL_CHAIN`**: tablas con `organization_id` directo que
-  NO heredan el patch de `projects_select` (planning: `schedule_tasks`,
-  `task_dependencies`, `progress_entries`, `resource_assignments`,
-  `planning_schedules`; cantidades: `quantity_workspace_*`,
-  `quantity_takeoff_*`, `quantity_import_batches`) siguen org-scoped vía
-  PostgREST para `consulta`. Cerrar antes de entregar cuentas a clientes
-  externos reales.
-- **`V5_6_5_CONSULTA_WRITE_HARDENING`**: políticas de escritura org-scoped sin
-  check de rol (p. ej. `projects_update`) permiten hoy mutaciones de
-  `consulta` vía PostgREST directo. Gap PRE-existente a V5.6.4; cerrar en
-  V5.6.5 (add `app.current_role() NOT IN ('consulta')` o allowlist por tabla).
+- **`V5_6_5_CLIENT_RLS_FULL_CHAIN`** — ✅ **RESUELTA EN RAMA por V5.6.5A**
+  (2026-07-03, PR draft `feature/v5-6-5a-project-scoped-rls-gap-closure`,
+  migración `20260702100000`): planning (5 tablas) y cantidades
+  (workspace/takeoff, 4 tablas) quedan project-scoped para roles cliente vía
+  `EXISTS` con cascada de la RLS de `projects`; 19 tablas internas
+  (APU/precios/notas/imports) con SELECT denegado a cliente. Harness [FC]
+  328/0. **Pendiente el gate DB** (ver compuerta abajo).
+- **`V5_6_5_CONSULTA_WRITE_HARDENING`** — ✅ **RESUELTA EN RAMA por V5.6.5A**
+  (migración `20260702100100`): `NOT app.is_client_role()` en ~65 políticas de
+  escritura (split de 6 FOR ALL incluido), inmutabilidad de emitidos intacta;
+  además cierra el hallazgo P0 de auto-escalación
+  `UPDATE profiles SET role='admin'` (trigger
+  `profiles_guard_privileged_cols`; RPCs SECURITY DEFINER exentas).
+  **Pendiente el gate DB.**
+
+---
+
+## V5_6_5A_PROJECT_SCOPED_RLS_GAP_CLOSURE (2026-07-03)
+
+> Contrato: `docs/design-references/V5_6_5_PROJECT_SCOPED_RLS_GAP_CLOSURE.md`.
+
+### Compuerta pendiente (release-crítica)
+- **`V5_6_5A_DB_APPLY_GATE`**: las migraciones `20260702100000` (full chain
+  SELECT) + `20260702100100` (write hardening + trigger profiles) están EN
+  RAMA y validadas contra Postgres local (`supabase db reset --local` +
+  harness 328/0), pero **NO aplicadas a Supabase Cloud**. Requiere
+  autorización explícita. **Prerrequisito: merge + deploy de PR #31**
+  (retira `apu` de consulta en la matriz y acarrea `profileId→sub` al
+  read-model); si el gate se aplica antes de #31, `/apu` para consulta
+  degrada a vacío y el read-model client queda fail-closed en 0 (seguro pero
+  disruptivo). NO entregar cuentas `consulta` reales antes de este gate.
+
+### Pendientes menores (no bloqueantes)
+- Cosmética de `GET /api/estimates/export` para consulta: hoy carece de
+  anti-escalada de perfil (V5.6.5A ya deja el anexo APU vacío a nivel DB);
+  conviene devolver 4xx limpio y/o añadir el mismo guard de `/api/exports`.
+- UI: ocultar el semáforo/contadores APU del detalle de estimate para
+  ViewerRole `client` (tras V5.6.5A muestran "sin APU" — cosmético).
+- Pregunta abierta Q-WRITE-1: ¿matriz de ESCRITURA por rol interno en DB
+  (p. ej. `obra` hoy puede escribir catálogo vía PostgREST)? Fuera del
+  alcance cliente-externo de V5.6.5A; decidir si se endurece en una fase
+  posterior.
 
 ### Pregunta abierta
 - Q-SCOPE-1: cuando exista el rol `cliente` real, ¿la asignación se hará por
