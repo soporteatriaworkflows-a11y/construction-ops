@@ -15,7 +15,7 @@
  *    UUID demo fijo. El proyecto activo se deriva ahora de los proyectos REALES
  *    visibles para el viewer; si no hay ninguno, se muestra estado vacío.
  *
- * Privacidad: campos ðŸ”’ (projectedSaving, realizedSaving, pricingCoverage)
+ * Privacidad: campos 🔒 (projectedSaving, realizedSaving, pricingCoverage)
  * solo se pasan a componentes cuando el viewer.role es management/internal.
  * Para rol `client`, esos campos no se pasan ni se renderizan.
  */
@@ -55,6 +55,9 @@ import { getObservationRepository } from '@/server/pricing';
 import { getMonitorRepository } from '@/server/pricing/monitor';
 import { formatCountdown } from '@/lib/pricing/monitor-ui';
 import { resolveViewer } from '@/server/auth/resolve-viewer';
+import { resolveAccessActor } from '@/server/access';
+import { canAccessModule, isAccessModule, type AccessModule } from '@/server/access/module-access';
+import { canUseQuoteAssistant } from '@/lib/access/surface-visibility';
 import { AuthError } from '@/server/auth/errors';
 import { InviteMembershipRecovery } from '@/components/auth/invite-membership-recovery';
 import { formatCOP, formatDateTime, ESTIMATE_VERSION_STATUS_LABELS } from '@/lib/utils/format';
@@ -72,6 +75,7 @@ import {
   type QuickNoteView,
 } from '@/server/quick-notes';
 import { createQuickNoteAction, archiveQuickNoteAction } from './notes-actions';
+import { DeniedModuleCallout } from './denied-module-callout';
 
 /** Render en REQUEST-TIME (ver cabecera). Igual que `/projects` y `/projects/new`. */
 export const dynamic = 'force-dynamic';
@@ -249,7 +253,17 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
   const rm = getReadModel();
 
-  const requestedProjectId = projectIdFromSearchParams(await searchParams);
+  const params = await searchParams;
+  const requestedProjectId = projectIdFromSearchParams(params);
+  const deniedParam = typeof params.denied === 'string' ? params.denied : null;
+  const deniedModule = isAccessModule(deniedParam) ? deniedParam : null;
+
+  let profileRole: string | null = null;
+  try {
+    profileRole = (await resolveAccessActor()).profileRole;
+  } catch {
+    profileRole = null;
+  }
 
   // Alcance derivado de la lista REAL de proyectos visibles (sin UUID demo).
   let projects: ProjectListItem[] = [];
@@ -278,7 +292,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           title="Centro de control"
           subtitle="Vista global de organizacion"
         />
-        <DashboardScopeSelector projects={projects} scope={scope} />
+        {deniedModule && <DeniedModuleCallout module={deniedModule} />}
+      <DashboardScopeSelector projects={projects} scope={scope} />
         <EmptyState
           icon={LayoutDashboard}
           title="Sin proyectos para resumir"
@@ -314,6 +329,11 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     ? `Vista de proyecto: ${scope.selectedProject.name}`
     : 'Vista global de organizacion. KPIs de organizacion/catalogo cuando aplica.';
   const isAuthorizedForSavings = viewer.role === 'management' || viewer.role === 'internal';
+  const canOpenModule = (module: AccessModule) => canAccessModule(profileRole, module);
+  const canOpenAssistant = canUseQuoteAssistant(profileRole);
+  const canReviewPrices = canOpenModule('operational-review');
+  const canMonitorPrices = canOpenModule('monitoring');
+  const canViewPricingInsights = canOpenModule('price-intelligence');
   // ------------------------------------------------------------------
   // KPIs operativos (Oleada OPERATIONAL BUDGET UX V1) — lecturas aditivas,
   // tolerantes a fallo (null ⇒ la tarjeta no muestra valor, no rompe la página).
@@ -330,9 +350,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     issuedVersionCount = null;
   }
 
-  // ðŸ”’ Pendientes de revisión de precios: solo roles management/internal.
+  // 🔒 Pendientes de revisión de precios: solo roles management/internal.
   let pendingPriceCount: number | null = null;
-  if (isAuthorizedForSavings) {
+  if (isAuthorizedForSavings && canReviewPrices) {
     try {
       const pricingViewer = {
         userId: viewer.profileId ?? viewer.organizationId,
@@ -348,9 +368,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     }
   }
 
-  // ðŸ”’ Monitoreo automático de precios (Fase 4A): KPIs tolerantes a fallo.
+  // 🔒 Monitoreo automático de precios (Fase 4A): KPIs tolerantes a fallo.
   let monitoringSummary: import('@/server/pricing/monitor').MonitoringSummary | null = null;
-  if (isAuthorizedForSavings) {
+  if (isAuthorizedForSavings && canMonitorPrices) {
     try {
       const pricingViewer = {
         userId: viewer.profileId ?? viewer.organizationId,
@@ -395,6 +415,50 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     null,
   );
 
+  const workflowSteps = [
+    { href: '/quote', label: 'Cotizar con asistente', icon: Sparkles, module: 'estimates' as const, requiresAssistant: true },
+    { href: '/projects', label: 'Proyectos', icon: FolderOpen, module: 'projects' as const },
+    { href: '/catalog', label: 'Catálogo', icon: Package, module: 'catalog' as const },
+    { href: '/catalog/providers', label: 'Proveedores', icon: Truck, module: 'catalog' as const },
+    { href: '/catalog', label: 'Inteligencia de precios', icon: Tags, module: 'price-intelligence' as const },
+    { href: '/catalog/monitoring', label: 'Monitoreo de precios', icon: Radar, module: 'monitoring' as const },
+    { href: '/catalog/prices/review', label: 'Revisión de precios', icon: ClipboardCheck, module: 'operational-review' as const },
+  ].filter((step) => (step.requiresAssistant ? canOpenAssistant : canOpenModule(step.module)));
+
+  const alertCards = [
+    canReviewPrices
+      ? {
+          href: '/catalog/prices/review',
+          label: 'Precios por revisar',
+          count: pendingPriceCount,
+          actionLabel: 'observaciones por revisar',
+          clearLabel: 'Sin precios pendientes',
+          icon: <Tags className="h-5 w-5" aria-hidden="true" />,
+        }
+      : null,
+    canMonitorPrices
+      ? {
+          href: '/catalog/monitoring',
+          label: 'Cambios de precio detectados',
+          count: monitoringSummary ? monitoringSummary.pendingChangesCount : null,
+          actionLabel: 'cambios por revisar',
+          clearLabel: 'Sin cambios pendientes',
+          icon: <TrendingUp className="h-5 w-5" aria-hidden="true" />,
+        }
+      : null,
+    canMonitorPrices
+      ? {
+          href: '/catalog/monitoring',
+          label: 'Fuentes con error',
+          count: monitoringSummary ? monitoringSummary.erroredCount : null,
+          actionLabel: 'fuentes con fallos',
+          clearLabel: 'Sin fuentes con error',
+          icon: <AlertTriangle className="h-5 w-5" aria-hidden="true" />,
+          tone: 'red' as const,
+        }
+      : null,
+  ].filter((card): card is NonNullable<typeof card> => card !== null);
+
   return (
     <div>
       <OperationsHeader
@@ -402,6 +466,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         title="Centro de control"
         subtitle={scopeSubtitle}
       />
+      {deniedModule && <DeniedModuleCallout module={deniedModule} />}
       <DashboardScopeSelector projects={projects} scope={scope} />
 
       {/* ZONA 1 — Centro de mando (grid modular de cards; navy SOLO como acento) */}
@@ -425,12 +490,16 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               <Button asChild size="sm">
                 <Link href={dashboardActionHref}>{dashboardActionLabel}</Link>
               </Button>
-              <Button asChild size="sm" variant="outline">
-                <Link href="/planning"><CalendarRange className="h-4 w-4" aria-hidden="true" />Cronograma</Link>
-              </Button>
-              <Button asChild size="sm" variant="outline">
-                <Link href="/catalog"><Package className="h-4 w-4" aria-hidden="true" />Catálogo</Link>
-              </Button>
+              {canOpenModule('planning') && (
+                <Button asChild size="sm" variant="outline">
+                  <Link href="/planning"><CalendarRange className="h-4 w-4" aria-hidden="true" />Cronograma</Link>
+                </Button>
+              )}
+              {canOpenModule('catalog') && (
+                <Button asChild size="sm" variant="outline">
+                  <Link href="/catalog"><Package className="h-4 w-4" aria-hidden="true" />Catálogo</Link>
+                </Button>
+              )}
             </div>
           </div>
 
@@ -521,22 +590,20 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               </div>
 
               {/* Precios por revisar */}
-              <div className="p-4">
-                <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-content-muted">
-                  <Tags className="h-3.5 w-3.5 text-iconic-primary/70" aria-hidden="true" />
-                  Precios por revisar
-                </p>
-                <p className={`mt-2 font-display text-2xl font-bold tabular-nums ${pendingPriceCount && pendingPriceCount > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-content'}`}>
-                  {pendingPriceCount === null ? '—' : pendingPriceCount}
-                </p>
-                {isAuthorizedForSavings ? (
+              {canReviewPrices && (
+                <div className="p-4">
+                  <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-content-muted">
+                    <Tags className="h-3.5 w-3.5 text-iconic-primary/70" aria-hidden="true" />
+                    Precios por revisar
+                  </p>
+                  <p className={`mt-2 font-display text-2xl font-bold tabular-nums ${pendingPriceCount && pendingPriceCount > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-content'}`}>
+                    {pendingPriceCount === null ? '—' : pendingPriceCount}
+                  </p>
                   <Link href="/catalog/prices/review" className="mt-1 inline-block text-[11px] font-medium text-iconic-primary hover:underline">
-                    Abrir revisión masiva →
+                    Abrir revisión masiva
                   </Link>
-                ) : (
-                  <p className="mt-1 text-[11px] text-content-muted">Observaciones pendientes - catalogo</p>
-                )}
-              </div>
+                </div>
+              )}
             </div>
         </SurfaceCard>
 
@@ -567,7 +634,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         </div>
 
         {/* Fila C — Monitoreo automático de precios (panel consolidado + subzona de tiempo) */}
-        {isAuthorizedForSavings && monitoringSummary && (
+        {canMonitorPrices && monitoringSummary && (
           <SurfaceCard variant="primary" className="overflow-hidden p-0">
             <div className="flex flex-col lg:flex-row">
               <div className="flex-1 p-4">
@@ -620,53 +687,23 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         )}
 
         {/* Fila D — Workflow strip (reemplaza las cards de acceso rápido) */}
-        <SurfaceCard variant="metric" className="px-3 py-4">
-          <WorkflowStrip
-            steps={[
-              { href: '/quote', label: 'Cotizar con asistente', icon: Sparkles, current: true },
-              { href: '/projects', label: 'Proyectos', icon: FolderOpen },
-              { href: '/catalog', label: 'Catálogo', icon: Package },
-              { href: '/catalog/providers', label: 'Proveedores', icon: Truck },
-              { href: '/catalog', label: 'Inteligencia de precios', icon: Tags },
-              { href: '/catalog/monitoring', label: 'Monitoreo de precios', icon: Radar },
-              { href: '/catalog/prices/review', label: 'Revisión de precios', icon: ClipboardCheck },
-            ]}
-          />
-        </SurfaceCard>
+        {workflowSteps.length > 0 && (
+          <SurfaceCard variant="metric" className="px-3 py-4">
+            <WorkflowStrip steps={workflowSteps.map((step, index) => ({ ...step, current: index === 0 }))} />
+          </SurfaceCard>
+        )}
       </section>
 
       {/* ------------------------------------------------------------------ */}
       {/* Pendientes y alertas — qué requiere acción (datos ya disponibles)    */}
       {/* ------------------------------------------------------------------ */}
-      {isAuthorizedForSavings && (
+      {alertCards.length > 0 && (
         <section aria-label="Pendientes y alertas" className="mt-6">
           <h2 className="mb-4 text-base font-semibold text-gray-900">Pendientes y alertas</h2>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <AlertCard
-              href="/catalog/prices/review"
-              label="Precios por revisar"
-              count={pendingPriceCount}
-              actionLabel="observaciones por revisar"
-              clearLabel="Sin precios pendientes"
-              icon={<Tags className="h-5 w-5" aria-hidden="true" />}
-            />
-            <AlertCard
-              href="/catalog/monitoring"
-              label="Cambios de precio detectados"
-              count={monitoringSummary ? monitoringSummary.pendingChangesCount : null}
-              actionLabel="cambios por revisar"
-              clearLabel="Sin cambios pendientes"
-              icon={<TrendingUp className="h-5 w-5" aria-hidden="true" />}
-            />
-            <AlertCard
-              href="/catalog/monitoring"
-              label="Fuentes con error"
-              count={monitoringSummary ? monitoringSummary.erroredCount : null}
-              actionLabel="fuentes con fallos"
-              clearLabel="Sin fuentes con error"
-              icon={<AlertTriangle className="h-5 w-5" aria-hidden="true" />}
-              tone="red"
-            />
+            {alertCards.map((card) => (
+              <AlertCard key={card.href + card.label} {...card} />
+            ))}
           </div>
         </section>
       )}
@@ -680,9 +717,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       />
 
       {/* ------------------------------------------------------------------ */}
-      {/* Ahorro e indicadores internos (ðŸ”’ solo management/internal)         */}
+      {/* Ahorro e indicadores internos (🔒 solo management/internal)         */}
       {/* ------------------------------------------------------------------ */}
-      {isAuthorizedForSavings && (
+      {isAuthorizedForSavings && canViewPricingInsights && (
         <SavingsSection
           projectedSaving={summary.projectedSaving}
           realizedSaving={summary.realizedSaving}

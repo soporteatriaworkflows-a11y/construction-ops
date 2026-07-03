@@ -35,7 +35,7 @@ export async function requireModuleAccess(module: AccessModule): Promise<AccessA
     redirect('/login'); // throws (NEXT_REDIRECT)
   }
   if (!canAccessModule(actor.profileRole, module)) {
-    redirect('/dashboard'); // throws (NEXT_REDIRECT)
+    redirect('/dashboard?denied=' + encodeURIComponent(module)); // throws (NEXT_REDIRECT)
   }
   return actor;
 }

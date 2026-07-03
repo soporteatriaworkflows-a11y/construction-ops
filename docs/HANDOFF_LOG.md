@@ -1,5 +1,20 @@
 # Handoff Log
 
+## 2026-07-02 - ICONIC_OPS_V5_6_2B_ROLE_SURFACE_UX_REFINEMENT - EN RAMA + PR (agent-dashboard/access)
+
+- Base: origin/main. Worktree: D:/ICONIC/SOFTWARE PRESUPUESTOS/construction-ops-v562b. Rama: feature/v5-6-2b-role-surface-ux-refinement.
+- Objetivo: no cambiar permisos; refinar superficies visuales para que la UI no ofrezca modulos que canAccessModule ya deniega server-side.
+- Dashboard: botones del centro de mando, WorkflowStrip, pendientes/alertas y secciones vacias filtradas por modulo; callout neutral y descartable para /dashboard?denied=<module>.
+- Paleta K: comandos con metadata de modulo; filtrado por canAccessModule/helpers de superficie; consulta no ve catalogo ni acciones de creacion/importacion; obra/compras/presupuestos quedan en superficies coherentes.
+- Rail/asistente: CTA Asistente, QuoteCompanion y dock flotante solo para roles con acceso a estimates + apu y que no sean consulta (admin/gerencia/presupuestos).
+- Guard: requireModuleAccess redirige denegados a /dashboard?denied=<module> sin tocar la matriz ni los route guards B2 excluidos.
+- Tests nuevos/ajustados: surface visibility, dashboard role-surface UX, command palette por rol/modulo, route/static tests de dashboard/monitor/estimates.
+- QA local: typecheck 0; lint 0; focal access/sidebar/dashboard/command-palette 208/208; suite completa 2452 passed/42 skipped; build 0; gm:regression 22/22; git diff --check limpio.
+- Restricciones respetadas: sin migraciones, sin RLS, sin Supabase Cloud/db push, sin Vercel envs, sin SMTP, sin DATABASE_URL, sin invitaciones/correos, sin V5.7 Cantidades, sin merge/tag/deploy manual, sin tocar module-access.ts ni role-map.ts.
+- STOP: PR contra main para auditoria; no merge ni deploy manual.
+
+---
+
 ## 2026-07-02 - ICONIC_OPS_V5_6_3A_INVITATION_EMAIL_FALLBACK_UX - EN RAMA + PR (agent-auth/access)
 
 - Base esperada: origin/main con V5.6.1E y V5.6.2. Objetivo: hacer honesto el flujo de invitaciones cuando el provider real de email no esta configurado.
@@ -7118,7 +7133,7 @@ Rama: feature/v5-4-2d-dashboard-project-scope-selector. Base: origin/main = 9fb7
 - Repository read-only: `listResourcePriceHistory(viewer, resourceId, limit)` en Price Observation Repository, org-scoped por `organization_id` y `resource_id`.
 - `/catalog/resources/[resourceId]/price-intelligence`: la ultima seccion evoluciona a `Historico y fuentes`; PageHeader, disclaimer, formulario, Validar URL y MonitoringSection quedan en su sitio.
 - UI: tabla densa desktop y cards mobile/tablet, con `<details>` por registro, filtros client-side estado/origen/proveedor, contador `N de M` y `Limpiar filtros`.
-- Comparacion derivada calculada server-side contra ultima observacion approved anterior del recurso; rotulo literal `Comparaci�n derivada (referencial no es baseline hist�rica exacta)`.
+- Comparacion derivada calculada server-side contra ultima observacion approved anterior del recurso; rotulo literal `Comparación derivada (referencial no es baseline histórica exacta)`.
 - Origen derivado sin inventar datos: monitor via `price_monitor_results.observation_id`, lote via `import_batch_id`, manual si no hay vinculo.
 - Privacidad: sanitizacion server-side antes de pasar filas al client component para roles no internos.
 - Restricciones: NO migraciones, NO Supabase Cloud/db push/RLS, NO Vercel/env/password, NO tag/deploy, NO V5.4.3/monitoring, NO Quick Notes, NO Dashboard Project Scope Selector, NO BOQ/APU/exports, NO approval/rejection workflow.
