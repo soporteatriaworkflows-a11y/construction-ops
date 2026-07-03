@@ -28,6 +28,7 @@ import {
   ExportGenerationError,
 } from '@/modules/exports/types';
 import type { ExportFormat, ExportProfile } from '@/modules/exports/types';
+import type { ProjectGrants } from '@/lib/contracts/read-model';
 import { FORMAT_PROFILE_COMPAT, FORMAT_CONTENT_TYPE } from '@/modules/exports/types';
 import { resolveAuthMode } from '@/lib/supabase/env';
 import { resolveAuthenticatedViewer, isSameOrLessPrivileged } from '@/server/auth';
@@ -82,6 +83,11 @@ export async function GET(request: NextRequest): Promise<Response> {
   // autenticada. NUNCA se hardcodea la org demo en producción ni se acepta del
   // navegador.
   let organizationId: string = DEMO_ORGANIZATION_ID;
+  // V5.6.4: alcance de proyectos del usuario AUTENTICADO (no del perfil
+  // solicitado). Demo (fixture, sin grants) ⇒ 'all'; supabase ⇒ del viewer:
+  // 'all' para roles internos (aunque exporten con proyección client) y la
+  // lista de grants para `consulta` (deny-by-default en el read-model).
+  let projectGrants: ProjectGrants = 'all';
   if (mode === 'supabase') {
     let viewer;
     try {
@@ -96,6 +102,8 @@ export async function GET(request: NextRequest): Promise<Response> {
     }
     requestedBy = viewer.userId;
     organizationId = viewer.organizationId;
+    // Normalización fail-closed: `client` sin grants resueltos ⇒ [].
+    projectGrants = viewer.projectGrants ?? (viewer.role === 'client' ? [] : 'all');
   }
 
   // Construir el servicio de exportación
@@ -114,6 +122,7 @@ export async function GET(request: NextRequest): Promise<Response> {
       includeSchedule,
       requestedBy,
       requestedAt,
+      projectGrants,
     });
 
     // `Uint8Array<ArrayBuffer>` es un BodyInit válido; se reconstruye la vista

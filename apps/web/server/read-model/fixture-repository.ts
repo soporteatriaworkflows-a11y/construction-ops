@@ -63,6 +63,7 @@ import {
   EstimateVersionNotFoundError,
   ProjectNotFoundError,
 } from './errors';
+import { isProjectGranted } from './project-grants';
 
 /* ----------------------------------------------------------------------------
  * Tipado del fixture (subconjunto consumido por el read-model)
@@ -290,8 +291,18 @@ export class FixtureReadModelRepository implements ReadModelPort {
     return computeEstimate(this.buildEstimateComputationInput());
   }
 
+  /**
+   * V5.6.4 (CLIENT_PROJECT_SCOPE): el único proyecto del fixture es visible si
+   * el viewer es de la org demo Y su alcance de grants lo incluye (deny-by-
+   * default para `client`; el resto de roles no queda restringido). Paridad de
+   * contrato con `DrizzleReadModelRepository.visibleProjectById`.
+   */
+  private canSeeFixtureProject(viewer: ViewerContext): boolean {
+    return this.isViewerOrg(viewer) && isProjectGranted(viewer, fixture.project.id);
+  }
+
   async listProjects(viewer: ViewerContext): Promise<ProjectListItem[]> {
-    if (!this.isViewerOrg(viewer)) return [];
+    if (!this.canSeeFixtureProject(viewer)) return [];
     const scopeCount = fixture.projectScopes.filter(
       (s) => s.projectId === fixture.project.id,
     ).length;
@@ -313,7 +324,7 @@ export class FixtureReadModelRepository implements ReadModelPort {
     viewer: ViewerContext,
     projectId: Uuid,
   ): Promise<ProjectOverview> {
-    if (!this.isViewerOrg(viewer) || projectId !== fixture.project.id) {
+    if (!this.canSeeFixtureProject(viewer) || projectId !== fixture.project.id) {
       throw new ProjectNotFoundError(projectId);
     }
     const [project] = await this.listProjects(viewer);
@@ -337,7 +348,7 @@ export class FixtureReadModelRepository implements ReadModelPort {
     viewer: ViewerContext,
     projectId?: Uuid,
   ): Promise<EstimateSummary[]> {
-    if (!this.isViewerOrg(viewer)) return [];
+    if (!this.canSeeFixtureProject(viewer)) return [];
     if (projectId !== undefined && projectId !== fixture.project.id) return [];
     return [this.computation().summary];
   }
@@ -346,7 +357,7 @@ export class FixtureReadModelRepository implements ReadModelPort {
     viewer: ViewerContext,
     estimateVersionId: Uuid,
   ): Promise<{ estimate: EstimateSummary; chapters: ChapterSummary[]; items: BoqItemView[] }> {
-    if (!this.isViewerOrg(viewer) || estimateVersionId !== fixture.estimateVersion.id) {
+    if (!this.canSeeFixtureProject(viewer) || estimateVersionId !== fixture.estimateVersion.id) {
       throw new EstimateVersionNotFoundError(estimateVersionId);
     }
     const { summary, chapters } = this.computation();
@@ -449,7 +460,8 @@ export class FixtureReadModelRepository implements ReadModelPort {
     viewer: ViewerContext,
     projectScopeId?: Uuid,
   ): Promise<QuantityGroupView[]> {
-    if (!this.isViewerOrg(viewer)) return [];
+    // Los grupos de cantidades del fixture cuelgan del único proyecto demo.
+    if (!this.canSeeFixtureProject(viewer)) return [];
     return fixture.quantityGroups
       .filter((g) => projectScopeId === undefined || g.projectScopeId === projectScopeId)
       .map((g) => ({
@@ -472,7 +484,7 @@ export class FixtureReadModelRepository implements ReadModelPort {
   ): Promise<WorkspaceGroupView[]> {
     // El workspace de cantidades es creación manual sobre BD real; en modo
     // fixture (demo) no hay grupos de workspace persistidos.
-    if (!this.isViewerOrg(viewer)) return [];
+    if (!this.canSeeFixtureProject(viewer)) return [];
     return [];
   }
 
@@ -493,7 +505,7 @@ export class FixtureReadModelRepository implements ReadModelPort {
     viewer: ViewerContext,
     projectId: Uuid,
   ): Promise<DashboardSummary> {
-    if (!this.isViewerOrg(viewer) || projectId !== fixture.project.id) {
+    if (!this.canSeeFixtureProject(viewer) || projectId !== fixture.project.id) {
       throw new ProjectNotFoundError(projectId);
     }
     const computation = this.computation();
@@ -542,7 +554,7 @@ export class FixtureReadModelRepository implements ReadModelPort {
   }
 
   async getSchedule(viewer: ViewerContext, projectId: Uuid): Promise<ScheduleSummary> {
-    if (!this.isViewerOrg(viewer) || projectId !== fixture.project.id) {
+    if (!this.canSeeFixtureProject(viewer) || projectId !== fixture.project.id) {
       throw new ProjectNotFoundError(projectId);
     }
     const full = computeSchedule({
@@ -559,7 +571,7 @@ export class FixtureReadModelRepository implements ReadModelPort {
     projectId: Uuid,
     taskId?: Uuid,
   ): Promise<ProgressEntryView[]> {
-    if (!this.isViewerOrg(viewer) || projectId !== fixture.project.id) {
+    if (!this.canSeeFixtureProject(viewer) || projectId !== fixture.project.id) {
       throw new ProjectNotFoundError(projectId);
     }
     const entries: ProgressEntryView[] = fixture.planning.progressEntries
@@ -584,7 +596,7 @@ export class FixtureReadModelRepository implements ReadModelPort {
     projectId: Uuid,
     taskId?: Uuid,
   ): Promise<ResourceAssignmentView[]> {
-    if (!this.isViewerOrg(viewer) || projectId !== fixture.project.id) {
+    if (!this.canSeeFixtureProject(viewer) || projectId !== fixture.project.id) {
       throw new ProjectNotFoundError(projectId);
     }
     const resourceName = new Map(fixture.resources.map((r) => [r.id, r.name]));

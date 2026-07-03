@@ -22,9 +22,13 @@ export const DEMO_ORGANIZATION_ID = '00000000-0000-4000-8000-000000000001';
  * Por defecto rol `management` para el preview interno (ve ahorros). Para
  * verificar la vista cliente, pasar `'client'`.
  *
+ * `projectGrants: 'all'` explícito: el modo demo no tiene concepto de grants
+ * (V5.6.4 aplica a usuarios reales `consulta`); sin esto, el preview con rol
+ * `client` quedaría fail-closed en 0 proyectos.
+ *
  * @param role - Rol del visor (por defecto `'management'`).
  * @returns Contexto demo con la organización del fixture.
  */
 export function getDemoViewer(role: ViewerRole = 'management'): ViewerContext {
-  return { organizationId: DEMO_ORGANIZATION_ID, role };
+  return { organizationId: DEMO_ORGANIZATION_ID, role, projectGrants: 'all' };
 }

@@ -32,6 +32,7 @@ import { generateApuExport } from '@/server/estimates/export/apu-annex';
 import type { EstimateExportFormat } from '@/lib/estimates/export-types';
 import type { ExportKind } from '@/lib/estimates/apu-export-types';
 import { resolveExportPlan, isExportProfile } from '@/lib/estimates/export-profile';
+import { isProjectGranted } from '@/server/read-model/project-grants';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -75,6 +76,12 @@ export async function GET(request: NextRequest): Promise<Response> {
     viewer = await resolveViewer();
   } catch {
     return err(401, 'Sesión requerida.');
+  }
+
+  // V5.6.4 (CLIENT_PROJECT_SCOPE): un viewer `client` solo exporta proyectos
+  // asignados. Anti-fuga de existencia: misma respuesta que un id inexistente.
+  if (!isProjectGranted(viewer, projectId)) {
+    return err(404, 'Presupuesto no encontrado.');
   }
 
   // Validación de cadena proyecto/alcance/presupuesto (RLS ⇒ cross-org NotFound).

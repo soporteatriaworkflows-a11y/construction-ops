@@ -117,7 +117,9 @@ function makeFakeRepo(): DrizzleReadRepository {
 const repo = new DrizzleReadModelRepository(makeFakeRepo());
 
 const internalViewer: ViewerContext = { organizationId: ORG_A, role: 'internal' };
-const clientViewer: ViewerContext = { organizationId: ORG_A, role: 'client' };
+// `projectGrants: 'all'`: aquí se valida la PROYECCIÓN por rol, no el alcance
+// por proyecto (V5.6.4; el scope se prueba en project-grants.test.ts).
+const clientViewer: ViewerContext = { organizationId: ORG_A, role: 'client', projectGrants: 'all' };
 const otherOrgViewer: ViewerContext = { organizationId: ORG_B, role: 'internal' };
 
 describe('DrizzleReadModelRepository — getSchedule (estructura)', () => {

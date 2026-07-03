@@ -75,9 +75,13 @@ export class ExportServiceImpl implements ExportService {
     // (request.organizationId), NUNCA hardcodeada a la org demo ni recibida del
     // navegador. En modo demo el route pasa DEMO_ORGANIZATION_ID explícitamente.
     const viewerRole: ViewerRole = request.profile;
+    // V5.6.4: `projectGrants` viene del usuario AUTENTICADO (route handler),
+    // no del perfil solicitado. Si falta y el perfil es `client`, el read-model
+    // queda fail-closed (0 proyectos) — nunca fail-open.
     const viewer = {
       organizationId: request.organizationId,
       role: viewerRole,
+      projectGrants: request.projectGrants,
     };
 
     const now = new Date().toISOString();
