@@ -1,5 +1,16 @@
 # Handoff Log
 
+## 2026-07-03 - ICONIC_OPS_V5_6_6A_ADMIN_ACCESS_ROLE_PROVIDER_FIX - EN RAMA + PR (agent-frontend-boq/access)
+
+- Base `origin/main = b77dc8d` (post PR #32). Worktree: D:/ICONIC/SOFTWARE PRESUPUESTOS/construction-ops-v566a. Rama: feature/v5-6-6a-admin-access-role-provider-fix. UI-only: sin migraciones, sin RLS, sin Cloud, sin tocar matriz de permisos.
+- FIX 1 (bug cambio de rol, settings/access): causa raíz UI — el `<Select>` de rol era NO controlado (`defaultValue={member.role}`); si el rol actual no estaba entre las opciones renderizadas, el navegador seleccionaba la primera visible (para un actor gerencia: "gerencia") y un submit sin abrir el dropdown enviaba un rol nunca elegido. Fix: select controlado (value+onChange), helper puro `settings/access/role-options.ts` (el rol ACTUAL siempre presente como opción deshabilitada si no es asignable, y en primera posición), confirmación explícita `window.confirm` "de X a Y" antes de enviar, botón deshabilitado sin cambio, feedback claro de éxito/error. Naming: etiqueta `consulta` → "Cliente / consulta" (labels.ts + email templates.ts; el rol de DB sigue siendo `consulta`, NO se creó rol `cliente`). RPC/service intactos (ya eran fieles; auditoría `role_changed` from/to existente sirve de verificación).
+- FIX 2 (dead-link editar proveedor): la lista enlazaba a `/catalog/providers/[id]/edit` desde Fase 3A pero la página no existía (404). Nueva `catalog/providers/[id]/edit/page.tsx`: carga con `getProviderById` (not-found si no existe), reutiliza `ProviderForm mode="edit"` + `updateProviderAction` existentes, gate de página espejo de la action (management/internal ⇒ admin/gerencia/compras/presupuestos; consulta/obra excluidos — sin cambio de permisos). De paso: en modo edición el `supplierType` queda deshabilitado (el update no lo admite; antes simulaba ser editable) y se añadió el campo `Estado` activo/inactivo (sin él, cada edición REACTIVABA silenciosamente proveedores inactivos: `formData.get('active') !== 'false'` con null ⇒ true). Copys engañosos de actions corregidos ("Solo admin y gerencia…" → "Tu rol no permite…"; el gate real siempre fue management/internal).
+- Tests nuevos: `tests/unit/access/role-options.test.ts` (7: rol actual siempre presente/primero, sin duplicados, orden asignables, no cae en gerencia, naming) y `tests/regression/provider-edit-route-static.test.ts` (5: href↔ruta existente, ProviderForm mode edit + getProviderById + notFound, paridad de gate con la action, providerId + campo active).
+- QA: ver PR. Restricciones respetadas: sin Cloud/db push/migraciones/RLS/Vercel envs/DATABASE_URL/SMTP/usuarios reales/service_role/tag; sin tocar -1rqh, V5.7B, portal cliente ni PDF presentación.
+- SIGUIENTE: merge tras auditoría (solo con autorización); luego V5.6.6B (matriz oficial de roles) según diseño entregado.
+
+---
+
 ## 2026-07-03 - ICONIC_OPS_V5_6_5A_PROJECT_SCOPED_RLS_GAP_CLOSURE - EN RAMA + PR DRAFT (agent-orchestrator/db-rls)
 
 - Base `origin/main = bdaa9cf` (post PR #30). Worktree: D:/ICONIC/SOFTWARE PRESUPUESTOS/construction-ops-v565a. Rama: feature/v5-6-5a-project-scoped-rls-gap-closure.

@@ -67,7 +67,7 @@ export async function createProviderAction(
   }
 
   if (!(['management', 'internal'] as string[]).includes(viewer.role)) {
-    return { success: false, error: 'Solo admin y gerencia pueden crear proveedores.' };
+    return { success: false, error: 'Tu rol no permite crear proveedores.' };
   }
 
   const input: ProviderCreateInput = {
@@ -115,7 +115,7 @@ export async function updateProviderAction(
   }
 
   if (!(['management', 'internal'] as string[]).includes(viewer.role)) {
-    return { success: false, error: 'Solo admin y gerencia pueden editar proveedores.' };
+    return { success: false, error: 'Tu rol no permite editar proveedores.' };
   }
 
   const providerId = formData.get('providerId') as string | null;

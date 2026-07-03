@@ -23,7 +23,8 @@ const ROLE_LABELS: Record<string, string> = {
   presupuestos: 'Presupuestos',
   compras: 'Compras',
   obra: 'Obra',
-  consulta: 'Consulta (cliente)',
+  // Paridad con settings/access/labels.ts (V5.6.6A).
+  consulta: 'Cliente / consulta',
 };
 
 /** Etiqueta legible de un rol; cae al código si es desconocido. */
