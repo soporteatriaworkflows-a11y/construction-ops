@@ -336,3 +336,40 @@ _Sin blockers activos._
   `profiles.role` del usuario (¿`compras`?) y los conteos de capítulos/ítems de
   "Versión 1" de ENTRE PATIOS antes de decidir si `compras` debe poder crear
   cronogramas (cambio de contrato de permisos) o si la versión está vacía.
+
+---
+
+## V5_6_4_CLIENT_PROJECT_SCOPE (2026-07-02)
+
+> Contrato: `docs/design-references/V5_6_4_CLIENT_PROJECT_SCOPE.md`. Decisiones
+> ya aprobadas por la usuaria: consulta-cliente NO ve APU; 0 grants = 0
+> proyectos con empty state; grants solo para rol `consulta` en esta fase;
+> internos intactos; sin contratistas/financiero/Omni.
+
+### Compuerta pendiente (release-crítica)
+- **`V5_6_4_DB_APPLY_GATE`**: las migraciones `project_access_grants` + RLS
+  project-scoped de `projects_select` están EN RAMA y validadas por
+  tests/harness, pero **NO aplicadas a Supabase Cloud**. Requiere autorización
+  explícita. Orden de release: aplicar migraciones (con backfill) → verificar
+  harness/queries → merge/deploy del enforcement app-layer. Si el enforcement
+  se despliega antes que la migración, `consulta` queda fail-closed en 0
+  proyectos (seguro pero disruptivo para consultas internas existentes).
+
+### Deudas registradas (no bloqueantes de V5.6.4, sí de cuentas cliente reales)
+- **`V5_6_5_CLIENT_RLS_FULL_CHAIN`**: tablas con `organization_id` directo que
+  NO heredan el patch de `projects_select` (planning: `schedule_tasks`,
+  `task_dependencies`, `progress_entries`, `resource_assignments`,
+  `planning_schedules`; cantidades: `quantity_workspace_*`,
+  `quantity_takeoff_*`, `quantity_import_batches`) siguen org-scoped vía
+  PostgREST para `consulta`. Cerrar antes de entregar cuentas a clientes
+  externos reales.
+- **`V5_6_5_CONSULTA_WRITE_HARDENING`**: políticas de escritura org-scoped sin
+  check de rol (p. ej. `projects_update`) permiten hoy mutaciones de
+  `consulta` vía PostgREST directo. Gap PRE-existente a V5.6.4; cerrar en
+  V5.6.5 (add `app.current_role() NOT IN ('consulta')` o allowlist por tabla).
+
+### Pregunta abierta
+- Q-SCOPE-1: cuando exista el rol `cliente` real, ¿la asignación se hará por
+  proyecto (como ahora) o por versión de presupuesto emitida (proyección aún
+  más estrecha)? La infraestructura de grants soporta ampliar a
+  `estimate_version_id` nullable en el futuro sin romper el modelo actual.
