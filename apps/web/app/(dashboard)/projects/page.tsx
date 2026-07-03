@@ -110,6 +110,15 @@ export default async function ProjectsPage() {
       />
 
       {projects.length === 0 ? (
+        viewer.role === 'client' ? (
+          // V5.6.4: consulta sin proyectos asignados — estado deliberado, sin
+          // CTA de creación (no puede crear) y sin insinuar que "no existen".
+          <EmptyState
+            icon={FolderOpen}
+            title="Aún no tienes proyectos asignados"
+            description="La persona que administra tu acceso puede asignarte proyectos desde Accesos. Cuando lo haga, los verás aquí."
+          />
+        ) : (
         <EmptyState
           icon={FolderOpen}
           title="Sin proyectos"
@@ -126,6 +135,7 @@ export default async function ProjectsPage() {
             )
           }
         />
+        )
       ) : (
         <div className="space-y-6">
           {projects.map((project) => (

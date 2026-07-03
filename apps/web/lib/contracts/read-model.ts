@@ -57,14 +57,28 @@ export type {
 export type ViewerRole = 'client' | 'management' | 'site' | 'internal';
 
 /**
+ * Alcance de proyectos del viewer (V5.6.4 CLIENT_PROJECT_SCOPE).
+ *  - `'all'`  → sin restricción por proyecto (roles internos, demo, o un
+ *    interno exportando con proyección client).
+ *  - `Uuid[]` → SOLO esos proyectos (usuarios `consulta` → ViewerRole client).
+ * SOLO se interpreta cuando `role === 'client'`; para el resto se ignora.
+ */
+export type ProjectGrants = 'all' | readonly Uuid[];
+
+/**
  * Contexto del visualizador. Se resuelve SIEMPRE server-side. En preview local
  * puede existir un contexto demo explícito (NO es autenticación productiva). En
  * modo `db`, RLS sigue siendo la barrera real de aislamiento por organización.
+ *
+ * `projectGrants` (V5.6.4): deny-by-default para `client` — si falta o es una
+ * lista vacía, un viewer `client` NO ve ningún proyecto (fail-closed). Se
+ * resuelve server-side desde `project_access_grants`; jamás del navegador.
  */
 export interface ViewerContext {
   organizationId: Uuid;
   profileId?: Uuid;
   role: ViewerRole;
+  projectGrants?: ProjectGrants;
 }
 
 /* ----------------------------------------------------------------------------

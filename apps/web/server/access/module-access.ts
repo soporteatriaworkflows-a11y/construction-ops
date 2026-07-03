@@ -53,7 +53,10 @@ export function isAccessModule(value: string | null | undefined): value is Acces
  * Notas de la matriz mínima obligatoria (V5.6.2):
  *  - `consulta` (→ ViewerRole `client`): solo lectura client-safe. NO catalog,
  *    price-intelligence, monitoring, operational-review, quick-notes,
- *    settings-access.
+ *    settings-access. **V5.6.4: tampoco `apu`** (decisión de negocio
+ *    2026-07-02): la biblioteca APU es org-wide —no scopeable por proyecto— y
+ *    expone el recetario completo de la constructora; el APU que corresponde
+ *    al cliente llega vía el detalle/anexo de su presupuesto asignado.
  *  - `obra` (→ `site`): sin módulos de pricing ni settings-access; tampoco
  *    catalog/apu (no listados en su set permitido).
  *  - `compras` (→ `internal`): catalog + price-intelligence + monitoring; NO
@@ -68,7 +71,8 @@ const MODULE_ACCESS: Record<AccessModule, readonly ProfileRole[]> = {
   dashboard: ['admin', 'gerencia', 'presupuestos', 'compras', 'obra', 'consulta'],
   projects: ['admin', 'gerencia', 'presupuestos', 'compras', 'obra', 'consulta'],
   estimates: ['admin', 'gerencia', 'presupuestos', 'obra', 'consulta'],
-  apu: ['admin', 'gerencia', 'presupuestos', 'consulta'],
+  // V5.6.4: consulta retirado (biblioteca APU org-wide, no project-scoped).
+  apu: ['admin', 'gerencia', 'presupuestos'],
   quantities: ['admin', 'gerencia', 'presupuestos', 'obra', 'consulta'],
   planning: ['admin', 'gerencia', 'presupuestos', 'obra', 'consulta'],
   catalog: ['admin', 'gerencia', 'presupuestos', 'compras'],

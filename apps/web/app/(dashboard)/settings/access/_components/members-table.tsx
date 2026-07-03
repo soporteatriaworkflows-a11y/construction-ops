@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { changeRoleAction, type AccessActionResult } from '../actions';
 import { roleLabel } from '../labels';
+import { ProjectGrantsCell, type GrantableProject } from './project-grants-cell';
 
 export interface MemberRow {
   userId: string;
@@ -19,6 +20,8 @@ export interface MemberRow {
   email: string;
   role: string;
   editable: boolean;
+  /** V5.6.4: proyectos asignados (solo relevante para rol `consulta`). */
+  grantedProjectIds: string[];
 }
 
 const INITIAL: AccessActionResult | null = null;
@@ -58,9 +61,15 @@ function RoleCell({ member, assignableRoles }: { member: MemberRow; assignableRo
 export function MembersTable({
   members,
   assignableRoles,
+  projects,
+  canManageGrants,
 }: {
   members: MemberRow[];
   assignableRoles: string[];
+  /** Proyectos activos de la organización (para asignar a `consulta`). */
+  projects: GrantableProject[];
+  /** V5.6.4: si el actor puede gestionar asignaciones (admin/gerencia). */
+  canManageGrants: boolean;
 }) {
   if (members.length === 0) {
     return <p className="text-sm text-iconic-graphite/60">No hay usuarios activos.</p>;
@@ -73,6 +82,7 @@ export function MembersTable({
             <th scope="col" className="px-4 py-2.5">Nombre</th>
             <th scope="col" className="px-4 py-2.5">Correo</th>
             <th scope="col" className="px-4 py-2.5">Rol</th>
+            <th scope="col" className="px-4 py-2.5">Proyectos</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-iconic-soft-blue/40">
@@ -82,6 +92,20 @@ export function MembersTable({
               <td className="px-4 py-3 text-iconic-graphite/80">{m.email}</td>
               <td className="px-4 py-3">
                 <RoleCell member={m} assignableRoles={assignableRoles} />
+              </td>
+              <td className="px-4 py-3">
+                {m.role === 'consulta' ? (
+                  <ProjectGrantsCell
+                    userId={m.userId}
+                    projects={projects}
+                    grantedProjectIds={m.grantedProjectIds}
+                    canManage={canManageGrants}
+                  />
+                ) : (
+                  <span className="text-xs text-iconic-graphite/50">
+                    Todos (rol interno)
+                  </span>
+                )}
               </td>
             </tr>
           ))}

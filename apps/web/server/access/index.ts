@@ -28,3 +28,10 @@ export {
   getInvitationEmailDeliveryHealth,
   type AccessServiceDeps,
 } from './service';
+export {
+  listProjectGrants,
+  grantProjectAccess,
+  revokeProjectAccess,
+  type ProjectGrantRow,
+  type ProjectGrantsDeps,
+} from './project-grants';

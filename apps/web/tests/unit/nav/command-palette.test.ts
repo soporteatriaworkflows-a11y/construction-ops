@@ -53,7 +53,8 @@ describe('command-palette — buildCommandItems', () => {
     expect(hrefs).toContain('/dashboard');
     expect(hrefs).toContain('/projects');
     expect(hrefs).toContain('/estimates');
-    expect(hrefs).toContain('/apu');
+    // V5.6.4: consulta ya no accede a la biblioteca APU (org-wide).
+    expect(hrefs).not.toContain('/apu');
     expect(hrefs).toContain('/quantities');
     expect(hrefs).toContain('/planning');
     expect(hrefs).not.toContain('/catalog');

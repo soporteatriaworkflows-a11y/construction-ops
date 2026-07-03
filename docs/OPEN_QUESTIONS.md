@@ -377,16 +377,16 @@ _Sin blockers activos._
 
 > Contrato: `docs/design-references/V5_6_5_PROJECT_SCOPED_RLS_GAP_CLOSURE.md`.
 
-### Compuerta pendiente (release-crítica)
-- **`V5_6_5A_DB_APPLY_GATE`**: las migraciones `20260702100000` (full chain
-  SELECT) + `20260702100100` (write hardening + trigger profiles) están EN
-  RAMA y validadas contra Postgres local (`supabase db reset --local` +
-  harness 328/0), pero **NO aplicadas a Supabase Cloud**. Requiere
-  autorización explícita. **Prerrequisito: merge + deploy de PR #31**
-  (retira `apu` de consulta en la matriz y acarrea `profileId→sub` al
-  read-model); si el gate se aplica antes de #31, `/apu` para consulta
-  degrada a vacío y el read-model client queda fail-closed en 0 (seguro pero
-  disruptivo). NO entregar cuentas `consulta` reales antes de este gate.
+### Compuerta (release-crítica) — ✅ EJECUTADA 2026-07-03
+- **`V5_6_5A_DB_APPLY_GATE`**: ✅ APLICADA 2026-07-03 con autorización
+  explícita del usuario, tras merge+deploy de PR #31 (prerrequisito
+  cumplido). `db push --linked` aplicó `20260702100000` + `20260702100100`
+  a `construction-ops-prod` (ref jabddbccmhrxztfzpdii) sin errores; solo
+  esas dos estaban pendientes (cero ajenas). Post-verify por schema dump
+  read-only: `app.is_client_role()` presente, 102 referencias en políticas,
+  trigger `profiles_guard_privileged_cols` activo, 0 FOR ALL residuales,
+  `projects_select`/`has_project_grant` intactas. RLS full-chain ACTIVA en
+  prod. Pendiente: validación autenticada manual consulta 0/1/N grants.
 
 ### Pendientes menores (no bloqueantes)
 - Cosmética de `GET /api/estimates/export` para consulta: hoy carece de

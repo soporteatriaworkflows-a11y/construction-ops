@@ -20,7 +20,9 @@ const MILESTONE_TASK = '0d000000-0000-4000-8000-000000000006';
 const internalViewer: ViewerContext = { organizationId: ORG, role: 'internal' };
 const managementViewer: ViewerContext = { organizationId: ORG, role: 'management' };
 const siteViewer: ViewerContext = { organizationId: ORG, role: 'site' };
-const clientViewer: ViewerContext = { organizationId: ORG, role: 'client' };
+// `projectGrants: 'all'`: aquí se valida la PROYECCIÓN por rol, no el alcance
+// por proyecto (V5.6.4; el scope se prueba en project-grants.test.ts).
+const clientViewer: ViewerContext = { organizationId: ORG, role: 'client', projectGrants: 'all' };
 const otherOrgViewer: ViewerContext = {
   organizationId: '00000000-0000-4000-8000-0000000000ff',
   role: 'internal',
