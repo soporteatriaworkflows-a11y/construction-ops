@@ -20,6 +20,8 @@ import {
   resendInvitation,
   revokeInvitation,
   changeMemberRole,
+  grantProjectAccess,
+  revokeProjectAccess,
   canManageAccess,
   AccessError,
 } from '@/server/access';
@@ -152,6 +154,51 @@ export async function changeRoleAction(
     await changeMemberRole(guard.actor, targetUserId, newRole);
     revalidatePath('/settings/access');
     return { success: true, message: 'Rol actualizado.' };
+  } catch (e) {
+    return { success: false, error: toMessage(e) };
+  }
+}
+
+/**
+ * V5.6.4 — Asigna un proyecto a un usuario `consulta`. El backstop real es la
+ * RPC SECURITY DEFINER (`grant_project_access`: solo admin/gerencia, destino
+ * solo consulta, misma organización, auditada, idempotente).
+ */
+export async function grantProjectAccessAction(
+  _prev: AccessActionResult | null,
+  formData: FormData,
+): Promise<AccessActionResult> {
+  const guard = await requireManager();
+  if (!guard.ok) return guard.result;
+  const targetUserId = String(formData.get('userId') ?? '');
+  const projectId = String(formData.get('projectId') ?? '');
+
+  try {
+    const res = await grantProjectAccess(guard.actor, targetUserId, projectId);
+    revalidatePath('/settings/access');
+    return {
+      success: true,
+      message: res.status === 'already_granted' ? 'Ya estaba asignado.' : 'Proyecto asignado.',
+    };
+  } catch (e) {
+    return { success: false, error: toMessage(e) };
+  }
+}
+
+/** V5.6.4 — Retira un proyecto asignado (RPC auditada). */
+export async function revokeProjectAccessAction(
+  _prev: AccessActionResult | null,
+  formData: FormData,
+): Promise<AccessActionResult> {
+  const guard = await requireManager();
+  if (!guard.ok) return guard.result;
+  const targetUserId = String(formData.get('userId') ?? '');
+  const projectId = String(formData.get('projectId') ?? '');
+
+  try {
+    await revokeProjectAccess(guard.actor, targetUserId, projectId);
+    revalidatePath('/settings/access');
+    return { success: true, message: 'Proyecto retirado.' };
   } catch (e) {
     return { success: false, error: toMessage(e) };
   }
