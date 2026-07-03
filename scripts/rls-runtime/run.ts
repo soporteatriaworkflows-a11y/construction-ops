@@ -184,8 +184,10 @@ async function main(): Promise<void> {
   // 38 tras QUANTITY_WORKSPACE_AND_BOQ_SYNC_V1 (+quantity_workspace_groups/lines).
   // 40 tras OPERATIONAL_ACCESS_LAYER_V1 (+organization_invitations/access_audit_log).
   // 41 tras SCHEDULE_FROM_BOQ_V1 (+planning_schedules).
-  // 42 tras V5_6_4_CLIENT_PROJECT_SCOPE (+project_access_grants).
-  check('Pre-flight: 42 tablas con RLS FORCE', rlsTables === '42', `rlsTables=${rlsTables}`);
+  // 42 tras QUICK_NOTES_V5_4_2A (+quick_notes; el harness no se actualizó en
+  //    esa oleada — corregido aquí).
+  // 43 tras V5_6_4_CLIENT_PROJECT_SCOPE (+project_access_grants).
+  check('Pre-flight: 43 tablas con RLS FORCE', rlsTables === '43', `rlsTables=${rlsTables}`);
 
   const [{ count: taskCount }] = await sql<{ count: string }[]>`
     SELECT count(*)::text AS count FROM schedule_tasks WHERE id = ${TASK_A}`;
