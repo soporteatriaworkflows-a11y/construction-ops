@@ -71,11 +71,14 @@ export function ProviderForm({ mode, provider }: ProviderFormProps) {
 
         <div className="space-y-1.5">
           <Label htmlFor="supplierType">Tipo de proveedor</Label>
+          {/* V5.6.6A: el update no admite cambiar el tipo (ProviderUpdateInput
+              no lo incluye); en edición se muestra deshabilitado para no
+              simular una edición que la action ignoraría. */}
           <Select
             id="supplierType"
             name="supplierType"
             defaultValue={provider?.supplierType ?? 'vendor'}
-            disabled={isPending}
+            disabled={isPending || mode === 'edit'}
           >
             <option value="vendor">Proveedor (vendor)</option>
             <option value="distributor">Distribuidor</option>
@@ -83,7 +86,22 @@ export function ProviderForm({ mode, provider }: ProviderFormProps) {
             <option value="subcontractor">Subcontratista</option>
             <option value="other">Otro</option>
           </Select>
+          {mode === 'edit' && (
+            <p className="text-xs text-gray-400">El tipo no puede cambiarse después de crear el proveedor.</p>
+          )}
         </div>
+
+        {mode === 'edit' && (
+          <div className="space-y-1.5">
+            <Label htmlFor="active">Estado</Label>
+            {/* Sin este campo, la action interpretaría active=true en cada
+                edición y reactivaría proveedores inactivos silenciosamente. */}
+            <Select id="active" name="active" defaultValue={String(provider?.active ?? true)} disabled={isPending}>
+              <option value="true">Activo</option>
+              <option value="false">Inactivo</option>
+            </Select>
+          </div>
+        )}
 
         <div className="space-y-1.5">
           <Label htmlFor="websiteUrl">Sitio web (URL)</Label>

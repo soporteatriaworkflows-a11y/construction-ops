@@ -11,7 +11,9 @@ export const ROLE_LABELS: Record<string, string> = {
   presupuestos: 'Presupuestos',
   compras: 'Compras',
   obra: 'Obra',
-  consulta: 'Consulta (cliente)',
+  // V5.6.6A: naming visible — el rol de DB sigue siendo `consulta`; la
+  // etiqueta antepone "Cliente" para que el operador lo encuentre sin dudar.
+  consulta: 'Cliente / consulta',
 };
 
 export function roleLabel(role: string): string {
