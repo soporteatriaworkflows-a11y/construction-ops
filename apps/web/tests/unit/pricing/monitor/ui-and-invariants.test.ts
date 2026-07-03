@@ -124,8 +124,8 @@ describe('UI del monitoreo (mandato 39-44)', () => {
     expect(dashboard).toMatch(/Monitoreo de precios/);
   });
 
-  it('T44: KPIs de monitoreo del dashboard van detrás de isAuthorizedForSavings (🔒)', () => {
-    expect(dashboard).toMatch(/isAuthorizedForSavings && monitoringSummary &&/);
+  it('T44: KPIs de monitoreo del dashboard van detras del modulo monitoring', () => {
+    expect(dashboard).toContain('canMonitorPrices && monitoringSummary &&');
   });
 
   it('todas las Server Actions del monitor exigen viewer autorizado y modo db', () => {

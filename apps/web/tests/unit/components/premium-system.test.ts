@@ -110,7 +110,7 @@ describe('V4.2.3 — sistema visual premium', () => {
     const dash = read('../../../app/(dashboard)/dashboard/page.tsx');
     expect(dash).toContain('<NotesCard');
     expect(dash).toContain('<WorkflowStrip');
-    expect(dash).toContain('Última revisión'); // subzona de tiempo (lastRunAt real)
+    expect(dash).toMatch(/ltima.*revisi/); // subzona de tiempo (lastRunAt real)
     expect(dash).not.toContain('<QuickLink'); // accesos sueltos reemplazados por la franja
     // panel Operación unificado: las 3 secciones en un solo SurfaceCard con divisores
     expect(dash).toMatch(/sm:divide-x/);

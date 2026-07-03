@@ -173,11 +173,10 @@ describe('Dashboard operativo (G)', () => {
     expect(source).toMatch(/countIssuedEstimateVersions\(/);
   });
 
-  it('🔒 precios por revisar SOLO para roles autorizados', () => {
-    // V4.2.7: "Precios por revisar" vive en el panel Operación; el enlace al centro
-    // de revisión sigue detrás del guard de roles (ahora vía ternario isAuthorizedForSavings ?).
+  it('precios por revisar SOLO para roles con modulo operational-review', () => {
     expect(source).toMatch(/Precios por revisar/);
-    expect(source).toMatch(/isAuthorizedForSavings\s*\?\s*\(\s*<Link href="\/catalog\/prices\/review"/);
+    expect(source).toContain('canReviewPrices &&');
+    expect(source).toContain('<Link href="/catalog/prices/review"');
     expect(source).toMatch(/countPendingResourcePriceObservations\(/);
   });
 

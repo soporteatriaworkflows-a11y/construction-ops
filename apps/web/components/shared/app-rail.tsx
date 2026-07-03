@@ -15,6 +15,7 @@ import Image from 'next/image';
 import { useState } from 'react';
 import { Sparkles, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { SidebarNav } from './sidebar-nav';
+import { canUseQuoteAssistant } from '@/lib/access/surface-visibility';
 
 const PIN_KEY = 'iconic-rail-pinned';
 const OPEN_COMPANION_EVENT = 'quote-companion:open';
@@ -49,6 +50,7 @@ export function AppRail({
   const [pinned, setPinned] = useState<boolean>(readPinned);
   const [hovered, setHovered] = useState(false);
   const expanded = pinned || hovered;
+  const quoteAssistantAvailable = canUseQuoteAssistant(profileRole);
 
   function togglePin() {
     setPinned((p) => {
@@ -119,17 +121,19 @@ export function AppRail({
 
         {/* Pie: CTA Asistente + indicador de modo sutil */}
         <div className="mt-auto space-y-2 p-3">
-          <button
-            type="button"
-            onClick={openAssistant}
-            title="Abrir asistente de cotización"
-            className={`flex w-full items-center gap-2.5 rounded-xl bg-iconic-primary/90 py-2 text-sm font-medium text-white ring-1 ring-inset ring-iconic-cyan/30 transition-all duration-150 hover:bg-iconic-primary hover:shadow-[0_8px_24px_-8px_rgba(0,93,214,0.7)] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iconic-cyan ${expanded ? 'px-2.5' : 'justify-center px-0'}`}
-          >
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/15" aria-hidden="true">
-              <Sparkles className="h-4 w-4" />
-            </span>
-            {expanded && <span className="truncate">Asistente</span>}
-          </button>
+          {quoteAssistantAvailable && (
+            <button
+              type="button"
+              onClick={openAssistant}
+              title="Abrir asistente de cotizacion"
+              className={`flex w-full items-center gap-2.5 rounded-xl bg-iconic-primary/90 py-2 text-sm font-medium text-white ring-1 ring-inset ring-iconic-cyan/30 transition-all duration-150 hover:bg-iconic-primary hover:shadow-[0_8px_24px_-8px_rgba(0,93,214,0.7)] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iconic-cyan ${expanded ? 'px-2.5' : 'justify-center px-0'}`}
+            >
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/15" aria-hidden="true">
+                <Sparkles className="h-4 w-4" />
+              </span>
+              {expanded && <span className="truncate">Asistente</span>}
+            </button>
+          )}
 
           {/* Modo de datos — MUY sutil (reemplaza el bloque "Grupo ICONIC / demo"). */}
           <div className={`flex items-center gap-2 ${expanded ? 'px-1.5' : 'justify-center'}`}>
