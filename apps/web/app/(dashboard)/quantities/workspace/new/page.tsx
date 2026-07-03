@@ -1,5 +1,5 @@
 /**
- * page.tsx — Crear grupo de cantidades (Quantity Workspace).
+ * page.tsx - Crear medición de cantidades.
  * Server Component: resuelve alcances del proyecto y renderiza el formulario.
  */
 import Link from 'next/link';
@@ -37,11 +37,11 @@ export default async function NewWorkspaceGroupPage() {
   return (
     <div>
       <PageHeader
-        title="Nuevo grupo de cantidades"
-        description="Crea cantidades manualmente y vincúlalas a APU/BOQ"
+        title="Nueva medición"
+        description="Crea mediciones manuales y vincúlalas a APU/BOQ"
         actions={
           <Button asChild size="sm" variant="outline">
-            <Link href="/quantities/workspace">Volver</Link>
+            <Link href="/quantities/workspace">Volver a Mediciones</Link>
           </Button>
         }
       />
@@ -54,7 +54,7 @@ export default async function NewWorkspaceGroupPage() {
 
       {!canCreate ? (
         <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800" role="note">
-          La creación de cantidades requiere modo Supabase con datos reales y rol de presupuestos.
+          La creación de mediciones requiere modo Supabase con datos reales y rol autorizado.
         </div>
       ) : scopes.length === 0 ? (
         <div className="rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">

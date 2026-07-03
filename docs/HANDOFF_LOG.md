@@ -7156,3 +7156,17 @@ Rama: feature/v5-4-2d-dashboard-project-scope-selector. Base: origin/main = 9fb7
 - Tests: `tests/unit/access/module-access.test.ts` (matriz 6 roles x modulos, deny-by-default, visibleModulesFor, assertCanAccessModule, regresion role-map + anti-escalamiento exports) + `tests/unit/access/module-access-wiring.test.ts` (guards route/action/sidebar cableados via analisis estatico). sidebar-access.test.ts preexistente intacto.
 - Docs: `docs/design-references/V5_6_2_ROLE_ACCESS_MATRIX_HARDENING.md`.
 - Restricciones respetadas: NO migraciones, NO Supabase Cloud/db push/RLS, NO Vercel envs, NO SMTP, NO DATABASE_URL, NO deploy/tag, NO tocar construction-ops-1rqh, NO tocar invitaciones/correos, NO role-map (congelado), NO exports salvo consumir, NO roles cliente/contratista, NO modulos futuros.
+
+---
+## 2026-07-02 - V5.7A_QUANTITIES_NAMING_SHELL - EN RAMA + PR PENDIENTE CI (agent-frontend-boq/uix)
+
+- Rama `feature/v5-7a-quantities-naming-shell`, worktree `D:\ICONIC\SOFTWARE PRESUPUESTOS\construction-ops-v57a`, base `origin/main = f3d4851`.
+- Fase UIX pura para Cantidades: `/quantities` y `/quantities/workspace` usan titulo unificado `Cantidades de obra` y subtitulo permanente `De aqui salen las cantidades reales que alimentan el presupuesto.`
+- `Workspace de Cantidades` queda renombrado en UI a `Mediciones`; tabs estilo FilterPills: Mediciones, Memorias importadas, Sincronización. La tab Sincronización en el hub muestra placeholder honesto; el sync real sigue en cada grupo y conserva preview obligatorio.
+- Nuevo shell presentacional `quantities-shell.tsx`: OperationsHeader, callout permanente, stepper estatico `Medición/Excel -> Cantidades -> Presupuesto -> Subtotal -> Exportación`, enlaces solo a rutas existentes seguras.
+- Empty states diferenciados: hub sin cantidades, mediciones vacias, memorias vacias, sincronizacion vacia, y roles sin permiso sin CTA de crear/importar.
+- Tests estaticos actualizados para adopcion de `OperationsHeader`, `InlineCallout` y tabs estilo FilterPills desde el shell de Cantidades.
+- Docs: `docs/design-references/V5_7A_QUANTITIES_NAMING_SHELL.md`.
+- QA local: Next local docs versionadas consultadas (`next 16.2.6`, `page.md`/`layout.md`); `pnpm.cmd typecheck` PASS; `pnpm.cmd lint` PASS; `pnpm.cmd test` PASS (2442 passed / 42 skipped); `pnpm.cmd build` PASS (warning no bloqueante de Turbopack root por lockfiles multiples); `pnpm.cmd gm:regression` PASS (22/22); `git diff --check` limpio.
+- Restricciones respetadas: NO server/quantity-workspace, NO server/quantity-import, NO formulas, NO recalculo de cantidades en frontend, NO sync actions, NO BOQ, NO APU, NO RLS, NO migraciones, NO Supabase, NO Vercel envs, NO DATABASE_URL, NO V5.6.2B, NO roles/permisos.
+- STOP: abrir PR y esperar auditoria. Sin merge, sin deploy manual, sin tag.

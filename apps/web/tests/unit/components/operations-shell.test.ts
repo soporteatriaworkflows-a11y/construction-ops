@@ -1,6 +1,5 @@
 /**
- * operations-shell.test.ts — Anti-regresión del shell operativo compartido
- * (ICONIC_OPS_UIX_APP_WIDE_OPERATIONS_ROLLOUT_V4). Stack node: checks de FUENTE.
+ * operations-shell.test.ts - Static regression checks for the shared operations shell.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -15,7 +14,7 @@ const KPI = read('../../../components/shared/kpi-card.tsx');
 
 describe('componentes shell operativos', () => {
   it('OperationsHeader: command bar navy ICONIC con eyebrow cian (no dark mode global)', () => {
-    expect(HEADER).toContain('from-iconic-primary'); // V4.2.10: azul vivo de marca (antes navy iconic-ink)
+    expect(HEADER).toContain('from-iconic-primary');
     expect(HEADER).toContain('text-iconic-cyan');
     expect(HEADER).toContain('eyebrow');
     expect(HEADER).toContain('stat');
@@ -24,26 +23,25 @@ describe('componentes shell operativos', () => {
     for (const t of ['default', 'ok', 'warn', 'danger']) expect(KPI).toContain(`${t}:`);
     expect(KPI).toContain('export function KpiBand');
   });
-  it('V4.1: OperationsHeaderAction (acción legible sobre navy)', () => {
+  it('V4.1: OperationsHeaderAction (accion legible sobre navy)', () => {
     expect(HEADER).toContain('export function OperationsHeaderAction');
     expect(HEADER).toContain("variant === 'primary'");
-    expect(HEADER).toContain('bg-white'); // primaria de alto contraste sobre navy
+    expect(HEADER).toContain('bg-white');
   });
 });
 
-describe('adopción app-wide (identidad común)', () => {
+describe('adopcion app-wide (identidad comun)', () => {
   const pages: Array<[string, string]> = [
     ['Detalle presupuesto', '../../../app/(dashboard)/projects/[id]/scopes/[scopeId]/estimates/[estimateId]/page.tsx'],
     ['APU Library', '../../../app/(dashboard)/apu/page.tsx'],
-    ['Catálogo', '../../../app/(dashboard)/catalog/page.tsx'],
-    ['Cantidades', '../../../app/(dashboard)/quantities/page.tsx'],
+    ['Catalogo', '../../../app/(dashboard)/catalog/page.tsx'],
+    ['Cantidades', '../../../app/(dashboard)/quantities/_components/quantities-shell.tsx'],
     ['Cronograma', '../../../app/(dashboard)/planning/page.tsx'],
     ['Proyectos', '../../../app/(dashboard)/projects/page.tsx'],
     ['Accesos', '../../../app/(dashboard)/settings/access/page.tsx'],
-    // V4.1 — pantallas puente/hub del recorrido principal
     ['Detalle proyecto', '../../../app/(dashboard)/projects/[id]/page.tsx'],
     ['Detalle alcance', '../../../app/(dashboard)/projects/[id]/scopes/[scopeId]/page.tsx'],
-    ['Índice presupuestos', '../../../app/(dashboard)/estimates/page.tsx'],
+    ['Indice presupuestos', '../../../app/(dashboard)/estimates/page.tsx'],
     ['Dashboard', '../../../app/(dashboard)/dashboard/page.tsx'],
   ];
   for (const [name, rel] of pages) {
@@ -54,7 +52,7 @@ describe('adopción app-wide (identidad común)', () => {
     });
   }
 
-  it('Detalle presupuesto, APU y Catálogo muestran banda de KPIs', () => {
+  it('Detalle presupuesto, APU y Catalogo muestran banda de KPIs', () => {
     for (const rel of [
       '../../../app/(dashboard)/projects/[id]/scopes/[scopeId]/estimates/[estimateId]/page.tsx',
       '../../../app/(dashboard)/apu/page.tsx',
