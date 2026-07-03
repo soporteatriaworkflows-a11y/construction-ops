@@ -3399,6 +3399,353 @@ async function main(): Promise<void> {
   check('grants: JWT real (solo sub) también queda project-scoped',
     grRealJwt.includes(PROJECT_A) && !grRealJwt.includes(PROJECT_A2) && !grRealJwt.includes(PROJECT_B));
 
+  // ==========================================================================
+  // [FC] V5_6_5A_PROJECT_SCOPED_RLS_GAP_CLOSURE — cadena completa + hardening.
+  //      Contrato: docs/design-references/V5_6_5_PROJECT_SCOPED_RLS_GAP_CLOSURE.md
+  //      (a) SELECT project-scoped para roles cliente en planning y cantidades;
+  //      (b) SELECT denegado a cliente en tablas internas (APU/precios/notas);
+  //      (c) escrituras directas de cliente denegadas en toda la cadena;
+  //      (d) trigger anti-escalación de profiles.role.
+  //      Reutiliza claimsAConsulta / claimsAClientViewer / PROJECT_A2 de [GR].
+  // ==========================================================================
+
+  // IDs efímeros de la sección (viven solo dentro de transacciones ROLLBACK).
+  const FC_SCOPE_A2 = '0f000000-0000-0000-0000-0000000000d6';
+  const FC_SCHED_A = '0f000000-0000-0000-0000-000000000f01';
+  const FC_TASK_A2 = '0f000000-0000-0000-0000-000000000f02';
+  const FC_QWG_A = '0f000000-0000-0000-0000-000000000f03';
+  const FC_QWG_A2 = '0f000000-0000-0000-0000-000000000f04';
+  const FC_QTG_A = '0f000000-0000-0000-0000-000000000f05';
+  const FC_QTG_NULL = '0f000000-0000-0000-0000-000000000f06';
+
+  // Semilla efímera: datos org-A "leakeables" bajo la política vieja.
+  //   - planning_schedule en PROJECT_A + tarea en PROJECT_A2 (no asignado);
+  //   - workspace groups/lines en SCOPE_A (PROJECT_A) y en un scope de A2;
+  //   - takeoff group vinculado a VERSION_A y otro SIN versión (huérfano);
+  //   - una quick note interna.
+  const seedFcData = async (q: postgres.ReservedSql): Promise<void> => {
+    await seedProjectA2(q);
+    await q`INSERT INTO project_scopes (id, project_id, code, name, scope_type, status)
+            VALUES (${FC_SCOPE_A2}, ${PROJECT_A2}, 'S-A2-FC', 'Alcance A2 FC', 'stage', 'active')
+            ON CONFLICT (id) DO NOTHING`;
+    await q`INSERT INTO planning_schedules (id, organization_id, project_id, estimate_version_id, name, start_date)
+            VALUES (${FC_SCHED_A}, ${ORG_A}, ${PROJECT_A}, ${VERSION_A}, 'Sched FC A', '2026-07-01')
+            ON CONFLICT (id) DO NOTHING`;
+    await q`INSERT INTO schedule_tasks (id, organization_id, project_id, wbs_code, name, planned_start, planned_end, planned_duration_days)
+            VALUES (${FC_TASK_A2}, ${ORG_A}, ${PROJECT_A2}, 'FC-A2', 'Tarea A2 FC', '2026-06-01', '2026-06-02', 1)
+            ON CONFLICT (id) DO NOTHING`;
+    await q`INSERT INTO quantity_workspace_groups (id, organization_id, project_scope_id, code, name, result_unit)
+            VALUES (${FC_QWG_A}, ${ORG_A}, ${SCOPE_A}, 'FC-QA', 'Grupo FC A', 'm2'),
+                   (${FC_QWG_A2}, ${ORG_A}, ${FC_SCOPE_A2}, 'FC-QA2', 'Grupo FC A2', 'm2')
+            ON CONFLICT (id) DO NOTHING`;
+    await q`INSERT INTO quantity_workspace_lines (organization_id, group_id, formula_type, description)
+            VALUES (${ORG_A}, ${FC_QWG_A}, 'direct', 'linea FC A'),
+                   (${ORG_A}, ${FC_QWG_A2}, 'direct', 'linea FC A2')`;
+    await q`INSERT INTO quantity_takeoff_groups (id, organization_id, estimate_version_id, description, source_row)
+            VALUES (${FC_QTG_A}, ${ORG_A}, ${VERSION_A}, 'FC takeoff A', 901),
+                   (${FC_QTG_NULL}, ${ORG_A}, NULL, 'FC takeoff sin version', 902)
+            ON CONFLICT (id) DO NOTHING`;
+    await q`INSERT INTO quantity_takeoff_lines (organization_id, group_id, formula_type, source_row, subtotal_calculated)
+            VALUES (${ORG_A}, ${FC_QTG_A}, 'length_height_count', 901, 1),
+                   (${ORG_A}, ${FC_QTG_NULL}, 'length_height_count', 902, 1)`;
+    await q`INSERT INTO quick_notes (organization_id, body, created_by)
+            VALUES (${ORG_A}, 'nota interna FC', ${USER_A_ADMIN})`;
+  };
+  const seedFcWithGrantA = async (q: postgres.ReservedSql): Promise<void> => {
+    await seedFcData(q);
+    await q`INSERT INTO project_access_grants (organization_id, profile_id, project_id)
+            VALUES (${ORG_A}, ${USER_A_CONSULTA}, ${PROJECT_A})
+            ON CONFLICT (profile_id, project_id) DO NOTHING`;
+  };
+  const seedFcWithGrantsA12 = async (q: postgres.ReservedSql): Promise<void> => {
+    await seedFcWithGrantA(q);
+    await q`INSERT INTO project_access_grants (organization_id, profile_id, project_id)
+            VALUES (${ORG_A}, ${USER_A_CONSULTA}, ${PROJECT_A2})
+            ON CONFLICT (profile_id, project_id) DO NOTHING`;
+  };
+
+  // FC1) Anti-fail-open: consulta SIN grants ve 0 filas en TODA la cadena
+  //      (planning/cantidades project-scoped + tablas internas denegadas).
+  const fcTablesZero = [
+    'planning_schedules', 'schedule_tasks', 'task_dependencies', 'progress_entries',
+    'resource_assignments', 'quantity_workspace_groups', 'quantity_workspace_lines',
+    'quantity_takeoff_groups', 'quantity_takeoff_lines', 'quantity_import_batches',
+    'quick_notes', 'apu_templates', 'apu_components', 'apu_calculation_snapshots',
+    'resources', 'suppliers', 'supplier_products', 'pricing_rules', 'price_observations',
+  ] as const;
+  const fcZero = await asUser(claimsAConsulta, async (q) => {
+    const out: Record<string, number> = {};
+    for (const t of fcTablesZero) {
+      const r = await q.unsafe(`SELECT count(*)::int AS c FROM ${t}`);
+      out[t] = (r[0] as { c: number }).c;
+    }
+    return out;
+  }, seedFcData);
+  for (const t of fcTablesZero) {
+    check(`fullchain: consulta sin grants ve 0 filas en ${t}`, fcZero[t] === 0, `count=${fcZero[t]}`);
+  }
+
+  // FC2) Con grant en A: planning del proyecto asignado visible; A2 invisible.
+  const fcPlan = await asUser(claimsAConsulta, async (q) => {
+    const scheds = await q<{ id: string }[]>`SELECT id FROM planning_schedules`;
+    const tasks = await q<{ project_id: string }[]>`SELECT project_id FROM schedule_tasks`;
+    return { scheds: scheds.map((s) => s.id), taskProjects: tasks.map((t) => t.project_id) };
+  }, seedFcWithGrantA);
+  check('fullchain: consulta con grant ve planning_schedules del proyecto asignado',
+    fcPlan.scheds.includes(FC_SCHED_A));
+  check('fullchain: consulta con grant ve tareas del proyecto asignado',
+    fcPlan.taskProjects.includes(PROJECT_A));
+  check('fullchain: consulta NO ve tareas del proyecto no asignado',
+    !fcPlan.taskProjects.includes(PROJECT_A2));
+
+  // FC3) Paridad claim 'client' (lecturas RLS-scoped del read-model).
+  const fcClientParity = await asUser(claimsAClientViewer, async (q) => {
+    const tasks = await q<{ project_id: string }[]>`SELECT project_id FROM schedule_tasks`;
+    return tasks.map((t) => t.project_id);
+  }, seedFcWithGrantA);
+  check('fullchain: claim user_role=client con grant queda igual de scoped',
+    fcClientParity.includes(PROJECT_A) && !fcClientParity.includes(PROJECT_A2));
+
+  // FC4) Workspace: groups por scope del proyecto asignado + cascada lines.
+  const fcWs = await asUser(claimsAConsulta, async (q) => {
+    const groups = await q<{ id: string }[]>`SELECT id FROM quantity_workspace_groups`;
+    const lines = await q<{ group_id: string }[]>`SELECT group_id FROM quantity_workspace_lines`;
+    return { g: groups.map((x) => x.id), l: lines.map((x) => x.group_id) };
+  }, seedFcWithGrantA);
+  check('fullchain: workspace group del proyecto asignado visible', fcWs.g.includes(FC_QWG_A));
+  check('fullchain: workspace group de proyecto NO asignado invisible', !fcWs.g.includes(FC_QWG_A2));
+  check('fullchain: cascada workspace lines→groups (solo líneas del grupo visible)',
+    fcWs.l.includes(FC_QWG_A) && !fcWs.l.includes(FC_QWG_A2));
+
+  // FC5) Takeoff: vinculado a versión asignada visible; huérfano invisible;
+  //      batches SIEMPRE 0 para consulta.
+  const fcTk = await asUser(claimsAConsulta, async (q) => {
+    const groups = await q<{ id: string }[]>`SELECT id FROM quantity_takeoff_groups`;
+    const lines = await q<{ group_id: string }[]>`SELECT group_id FROM quantity_takeoff_lines`;
+    const batches = await q<{ id: string }[]>`SELECT id FROM quantity_import_batches`;
+    return { g: groups.map((x) => x.id), l: lines.map((x) => x.group_id), b: batches.length };
+  }, seedFcWithGrantA);
+  check('fullchain: takeoff group vinculado a versión asignada visible', fcTk.g.includes(FC_QTG_A));
+  check('fullchain: takeoff group SIN versión invisible para consulta (fail-closed)',
+    !fcTk.g.includes(FC_QTG_NULL));
+  check('fullchain: cascada takeoff lines→groups',
+    fcTk.l.includes(FC_QTG_A) && !fcTk.l.includes(FC_QTG_NULL));
+  check('fullchain: import batches siempre 0 para consulta (aún con grant)', fcTk.b === 0,
+    `count=${fcTk.b}`);
+
+  // FC6) Varios grants: ve planning de ambos proyectos.
+  const fcMulti = await asUser(claimsAConsulta, async (q) => {
+    const tasks = await q<{ project_id: string }[]>`SELECT DISTINCT project_id FROM schedule_tasks`;
+    return tasks.map((t) => t.project_id);
+  }, seedFcWithGrantsA12);
+  check('fullchain: consulta con varios grants ve planning de ambos proyectos',
+    fcMulti.includes(PROJECT_A) && fcMulti.includes(PROJECT_A2));
+
+  // FC7) Deny interno persiste aunque haya grant (APU/precios/notas).
+  const fcDenyGrant = await asUser(claimsAConsulta, async (q) => {
+    const out: Record<string, number> = {};
+    for (const t of ['apu_templates', 'apu_calculation_snapshots', 'resources', 'pricing_rules', 'quick_notes'] as const) {
+      const r = await q.unsafe(`SELECT count(*)::int AS c FROM ${t}`);
+      out[t] = (r[0] as { c: number }).c;
+    }
+    return out;
+  }, seedFcWithGrantA);
+  check('fullchain: APU/precios/notas siguen en 0 para consulta con grant',
+    Object.values(fcDenyGrant).every((c) => c === 0), JSON.stringify(fcDenyGrant));
+
+  // FC8) Internos sin regresión (SELECT org-wide intacto).
+  const fcInternal = await asUser(claimsA, async (q) => {
+    const tasks = await q<{ project_id: string }[]>`SELECT project_id FROM schedule_tasks`;
+    const groups = await q<{ id: string }[]>`SELECT id FROM quantity_workspace_groups`;
+    const apus = await q<{ id: string }[]>`SELECT id FROM apu_templates`;
+    return {
+      taskA2: tasks.some((t) => t.project_id === PROJECT_A2),
+      g: groups.map((x) => x.id),
+      apu: apus.length,
+    };
+  }, seedFcData);
+  check('fullchain: admin sigue viendo planning de TODA la org (incl. sin grant)', fcInternal.taskA2);
+  check('fullchain: admin sigue viendo workspace completo',
+    fcInternal.g.includes(FC_QWG_A) && fcInternal.g.includes(FC_QWG_A2));
+  check('fullchain: admin sigue viendo apu_templates', fcInternal.apu > 0, `apus=${fcInternal.apu}`);
+
+  const fcObra = await asUser(claimsAObra, async (q) => {
+    const tasks = await q<{ project_id: string }[]>`SELECT project_id FROM schedule_tasks`;
+    return tasks.some((t) => t.project_id === PROJECT_A2);
+  }, seedFcData);
+  check('fullchain: obra (interno) sigue viendo planning org-wide', fcObra);
+
+  // FC9) Escrituras directas de consulta denegadas (incluso con grant activo).
+  let fcInsTask = false;
+  await asUser(claimsAConsulta, async (q) => {
+    await q.unsafe('SAVEPOINT sp_fc_ins_task');
+    try {
+      await q`INSERT INTO schedule_tasks (organization_id, project_id, wbs_code, name, planned_start, planned_end, planned_duration_days)
+              VALUES (${ORG_A}, ${PROJECT_A}, 'FC-X', 'X', '2026-06-01', '2026-06-02', 1)`;
+    } catch {
+      fcInsTask = true;
+    }
+    await q.unsafe('ROLLBACK TO SAVEPOINT sp_fc_ins_task');
+  }, seedFcWithGrantA);
+  check('hardening: consulta no puede INSERT schedule_tasks (ni con grant)', fcInsTask);
+
+  const fcUpdProject = await asUser(claimsAConsulta, async (q) => {
+    const res = await q`UPDATE projects SET name = 'hacked' WHERE id = ${PROJECT_A}`;
+    return res.count;
+  }, seedFcWithGrantA);
+  check('hardening: consulta UPDATE projects afecta 0 filas', fcUpdProject === 0,
+    `count=${fcUpdProject}`);
+
+  let fcInsBoq = false;
+  await asUser(claimsAConsulta, async (q) => {
+    const ch = await q<{ id: string }[]>`
+      SELECT id FROM chapters WHERE estimate_version_id = ${VERSION_A} LIMIT 1`;
+    if (ch.length === 0) return; // sin capítulo semilla: check fallará con detalle
+    await q.unsafe('SAVEPOINT sp_fc_ins_boq');
+    try {
+      await q`INSERT INTO boq_items (estimate_version_id, chapter_id, code, description_snapshot, unit_snapshot,
+                quantity_snapshot, unit_price_snapshot, subtotal, sort_order)
+              VALUES (${VERSION_A}, ${ch[0]!.id}, 'FC.1', 'x', 'u', 1, 1, 1, 999)`;
+    } catch {
+      fcInsBoq = true;
+    }
+    await q.unsafe('ROLLBACK TO SAVEPOINT sp_fc_ins_boq');
+  }, seedFcWithGrantA);
+  check('hardening: consulta no puede INSERT boq_items en versión asignada', fcInsBoq);
+
+  const fcUpdBoq = await asUser(claimsAConsulta, async (q) => {
+    const res = await q`UPDATE boq_items SET quantity_snapshot = 99 WHERE estimate_version_id = ${VERSION_A}`;
+    return res.count;
+  }, seedFcWithGrantA);
+  check('hardening: consulta UPDATE boq_items afecta 0 filas', fcUpdBoq === 0, `count=${fcUpdBoq}`);
+
+  const fcDelEst = await asUser(claimsAConsulta, async (q) => {
+    const res = await q`DELETE FROM estimates`;
+    return res.count;
+  }, seedFcWithGrantA);
+  check('hardening: consulta DELETE estimates afecta 0 filas', fcDelEst === 0, `count=${fcDelEst}`);
+
+  let fcInsProg = false;
+  await asUser(claimsAConsulta, async (q) => {
+    await q.unsafe('SAVEPOINT sp_fc_ins_prog');
+    try {
+      await q`INSERT INTO progress_entries (organization_id, project_id, task_id, recorded_at, physical_progress_pct)
+              VALUES (${ORG_A}, ${PROJECT_A}, ${TASK_A}, now(), 10)`;
+    } catch {
+      fcInsProg = true;
+    }
+    await q.unsafe('ROLLBACK TO SAVEPOINT sp_fc_ins_prog');
+  }, seedFcWithGrantA);
+  check('hardening: consulta no puede INSERT progress_entries', fcInsProg);
+
+  let fcInsQwg = false;
+  await asUser(claimsAConsulta, async (q) => {
+    await q.unsafe('SAVEPOINT sp_fc_ins_qwg');
+    try {
+      await q`INSERT INTO quantity_workspace_groups (organization_id, project_scope_id, code, name, result_unit)
+              VALUES (${ORG_A}, ${SCOPE_A}, 'FC-DENY', 'x', 'm2')`;
+    } catch {
+      fcInsQwg = true;
+    }
+    await q.unsafe('ROLLBACK TO SAVEPOINT sp_fc_ins_qwg');
+  }, seedFcWithGrantA);
+  check('hardening: consulta no puede INSERT quantity_workspace_groups', fcInsQwg);
+
+  // FC10) Anti-escalación de profiles (trigger profiles_guard_privileged_cols).
+  let fcSelfEsc = '';
+  await asUser(claimsAConsulta, async (q) => {
+    await q.unsafe('SAVEPOINT sp_fc_esc1');
+    try {
+      await q`UPDATE profiles SET role = 'admin' WHERE id = ${USER_A_CONSULTA}`;
+    } catch (e) {
+      fcSelfEsc = e instanceof Error ? e.message : 'err';
+    }
+    await q.unsafe('ROLLBACK TO SAVEPOINT sp_fc_esc1');
+  });
+  check('profiles: consulta NO puede auto-escalar role (trigger)',
+    fcSelfEsc.includes('profiles_privileged_cols_admin_only'), fcSelfEsc);
+
+  let fcObraEsc = '';
+  await asUser(claimsAObra, async (q) => {
+    await q.unsafe('SAVEPOINT sp_fc_esc2');
+    try {
+      await q`UPDATE profiles SET role = 'admin' WHERE id = ${USER_A_OBRA}`;
+    } catch (e) {
+      fcObraEsc = e instanceof Error ? e.message : 'err';
+    }
+    await q.unsafe('ROLLBACK TO SAVEPOINT sp_fc_esc2');
+  });
+  check('profiles: obra NO puede auto-escalar role (trigger)',
+    fcObraEsc.includes('profiles_privileged_cols_admin_only'), fcObraEsc);
+
+  const fcSelfName = await asUser(claimsAConsulta, async (q) => {
+    const res = await q`UPDATE profiles SET full_name = 'Consulta FC' WHERE id = ${USER_A_CONSULTA}`;
+    return res.count;
+  });
+  check('profiles: consulta sí puede editar su full_name (sin tocar rol)', fcSelfName === 1,
+    `count=${fcSelfName}`);
+
+  // Gerencia AUTO-escalándose a admin (su propia fila SÍ es visible/editable):
+  // el trigger la bloquea. Se usa el perfil gerencia REAL de org B (seed 0004).
+  const claimsBGerencia: Claims = {
+    organization_id: ORG_B,
+    user_role: 'gerencia',
+    sub: USER_B_GERENCIA,
+  };
+  let fcGerEsc = '';
+  await asUser(claimsBGerencia, async (q) => {
+    await q.unsafe('SAVEPOINT sp_fc_esc3');
+    try {
+      await q`UPDATE profiles SET role = 'admin' WHERE id = ${USER_B_GERENCIA}`;
+    } catch (e) {
+      fcGerEsc = e instanceof Error ? e.message : 'err';
+    }
+    await q.unsafe('ROLLBACK TO SAVEPOINT sp_fc_esc3');
+  });
+  check('profiles: gerencia NO puede auto-escalarse a admin (trigger)',
+    fcGerEsc.includes('profiles_gerencia_cannot_touch_admin'), fcGerEsc);
+
+  // Contrato PRE-existente documentado (desde profiles_self_select,
+  // 20260602130000): un UPDATE directo sobre la fila de un TERCERO afecta 0
+  // filas para cualquier rol (el WHERE que lee columnas exige visibilidad
+  // SELECT, que es self-only). La gestión de roles de terceros va por el RPC
+  // change_member_role (SECURITY DEFINER). Aquí se fija ese contrato.
+  const fcAdminRole = await asUser(claimsA, async (q) => {
+    const res = await q`UPDATE profiles SET role = 'compras' WHERE id = ${USER_A_OBRA}`;
+    return res.count;
+  });
+  check('profiles: UPDATE directo de terceros afecta 0 filas (roles solo via RPC)',
+    fcAdminRole === 0, `count=${fcAdminRole}`);
+
+  const fcRpcRole = await asUser(claimsA, async (q) => {
+    const r = await q<{ res: { role?: string } }[]>`
+      SELECT public.change_member_role(${USER_A_OBRA}, 'compras') AS res`;
+    return r[0]?.res?.role;
+  });
+  check('profiles: RPC change_member_role sigue funcionando (SECURITY DEFINER exento)',
+    fcRpcRole === 'compras', `role=${fcRpcRole}`);
+
+  // FC11) Escrituras internas sin regresión.
+  const fcAdminUpd = await asUser(claimsA, async (q) => {
+    const res = await q`UPDATE projects SET name = name WHERE id = ${PROJECT_A}`;
+    return res.count;
+  });
+  check('hardening: admin UPDATE projects sigue OK', fcAdminUpd === 1, `count=${fcAdminUpd}`);
+
+  const claimsAPresupuestos: Claims = {
+    organization_id: ORG_A,
+    user_role: 'presupuestos',
+    sub: USER_A_ADMIN,
+  };
+  const fcPresIns = await asUser(claimsAPresupuestos, async (q) => {
+    const r = await q<{ id: string }[]>`
+      INSERT INTO quantity_workspace_groups (organization_id, project_scope_id, code, name, result_unit)
+      VALUES (${ORG_A}, ${SCOPE_A}, 'FC-PRES', 'Grupo presupuestos FC', 'm2')
+      RETURNING id`;
+    return r.length;
+  });
+  check('hardening: presupuestos sigue creando workspace groups', fcPresIns === 1);
+
   // --- Resumen ---
   console.log(`\nRESULTADO RLS RUNTIME: ${pass} PASS / ${fail} FAIL`);
   if (fail > 0) {

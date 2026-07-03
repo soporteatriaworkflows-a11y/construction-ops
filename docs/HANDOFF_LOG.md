@@ -1,5 +1,22 @@
 # Handoff Log
 
+## 2026-07-03 - ICONIC_OPS_V5_6_5A_PROJECT_SCOPED_RLS_GAP_CLOSURE - EN RAMA + PR DRAFT (agent-orchestrator/db-rls)
+
+- Base `origin/main = bdaa9cf` (post PR #30). Worktree: D:/ICONIC/SOFTWARE PRESUPUESTOS/construction-ops-v565a. Rama: feature/v5-6-5a-project-scoped-rls-gap-closure.
+- Objetivo: cerrar las deudas P1 de V5.6.4 (`V5_6_5_CLIENT_RLS_FULL_CHAIN` + `V5_6_5_CONSULTA_WRITE_HARDENING`) — RLS project-scoped de cadena completa para roles cliente y endurecimiento de escrituras vía PostgREST.
+- Diagnóstico: planning (5 tablas) y cantidades workspace/takeoff/import (5 tablas) org-scoped sin cascada; 19 tablas internas (APU/precios/notas) legibles por consulta vía PostgREST; ~65 políticas de escritura sin check de rol cliente; hallazgo P0 nuevo: auto-escalación `UPDATE profiles SET role='admin'` sobre fila propia (la de terceros ya daba 0 filas por profiles_self_select).
+- Migración `20260702100000_v5_6_5a_client_rls_full_chain.sql`: helper `app.is_client_role()` (consulta/client); SELECT project-scoped vía EXISTS con cascada de RLS de projects en planning_schedules/schedule_tasks/task_dependencies/progress_entries/resource_assignments/quantity_workspace_*/quantity_takeoff_* (takeoff sin versión = invisible, fail-closed); deny total de SELECT a cliente en 19 tablas internas (apu_calculation_snapshots verificado sin uso en app por readmodel-agent).
+- Migración `20260702100100_v5_6_5a_consulta_write_hardening.sql`: split de 6 FOR ALL (project_scopes/estimates/quantity_groups/quantity_lines/supplier_products/apu_components) + guard `NOT app.is_client_role()` en escrituras de toda la cadena (inmutabilidad de emitidos y EXISTS cross-org intactos); trigger `profiles_guard_privileged_cols` (solo admin/gerencia cambian role/organization_id vía API de datos; gerencia nunca hacia/desde admin; RPCs SECURITY DEFINER/seeds exentas).
+- Harness RLS `scripts/rls-runtime/run.ts`: sección nueva [FC] (51 checks): anti-fail-open 19 tablas en 0 para consulta sin grants; grant 1/N; paridad claim client; cascadas intermedias; internos sin regresión; 7 escrituras de consulta denegadas; 5 checks de anti-escalación de profiles. Resultado local: **328 PASS / 0 FAIL** (baseline previo 277/0 intacto) tras `supabase db reset --local` limpio.
+- Roles internos: comportamiento idéntico (predicados corto-circuitan en NOT is_client_role; baseline del harness sin cambios). Sin cambios de app (typecheck baseline 0).
+- Docs: contrato `docs/design-references/V5_6_5_PROJECT_SCOPED_RLS_GAP_CLOSURE.md` (matriz completa tabla/riesgo/cascada/ops); OPEN_QUESTIONS (deudas resueltas en rama + compuerta `V5_6_5A_DB_APPLY_GATE` + pendientes menores); nota en DATABASE_SCHEMA.
+- Restricciones respetadas: sin Supabase Cloud, sin db push remoto/--linked, sin Vercel envs/DATABASE_URL/SMTP, sin usuarios reales, sin tocar PR #31 ni la terminal V5_6_4_DB_APPLY_GATE, sin merge/tag/deploy, sin mezclar V5.7B.
+- SIGUIENTE COMPUERTA EXACTA: (1) merge+deploy PR #31 → (2) `V5_6_5A_DB_APPLY_GATE`: db push autorizado de 20260702100000+20260702100100 a construction-ops-prod + post-verify + smoke → (3) validación manual consulta 0/1/N grants vía PostgREST. NO entregar cuentas consulta reales antes del gate.
+- STOP: PR draft contra main; sin merge. QA de app (suite/gm/build) a cargo del orquestador en el cierre de la ola.
+- ACTUALIZACIÓN 2026-07-03 (misma ola, autorización explícita del usuario): compuerta `V5_6_5A_DB_APPLY_GATE` EJECUTADA contra `construction-ops-prod` (ref jabddbccmhrxztfzpdii). Preflight: solo las 2 migraciones V5.6.5A pendientes, V5.6.4 ya en remoto, cero ajenas. `db push --linked` aplicó 20260702100000+20260702100100 sin errores. Post-verify vía schema dump read-only: `app.is_client_role()` presente, 102 referencias en políticas, trigger `profiles_guard_privileged_cols` activo, 0 políticas FOR ALL residuales, `projects_select`/`has_project_grant` (V5.6.4) intactas, cascada EXISTS(projects) confirmada en schedule_tasks_select. RLS full-chain ACTIVA en prod. Sigue: merge PR #32 + smoke.
+
+---
+
 ## 2026-07-02 - ICONIC_OPS_V5_6_4_CLIENT_PROJECT_SCOPE - EN RAMAS + PR (sin merge/deploy/db push remoto) (agent-orchestrator)
 
 - Contrato: docs/design-references/V5_6_4_CLIENT_PROJECT_SCOPE.md. Objetivo: consulta (ViewerRole client) ve SOLO proyectos asignados; deny-by-default (0 grants = 0 proyectos); anti-fuga de existencia (no asignado responde igual que inexistente).
