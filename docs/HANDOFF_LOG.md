@@ -1,5 +1,16 @@
 # Handoff Log
 
+## 2026-07-03 - ICONIC_OPS_V5_6_6B_ROLE_MATRIX_COMPRAS_WRITE_SURFACE - EN RAMA + PR (agent-orchestrator/access)
+
+- Base `origin/main = 9192164` (post PR #34). Worktree: D:/ICONIC/SOFTWARE PRESUPUESTOS/construction-ops-v566b. Rama: feature/v5-6-6b-role-matrix-compras-write-surface. App-layer + docs: sin migraciones, sin RLS, sin Cloud; module-access.ts y role-map.ts INTACTOS.
+- PARTE A (matriz oficial): `docs/design-references/V5_6_6_ROLE_MATRIX.md` — contrato por rol (módulos/proyectos/lectura/escritura/exports/ocultos/auditoría/pendientes) para admin/gerencia/presupuestos/compras/obra/cliente-consulta. Decisiones registradas: obra scoped en V5.6.6C; compras scoped en V5.6.6C según asignación admin; presupuestos allow-all; 6B no implementa grants internos. OPEN_QUESTIONS actualizado (sección V5_6_6B con fases 6C/6D y nota de emisión por presupuestos).
+- PARTE B (hardening de superficie de compras): causa raíz — las superficies de edición del presupuesto se gateaban SOLO por `isCreationModeEnabled()` (entorno), sin rol; y ViewerRole colapsa admin/presupuestos/compras en `internal`. Fix: (1) `AuthenticatedViewer`/`ViewerContext` acarrean `profileRole` (aditivo, opcional; resolve-viewer lo puebla de profiles.role); (2) NUEVO helper puro `server/access/budget-surface.ts` (canEditBudgetSurface / canArchiveBudgetItems / canImportBudgetData / canViewIndirectCosts; editores = admin/gerencia/presupuestos; deny-by-default); (3) 8 páginas del detalle de presupuesto combinan entorno+rol (detalle, capítulo, capítulo new/edit, ítem new/edit, workspace, import) y la sección "AIU y costos indirectos" se OCULTA a compras/obra/consulta (canViewIndirectCosts); (4) backstop en TODAS las server actions mutadoras: chapter/item/aiu/version/archive/import(workbook)/boq-add del workspace + linkApuToBoq de la biblioteca APU — "Tu rol no permite editar el presupuesto."; simulator-actions es READ-ONLY (sin cambio). Compras conserva lectura completa (capítulos/cantidades/unitarios/subtotales) y todo su dominio catálogo/proveedores/monitoreo; presupuestos conserva TODO incl. emisión de versiones (cero regresión).
+- Tests: `tests/unit/access/budget-surface.test.ts` (14: matriz por gate + deny-by-default + lectura compras + sin regresión presupuestos) y `tests/regression/compras-budget-surface-static.test.ts` (19: wiring páginas entorno+rol, guards en 8 archivos de actions, AIU gated, profileRole acarreado, role-map congelado).
+- QA: ver PR. Restricciones respetadas: sin Cloud/db push/migraciones/RLS/envs/SMTP/usuarios reales/tag; sin tocar -1rqh, V5.7B, portal, PDF; sin rol DB `cliente`.
+- SIGUIENTE: auditoría + merge con autorización; luego V5.6.6C (grants internos obra/compras, requiere migración) según matriz.
+
+---
+
 ## 2026-07-03 - ICONIC_OPS_V5_6_6A_ADMIN_ACCESS_ROLE_PROVIDER_FIX - EN RAMA + PR (agent-frontend-boq/access)
 
 - Base `origin/main = b77dc8d` (post PR #32). Worktree: D:/ICONIC/SOFTWARE PRESUPUESTOS/construction-ops-v566a. Rama: feature/v5-6-6a-admin-access-role-provider-fix. UI-only: sin migraciones, sin RLS, sin Cloud, sin tocar matriz de permisos.
