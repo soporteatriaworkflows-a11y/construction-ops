@@ -23,6 +23,7 @@ import type { ChapterInput } from '@/lib/estimates/boq-edit-types';
 import { resolveAuthenticatedViewer } from '@/server/auth/resolve-viewer';
 import { AuthError } from '@/server/auth/errors';
 import { isCreationModeEnabled } from '../../../../../mode-guard';
+import { canEditBudgetSurface } from '@/server/access/budget-surface';
 
 export type ChapterActionResult =
   | { ok: true; chapterId: string; financial: FinancialSummary }
@@ -70,6 +71,11 @@ export async function createChapterAction(formData: FormData): Promise<ChapterAc
     return { ok: false, error: e instanceof AuthError ? (AUTH_MESSAGES[e.reason] ?? 'Error de autenticación.') : 'Error al verificar la sesión.' };
   }
 
+  // V5.6.6B: backstop de rol (compras/obra/consulta no editan capítulos).
+  if (!canEditBudgetSurface(viewer.profileRole)) {
+    return { ok: false, error: 'Tu rol no permite editar el presupuesto.' };
+  }
+
   try {
     const res = await getEstimatesWriteRepository().createEstimateChapter(viewer, estimateId, readInput(formData));
     return { ok: true, chapterId: res.chapterId, financial: res.financial };
@@ -91,6 +97,11 @@ export async function updateChapterAction(formData: FormData): Promise<ChapterAc
     viewer = await resolveAuthenticatedViewer();
   } catch (e) {
     return { ok: false, error: e instanceof AuthError ? (AUTH_MESSAGES[e.reason] ?? 'Error de autenticación.') : 'Error al verificar la sesión.' };
+  }
+
+  // V5.6.6B: backstop de rol (compras/obra/consulta no editan capítulos).
+  if (!canEditBudgetSurface(viewer.profileRole)) {
+    return { ok: false, error: 'Tu rol no permite editar el presupuesto.' };
   }
 
   try {

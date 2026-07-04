@@ -27,6 +27,7 @@ import { EstimateNotFoundError } from '@/server/estimates';
 import { resolveAuthenticatedViewer } from '@/server/auth/resolve-viewer';
 import { AuthError } from '@/server/auth/errors';
 import { isCreationModeEnabled } from '../../../../../../mode-guard';
+import { canImportBudgetData } from '@/server/access/budget-surface';
 import type { ImportPreview, ImportResult, MappingOverride } from '@/lib/import/types';
 
 /** Parsea de forma segura los overrides de mapping enviados por el cliente. */
@@ -103,6 +104,11 @@ export async function previewExcelImportAction(
     return { ok: false, error: e instanceof AuthError ? authMessage(e) : 'Error al verificar la sesión.' };
   }
 
+  // V5.6.6B: backstop de rol (compras/obra/consulta no importan presupuesto).
+  if (!canImportBudgetData(viewer.profileRole)) {
+    return { ok: false, error: 'Tu rol no permite importar al presupuesto.' };
+  }
+
   try {
     const overrides = parseOverrides(formData.get('overrides'));
     const preview = await previewEstimateExcelImport(viewer, estimateId, file, overrides);
@@ -130,6 +136,11 @@ export async function confirmExcelImportAction(
     viewer = await resolveAuthenticatedViewer();
   } catch (e) {
     return { ok: false, error: e instanceof AuthError ? authMessage(e) : 'Error al verificar la sesión.' };
+  }
+
+  // V5.6.6B: backstop de rol (compras/obra/consulta no importan presupuesto).
+  if (!canImportBudgetData(viewer.profileRole)) {
+    return { ok: false, error: 'Tu rol no permite importar al presupuesto.' };
   }
 
   try {

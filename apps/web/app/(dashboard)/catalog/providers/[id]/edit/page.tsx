@@ -56,30 +56,34 @@ export default async function EditProviderPage({
     );
   }
 
+  // JSX fuera de try/catch (regla react-hooks/error-boundaries): primero se
+  // resuelven viewer y proveedor; los returns con JSX van después.
+  const viewer = await resolveAuthenticatedViewer();
+
+  if (!EDIT_ROLES.includes(viewer.role)) {
+    return (
+      <div>
+        <PageHeader title="Editar proveedor" />
+        <div
+          className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+          role="alert"
+        >
+          Tu rol no permite editar proveedores.
+        </div>
+        <div className="mt-4">
+          <Link href="/catalog/providers">
+            <Button variant="outline" size="sm">
+              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+              Volver a proveedores
+            </Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   let provider: ProviderView;
   try {
-    const viewer = await resolveAuthenticatedViewer();
-    if (!EDIT_ROLES.includes(viewer.role)) {
-      return (
-        <div>
-          <PageHeader title="Editar proveedor" />
-          <div
-            className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
-            role="alert"
-          >
-            Tu rol no permite editar proveedores.
-          </div>
-          <div className="mt-4">
-            <Link href="/catalog/providers">
-              <Button variant="outline" size="sm">
-                <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-                Volver a proveedores
-              </Button>
-            </Link>
-          </div>
-        </div>
-      );
-    }
     provider = await getProviderRepository().getProviderById(viewer, id);
   } catch (e) {
     if (e instanceof ProviderNotFoundError) notFound();

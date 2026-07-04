@@ -19,6 +19,7 @@ import type { AiuRatesInput, FinancialSummary } from '@/lib/estimates/aiu-types'
 import { resolveAuthenticatedViewer } from '@/server/auth/resolve-viewer';
 import { AuthError } from '@/server/auth/errors';
 import { isCreationModeEnabled } from '../../../../../mode-guard';
+import { canEditBudgetSurface } from '@/server/access/budget-surface';
 
 export type AiuActionResult =
   | { ok: true; summary: FinancialSummary }
@@ -42,6 +43,11 @@ export async function updateAiuAction(formData: FormData): Promise<AiuActionResu
       config: 'Error de configuración del servidor.',
     };
     return { ok: false, error: e instanceof AuthError ? (messages[e.reason] ?? 'Error de autenticación.') : 'Error al verificar la sesión.' };
+  }
+
+  // V5.6.6B: backstop de rol (compras/obra/consulta no editan AIU).
+  if (!canEditBudgetSurface(viewer.profileRole)) {
+    return { ok: false, error: 'Tu rol no permite editar el presupuesto.' };
   }
 
   const input: AiuRatesInput = {

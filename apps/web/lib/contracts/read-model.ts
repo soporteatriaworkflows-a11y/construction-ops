@@ -79,6 +79,12 @@ export interface ViewerContext {
   profileId?: Uuid;
   role: ViewerRole;
   projectGrants?: ProjectGrants;
+  /**
+   * V5.6.6B: rol de `profiles` (DB) para gates de superficie por acción
+   * (compras/obra no editan presupuesto aunque compartan ViewerRole con
+   * roles editores). Opcional (demo/fixture); deny-by-default en helpers.
+   */
+  profileRole?: string;
 }
 
 /* ----------------------------------------------------------------------------

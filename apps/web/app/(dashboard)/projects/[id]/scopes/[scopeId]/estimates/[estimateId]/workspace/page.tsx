@@ -24,6 +24,7 @@ import {
 import type { WorkspaceChapterData } from '@/lib/estimates/workspace-view';
 import { isVersionEditable } from '@/lib/estimates/workspace-view';
 import { isCreationModeEnabled } from '../../../../../../mode-guard';
+import { canEditBudgetSurface, canViewIndirectCosts } from '@/server/access/budget-surface';
 import { listApusForBoqAdd, type ApuAddOption } from '@/server/apu-builder';
 import type { AuthenticatedViewer } from '@/server/auth/types';
 import { formatVersionLabel } from '../../../estimate-format';
@@ -103,7 +104,9 @@ export default async function BoqWorkspacePage({ params, searchParams }: PagePro
   ]);
   const breakdown = computeChapterBreakdown(chapters);
 
-  const canEdit = isCreationModeEnabled();
+  // V5.6.6B: gate de modo + gate de ROL (compras/obra/consulta solo lectura).
+  const canEdit = isCreationModeEnabled() && canEditBudgetSurface(viewer.profileRole);
+  const showIndirects = canViewIndirectCosts(viewer.profileRole);
   const versionEditable = isVersionEditable(active.status);
   const canMutate = canEdit && versionEditable;
   const statusLabel = ESTIMATE_VERSION_STATUS_LABELS[active.status] ?? active.status;
@@ -128,7 +131,7 @@ export default async function BoqWorkspacePage({ params, searchParams }: PagePro
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <EstimateVersionBadge status={active.status} />
-        {aiu && !aiu.isEmpty && (
+        {aiu && !aiu.isEmpty && showIndirects && (
           <span className="text-xs text-gray-500">
             AIU: A {aiu.administrationRate}% · I {aiu.contingencyRate}% · U {aiu.utilityRate}% ·
             IVA/U {aiu.utilityVatRate}%

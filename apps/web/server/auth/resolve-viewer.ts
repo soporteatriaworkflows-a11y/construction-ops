@@ -18,7 +18,7 @@ import { resolveAuthMode, type AppAuthMode } from '@/lib/supabase/env';
 import { getSessionClaims } from './session';
 import { mapProfileRoleToViewerRole } from './role-map';
 import { AuthError } from './errors';
-import type { AuthenticatedViewer } from './types';
+import type { AuthenticatedViewer, ProfileRole } from './types';
 
 /**
  * Resuelve el `AuthenticatedViewer` real desde la sesión de Supabase y la fila
@@ -67,6 +67,8 @@ export async function resolveAuthenticatedViewer(): Promise<AuthenticatedViewer>
     role,
     email: (data.email as string | undefined) ?? session.email,
     projectGrants,
+    // V5.6.6B: rol de profiles para gates de superficie (budget-surface.ts).
+    profileRole: data.role as ProfileRole,
   };
 }
 
@@ -106,6 +108,8 @@ export function toViewerContext(v: AuthenticatedViewer): ViewerContext {
     role: v.role,
     // Normalización fail-closed: un viewer `client` sin grants resueltos ⇒ [].
     projectGrants: v.projectGrants ?? (v.role === 'client' ? [] : 'all'),
+    // V5.6.6B: acarrea el rol de profiles para gates de superficie.
+    profileRole: v.profileRole,
   };
 }
 

@@ -10,6 +10,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { resolveAuthenticatedViewer } from '@/server/auth/resolve-viewer';
+import { canEditBudgetSurface } from '@/server/access/budget-surface';
 import { addApuToBoq } from '@/server/apu-builder';
 import { InsufficientRoleError } from '@/server/pricing/errors';
 import {
@@ -41,6 +42,10 @@ export async function addApuToBoqAction(
 
   try {
     const viewer = await resolveAuthenticatedViewer();
+    // V5.6.6B: backstop de rol (compras/obra/consulta no agregan al BOQ).
+    if (!canEditBudgetSurface(viewer.profileRole)) {
+      return { ok: false, error: 'Tu rol no permite editar el presupuesto.' };
+    }
     const result = await addApuToBoq(viewer, {
       estimateVersionId,
       chapterId,
