@@ -99,10 +99,11 @@ describe('acceso UX a F3/F6A (analisis estatico de componentes)', () => {
     expect(intake).toContain('Lectura asistida desde PDF/plano');
   });
 
-  it('la seccion F6A conserva el copy obligatorio de fase', () => {
+  it('la seccion F6A/F6B conserva el copy obligatorio de fase', () => {
     expect(intake).toContain('Lectura asistida preliminar. No reemplaza revision tecnica.');
     expect(intake).toContain('No se aprueban cantidades automaticamente');
-    expect(intake).toContain('no infiere escala ni geometria');
+    expect(intake).toContain('no interpreta geometria, escala ni cotas visuales en esta fase');
+    expect(intake).toContain('Solo se extrae texto seleccionable del PDF.');
     expect(intake).toContain(
       'No hay informacion suficiente para cantidad automatica; se requiere seleccion, calibracion o revision manual.',
     );
