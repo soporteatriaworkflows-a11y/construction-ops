@@ -22,6 +22,7 @@ import {
   type ManualTakeoffRecord,
 } from '@/lib/steel/manual-takeoff';
 import { loadManualTakeoffs } from '@/lib/steel/manual-store';
+import { openManualTakeoff } from '@/lib/steel/open-takeoff';
 import { useManualTakeoffs, writeManualTakeoffs } from '@/lib/steel/use-manual-takeoffs';
 import { SteelStatusBadge } from '../../_components/steel-status-badge';
 
@@ -31,6 +32,7 @@ export function ManualTakeoffsSection() {
   const [name, setName] = useState('');
   const [projectName, setProjectName] = useState('');
   const [scopeLabel, setScopeLabel] = useState('');
+  const [opening, setOpening] = useState(false);
 
   function handleCreate(event: React.FormEvent) {
     event.preventDefault();
@@ -48,13 +50,15 @@ export function ManualTakeoffsSection() {
     // Siempre sobre el store fresco (no el snapshot renderizado): evita pisar
     // lo guardado si el click llega antes de que la vista termine de hidratar.
     writeManualTakeoffs([...loadManualTakeoffs(), record]);
-    router.push(`/steel/takeoffs/${record.id}`);
+    setOpening(true);
+    openManualTakeoff((href) => router.push(href), record.id);
   }
 
   function handleTryIntake() {
     const ensured = ensureDemoIntakeTakeoff(loadManualTakeoffs());
     if (ensured.created) writeManualTakeoffs(ensured.records);
-    router.push(`/steel/takeoffs/${ensured.id}`);
+    setOpening(true);
+    openManualTakeoff((href) => router.push(href), ensured.id);
   }
 
   function handleDelete(id: string) {
@@ -86,8 +90,8 @@ export function ManualTakeoffsSection() {
               preliminar: no reemplaza revisión técnica ni aprueba cantidades automáticamente.
             </p>
           </div>
-          <Button type="button" variant="outline" onClick={handleTryIntake}>
-            Probar lectura asistida desde PDF/plano
+          <Button type="button" variant="outline" onClick={handleTryIntake} disabled={opening}>
+            {opening ? 'Abriendo demo…' : 'Probar lectura asistida desde PDF/plano'}
           </Button>
         </div>
       </SurfaceCard>

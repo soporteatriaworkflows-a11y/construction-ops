@@ -113,6 +113,21 @@ describe('acceso UX a F3/F6A (analisis estatico de componentes)', () => {
     expect(workspace).toContain('loadManualTakeoffs()');
   });
 
+  it('la navegacion al takeoff usa openManualTakeoff (push + fallback garantizado)', () => {
+    expect(section).toContain('openManualTakeoff(');
+    expect(workspace).toContain('openManualTakeoff(');
+    expect(section).not.toMatch(/router\.push\(`\/steel/);
+    expect(workspace).not.toMatch(/router\.push\(`\/steel/);
+  });
+
+  it('la ruta del takeoff tiene loading.tsx (feedback durante compilacion/carga)', () => {
+    const loading = readFileSync(
+      path.join(process.cwd(), 'app', '(dashboard)', 'steel', 'takeoffs', '[id]', 'loading.tsx'),
+      'utf8',
+    );
+    expect(loading).toContain('Abriendo takeoff');
+  });
+
   it('el flujo local no importa nada de DB/Supabase/server', () => {
     for (const source of [section, workspace, intake]) {
       const importLines = source
