@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { getReadModel } from '@/server/read-model';
 import { resolveViewer } from '@/server/auth/resolve-viewer';
 import { isCreationModeEnabled } from '@/app/(dashboard)/projects/mode-guard';
+import { getFriendlyDataLoadError } from '@/lib/db/errors';
 import { WorkspaceForm } from './_components/workspace-form';
 
 export const dynamic = 'force-dynamic';
@@ -31,7 +32,7 @@ export default async function NewWorkspaceGroupPage() {
       }
     }
   } catch (e) {
-    error = e instanceof Error ? e.message : 'Error al cargar alcances';
+    error = getFriendlyDataLoadError(e, 'No pudimos cargar los alcances de medición en este momento. Intenta actualizar en unos segundos.');
   }
 
   return (

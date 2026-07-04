@@ -74,22 +74,20 @@ export async function getApuLibrary(
   const apus = await getReadModel().listApus(viewer);
   // Reconciliación y vínculo BOQ requieren acceso db RLS-bound; en modo
   // fixture/demo degradan a vacío sin romper la biblioteca.
-  const [recon, linkedIds] = await Promise.all([
-    getReconciliationData(viewer, { repo }).catch(() => ({
-      rows: [],
-      summary: {
-        totalComponents: 0,
-        associated: 0,
-        exactPending: 0,
-        suggested: 0,
-        ambiguous: 0,
-        unresolved: 0,
-        intentionallyUnresolved: 0,
-      },
-      batches: [],
-    })),
-    repo.listLinkedApuTemplateIds(viewer).catch(() => new Set<Uuid>()),
-  ]);
+  const recon = await getReconciliationData(viewer, { repo }).catch(() => ({
+    rows: [],
+    summary: {
+      totalComponents: 0,
+      associated: 0,
+      exactPending: 0,
+      suggested: 0,
+      ambiguous: 0,
+      unresolved: 0,
+      intentionallyUnresolved: 0,
+    },
+    batches: [],
+  }));
+  const linkedIds = await repo.listLinkedApuTemplateIds(viewer).catch(() => new Set<Uuid>());
 
   // Estado de recursos por plantilla.
   const statusByTemplate = new Map<Uuid, ApuResourceStatus>();

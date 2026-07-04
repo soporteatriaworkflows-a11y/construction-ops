@@ -40,6 +40,7 @@ import {
   type MonitorFilterStatus,
 } from '@/lib/pricing/monitor-ui';
 import { RunNowButton, TargetToggleButton, CadenceForm } from './_components/monitor-controls';
+import { getFriendlyDataLoadError } from '@/lib/db/errors';
 
 export const dynamic = 'force-dynamic';
 
@@ -137,27 +138,27 @@ export default async function MonitoringCenterPage({
       viewerRole = viewer.role;
     }
 
-    [targets, runs, summary] = await Promise.all([
-      repo.listTargets(viewer),
-      repo.listRecentRuns(viewer, RECENT_RUN_LIMIT),
-      repo.getMonitoringSummary(viewer),
-    ]);
+    targets = await repo.listTargets(viewer);
+    runs = await repo.listRecentRuns(viewer, RECENT_RUN_LIMIT);
+    try {
+      summary = await repo.getMonitoringSummary(viewer);
+    } catch {
+      summary = null;
+    }
 
-    const runResults = await Promise.all(
-      runs.map(async (run) => {
+    for (const run of runs) {
+      try {
         const rows = await repo.listRunResults(viewer, run.id, RUN_RESULT_LIMIT + 1);
-        return [
-          run.id,
-          {
-            results: rows.slice(0, RUN_RESULT_LIMIT),
-            hasMore: rows.length > RUN_RESULT_LIMIT,
-          },
-        ] as const;
-      }),
-    );
-    runResultsById = Object.fromEntries(runResults);
+        runResultsById[run.id] = {
+          results: rows.slice(0, RUN_RESULT_LIMIT),
+          hasMore: rows.length > RUN_RESULT_LIMIT,
+        };
+      } catch {
+        runResultsById[run.id] = { results: [], hasMore: false };
+      }
+    }
   } catch (e) {
-    error = e instanceof Error ? e.message : 'Error al cargar el monitoreo';
+    error = getFriendlyDataLoadError(e, 'No pudimos cargar el monitoreo en este momento. Intenta actualizar en unos segundos.');
   }
 
   const canMutate = MUTATION_ROLES.includes(viewerRole);
@@ -170,7 +171,7 @@ export default async function MonitoringCenterPage({
       <div>
         <OperationsHeader eyebrow="Catálogo · Precios" title="Monitoreo de precios" subtitle="Panel operativo del agente de monitoreo." />
         <div className="mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-200" role="alert">
-          Error: {error}
+          {error}
         </div>
       </div>
     );

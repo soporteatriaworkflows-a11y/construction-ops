@@ -16,6 +16,7 @@ import { getReadModel } from '@/server/read-model';
 import { resolveViewer, resolveAuthenticatedViewer } from '@/server/auth/resolve-viewer';
 import { isCreationModeEnabled } from '@/app/(dashboard)/projects/mode-guard';
 import { listQuantityImportBatches } from '@/server/quantity-import';
+import { getFriendlyDataLoadError } from '@/lib/db/errors';
 import type { ImportedBatchSummary } from '@/lib/quantity-import/types';
 import type { ViewerContext } from '@/lib/contracts/read-model';
 import { QuantitiesShell, type QuantitiesTab } from './_components/quantities-shell';
@@ -59,7 +60,7 @@ export default async function QuantitiesPage({
       }
     }
   } catch (e) {
-    loadError = e instanceof Error ? e.message : 'Error al cargar proyecto';
+    loadError = getFriendlyDataLoadError(e, 'No pudimos cargar el proyecto de cantidades en este momento. Intenta actualizar en unos segundos.');
   }
 
   let groups: Awaited<ReturnType<typeof rm.listQuantities>> = [];
@@ -68,7 +69,7 @@ export default async function QuantitiesPage({
     try {
       groups = await rm.listQuantities(viewer, scopeId);
     } catch (e) {
-      loadError = e instanceof Error ? e.message : 'Error al cargar cantidades';
+      loadError = getFriendlyDataLoadError(e, 'No pudimos cargar las cantidades en este momento. Intenta actualizar en unos segundos.');
     }
   }
 
@@ -102,7 +103,7 @@ export default async function QuantitiesPage({
     return (
       <QuantitiesShell activeTab={activeTab} actions={actions}>
         <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert" aria-live="assertive">
-          Error: {loadError}
+          {loadError}
         </div>
       </QuantitiesShell>
     );

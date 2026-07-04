@@ -308,41 +308,39 @@ export class DbMonitorRepository implements MonitorRepository {
     const orgId = viewer.organizationId;
     const nowIso = this.now().toISOString();
 
-    const [total, active, overdue, errored, pendingChanges, lastRun] = await Promise.all([
-      supabase
-        .from('price_monitor_targets')
-        .select('id', { count: 'exact', head: true })
-        .eq('organization_id', orgId),
-      supabase
-        .from('price_monitor_targets')
-        .select('id', { count: 'exact', head: true })
-        .eq('organization_id', orgId)
-        .eq('enabled', true),
-      supabase
-        .from('price_monitor_targets')
-        .select('id', { count: 'exact', head: true })
-        .eq('organization_id', orgId)
-        .eq('enabled', true)
-        .lte('next_check_at', nowIso),
-      supabase
-        .from('price_monitor_targets')
-        .select('id', { count: 'exact', head: true })
-        .eq('organization_id', orgId)
-        .eq('enabled', true)
-        .gte('consecutive_failures', MONITOR_FAILURE_ALERT_THRESHOLD),
-      supabase
-        .from('resource_price_observations')
-        .select('id, price_monitor_results!observation_id!inner(id)', { count: 'exact', head: true })
-        .eq('organization_id', orgId)
-        .eq('status', 'pending'),
-      supabase
-        .from('price_monitor_runs')
-        .select('started_at')
-        .eq('organization_id', orgId)
-        .order('started_at', { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-    ]);
+    const total = await supabase
+      .from('price_monitor_targets')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', orgId);
+    const active = await supabase
+      .from('price_monitor_targets')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', orgId)
+      .eq('enabled', true);
+    const overdue = await supabase
+      .from('price_monitor_targets')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', orgId)
+      .eq('enabled', true)
+      .lte('next_check_at', nowIso);
+    const errored = await supabase
+      .from('price_monitor_targets')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', orgId)
+      .eq('enabled', true)
+      .gte('consecutive_failures', MONITOR_FAILURE_ALERT_THRESHOLD);
+    const pendingChanges = await supabase
+      .from('resource_price_observations')
+      .select('id, price_monitor_results!observation_id!inner(id)', { count: 'exact', head: true })
+      .eq('organization_id', orgId)
+      .eq('status', 'pending');
+    const lastRun = await supabase
+      .from('price_monitor_runs')
+      .select('started_at')
+      .eq('organization_id', orgId)
+      .order('started_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
     for (const r of [total, active, overdue, errored, pendingChanges]) {
       if (r.error) throw new Error(`monitor_summary_failed: ${r.error.code ?? 'unknown'}`);
