@@ -73,6 +73,7 @@ type RuleId =
   | 'explicit_length'
   | 'segmented'
   | 'natural'
+  | 'natural_no_qty'
   | 'spacing_spec'
   | 'bar_mention'
   | 'mesh'
@@ -112,6 +113,13 @@ const RULE_PATTERNS: readonly { rule: RuleId; pattern: RegExp; reason: string }[
     pattern:
       /(\d+)\s+(varillas?|barras?|estribos?|flejes?|ganchos?)\s+(?:[a-záéíóúñ]+\s+)*#\s*(\d{1,2})\s*(?:de|x|×)\s*(\d+(?:[.,]\d+)?)\s*(cm|mm|mts?|m)?\b/gi,
     reason: 'Despiece en lenguaje natural (cantidad + #varilla + longitud)',
+  },
+  {
+    rule: 'natural_no_qty',
+    // varillas #4 de 62 cm (sin cantidad al frente): parcial honesto
+    pattern:
+      /(?:varillas?|barras?|estribos?|flejes?|ganchos?)\s+(?:[a-záéíóúñ]+\s+)*#\s*(\d{1,2})\s*(?:de|x|×)\s*(\d+(?:[.,]\d+)?)\s*(cm|mm|mts?|m)?\b/gi,
+    reason: 'Varilla con longitud pero sin cantidad',
   },
   {
     rule: 'spacing_spec',
@@ -472,6 +480,26 @@ function evaluateNatural(match: RegExpMatchArray): EvaluationCore {
   };
 }
 
+function evaluateNaturalNoQuantity(match: RegExpMatchArray): EvaluationCore {
+  const fragment = (match[0] ?? '').trim();
+  const barToken = match[1] ?? '?';
+  const lengthToken = match[2] ?? '';
+  const unit = match[3]?.toLowerCase();
+
+  return {
+    candidateText: fragment,
+    detectedFields: ['barNumber', 'length'],
+    missingFields: ['quantity'],
+    warnings: [],
+    suggestedInterpretation: `Vi varilla #${barToken} de ${lengthToken}${unit ? ` ${unit}` : ' (unidad no indicada)'} sin cantidad: candidato parcial, no se inventa la cantidad.`,
+    confidenceLevel: 'needs_review',
+    confidenceScore: '0.5',
+    confidenceReason: 'Varilla y longitud detectadas, pero falta la cantidad.',
+    f1Ready: false,
+    status: 'needs_review',
+  };
+}
+
 function evaluateSpacingSpec(match: RegExpMatchArray): EvaluationCore {
   const fragment = match[0] ?? '';
   const barToken = match[1] ?? '';
@@ -548,6 +576,8 @@ function evaluateMatch(raw: RawMatch): EvaluationCore {
       return evaluateSegmented(raw.groups);
     case 'natural':
       return evaluateNatural(raw.groups);
+    case 'natural_no_qty':
+      return evaluateNaturalNoQuantity(raw.groups);
     case 'spacing_spec':
       return evaluateSpacingSpec(raw.groups);
     case 'bar_mention':
@@ -594,13 +624,19 @@ function extractElementLabel(line: string): string | undefined {
   return code;
 }
 
-function applyOcrSuspicion(core: EvaluationCore, fragment: string): EvaluationCore {
-  if (!OCR_SUSPECT_PATTERN.test(fragment)) return core;
+/**
+ * Sospecha de mala lectura/OCR evaluada sobre TODA la línea, no solo el
+ * fragmento: un `5#56OO` corrupto produce el fragmento plausible `5#56`
+ * y las letras corruptas quedan justo fuera del match (riesgo R1 del
+ * blueprint F6). Solo advierte y fuerza revisión; nunca corrige.
+ */
+function applyOcrSuspicion(core: EvaluationCore, lineText: string): EvaluationCore {
+  if (!OCR_SUSPECT_PATTERN.test(lineText)) return core;
   return {
     ...core,
     warnings: [
       ...core.warnings,
-      'Posible error de lectura/OCR: hay letras (O, l, I) mezcladas con numeros. Verifica contra el original.',
+      'Posible error de lectura/OCR: hay letras (O, l, I) pegadas a numeros en esta linea. Verifica contra el original.',
     ],
     confidenceLevel: core.confidenceLevel === 'high' ? 'medium' : core.confidenceLevel,
     status: core.status === 'pending' ? 'needs_review' : core.status,
@@ -646,7 +682,7 @@ export function detectPdfIntakeCandidates(
 
     for (const raw of matches) {
       let core = evaluateMatch(raw);
-      core = applyOcrSuspicion(core, raw.text);
+      core = applyOcrSuspicion(core, line);
       core = applyElementContext(core, elementLabel);
 
       candidates.push({

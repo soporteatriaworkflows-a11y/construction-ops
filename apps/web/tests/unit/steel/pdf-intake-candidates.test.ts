@@ -43,6 +43,14 @@ describe('pdf-intake-candidates (F6A) — deteccion', () => {
     expect(candidate.confidenceReason).toContain('revision');
   });
 
+  it('detecta grupos 2X65E#3182 (2 grupos x 65 estribos) via F1', () => {
+    const candidate = single('2X65E#3182');
+    expect(candidate.f1Ready).toBe(true);
+    expect(candidate.status).toBe('pending');
+    expect(candidate.suggestedInterpretation).toContain('130 estribos');
+    expect(candidate.suggestedInterpretation).toContain('2 grupos');
+  });
+
   it('clasifica #4 L=0.62 como alta confianza', () => {
     const candidate = single('#4 L=0.62');
     expect(candidate.confidenceLevel).toBe('high');
@@ -98,6 +106,25 @@ describe('pdf-intake-candidates (F6A) — parciales sin inventar', () => {
   it('detecta "E#3 cada 15 cm" y "#3 @ 0.15" como especificaciones de separacion', () => {
     expect(single('E#3 cada 15 cm').detectedFields).toContain('spacing');
     expect(single('#3 @ 0.15').detectedFields).toContain('spacing');
+  });
+
+  it('produce candidato parcial para "varillas #4 de 62 cm" (longitud sin cantidad)', () => {
+    const candidate = single('varillas #4 de 62 cm');
+    expect(candidate.detectedFields).toEqual(expect.arrayContaining(['barNumber', 'length']));
+    expect(candidate.missingFields).toEqual(['quantity']);
+    expect(candidate.f1Ready).toBe(false);
+    expect(canApprovePdfIntakeCandidate(candidate).ok).toBe(false);
+    expect(candidate.suggestedInterpretation).toContain('no se inventa la cantidad');
+  });
+
+  it('advierte posible error OCR cuando la linea trae letras pegadas a numeros (5#56OO)', () => {
+    const suspect = single('5#56OO');
+    expect(suspect.warnings.join(' ')).toContain('OCR');
+    expect(suspect.status).toBe('needs_review');
+
+    const clean = single('5#5600');
+    expect(clean.warnings.join(' ')).not.toContain('OCR');
+    expect(clean.status).toBe('pending');
   });
 
   it('detecta malla electrosoldada como baja confianza sin datos completos', () => {

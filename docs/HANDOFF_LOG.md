@@ -7317,3 +7317,15 @@ Rama: feature/v5-4-2d-dashboard-project-scope-selector. Base: origin/main = 9fb7
 - **Tests:** `tests/unit/steel/pdf-intake-candidates.test.ts` (23) cubre los 13 casos del mandato + normalizacion natural, contradiccion de segmentos, evidencia inmutable tras edicion, gate de aprobacion, conversion F3 real (`computeManualLine`), ausencia de campos calculados en candidatos y parser F1 intacto.
 - **Validaciones:** `pnpm typecheck` exit 0 · `pnpm lint` exit 0 · suite completa **2603 passed / 42 skipped / 0 fail** (corrio entera, ~55 s) · archivo nuevo 23/23.
 - **Restricciones respetadas:** sin DB · sin Supabase · sin RLS · sin migraciones · sin `.env` · sin deploy · sin produccion · sin service role · sin storage/subida real · sin OCR real · sin dependencias nuevas · sin navegacion global / `ACCESS_MODULES` / `NAV_ITEMS` · sin tocar APU/BOQ/catalogo real · todo detras de `STEEL_OPS_UIX_PREVIEW` (gate sin cambios) · PR contra main SIN merge.
+
+---
+
+## 2026-07-04 - STEEL_OPS_F6A_AUDIT_FABLE - Auditoria + mejoras en rama (pre-merge)
+
+- Auditoria Fable sobre PR #45 (`feature/steel-ops-f6a-pdf-intake-preview`). Diff verificado con `gh pr diff --name-only`: 5 archivos, todos dentro de alcance (steel lib/tests/UI + HANDOFF_LOG). mergeStateStatus CLEAN. Numeracion de pasos del workspace consistente (1-7).
+- **3 mejoras aplicadas tras la auditoria:**
+  1. **Anti-OCR sobre la linea completa:** `5#56OO` producia el candidato plausible `5#56` SIN advertencia porque las letras corruptas quedaban fuera del fragmento matcheado. Ahora la sospecha OCR evalua toda la linea: advierte y fuerza revision (riesgo R1 del blueprint), nunca corrige.
+  2. **Nueva regla `natural_no_qty`:** `varillas #4 de 62 cm` (sin cantidad al frente) no producia NINGUN candidato (la regla natural exige cantidad y la de mencion lo excluia). Ahora sale parcial honesto: varilla+longitud detectadas, cantidad faltante, no aprobable.
+  3. **Test faltante del mandato:** `2X65E#3182` (2 grupos x 65 estribos = 130 via F1) ahora asertado explicitamente.
+- Tests del detector 23 -> 26 (26/26). typecheck 0 · lint 0 · suite completa **2606 passed / 42 skipped / 0 fail**.
+- Restricciones re-verificadas: sin DB/Supabase/RLS/migraciones/.env/deploy/produccion/service role/storage/OCR real/dependencias nuevas/navegacion global/ACCESS_MODULES/NAV_ITEMS; APU/BOQ/catalogo real intactos; todo tras `STEEL_OPS_UIX_PREVIEW`.
