@@ -34,6 +34,7 @@ import {
   type ManualTakeoffRecord,
 } from '@/lib/steel/manual-takeoff';
 import { loadManualTakeoffs } from '@/lib/steel/manual-store';
+import { openManualTakeoff } from '@/lib/steel/open-takeoff';
 import { useManualTakeoffs, writeManualTakeoffs } from '@/lib/steel/use-manual-takeoffs';
 import type { SteelTakeoffStatusView } from '@/lib/steel/types';
 import { SteelStatusBadge } from '../../_components/steel-status-badge';
@@ -126,7 +127,7 @@ export function ManualTakeoffWorkspace({ takeoffId }: { takeoffId: string }) {
   function handleOpenDemo() {
     const ensured = ensureDemoIntakeTakeoff(loadManualTakeoffs());
     if (ensured.created) writeManualTakeoffs(ensured.records);
-    router.push(`/steel/takeoffs/${ensured.id}`);
+    openManualTakeoff((href) => router.push(href), ensured.id);
   }
 
   if (!hydrated) {

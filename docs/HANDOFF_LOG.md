@@ -7364,3 +7364,19 @@ Rama: feature/v5-4-2d-dashboard-project-scope-selector. Base: origin/main = 9fb7
 - **Verificacion navegador real (headless Edge contra dev server):** lista hidratada con entrada F6A y estado vacio; `mtk-demo-lectura` sin datos locales muestra not-found + boton demo.
 - Validaciones: typecheck 0 · lint 0 · suite completa **2617 passed / 42 skipped / 0 fail**.
 - Restricciones: sin DB/Supabase/RLS/migraciones/.env/deploy/produccion/service role/storage/OCR/navegacion global/ACCESS_MODULES/NAV_ITEMS; APU/BOQ/catalogo intactos; todo tras `STEEL_OPS_UIX_PREVIEW`.
+
+---
+
+## 2026-07-04 - STEEL_OPS_F6A_OPEN_DEMO_HOTFIX - EN RAMA + PR (sin merge)
+
+- Rama `fix/steel-open-pdf-intake-demo`, base `origin/main = bf972fa`. Reporte: el boton "Probar lectura asistida desde PDF/plano" aparece pero "al hacer clic no abre nada".
+- **Reproduccion con click real (Edge headless + CDP, WebSocket nativo de Node, sin dependencias):** en main el click SI funciona (URL cambia a `/steel/takeoffs/mtk-demo-lectura`, demo creado en localStorage, seccion de intake visible, 0 errores de pagina). La causa mas plausible del sintoma: en dev el primer acceso a `/steel/takeoffs/[id]` compila la ruta bajo demanda y la navegacion SPA no muestra NINGUN feedback (no habia `loading.tsx`) — el click parece muerto; y si el router del cliente queda en mal estado (pestana vieja), `router.push` muere en silencio.
+- **Fix (navegacion inequivoca + feedback):**
+  1. `lib/steel/open-takeoff.ts` (nuevo, puro con I/O inyectable): `openManualTakeoff` hace `router.push` y, si tras 2.5 s la URL no cambio, fuerza `window.location.assign` (carga completa). El estado ya esta en localStorage antes de navegar, asi que nada se pierde.
+  2. Cableado en los 3 puntos de navegacion (crear takeoff, boton demo de la lista, boton demo del not-found del workspace).
+  3. Boton demo con feedback inmediato: "Abriendo demo…" + disabled mientras navega.
+  4. `app/(dashboard)/steel/takeoffs/[id]/loading.tsx` (nuevo): "Abriendo takeoff…" durante compilacion/carga de la ruta.
+- **Tests:** `open-takeoff.test.ts` (5: href, push+schedule, fallback assign cuando la URL no cambia, sin assign cuando la SPA navego, seguro sin window) + 2 estaticos nuevos en `pdf-intake-access.test.ts` (navegacion via helper en ambos componentes; loading.tsx presente).
+- **Verificacion navegador real (CDP):** click en la rama => URL `mtk-demo-lectura`, intake visible, 0 errores.
+- Validaciones: typecheck 0 · lint 0 · steel 110/110 · suite completa **2624 passed / 42 skipped / 0 fail**.
+- Restricciones: sin DB/Supabase/RLS/migraciones/.env/deploy/produccion/service role/storage/OCR/navegacion global/ACCESS_MODULES/NAV_ITEMS; sin dependencias nuevas; todo tras `STEEL_OPS_UIX_PREVIEW`.
