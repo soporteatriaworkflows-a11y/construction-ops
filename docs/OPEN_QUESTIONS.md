@@ -419,9 +419,15 @@ _Sin blockers activos._
   helper `server/access/budget-surface.ts` + backstop en server actions).
 
 ### Fases pendientes derivadas de la matriz
-- **V5.6.6C — grants internos**: extender RPCs grant/revoke a destinos
-  obra/compras + helper RLS `is_scoped_role` (requiere migración y
-  harness; deny-by-default para obra, según asignación para compras).
+- **V5.6.6C — grants internos**: ✅ IMPLEMENTADA EN RAMA (2026-07-04, PR;
+  contrato `docs/design-references/V5_6_6C_INTERNAL_PROJECT_GRANTS.md`).
+  RPC generalizada a destinos consulta/obra/compras + helper
+  `app.is_scoped_role` + backfill de continuidad + app-layer/UI + harness
+  346/0. **Compuerta pendiente `V5_6_6C_DB_APPLY_GATE`**: aplicar
+  `20260703090000` + `20260703090100` a Cloud EN LA MISMA VENTANA que el
+  deploy del merge (si el app-layer se despliega sin el backfill,
+  obra/compras existentes quedan fail-closed en 0 proyectos — seguro pero
+  disruptivo). Reportar conteos de backfill al aplicar.
 - **V5.6.6D — auditoría de dominio**: tabla `change_audit_log`
   append-only (actor/before/after/reason/project/version) con triggers en
   BOQ/AIU/capítulos/cantidades/cronograma/precios/imports; `reason`

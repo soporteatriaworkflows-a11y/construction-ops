@@ -31,6 +31,10 @@ export interface MemberRow {
 
 const INITIAL: AccessActionResult | null = null;
 
+// V5.6.6C: roles con asignación de proyectos (espejo de SCOPED_PROFILE_ROLES
+// de server/auth/types; literal local porque este es un Client Component).
+const SCOPED_GRANT_ROLES = ['consulta', 'obra', 'compras'];
+
 function RoleCell({ member, assignableRoles }: { member: MemberRow; assignableRoles: string[] }) {
   const [state, formAction, isPending] = useActionState(changeRoleAction, INITIAL);
   // Select CONTROLADO: lo que se envía es exactamente lo que el usuario ve.
@@ -136,7 +140,8 @@ export function MembersTable({
                 <RoleCell member={m} assignableRoles={assignableRoles} />
               </td>
               <td className="px-4 py-3">
-                {m.role === 'consulta' ? (
+                {SCOPED_GRANT_ROLES.includes(m.role) ? (
+                  // V5.6.6C: consulta, obra y compras se asignan por proyecto.
                   <ProjectGrantsCell
                     userId={m.userId}
                     projects={projects}
@@ -145,7 +150,7 @@ export function MembersTable({
                   />
                 ) : (
                   <span className="text-xs text-iconic-graphite/50">
-                    Todos (rol interno)
+                    Todos (allow-all)
                   </span>
                 )}
               </td>

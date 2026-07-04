@@ -1,5 +1,21 @@
 # Handoff Log
 
+## 2026-07-04 - ICONIC_OPS_V5_6_6C_INTERNAL_PROJECT_GRANTS - EN RAMA + PR (agent-orchestrator/db-rls/access)
+
+- Base `origin/main = b487028` (post PR #40). Worktree: D:/ICONIC/SOFTWARE PRESUPUESTOS/construction-ops-v566c. Rama: feature/v5-6-6c-internal-project-grants. LOCAL ONLY: sin Cloud/db push/merge. Contrato: docs/design-references/V5_6_6C_INTERNAL_PROJECT_GRANTS.md.
+- Decisiones implementadas: obra y compras SCOPED por proyecto (reutilizando project_access_grants, sin modelo paralelo); presupuestos/admin/gerencia allow-all; consulta intacta; nuevos obra/compras nacen con 0 grants; backfill de continuidad para existentes (granted_by NULL + audit backfill:true, phase v5_6_6c).
+- Migraciones locales: 20260703090000 (grant_project_access acepta destino consulta/obra/compras, rechaza allow-all con grants_only_for_scoped_roles; backfill) y 20260703090100 (helper app.is_scoped_role [consulta/client/obra/site/compras]; projects_select scoped por grant; las 9 políticas project-chain de V5.6.5A pasan de is_client_role a is_scoped_role; los deny de APU/precios/notas NO cambian — compras conserva su dominio).
+- Nota claims: PostgREST directo (riesgo real) queda scoped para obra Y compras (current_role=profiles.role); vía read-model obra ('site') scoped en DB y compras ('internal') scoped por el choke point app-layer de grants. Defensa en profundidad documentada en el contrato.
+- App-layer: SCOPED_PROFILE_ROLES/isScopedProfileRole (auth/types); resolve-viewer resuelve grants para los 3 roles scoped (fail-closed) + normalización en toViewerContext; helper puro read-model/project-grants ahora restringe por LISTA a cualquier rol (fixture/exports heredan); members-table asigna proyectos a consulta/obra/compras ("Todos (allow-all)" para el resto); empty states scoped en /projects y dashboard.
+- Harness: 346 PASS / 0 FAIL tras supabase db reset --local. Sección [IG] 17 checks (obra 0/1/N, paridad site, compras 0/1 + dominio + BOQ 0 filas sin grant, allow-all sin cambio, consulta intacta, anti-fuga, RPC acepta obra/compras y rechaza presupuestos); flips documentados: GR9 y el check FC de interno org-wide pasó de obra a presupuestos.
+- RECOVERY previo documentado: fallo "permission denied _reconcile_apu_component_row" clasificado TRANSITORIO/no reproducible (ACLs idénticos con y sin migraciones; main puro y rama pasan recon); sin hotfix APU.
+- Tests unit: project-grants.test.ts actualizado al contrato nuevo (lista restringe a cualquier rol; undefined fail-closed solo client) — 16/16.
+- SIGUIENTE COMPUERTA EXACTA: auditoría del PR → `V5_6_6C_DB_APPLY_GATE` (aplicar las 2 migraciones a construction-ops-prod con backfill y reportar conteos) EN LA MISMA VENTANA que merge+deploy (deploy sin backfill = obra/compras existentes fail-closed 0 proyectos) → validación manual obra/compras 0/1/N + asignación en /settings/access.
+
+- ACTUALIZACIÓN 2026-07-04 (misma ola, autorización explícita): compuerta `V5_6_6C_DB_APPLY_GATE` EJECUTADA contra construction-ops-prod (ref jabddbccmhrxztfzpdii). Preflight: solo las 2 migraciones V5.6.6C pendientes, cero ajenas. `db push --linked` sin errores. Post-verify por schema dump read-only: is_scoped_role con 10 políticas (projects + 9 project-chain), check `grants_only_for_scoped_roles` presente y `grants_only_for_consulta` eliminado, is_client_role intacto en los deny (93 refs), has_project_grant intacto. CONTEOS BACKFILL (data dump read-only, borrado tras verificar): prod NO tiene usuarios obra/compras hoy (perfiles: 1 admin + 1 presupuestos) ⇒ backfill = 0 filas (no-op correcto); 1 proyecto; 1 grant legacy V5.6.4 inerte (su perfil ya no es consulta; revocable vía RPC cuando se quiera). Nuevos obra/compras nacerán con 0 grants. Sigue: merge PR #43 + deploy + smoke.
+
+---
+
 ## 2026-07-03 - STEEL_OPS_F3_MANUAL_TAKEOFF_FLOW - EN RAMA + PR, SIN MERGE - Fable (oleada F3, sesión principal)
 
 - Rama `feature/steel-ops-f3-manual-takeoff-flow` (base `origin/main = 62dab9a`, post-merge de #35/#38/#39). PR `feat(steel): add manual takeoff flow preview` contra main, SIN merge.
@@ -9,6 +25,8 @@
 - QA: typecheck 0 · lint 0 (hallazgo `react-hooks/set-state-in-effect` resuelto migrando a `useSyncExternalStore`, no suprimido) · tests steel 60/60 (16 nuevos) · suite completa 2540/2540 PASS (42 skipped preexistentes; baseline 2524 + 16).
 - Restricciones respetadas: sin DB/Supabase/RLS/migraciones/.env/deploy/producción/service role; sin tocar navegación global (ACCESS_MODULES/NAV_ITEMS/sidebar/command palette) ni APU/BOQ/catálogo real; todo detrás de `STEEL_OPS_UIX_PREVIEW`.
 - Detalle completo, riesgos y camino a DB real: `docs/STEEL_OPS_F3_MANUAL_FLOW_HANDOFF.md`. SIGUIENTE: revisión visual del flujo (flag on) → congelar contrato F2 → oleada de implementación de datos según `STEEL_OPS_F2_MIGRATION_SAFETY_PLAN.md`. STOP: PR contra main SIN merge.
+
+---
 
 ## 2026-07-03 - ICONIC_OPS_V5_6_6B_ROLE_MATRIX_COMPRAS_WRITE_SURFACE - EN RAMA + PR (agent-orchestrator/access)
 

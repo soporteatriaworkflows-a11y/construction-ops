@@ -78,9 +78,10 @@ Regla transversal: el enum de DB es
 
 1. Módulos visibles: dashboard, projects, estimates (lectura), catalog,
    price-intelligence, monitoring, settings propio, exports.
-2. Proyectos visibles: todos HOY. **FUTURO V5.6.6C: scoped por proyecto
-   según asignación de admin (decisión aprobada), reutilizando
-   `project_access_grants`.**
+2. Proyectos visibles: scoped por proyecto según asignación de
+   admin/gerencia, reutilizando `project_access_grants` — **IMPLEMENTADO en
+   V5.6.6C (en rama; activo en prod tras `V5_6_6C_DB_APPLY_GATE`)**, con
+   backfill de continuidad para usuarios existentes.
 3. Lectura permitida: catálogo/proveedores/monitoreo completos; dentro
    de proyecto: capítulos, cantidades, valores unitarios y subtotales.
 4. Escritura permitida: SOLO su dominio — catálogo, proveedores, precios
@@ -104,8 +105,10 @@ Regla transversal: el enum de DB es
 
 1. Módulos visibles: dashboard, projects, estimates (lectura),
    quantities, planning, settings propio, exports.
-2. Proyectos visibles: todos HOY. **FUTURO V5.6.6C: scoped por proyectos
-   /obras asignadas (decisión aprobada).**
+2. Proyectos visibles: scoped por proyectos/obras asignadas —
+   **IMPLEMENTADO en V5.6.6C (en rama; activo en prod tras
+   `V5_6_6C_DB_APPLY_GATE`)**, deny-by-default para usuarios nuevos y
+   backfill de continuidad para existentes.
 3. Lectura: cantidades, cronograma, BOQ de sus proyectos (perfil obra de
    exports ya limita datos sensibles).
 4. Escritura: cantidades y cronograma (sus módulos actuales). NO
