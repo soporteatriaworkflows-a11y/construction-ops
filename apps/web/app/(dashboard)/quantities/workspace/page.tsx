@@ -13,6 +13,7 @@ import { formatNumber } from '@/lib/utils/format';
 import { getReadModel } from '@/server/read-model';
 import { resolveViewer } from '@/server/auth/resolve-viewer';
 import { isCreationModeEnabled } from '@/app/(dashboard)/projects/mode-guard';
+import { getFriendlyDataLoadError } from '@/lib/db/errors';
 import type { WorkspaceGroupView } from '@/lib/contracts/read-model';
 import { QuantitiesShell } from '../_components/quantities-shell';
 
@@ -29,7 +30,7 @@ export default async function QuantityWorkspacePage() {
     canCreate = isCreationModeEnabled() && ['management', 'internal'].includes(viewer.role);
     groups = await rm.listWorkspaceGroups(viewer);
   } catch (e) {
-    error = e instanceof Error ? e.message : 'Error al cargar mediciones';
+    error = getFriendlyDataLoadError(e, 'No pudimos cargar las mediciones en este momento. Intenta actualizar en unos segundos.');
   }
 
   const newCta = (
@@ -53,7 +54,7 @@ export default async function QuantityWorkspacePage() {
     return (
       <QuantitiesShell activeTab="measurements" actions={actions}>
         <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
-          Error: {error}
+          {error}
         </div>
       </QuantitiesShell>
     );

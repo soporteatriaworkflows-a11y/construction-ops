@@ -19,6 +19,7 @@ import { resolveAuthMode } from '@/lib/supabase/env';
 import { isCreationModeEnabled } from '@/app/(dashboard)/projects/mode-guard';
 import { CatalogExplorer } from './catalog-explorer';
 import { isOldPrice } from '@/lib/catalog/price-age';
+import { getFriendlyDataLoadError } from '@/lib/db/errors';
 import type { CatalogResourceView } from '@/lib/contracts/read-model';
 
 // Render request-time: viewer real por modo (db=autenticado, fixture=demo).
@@ -44,7 +45,7 @@ export default async function CatalogPage({
     viewerRole = viewer.role;
     resources = await rm.listCatalogResources(viewer);
   } catch (e) {
-    error = e instanceof Error ? e.message : 'Error al cargar catalogo';
+    error = getFriendlyDataLoadError(e, 'No pudimos cargar el catálogo en este momento. Intenta actualizar en unos segundos.');
   }
 
   const authMode = resolveAuthMode();
@@ -68,7 +69,7 @@ export default async function CatalogPage({
           role="alert"
           aria-live="assertive"
         >
-          Error al cargar catálogo: {error}
+          {error}
         </div>
       </div>
     );

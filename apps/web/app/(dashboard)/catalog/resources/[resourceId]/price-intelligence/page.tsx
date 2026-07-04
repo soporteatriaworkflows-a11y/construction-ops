@@ -25,6 +25,7 @@ import { ObservationForm } from './_components/observation-form';
 import { UrlValidationPanel } from './_components/url-validation-panel';
 import { MonitoringSection } from './_components/monitoring-section';
 import { PriceHistoryTable } from './_components/price-history-table';
+import { getFriendlyDataLoadError } from '@/lib/db/errors';
 
 export const dynamic = 'force-dynamic';
 
@@ -116,18 +117,19 @@ export default async function PriceIntelligencePage({ params }: PageProps) {
 
     // Monitoreo automático (Fase 4A): targets + historial breve por target.
     monitorTargets = await monitorRepo.listTargetsForResource(effectiveViewer, resourceId);
-    const resultLists = await Promise.all(
-      monitorTargets.map((t) => monitorRepo.listRecentResults(effectiveViewer, t.id, 3)),
-    );
-    monitorResultsByTarget = Object.fromEntries(
-      monitorTargets.map((t, i) => [t.id, resultLists[i] ?? []]),
-    );
+    for (const target of monitorTargets) {
+      try {
+        monitorResultsByTarget[target.id] = await monitorRepo.listRecentResults(effectiveViewer, target.id, 3);
+      } catch {
+        monitorResultsByTarget[target.id] = [];
+      }
+    }
 
     showInternalFields = INTERNAL_ROLES.includes(viewerRole);
     canCreate = CREATE_ROLES.includes(viewerRole);
     canApprove = APPROVE_ROLES.includes(viewerRole);
   } catch (e) {
-    error = e instanceof Error ? e.message : 'Error al cargar inteligencia de precios';
+    error = getFriendlyDataLoadError(e, 'No pudimos cargar la inteligencia de precios en este momento. Intenta actualizar en unos segundos.');
   }
 
   if (error) {
@@ -135,7 +137,7 @@ export default async function PriceIntelligencePage({ params }: PageProps) {
       <div>
         <PageHeader title="Inteligencia de precios" />
         <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
-          Error: {error}
+          {error}
         </div>
       </div>
     );

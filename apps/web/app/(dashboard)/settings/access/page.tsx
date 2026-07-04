@@ -23,6 +23,7 @@ import { getReadModel } from '@/server/read-model';
 import { resolveViewer } from '@/server/auth/resolve-viewer';
 import { InlineCallout } from '@/components/shared/inline-callout';
 import { OperationsHeader } from '@/components/shared/operations-header';
+import { getFriendlyDataLoadError } from '@/lib/db/errors';
 import { InviteForm } from './_components/invite-form';
 import { MembersTable, type MemberRow } from './_components/members-table';
 import { InvitationsTable, type InvitationRow } from './_components/invitations-table';
@@ -43,12 +44,26 @@ export default async function AccessSettingsPage() {
     );
   }
 
-  const [members, invitations, grants] = await Promise.all([
-    listMembers(actor.organizationId),
-    listInvitations(actor.organizationId),
-    // V5.6.4: asignaciones usuario↔proyecto (RLS-bound; fixture ⇒ []).
-    listProjectGrants(),
-  ]);
+  let members: Awaited<ReturnType<typeof listMembers>> = [];
+  let invitations: Awaited<ReturnType<typeof listInvitations>> = [];
+  let grants: Awaited<ReturnType<typeof listProjectGrants>> = [];
+  const sectionErrors: string[] = [];
+
+  try {
+    members = await listMembers(actor.organizationId);
+  } catch (e) {
+    sectionErrors.push(getFriendlyDataLoadError(e, 'No pudimos cargar los usuarios activos en este momento. Intenta actualizar en unos segundos.'));
+  }
+  try {
+    invitations = await listInvitations(actor.organizationId);
+  } catch (e) {
+    sectionErrors.push(getFriendlyDataLoadError(e, 'No pudimos cargar las invitaciones en este momento. Intenta actualizar en unos segundos.'));
+  }
+  try {
+    grants = await listProjectGrants();
+  } catch (e) {
+    sectionErrors.push(getFriendlyDataLoadError(e, 'No pudimos cargar las asignaciones por proyecto en este momento. Intenta actualizar en unos segundos.'));
+  }
 
   // Proyectos activos de la organización para el diálogo de asignación. El
   // actor es admin/gerencia ⇒ el read-model devuelve todos los de su org.
@@ -59,7 +74,8 @@ export default async function AccessSettingsPage() {
       id: p.id,
       name: p.name,
     }));
-  } catch {
+  } catch (e) {
+    sectionErrors.push(getFriendlyDataLoadError(e, 'No pudimos cargar la lista de proyectos asignables en este momento. Intenta actualizar en unos segundos.'));
     grantableProjects = [];
   }
 
@@ -102,6 +118,12 @@ export default async function AccessSettingsPage() {
         subtitle="Gestiona los usuarios de tu organización, sus roles y las invitaciones pendientes."
         stat={{ label: 'Usuarios', value: String(memberRows.length) }}
       />
+
+      {sectionErrors.length > 0 && (
+        <InlineCallout tone="warning" title="Carga parcial de accesos">
+          {sectionErrors[0]}
+        </InlineCallout>
+      )}
 
       {/* Invitar */}
       <section className="rounded-xl border border-iconic-soft-blue/50 bg-white p-6 shadow-sm">

@@ -106,11 +106,9 @@ export default async function ApuDetailPage({ params, searchParams }: PageProps)
     canMutate = isCreationModeEnabled() && ['management', 'internal'].includes(viewer.role);
     if (canMutate) {
       const av = viewer as AuthenticatedViewer;
-      const [recon, links, batches] = await Promise.all([
-        getTemplateReconciliation(av, id).catch(() => ({ rows: [], summary: null, batches: [] })),
-        getApuBoqLinks(av, id).catch(() => []),
-        getImportBatches(av).catch(() => []),
-      ]);
+      const recon = await getTemplateReconciliation(av, id).catch(() => ({ rows: [], summary: null, batches: [] }));
+      const links = await getApuBoqLinks(av, id).catch(() => []);
+      const batches = await getImportBatches(av).catch(() => []);
       reconRows = recon.rows;
       boqLinks = links;
       const batchId = recon.rows.find((r) => r.importBatchId)?.importBatchId ?? null;

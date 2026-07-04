@@ -19,6 +19,7 @@ import { formatCOP } from '@/lib/utils/format';
 import { getApuLibrary } from '@/server/apu-library/service';
 import { resolveViewer } from '@/server/auth/resolve-viewer';
 import { isCreationModeEnabled } from '@/app/(dashboard)/projects/mode-guard';
+import { getFriendlyDataLoadError } from '@/lib/db/errors';
 import type { AuthenticatedViewer } from '@/server/auth/types';
 import type {
   ApuLibraryFilter,
@@ -99,7 +100,7 @@ export default async function ApuPage({ searchParams }: PageProps) {
       showArchived: view === 'cards' ? cardsArchived : filter === 'archived',
     });
   } catch (e) {
-    error = e instanceof Error ? e.message : 'Error al cargar la biblioteca APU';
+    error = getFriendlyDataLoadError(e, 'No pudimos cargar la biblioteca APU en este momento. Intenta actualizar en unos segundos.');
   }
 
   const actions = (
@@ -139,7 +140,7 @@ export default async function ApuPage({ searchParams }: PageProps) {
           className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
           role="alert"
         >
-          Error al cargar la biblioteca APU: {error}
+          {error}
         </div>
       </div>
     );
