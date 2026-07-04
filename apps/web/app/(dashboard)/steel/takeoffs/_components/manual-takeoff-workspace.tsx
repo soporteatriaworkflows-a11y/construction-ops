@@ -234,7 +234,7 @@ export function ManualTakeoffWorkspace({ takeoffId }: { takeoffId: string }) {
 
           <section className="mb-8" aria-label="Export">
             <SectionTitle step={6} title="Preparación de export" />
-            <ManualExportSection takeoff={takeoff} lines={computedLines} order={order} />
+            <ManualExportSection takeoff={takeoff} lines={computedLines} planResult={planResult} order={order} />
           </section>
         </>
       )}
