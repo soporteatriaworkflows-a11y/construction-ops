@@ -5,6 +5,7 @@ import { EmptyState } from '@/components/shared/empty-state';
 import { SurfaceCard } from '@/components/shared/surface-card';
 import { MOCK_STEEL_TAKEOFFS } from '@/lib/steel/mock-data';
 import { SteelStatusBadge } from '../_components/steel-status-badge';
+import { ManualTakeoffsSection } from './_components/manual-takeoffs-section';
 
 export default function SteelTakeoffsPage() {
   const takeoffs = MOCK_STEEL_TAKEOFFS;
@@ -13,9 +14,14 @@ export default function SteelTakeoffsPage() {
     <div>
       <PageHeader
         title="Takeoffs de acero"
-        description="Estudios de despiece por proyecto/torre/piso/frente. Mock — sin persistencia."
+        description="Estudios de despiece por proyecto/torre/piso/frente. Crea takeoffs manuales (locales) o explora los de ejemplo."
       />
 
+      <ManualTakeoffsSection />
+
+      <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-iconic-graphite/60">
+        Takeoffs de ejemplo (mock)
+      </h2>
       {takeoffs.length === 0 ? (
         <EmptyState
           icon={ClipboardList}
