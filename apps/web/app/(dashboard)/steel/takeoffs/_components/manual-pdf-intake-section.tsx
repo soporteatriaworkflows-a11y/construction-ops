@@ -2,7 +2,9 @@
  * manual-pdf-intake-section.tsx — Preview F6A de ingesta PDF/plano.
  *
  * Cliente puro: el archivo seleccionado no se sube, no se persiste y no se
- * envía al servidor. La detección trabaja sobre texto pegado manualmente.
+ * envía al servidor. La detección trabaja sobre texto pegado manualmente y
+ * produce candidatos revisables (lib/steel/pdf-intake-candidates.ts); la
+ * conversión entrega INPUT del takeoff manual F3 y F1 hace todo el cálculo.
  */
 'use client';
 
@@ -15,33 +17,42 @@ import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { InlineCallout } from '@/components/shared/inline-callout';
 import {
+  canApprovePdfIntakeCandidate,
   detectPdfIntakeCandidates,
   pdfIntakeCandidatesToManualLines,
-  updatePdfIntakeCandidateText,
+  reevaluatePdfIntakeCandidateText,
   type PdfIntakeCandidate,
   type PdfIntakeCandidateStatus,
   type PdfIntakeConfidenceLevel,
-} from '@/lib/steel/pdf-intake-preview';
+  type PdfIntakeFieldKey,
+} from '@/lib/steel/pdf-intake-candidates';
 import type { ManualLineRecord } from '@/lib/steel/manual-takeoff';
 
 const SAMPLE_TEXT = [
-  'Zapata Z-1 5#5600',
-  'Estribos 74E#3200',
-  'Refuerzo superior #4 L=0.62',
-  'Separacion @15CM revisar luz',
+  'VC-01 5#5600',
+  'PILOTE P-03 74E#3200',
+  '240 varillas #4 de 62 cm',
+  'Estribos #3 @15 revisar luz',
+  'barras longitudinales #5',
+  '15 + 35 + 15 = 65 cm',
 ].join('\n');
 
 const CONFIDENCE_LABEL: Record<PdfIntakeConfidenceLevel, string> = {
   high: 'Alta',
   medium: 'Media',
   low: 'Baja',
+  needs_review: 'Requiere revision',
   not_interpretable: 'No interpretable',
 };
 
-const CONFIDENCE_VARIANT: Record<PdfIntakeConfidenceLevel, 'success' | 'warning' | 'secondary' | 'destructive'> = {
+const CONFIDENCE_VARIANT: Record<
+  PdfIntakeConfidenceLevel,
+  'success' | 'warning' | 'secondary' | 'destructive'
+> = {
   high: 'success',
   medium: 'warning',
   low: 'secondary',
+  needs_review: 'warning',
   not_interpretable: 'destructive',
 };
 
@@ -57,6 +68,14 @@ const STATUS_VARIANT: Record<PdfIntakeCandidateStatus, 'default' | 'success' | '
   approved: 'success',
   discarded: 'secondary',
   needs_review: 'warning',
+};
+
+const FIELD_LABEL: Record<PdfIntakeFieldKey, string> = {
+  quantity: 'cantidad',
+  barNumber: 'varilla #',
+  length: 'longitud',
+  spacing: 'separacion',
+  element: 'elemento',
 };
 
 function localFileLabel(file: File | null, fallbackName: string): string {
@@ -98,6 +117,11 @@ export function ManualPdfIntakeSection({
 
   function setStatus(id: string, status: PdfIntakeCandidateStatus) {
     patchCandidate(id, (candidate) => ({ ...candidate, status }));
+  }
+
+  function handleApprove(candidate: PdfIntakeCandidate) {
+    if (!canApprovePdfIntakeCandidate(candidate).ok) return;
+    setStatus(candidate.id, 'approved');
   }
 
   function handleAddApproved() {
@@ -175,7 +199,7 @@ export function ManualPdfIntakeSection({
           value={sourceText}
           onChange={(event) => setSourceText(event.target.value)}
           className="mt-1 min-h-32 w-full rounded-md border border-gray-300 bg-white px-3 py-2 font-mono text-sm text-gray-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50 dark:border-line dark:bg-surface-soft dark:text-content"
-          placeholder="Pega aqui texto copiado del PDF, por ejemplo: 5#5600, 74E#3200, #4 L=0.62"
+          placeholder="Pega aqui texto copiado del PDF, por ejemplo: VC-01 5#5600, 240 varillas #4 de 62 cm, Estribos #3 @15"
           disabled={disabled}
         />
         <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -200,97 +224,143 @@ export function ManualPdfIntakeSection({
 
       {candidates.length > 0 && (
         <div className="mt-4 overflow-x-auto rounded-lg border border-iconic-soft-blue/40">
-          <table className="w-full min-w-[980px] text-sm">
+          <table className="w-full min-w-[1080px] text-sm">
             <thead className="bg-brand-50/60 text-left text-xs uppercase tracking-wide text-iconic-graphite/60">
               <tr>
                 <th scope="col" className="px-3 py-2">Texto candidato</th>
-                <th scope="col" className="px-3 py-2">Interpretacion sugerida</th>
-                <th scope="col" className="px-3 py-2">Pagina/zona</th>
+                <th scope="col" className="px-3 py-2">Interpretacion y campos</th>
+                <th scope="col" className="px-3 py-2">Evidencia</th>
                 <th scope="col" className="px-3 py-2">Confianza</th>
                 <th scope="col" className="px-3 py-2">Estado</th>
                 <th scope="col" className="px-3 py-2"><span className="sr-only">Acciones</span></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-iconic-soft-blue/20">
-              {candidates.map((candidate) => (
-                <tr key={candidate.id} className={candidate.status === 'discarded' ? 'opacity-60' : undefined}>
-                  <td className="w-56 px-3 py-2 align-top">
-                    <Input
-                      value={candidate.originalText}
-                      onChange={(event) =>
-                        patchCandidate(candidate.id, (current) => updatePdfIntakeCandidateText(current, event.target.value))
-                      }
-                      className="font-mono text-xs"
-                      disabled={disabled || candidate.status === 'discarded'}
-                    />
-                  </td>
-                  <td className="max-w-sm px-3 py-2 align-top text-xs text-iconic-graphite/70">
-                    <p className="line-clamp-2">{candidate.suggestedInterpretation}</p>
-                    <p className="mt-1 text-[11px] text-iconic-graphite/50">{candidate.confidenceReason}</p>
-                  </td>
-                  <td className="px-3 py-2 align-top text-xs">
-                    Pag. {candidate.pageNumber}
-                    <br />
-                    <span className="text-iconic-graphite/50">{candidate.zoneLabel}</span>
-                  </td>
-                  <td className="px-3 py-2 align-top">
-                    <Badge variant={CONFIDENCE_VARIANT[candidate.confidenceLevel]}>
-                      {CONFIDENCE_LABEL[candidate.confidenceLevel]} · {(Number(candidate.confidenceScore) * 100).toFixed(0)}%
-                    </Badge>
-                  </td>
-                  <td className="px-3 py-2 align-top">
-                    <Select
-                      value={candidate.status}
-                      onChange={(event) => setStatus(candidate.id, event.target.value as PdfIntakeCandidateStatus)}
-                      disabled={disabled}
-                      aria-label={`Estado de ${candidate.originalText}`}
-                    >
-                      {Object.entries(STATUS_LABEL).map(([value, label]) => (
-                        <option key={value} value={value}>
-                          {label}
-                        </option>
-                      ))}
-                    </Select>
-                    <div className="mt-1">
-                      <Badge variant={STATUS_VARIANT[candidate.status]}>{STATUS_LABEL[candidate.status]}</Badge>
-                    </div>
-                  </td>
-                  <td className="px-3 py-2 align-top">
-                    <div className="flex justify-end gap-1">
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => setStatus(candidate.id, 'approved')}
+              {candidates.map((candidate) => {
+                const approval = canApprovePdfIntakeCandidate(candidate);
+                return (
+                  <tr key={candidate.id} className={candidate.status === 'discarded' ? 'opacity-60' : undefined}>
+                    <td className="w-52 px-3 py-2 align-top">
+                      <Input
+                        value={candidate.candidateText}
+                        onChange={(event) =>
+                          patchCandidate(candidate.id, (current) =>
+                            reevaluatePdfIntakeCandidateText(current, event.target.value),
+                          )
+                        }
+                        className="font-mono text-xs"
                         disabled={disabled || candidate.status === 'discarded'}
-                        aria-label={`Aprobar ${candidate.originalText}`}
-                      >
-                        <Check className="h-4 w-4" aria-hidden="true" />
-                      </Button>
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => setStatus(candidate.id, 'discarded')}
+                        aria-label={`Texto candidato ${candidate.evidence.originalText}`}
+                      />
+                      {candidate.elementLabel && (
+                        <p className="mt-1 text-[11px] text-iconic-graphite/60">
+                          Elemento: <span className="font-medium">{candidate.elementLabel}</span>
+                        </p>
+                      )}
+                    </td>
+                    <td className="max-w-sm px-3 py-2 align-top text-xs text-iconic-graphite/70">
+                      <p className="line-clamp-3">{candidate.suggestedInterpretation}</p>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {candidate.detectedFields.map((field) => (
+                          <Badge key={`det-${field}`} variant="success">
+                            {FIELD_LABEL[field]}
+                          </Badge>
+                        ))}
+                        {candidate.missingFields.map((field) => (
+                          <Badge key={`mis-${field}`} variant="destructive">
+                            falta {FIELD_LABEL[field]}
+                          </Badge>
+                        ))}
+                      </div>
+                      {candidate.warnings.length > 0 && (
+                        <ul className="mt-1 list-disc pl-4 text-[11px] text-amber-700 dark:text-amber-400">
+                          {candidate.warnings.map((warning) => (
+                            <li key={warning}>{warning}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </td>
+                    <td className="max-w-52 px-3 py-2 align-top text-xs">
+                      <p>
+                        Pag. {candidate.evidence.pageNumber}, linea {candidate.evidence.lineIndex + 1}
+                      </p>
+                      <p className="mt-1 font-mono text-[11px] text-iconic-graphite/70">
+                        “{candidate.evidence.originalText}”
+                      </p>
+                      <p className="mt-1 text-[11px] text-iconic-graphite/50">
+                        {candidate.evidence.detectionReason}
+                      </p>
+                    </td>
+                    <td className="px-3 py-2 align-top">
+                      <Badge variant={CONFIDENCE_VARIANT[candidate.confidenceLevel]}>
+                        {CONFIDENCE_LABEL[candidate.confidenceLevel]} · {(Number(candidate.confidenceScore) * 100).toFixed(0)}%
+                      </Badge>
+                      <p className="mt-1 max-w-40 text-[11px] text-iconic-graphite/50">
+                        {candidate.confidenceReason}
+                      </p>
+                    </td>
+                    <td className="px-3 py-2 align-top">
+                      <Select
+                        value={candidate.status}
+                        onChange={(event) => {
+                          const next = event.target.value as PdfIntakeCandidateStatus;
+                          if (next === 'approved' && !canApprovePdfIntakeCandidate(candidate).ok) return;
+                          setStatus(candidate.id, next);
+                        }}
                         disabled={disabled}
-                        aria-label={`Descartar ${candidate.originalText}`}
+                        aria-label={`Estado de ${candidate.evidence.originalText}`}
                       >
-                        <Trash2 className="h-4 w-4" aria-hidden="true" />
-                      </Button>
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => setStatus(candidate.id, 'pending')}
-                        disabled={disabled || candidate.status !== 'discarded'}
-                        aria-label={`Restaurar ${candidate.originalText}`}
-                      >
-                        <Undo2 className="h-4 w-4" aria-hidden="true" />
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                        {Object.entries(STATUS_LABEL).map(([value, label]) => (
+                          <option key={value} value={value} disabled={value === 'approved' && !approval.ok}>
+                            {label}
+                          </option>
+                        ))}
+                      </Select>
+                      <div className="mt-1">
+                        <Badge variant={STATUS_VARIANT[candidate.status]}>{STATUS_LABEL[candidate.status]}</Badge>
+                      </div>
+                      {!approval.ok && candidate.status !== 'discarded' && (
+                        <p className="mt-1 max-w-40 text-[11px] text-iconic-graphite/50">{approval.reason}</p>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 align-top">
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => handleApprove(candidate)}
+                          disabled={disabled || !approval.ok}
+                          aria-label={`Aprobar ${candidate.evidence.originalText}`}
+                          title={approval.ok ? 'Aprobar' : approval.reason}
+                        >
+                          <Check className="h-4 w-4" aria-hidden="true" />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => setStatus(candidate.id, 'discarded')}
+                          disabled={disabled}
+                          aria-label={`Descartar ${candidate.evidence.originalText}`}
+                        >
+                          <Trash2 className="h-4 w-4" aria-hidden="true" />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => setStatus(candidate.id, 'pending')}
+                          disabled={disabled || candidate.status !== 'discarded'}
+                          aria-label={`Restaurar ${candidate.evidence.originalText}`}
+                        >
+                          <Undo2 className="h-4 w-4" aria-hidden="true" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -299,7 +369,8 @@ export function ManualPdfIntakeSection({
       {candidates.length > 0 && (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs text-iconic-graphite/60">
-            Los aprobados entran como lineas nuevas del takeoff manual; F1 hara el parser/calculo despues.
+            Los aprobados entran como lineas nuevas del takeoff manual; F1 hace el parser y el calculo despues.
+            Los candidatos con campos faltantes no se pueden aprobar: el sistema no inventa cantidades.
           </p>
           <Button type="button" onClick={handleAddApproved} disabled={disabled || approved === 0}>
             Enviar aprobados al takeoff manual
