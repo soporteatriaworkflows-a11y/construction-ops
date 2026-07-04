@@ -53,6 +53,9 @@ const SCOPE_B = '00000000-0000-0000-0000-0000000000d2'; // alcance de B (creado 
 // user_role, forzando a app.current_org()/current_role() a leer profiles.
 const USER_A_OBRA = '00000000-0000-0000-0000-0000000000b4'; // role 'obra' (site)
 const USER_A_CONSULTA = '00000000-0000-0000-0000-0000000000b6'; // role 'consulta' (client) — seed 0001
+// V5.6.6C (grants internos): perfiles presupuestos/compras de la seed 0001.
+const USER_A_PRESUPUESTOS = '00000000-0000-0000-0000-0000000000b3';
+const USER_A_COMPRAS = '00000000-0000-0000-0000-0000000000b5';
 const USER_B_GERENCIA = '00000000-0000-0000-0000-0000000000b8'; // role 'gerencia'
 // Usuario autenticado SIN membresía (auth.users sin profile) — seed 0004.
 const USER_NO_PROFILE = '00000000-0000-0000-0000-0000000000bf';
@@ -3333,18 +3336,20 @@ async function main(): Promise<void> {
     grRpcTwice.status === 'already_granted' && grRpcTwice.audit === 1,
     JSON.stringify(grRpcTwice));
 
-  // GR9) RPC rechaza destinatario que no es consulta.
-  let grOnlyConsulta = false;
+  // GR9) RPC rechaza destinatario allow-all (V5.6.6C: los roles SCOPED
+  //      consulta/obra/compras SÍ son asignables; admin/gerencia/presupuestos
+  //      no — asignarles proyectos sería un no-op engañoso).
+  let grOnlyScoped = false;
   await asUser(claimsA, async (q) => {
-    await q.unsafe('SAVEPOINT sp_gr_only_consulta');
+    await q.unsafe('SAVEPOINT sp_gr_only_scoped');
     try {
-      await q`SELECT public.grant_project_access(${USER_A_OBRA}, ${PROJECT_A})`;
+      await q`SELECT public.grant_project_access(${USER_A_PRESUPUESTOS}, ${PROJECT_A})`;
     } catch (e) {
-      grOnlyConsulta = e instanceof Error && e.message.includes('grants_only_for_consulta');
+      grOnlyScoped = e instanceof Error && e.message.includes('grants_only_for_scoped_roles');
     }
-    await q.unsafe('ROLLBACK TO SAVEPOINT sp_gr_only_consulta');
+    await q.unsafe('ROLLBACK TO SAVEPOINT sp_gr_only_scoped');
   });
-  check('grants: RPC rechaza destinatario no-consulta (grants_only_for_consulta)', grOnlyConsulta);
+  check('grants: RPC rechaza destinatario allow-all (grants_only_for_scoped_roles)', grOnlyScoped);
 
   // GR10) RPC rechaza actor sin rol de gestión (obra).
   let grActorDenied = false;
@@ -3569,11 +3574,18 @@ async function main(): Promise<void> {
     fcInternal.g.includes(FC_QWG_A) && fcInternal.g.includes(FC_QWG_A2));
   check('fullchain: admin sigue viendo apu_templates', fcInternal.apu > 0, `apus=${fcInternal.apu}`);
 
-  const fcObra = await asUser(claimsAObra, async (q) => {
+  // V5.6.6C: obra pasó a ser rol SCOPED (su cobertura vive en la sección
+  // [IG]); el check de "interno no scoped sin regresión" usa presupuestos.
+  const claimsAPresupFc: Claims = {
+    organization_id: ORG_A,
+    user_role: 'presupuestos',
+    sub: USER_A_PRESUPUESTOS,
+  };
+  const fcPresupWide = await asUser(claimsAPresupFc, async (q) => {
     const tasks = await q<{ project_id: string }[]>`SELECT project_id FROM schedule_tasks`;
     return tasks.some((t) => t.project_id === PROJECT_A2);
   }, seedFcData);
-  check('fullchain: obra (interno) sigue viendo planning org-wide', fcObra);
+  check('fullchain: presupuestos (allow-all) sigue viendo planning org-wide', fcPresupWide);
 
   // FC9) Escrituras directas de consulta denegadas (incluso con grant activo).
   let fcInsTask = false;
@@ -3745,6 +3757,175 @@ async function main(): Promise<void> {
     return r.length;
   });
   check('hardening: presupuestos sigue creando workspace groups', fcPresIns === 1);
+
+  // ==========================================================================
+  // [IG] V5_6_6C_INTERNAL_PROJECT_GRANTS — obra/compras scoped por proyecto.
+  //      Contrato: docs/design-references/V5_6_6C_INTERNAL_PROJECT_GRANTS.md.
+  //      Reutiliza seedProjectA2 / FC_* de las secciones [GR]/[FC].
+  //      Nota claims: PostgREST real => current_role()=profiles.role
+  //      ('obra'/'compras'); read-model => claim ViewerRole ('site' para obra;
+  //      compras colapsa en 'internal' y su corte lo hace el choke point
+  //      app-layer — aquí se valida la vía PostgREST + 'site').
+  // ==========================================================================
+
+  const claimsAObraReal: Claims = { organization_id: ORG_A, user_role: 'obra', sub: USER_A_OBRA };
+  const claimsAObraSite: Claims = { organization_id: ORG_A, user_role: 'site', sub: USER_A_OBRA };
+  const claimsACompras: Claims = { organization_id: ORG_A, user_role: 'compras', sub: USER_A_COMPRAS };
+  const claimsAPresupReal: Claims = { organization_id: ORG_A, user_role: 'presupuestos', sub: USER_A_PRESUPUESTOS };
+
+  const seedGrantObraA = async (q: postgres.ReservedSql): Promise<void> => {
+    await seedProjectA2(q);
+    await q`INSERT INTO project_access_grants (organization_id, profile_id, project_id)
+            VALUES (${ORG_A}, ${USER_A_OBRA}, ${PROJECT_A})
+            ON CONFLICT (profile_id, project_id) DO NOTHING`;
+  };
+  const seedGrantObraA12 = async (q: postgres.ReservedSql): Promise<void> => {
+    await seedGrantObraA(q);
+    await q`INSERT INTO project_access_grants (organization_id, profile_id, project_id)
+            VALUES (${ORG_A}, ${USER_A_OBRA}, ${PROJECT_A2})
+            ON CONFLICT (profile_id, project_id) DO NOTHING`;
+  };
+  const seedGrantComprasA = async (q: postgres.ReservedSql): Promise<void> => {
+    await seedProjectA2(q);
+    await q`INSERT INTO project_access_grants (organization_id, profile_id, project_id)
+            VALUES (${ORG_A}, ${USER_A_COMPRAS}, ${PROJECT_A})
+            ON CONFLICT (profile_id, project_id) DO NOTHING`;
+  };
+
+  // IG1) Anti-fail-open: obra SIN grants ve 0 proyectos y 0 planning.
+  const igObraZero = await asUser(claimsAObraReal, async (q) => {
+    const projects = await q<{ id: string }[]>`SELECT id FROM projects`;
+    const tasks = await q<{ id: string }[]>`SELECT id FROM schedule_tasks`;
+    const qwg = await q<{ id: string }[]>`SELECT id FROM quantity_workspace_groups`;
+    return { p: projects.length, t: tasks.length, w: qwg.length };
+  }, seedProjectA2);
+  check('grants-int: obra sin grants ve 0 proyectos', igObraZero.p === 0, `p=${igObraZero.p}`);
+  check('grants-int: obra sin grants ve 0 planning', igObraZero.t === 0, `t=${igObraZero.t}`);
+  check('grants-int: obra sin grants ve 0 workspace', igObraZero.w === 0, `w=${igObraZero.w}`);
+
+  // IG2) obra con 1 grant: ve SOLO el proyecto asignado y su planning.
+  const igObraOne = await asUser(claimsAObraReal, async (q) => {
+    const projects = await q<{ id: string }[]>`SELECT id FROM projects`;
+    const tasks = await q<{ project_id: string }[]>`SELECT DISTINCT project_id FROM schedule_tasks`;
+    return { p: projects.map((r) => r.id), t: tasks.map((r) => r.project_id) };
+  }, seedGrantObraA);
+  check('grants-int: obra con 1 grant ve exactamente ese proyecto',
+    igObraOne.p.length === 1 && igObraOne.p.includes(PROJECT_A));
+  check('grants-int: obra con grant ve planning del asignado y no de A2',
+    igObraOne.t.includes(PROJECT_A) && !igObraOne.t.includes(PROJECT_A2));
+
+  // IG3) obra con N grants ve los N proyectos.
+  const igObraTwo = await asUser(claimsAObraReal, async (q) => {
+    const projects = await q<{ id: string }[]>`SELECT id FROM projects`;
+    return projects.map((r) => r.id);
+  }, seedGrantObraA12);
+  check('grants-int: obra con 2 grants ve ambos proyectos',
+    igObraTwo.includes(PROJECT_A) && igObraTwo.includes(PROJECT_A2) && igObraTwo.length === 2,
+    `n=${igObraTwo.length}`);
+
+  // IG4) Paridad claim 'site' (ViewerRole de obra en el read-model).
+  const igObraSite = await asUser(claimsAObraSite, async (q) => {
+    const projects = await q<{ id: string }[]>`SELECT id FROM projects`;
+    return projects.map((r) => r.id);
+  }, seedGrantObraA);
+  check('grants-int: claim site (read-model de obra) queda igual de scoped',
+    igObraSite.includes(PROJECT_A) && !igObraSite.includes(PROJECT_A2));
+
+  // IG5) compras sin grants: 0 proyectos; con grant: solo el asignado.
+  const igComprasZero = await asUser(claimsACompras, async (q) => {
+    const projects = await q<{ id: string }[]>`SELECT id FROM projects`;
+    return projects.length;
+  }, seedProjectA2);
+  check('grants-int: compras sin grants ve 0 proyectos', igComprasZero === 0,
+    `count=${igComprasZero}`);
+
+  const igComprasOne = await asUser(claimsACompras, async (q) => {
+    const projects = await q<{ id: string }[]>`SELECT id FROM projects`;
+    return projects.map((r) => r.id);
+  }, seedGrantComprasA);
+  check('grants-int: compras con grant ve solo el proyecto asignado',
+    igComprasOne.includes(PROJECT_A) && !igComprasOne.includes(PROJECT_A2));
+
+  // IG6) compras conserva su dominio SIN grants (catálogo/proveedores/precios
+  //      no son project-scoped: el deny de V5.6.5A solo aplica a client).
+  const igComprasDomain = await asUser(claimsACompras, async (q) => {
+    const suppliers = await q<{ id: string }[]>`SELECT id FROM suppliers`;
+    const resources = await q<{ id: string }[]>`SELECT id FROM resources`;
+    return { s: suppliers.length, r: resources.length };
+  });
+  check('grants-int: compras conserva catálogo/proveedores sin grants',
+    igComprasDomain.s > 0 && igComprasDomain.r > 0, JSON.stringify(igComprasDomain));
+
+  // IG7) compras sin grant NO alcanza el presupuesto ni por escritura directa
+  //      (la cascada de projects oculta la versión => 0 filas afectadas).
+  const igComprasWrite = await asUser(claimsACompras, async (q) => {
+    const res = await q`UPDATE boq_items SET quantity_snapshot = 99
+                        WHERE estimate_version_id = ${VERSION_A}`;
+    return res.count;
+  }, seedProjectA2);
+  check('grants-int: compras sin grant no muta BOQ (0 filas)', igComprasWrite === 0,
+    `count=${igComprasWrite}`);
+
+  // IG8) Roles allow-all sin cambio: presupuestos/admin/gerencia ven todo.
+  const igPresup = await asUser(claimsAPresupReal, async (q) => {
+    const projects = await q<{ id: string }[]>`SELECT id FROM projects`;
+    return projects.map((r) => r.id);
+  }, seedProjectA2);
+  check('grants-int: presupuestos sigue viendo TODOS los proyectos (allow-all)',
+    igPresup.includes(PROJECT_A) && igPresup.includes(PROJECT_A2));
+
+  const igAdmin = await asUser(claimsA, async (q) => {
+    const projects = await q<{ id: string }[]>`SELECT id FROM projects`;
+    return projects.map((r) => r.id);
+  }, seedProjectA2);
+  check('grants-int: admin sigue viendo TODOS los proyectos',
+    igAdmin.includes(PROJECT_A) && igAdmin.includes(PROJECT_A2));
+
+  const igGerencia = await asUser(claimsAGerencia, async (q) => {
+    const projects = await q<{ id: string }[]>`SELECT id FROM projects`;
+    return projects.length;
+  }, seedProjectA2);
+  check('grants-int: gerencia sigue viendo todos (allow-all)', igGerencia >= 2,
+    `count=${igGerencia}`);
+
+  // IG9) consulta no se rompe: con grant sigue viendo su proyecto (paridad GR).
+  const igConsulta = await asUser(claimsAConsulta, async (q) => {
+    const projects = await q<{ id: string }[]>`SELECT id FROM projects`;
+    return projects.map((r) => r.id);
+  }, seedGrantA);
+  check('grants-int: consulta con grant intacta tras V5.6.6C',
+    igConsulta.includes(PROJECT_A) && !igConsulta.includes(PROJECT_A2));
+
+  // IG10) Anti-fuga de existencia: URL directa (SELECT por id) de un proyecto
+  //       no asignado devuelve 0 filas para obra — mismo shape que inexistente.
+  const igLeak = await asUser(claimsAObraReal, async (q) => {
+    const byId = await q<{ id: string }[]>`SELECT id FROM projects WHERE id = ${PROJECT_A2}`;
+    const ghost = await q<{ id: string }[]>`
+      SELECT id FROM projects WHERE id = '0f000000-0000-0000-0000-00000000dead'`;
+    return { byId: byId.length, ghost: ghost.length };
+  }, seedGrantObraA);
+  check('grants-int: proyecto no asignado responde igual que inexistente (obra)',
+    igLeak.byId === 0 && igLeak.ghost === 0, JSON.stringify(igLeak));
+
+  // IG11) RPC ahora acepta destinos obra y compras (auditados).
+  const igRpcObra = await asUser(claimsA, async (q) => {
+    const r = await q<{ res: { status?: string } }[]>`
+      SELECT public.grant_project_access(${USER_A_OBRA}, ${PROJECT_A}) AS res`;
+    const audit = await q<{ c: number }[]>`
+      SELECT count(*)::int AS c FROM access_audit_log
+      WHERE action = 'project_grant_created' AND target_user_id = ${USER_A_OBRA}`;
+    return { status: r[0]?.res?.status, audit: audit[0]!.c };
+  });
+  check('grants-int: RPC asigna proyecto a obra (granted + auditoría)',
+    igRpcObra.status === 'granted' && igRpcObra.audit === 1, JSON.stringify(igRpcObra));
+
+  const igRpcCompras = await asUser(claimsA, async (q) => {
+    const r = await q<{ res: { status?: string } }[]>`
+      SELECT public.grant_project_access(${USER_A_COMPRAS}, ${PROJECT_A}) AS res`;
+    return r[0]?.res?.status;
+  });
+  check('grants-int: RPC asigna proyecto a compras (granted)', igRpcCompras === 'granted',
+    `status=${igRpcCompras}`);
 
   // --- Resumen ---
   console.log(`\nRESULTADO RLS RUNTIME: ${pass} PASS / ${fail} FAIL`);
