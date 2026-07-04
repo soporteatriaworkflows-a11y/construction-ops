@@ -99,6 +99,12 @@ Gestor: pnpm 11.5.0 (Corepack). Lockfile: `pnpm-lock.yaml`.
 > en Oleada 3C (exports, rama `integration/wave-3c`). Solo server-side. Nota: el
 > importador de Excel usa `xlsx` (lectura); las exportaciones `.xlsx` usan
 > `exceljs` (escritura).
+> **`pdfjs-dist` ^6.1.200 (Apache-2.0)** instalado en STEEL_OPS F6B
+> (`feature/steel-ops-f6b-pdf-text-intake`): lectura CLIENT-SIDE de texto
+> seleccionable de PDF para la lectura asistida de Steel Ops. Import dinámico
+> solo en navegador (no engorda el bundle inicial ni corre en server); el
+> archivo jamás se sube ni persiste. Alternativas descartadas: `mupdf`
+> (AGPL — prohibida), `pdf-parse` (solo Node/server).
 
 ## Notas de licencias transitivas (Oleada 3C — 2026-06-01)
 

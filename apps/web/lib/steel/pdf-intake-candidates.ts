@@ -13,6 +13,7 @@
  */
 import { parseSteelDescription, toDecimal } from '@/modules/steel';
 import type { ManualLineRecord } from './manual-takeoff';
+import type { PlanSourceType } from './pdf-text-extract';
 
 export type PdfIntakeConfidenceLevel =
   | 'high'
@@ -33,8 +34,12 @@ export interface PdfIntakeEvidence {
   readonly lineText: string;
   /** Índice 0-based de la línea dentro del texto pegado. */
   readonly lineIndex: number;
-  /** Página mock declarada por el usuario. */
+  /** Página declarada (mock en flujo manual; real en extracción PDF F6B). */
   readonly pageNumber: number;
+  /** Nombre del archivo fuente cuando el texto proviene de un PDF (F6B). */
+  readonly fileName?: string;
+  /** Tipo de fuente de la página dentro del plan set (F6B): planta, despiece… */
+  readonly sourceType?: PlanSourceType;
   /** Regla de detección que produjo el candidato, en lenguaje humano. */
   readonly detectionReason: string;
 }
@@ -62,6 +67,7 @@ export interface PdfIntakeCandidate {
 export interface PdfIntakeDetectOptions {
   pageNumber?: number;
   fileName?: string;
+  sourceType?: PlanSourceType;
 }
 
 // ---------------------------------------------------------------------------
@@ -612,7 +618,7 @@ function collectRawMatches(line: string): RawMatch[] {
   return accepted.sort((a, b) => a.start - b.start);
 }
 
-function extractElementLabel(line: string): string | undefined {
+export function extractElementLabel(line: string): string | undefined {
   const match = line.match(ELEMENT_CODE_PATTERN);
   if (!match) return undefined;
   const word = match[1];
@@ -622,6 +628,26 @@ function extractElementLabel(line: string): string | undefined {
     return `${word} ${code}`;
   }
   return code;
+}
+
+const ELEMENT_CODE_PATTERN_ALL = /(?:\b([A-Za-zÁÉÍÓÚÑáéíóúñ]{3,12})\s+)?\b([A-Z]{1,4}-\d{1,3}[A-Z]?)\b/g;
+
+/**
+ * TODAS las menciones de elemento de una línea (para evidencia de plan set,
+ * F6B). Excluye códigos de EJES de grilla ("EJE A-1", "EJES B-2"): un eje es
+ * ubicación, no un elemento estructural.
+ */
+export function extractElementMentionsFromLine(line: string): string[] {
+  const labels: string[] = [];
+  ELEMENT_CODE_PATTERN_ALL.lastIndex = 0;
+  for (const match of line.matchAll(ELEMENT_CODE_PATTERN_ALL)) {
+    const word = match[1];
+    const code = match[2];
+    if (!code) continue;
+    if (word && /^ejes?$/i.test(word)) continue;
+    labels.push(word && ELEMENT_WORDS.has(word.toLowerCase()) ? `${word} ${code}` : code);
+  }
+  return labels;
 }
 
 /**
@@ -692,6 +718,8 @@ export function detectPdfIntakeCandidates(
           lineText: line.trim(),
           lineIndex,
           pageNumber,
+          fileName: options.fileName,
+          sourceType: options.sourceType,
           detectionReason: RULE_REASON[raw.rule],
         },
         candidateText: core.candidateText,
@@ -763,6 +791,24 @@ export function canApprovePdfIntakeCandidate(candidate: PdfIntakeCandidate): {
     };
   }
   return { ok: true };
+}
+
+/**
+ * Detección multi-página (F6B): corre el detector sobre el texto de cada
+ * página extraída del PDF, conservando número de página real y nombre de
+ * archivo en la evidencia. No calcula nada; no interpreta geometría ni escala.
+ */
+export function detectPdfIntakeCandidatesFromPages(
+  pages: readonly { pageNumber: number; text: string; sourceType?: PlanSourceType }[],
+  options: { fileName?: string } = {},
+): readonly PdfIntakeCandidate[] {
+  return pages.flatMap((page) =>
+    detectPdfIntakeCandidates(page.text, {
+      pageNumber: page.pageNumber,
+      fileName: options.fileName,
+      sourceType: page.sourceType,
+    }),
+  );
 }
 
 /**
