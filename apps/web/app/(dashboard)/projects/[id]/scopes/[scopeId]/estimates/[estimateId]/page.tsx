@@ -48,6 +48,11 @@ import { getEstimatesWriteRepository, EstimateNotFoundError } from '@/server/est
 import type { ChapterReviewItem } from '@/lib/estimates/review-types';
 import type { AiuRatesView, FinancialSummary } from '@/lib/estimates/aiu-types';
 import { isCreationModeEnabled } from '../../../../../mode-guard';
+import {
+  canEditBudgetSurface,
+  canImportBudgetData,
+  canViewIndirectCosts,
+} from '@/server/access/budget-surface';
 import { formatVersionLabel } from '../../estimate-format';
 import { AiuForm } from './aiu-form';
 import { ExportButtons, type ExportCounts } from './export-buttons';
@@ -100,11 +105,13 @@ export default async function EstimateDetailPage({ params, searchParams }: PageP
 
   const active = estimate.activeVersion;
   const hasContent = !!active && (active.chapterCount > 0 || active.itemCount > 0);
-  const canImport = isCreationModeEnabled();
+  // V5.6.6B: gate de modo (supabase+db) + gate de ROL (compras/obra/consulta
+  // no editan presupuesto; ver server/access/budget-surface.ts).
+  const canImport = isCreationModeEnabled() && canImportBudgetData(viewer.profileRole);
   const importHref = `${scopeHref}/estimates/${estimateId}/import`;
 
   const versionEditable = !!active && !['approved', 'issued', 'archived'].includes(active.status);
-  const canEdit = canImport; // gate de modo (supabase+db)
+  const canEdit = isCreationModeEnabled() && canEditBudgetSurface(viewer.profileRole);
   const canMutate = canEdit && versionEditable; // editable solo si la versión NO está emitida
   const canArchive = canMutate;
 
@@ -506,7 +513,7 @@ export default async function EstimateDetailPage({ params, searchParams }: PageP
       {/* ------------------------------------------------------------------ */}
       {/* AIU y costos indirectos (4D.2)                                      */}
       {/* ------------------------------------------------------------------ */}
-      {hasContent && aiu && financialSummary && (
+      {hasContent && aiu && financialSummary && canViewIndirectCosts(viewer.profileRole) && (
         <section aria-label="AIU y costos indirectos" className="mt-8">
           <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-600">
             <DollarSign className="h-4 w-4 text-gray-400" aria-hidden="true" />

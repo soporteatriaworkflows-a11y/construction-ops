@@ -23,6 +23,7 @@ import type { FinancialSummary } from '@/lib/estimates/aiu-types';
 import { resolveAuthenticatedViewer } from '@/server/auth/resolve-viewer';
 import { AuthError } from '@/server/auth/errors';
 import { isCreationModeEnabled } from '../../../../../mode-guard';
+import { canArchiveBudgetItems } from '@/server/access/budget-surface';
 
 export type ArchiveActionResult =
   | { ok: true; financial: FinancialSummary }
@@ -67,6 +68,11 @@ async function run(
     viewer = await resolveAuthenticatedViewer();
   } catch (e) {
     return { ok: false, error: e instanceof AuthError ? (AUTH_MESSAGES[e.reason] ?? 'Error de autenticación.') : 'Error al verificar la sesión.' };
+  }
+
+  // V5.6.6B: backstop de rol (compras/obra/consulta no archivan presupuesto).
+  if (!canArchiveBudgetItems(viewer.profileRole)) {
+    return { ok: false, error: 'Tu rol no permite editar el presupuesto.' };
   }
 
   try {

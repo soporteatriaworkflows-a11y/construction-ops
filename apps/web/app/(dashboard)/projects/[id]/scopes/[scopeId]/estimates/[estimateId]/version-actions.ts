@@ -19,6 +19,7 @@ import type { EstimateVersionSummary } from '@/lib/estimates/version-types';
 import { resolveAuthenticatedViewer } from '@/server/auth/resolve-viewer';
 import { AuthError } from '@/server/auth/errors';
 import { isCreationModeEnabled } from '../../../../../mode-guard';
+import { canEditBudgetSurface } from '@/server/access/budget-surface';
 
 export type VersionActionResult =
   | { ok: true; version: EstimateVersionSummary }
@@ -57,6 +58,11 @@ async function run(
     viewer = await resolveAuthenticatedViewer();
   } catch (e) {
     return { ok: false, error: e instanceof AuthError ? (AUTH_MESSAGES[e.reason] ?? 'Error de autenticación.') : 'Error al verificar la sesión.' };
+  }
+  // V5.6.6B: backstop de rol (compras/obra/consulta no gestionan versiones).
+  // presupuestos sigue incluido: cero cambio en su flujo de emisión.
+  if (!canEditBudgetSurface(viewer.profileRole)) {
+    return { ok: false, error: 'Tu rol no permite editar el presupuesto.' };
   }
   try {
     const version = await op(getEstimatesWriteRepository(), viewer, estimateId);
