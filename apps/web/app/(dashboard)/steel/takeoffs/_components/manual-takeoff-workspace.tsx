@@ -40,6 +40,7 @@ import { ManualAlertsPanel } from './manual-alerts-panel';
 import { ManualCutPlanSection } from './manual-cut-plan-section';
 import { ManualOrderSection } from './manual-order-section';
 import { ManualExportSection } from './manual-export-section';
+import { ManualPdfIntakeSection } from './manual-pdf-intake-section';
 
 function newLineId(): string {
   return `line-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
@@ -75,9 +76,14 @@ export function ManualTakeoffWorkspace({ takeoffId }: { takeoffId: string }) {
   }
 
   function handleAddLine(line: Omit<ManualLineRecord, 'id'>) {
+    handleAddLines([line]);
+  }
+
+  function handleAddLines(lines: readonly Omit<ManualLineRecord, 'id'>[]) {
+    if (lines.length === 0) return;
     updateTakeoff((current) => ({
       ...current,
-      lines: [...current.lines, { ...line, id: newLineId() }],
+      lines: [...current.lines, ...lines.map((line) => ({ ...line, id: newLineId() }))],
     }));
     // Las líneas cambiaron: el plan/pedido previos quedan obsoletos.
     setPlanResult(null);
@@ -186,8 +192,13 @@ export function ManualTakeoffWorkspace({ takeoffId }: { takeoffId: string }) {
         />
       </div>
 
+      <section className="mb-8" aria-label="Importar desde PDF o plano">
+        <SectionTitle step={1} title="Importar desde PDF/plano (preview)" />
+        <ManualPdfIntakeSection disabled={!canEdit} onAddApproved={handleAddLines} />
+      </section>
+
       <section className="mb-8" aria-label="Agregar líneas">
-        <SectionTitle step={1} title="Agregar líneas de acero (descripción original del plano)" />
+        <SectionTitle step={2} title="Agregar líneas de acero (descripción original del plano)" />
         {canEdit ? (
           <ManualLineForm onAdd={handleAddLine} />
         ) : (
@@ -199,7 +210,7 @@ export function ManualTakeoffWorkspace({ takeoffId }: { takeoffId: string }) {
       </section>
 
       <section className="mb-8" aria-label="Líneas calculadas">
-        <SectionTitle step={2} title={`Líneas calculadas (${computedLines.length})`} />
+        <SectionTitle step={3} title={`Líneas calculadas (${computedLines.length})`} />
         {computedLines.length === 0 ? (
           <EmptyState
             title="Sin líneas todavía"
@@ -213,17 +224,17 @@ export function ManualTakeoffWorkspace({ takeoffId }: { takeoffId: string }) {
       {computedLines.length > 0 && (
         <>
           <section className="mb-8" aria-label="Alertas">
-            <SectionTitle step={3} title="Alertas por línea" />
+            <SectionTitle step={4} title="Alertas por línea" />
             <ManualAlertsPanel lines={computedLines} />
           </section>
 
           <section className="mb-8" aria-label="Plan de corte">
-            <SectionTitle step={4} title="Plan de corte (FFD) y banco de sobrantes" />
+            <SectionTitle step={5} title="Plan de corte (FFD) y banco de sobrantes" />
             <ManualCutPlanSection lines={computedLines} planResult={planResult} onGenerate={handleGeneratePlan} />
           </section>
 
           <section className="mb-8" aria-label="Pedido proveedor">
-            <SectionTitle step={5} title="Pedido proveedor (mock)" />
+            <SectionTitle step={6} title="Pedido proveedor (mock)" />
             <ManualOrderSection
               order={order}
               hasPlan={planResult !== null}
@@ -233,7 +244,7 @@ export function ManualTakeoffWorkspace({ takeoffId }: { takeoffId: string }) {
           </section>
 
           <section className="mb-8" aria-label="Export">
-            <SectionTitle step={6} title="Preparación de export" />
+            <SectionTitle step={7} title="Preparación de export" />
             <ManualExportSection takeoff={takeoff} lines={computedLines} planResult={planResult} order={order} />
           </section>
         </>
