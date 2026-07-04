@@ -4,6 +4,12 @@
 
 _Sin blockers activos._
 
+## CLIENT_NOTES_AND_ALERTS - notas cliente y alertas internas
+
+- Futuro: usuario consulta/cliente puede dejar nota sobre item, tarea o cuadro de resumen client-safe.
+- Admin, gerencia y presupuestos reciben alerta/notificacion para revisar y responder.
+- No implementado en P1_CLIENT_SAFE_SURFACE; queda fuera de esta rama para evitar ampliar portal cliente, permisos, DB o notificaciones.
+
 > **Nota 2026-06-15 (SCHEDULE_PREVIEW_READMODEL_ROOT_CAUSE_V4):** causa raíz REAL
 > del preview "muerto" tras V3 identificada y corregida: `loadGeneratorSource` no
 > coercía `numeric` a `DecimalString`; con `numeric` serializado como número JS por

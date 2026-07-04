@@ -185,9 +185,11 @@ function DashboardError({ message }: { message: string }) {
 function DashboardScopeSelector({
   projects,
   scope,
+  allowGlobal = true,
 }: {
   projects: ProjectListItem[];
   scope: DashboardProjectScope;
+  allowGlobal?: boolean;
 }) {
   const selectedId = scope.mode === 'project' ? scope.selectedProject.id : null;
 
@@ -208,9 +210,11 @@ function DashboardScopeSelector({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button asChild size="sm" variant={selectedId === null ? 'default' : 'outline'}>
-            <Link href="/dashboard">Todos los proyectos</Link>
-          </Button>
+          {allowGlobal && (
+            <Button asChild size="sm" variant={selectedId === null ? 'default' : 'outline'}>
+              <Link href="/dashboard">Todos los proyectos</Link>
+            </Button>
+          )}
           {projects.map((project) => (
             <Button
               key={project.id}
@@ -274,7 +278,11 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   try {
     projects = await rm.listProjects(viewer);
     projectCount = projects.length;
-    scope = resolveDashboardProjectScope(projects, requestedProjectId);
+    const isScopedDashboard = isScopedProfileRole(profileRole);
+    scope = resolveDashboardProjectScope(
+      projects,
+      requestedProjectId ?? (isScopedDashboard ? (projects[0]?.id ?? null) : null),
+    );
     projectId = scope.highlightedProject?.id ?? null;
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Error al cargar proyectos';
@@ -297,7 +305,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           subtitle="Vista global de organizacion"
         />
         {deniedModule && <DeniedModuleCallout module={deniedModule} />}
-      <DashboardScopeSelector projects={projects} scope={scope} />
+      <DashboardScopeSelector projects={projects} scope={scope} allowGlobal={!isScopedProfileRole(profileRole)} />
         <EmptyState
           icon={LayoutDashboard}
           title={isConsulta ? 'Aún no tienes proyectos asignados' : 'Sin proyectos para resumir'}
@@ -475,7 +483,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         subtitle={scopeSubtitle}
       />
       {deniedModule && <DeniedModuleCallout module={deniedModule} />}
-      <DashboardScopeSelector projects={projects} scope={scope} />
+      <DashboardScopeSelector projects={projects} scope={scope} allowGlobal={!isScopedProfileRole(profileRole)} />
 
       {/* ZONA 1 — Centro de mando (grid modular de cards; navy SOLO como acento) */}
       <section aria-label="Centro de mando" className="mb-6 grid gap-4 lg:grid-cols-3">

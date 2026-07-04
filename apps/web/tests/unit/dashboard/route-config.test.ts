@@ -35,7 +35,8 @@ describe('dashboard - configuracion de render y alcance', () => {
     expect(source).toMatch(/const params = await searchParams/);
     expect(source).toMatch(/projectIdFromSearchParams\(params\)/);
     expect(source).toMatch(/listProjects\(/);
-    expect(source).toMatch(/resolveDashboardProjectScope\(projects, requestedProjectId\)/);
+    expect(source).toMatch(/const isScopedDashboard = isScopedProfileRole\(profileRole\)/);
+    expect(source).toMatch(/requestedProjectId \?\? \(isScopedDashboard \? \(projects\[0\]\?\.id \?\? null\) : null\)/);
     expect(source).not.toMatch(/selectActiveProjectId\(/);
   });
 

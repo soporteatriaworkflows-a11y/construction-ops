@@ -1,5 +1,19 @@
 # Handoff Log
 
+## 2026-07-04 - P1_CLIENT_SAFE_SURFACE - EN RAMA + PR, SIN MERGE
+
+- Worktree: D:/ICONIC/SOFTWARE PRESUPUESTOS/construction-ops-p1-client-safe-surface. Rama: feature/p1-client-safe-surface. Base: origin/main post P0A (merge 3022bfd). Sin merge, sin deploy, sin tag.
+- Superficie cliente: el simulador comercial del workspace de presupuesto queda visible solo para admin/gerencia/presupuestos; consulta/cliente, obra y compras no lo ven.
+- Dashboard scoped: roles scoped usan proyecto asignado como entrada por defecto y no reciben el selector global "Todos los proyectos"; admin/gerencia/presupuestos conservan vista global.
+- Cronograma/trazabilidad: consulta conserva Gantt, tareas generales, fechas, avance, estado y responsable; se ocultan rendimientos, cantidad/cuadrilla y vinculos BOQ/APU en tabs y panel de detalle client-safe.
+- Price intelligence: usuarios sin modulo ven mensaje claro en la pagina, sin redireccion confusa; la matriz sigue admin/gerencia/compras.
+- PDF presentacion: no implementado ni activado; PDF cliente existente queda intacto. V5.8B mantiene el alcance de PDF presentacion.
+- Docs: OPEN_QUESTIONS registra CLIENT_NOTES_AND_ALERTS como futuro, sin implementar notificaciones ni portal cliente.
+- Restricciones: sin Supabase Cloud, db push, migraciones, RLS, Vercel envs, DATABASE_URL, SMTP, usuarios reales, deploy, tag, merge, role-map, DB enum, construction-ops-1rqh, V5.7B, portal cliente completo, PDF presentacion completo ni auditoria 6D.
+- QA local: pnpm install --frozen-lockfile; typecheck PASS; lint PASS; tests focales PASS (39); suite completa PASS (2632, 42 skipped); build PASS; gm:regression PASS (22); git diff --check PASS.
+
+---
+
 ## 2026-07-04 - ICONIC_OPS_V5_6_6C_INTERNAL_PROJECT_GRANTS - EN RAMA + PR (agent-orchestrator/db-rls/access)
 
 - Base `origin/main = b487028` (post PR #40). Worktree: D:/ICONIC/SOFTWARE PRESUPUESTOS/construction-ops-v566c. Rama: feature/v5-6-6c-internal-project-grants. LOCAL ONLY: sin Cloud/db push/merge. Contrato: docs/design-references/V5_6_6C_INTERNAL_PROJECT_GRANTS.md.
