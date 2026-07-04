@@ -1,5 +1,17 @@
 # Handoff Log
 
+## 2026-07-03 - STEEL_OPS_F3_MANUAL_TAKEOFF_FLOW - EN RAMA + PR, SIN MERGE - Fable (oleada F3, sesión principal)
+
+- Rama `feature/steel-ops-f3-manual-takeoff-flow` (base `origin/main = 62dab9a`, post-merge de #35/#38/#39). PR `feat(steel): add manual takeoff flow preview` contra main, SIN merge.
+- Oleada multiagente ejecutada SECUENCIALMENTE en la sesión principal (los agentes 1-6 del mandato comparten los mismos archivos del flujo; PROJECT_MASTER §11.1 prohíbe agentes paralelos sobre archivos compartidos — mismo precedente de la oleada UIX heavy #38). Roles cubiertos: A0 orquestación/alcance, A1 UX takeoffs, A2 parser bridge, A3 calculation bridge, A4 alertas, A5 plan de corte, A6 pedido mock, A7 QA, A8 handoff.
+- Entregable: primer flujo operativo manual de Steel Ops SIN persistencia real. Crear takeoff local (localStorage, solo inputs) → agregar líneas con la notación real (`5#5600`, `74E#3200`, `2X65E#3182`, `10#7205 @ 15CM`, `#4 L=0.62`, `15 + 35 + 15`) → interpretación con `parseSteelDescription` (F1 REAL: confianza + explicación + needs_review, preview en vivo antes de agregar) → cálculo ml/kg/unidades/costo/desperdicio con `calculateSteelLine` + clasificación D5 → alertas reales `evaluateSteelLineAlerts` con panel "por qué necesita revisión" → plan de corte `optimizeSteelCutsFFD` (excluidas con razón; barras por varilla; banco de sobrantes + ahorro) → pedido proveedor MOCK agrupado varilla×longitud comercial (unidades = barras del plan; precios mock con estado/vigencia) → export CSV local (Blob, BOM UTF-8, celdas sanitizadas — convención APU_EXPORTS_V1). Estados `draft → in_review → approved → locked` (locked terminal, espejo de inmutabilidad; líneas editables solo en draft/in_review).
+- Archivos nuevos: `lib/steel/manual-takeoff.ts` (motor puro), `lib/steel/manual-store.ts` (localStorage defensivo), `lib/steel/use-manual-takeoffs.ts` (`useSyncExternalStore`, sync entre pestañas), 8 componentes en `app/(dashboard)/steel/takeoffs/_components/`, 2 tests (16 casos). Modificados: `steel/takeoffs/page.tsx` (sección manual + separación de mocks) y `steel/takeoffs/[id]/page.tsx` (ids `mtk-*` → workspace cliente). Cero ediciones a archivos compartidos, gate `STEEL_OPS_UIX_PREVIEW` intacto.
+- QA: typecheck 0 · lint 0 (hallazgo `react-hooks/set-state-in-effect` resuelto migrando a `useSyncExternalStore`, no suprimido) · tests steel 60/60 (16 nuevos) · suite completa 2540/2540 PASS (42 skipped preexistentes; baseline 2524 + 16).
+- Restricciones respetadas: sin DB/Supabase/RLS/migraciones/.env/deploy/producción/service role; sin tocar navegación global (ACCESS_MODULES/NAV_ITEMS/sidebar/command palette) ni APU/BOQ/catálogo real; todo detrás de `STEEL_OPS_UIX_PREVIEW`.
+- Detalle completo, riesgos y camino a DB real: `docs/STEEL_OPS_F3_MANUAL_FLOW_HANDOFF.md`. SIGUIENTE: revisión visual del flujo (flag on) → congelar contrato F2 → oleada de implementación de datos según `STEEL_OPS_F2_MIGRATION_SAFETY_PLAN.md`. STOP: PR contra main SIN merge.
+
+---
+
 ## 2026-07-03 - STEEL_OPS_UIX_HEAVY_WAVE + HARDENING - PR #38 - Fable UIX
 
 - Rama `feature/steel-ops-uix-heavy-wave` (desde `feature/steel-ops-fable-uix` + merge de `origin/feature/steel-ops-f1-domain`; `origin/main` ya era ancestro). PR #38 abierto contra main, SIN merge. `docs/F1_DOMAIN_CONTRACT.md` sigue sin trackear, excluido de todos los commits.
