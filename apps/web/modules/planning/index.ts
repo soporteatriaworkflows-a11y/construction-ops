@@ -85,3 +85,18 @@ export type {
   RecalcTaskResult,
   RecalcResult,
 } from './recalc';
+export {
+  clampGanttZoom,
+  ganttZoomIn,
+  ganttZoomOut,
+  ganttColumnWidth,
+  ganttRangeDays,
+  ganttFitZoom,
+  GANTT_ZOOM_MIN,
+  GANTT_ZOOM_MAX,
+  GANTT_ZOOM_STEP,
+  GANTT_ZOOM_DEFAULT,
+  GANTT_BASE_COLUMN_WIDTH,
+  GANTT_DAYS_PER_COLUMN,
+} from './gantt-zoom';
+export type { GanttZoomViewMode } from './gantt-zoom';

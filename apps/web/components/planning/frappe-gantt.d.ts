@@ -38,6 +38,18 @@ declare module 'frappe-gantt' {
     readonly?: boolean;
     infinite_padding?: boolean;
     popup_on?: 'click' | 'hover';
+    /** Ancho de columna en px (por defecto varía según `view_mode`). */
+    column_width?: number;
+    /** Alto de la barra de tarea en px (default 30). */
+    bar_height?: number;
+    /** Espacio vertical entre filas en px (default 18). */
+    padding?: number;
+    /** Alto del encabezado superior en px (default 45). */
+    upper_header_height?: number;
+    /** Alto del encabezado inferior en px (default 30). */
+    lower_header_height?: number;
+    /** Alto del contenedor: px o 'auto' (default). */
+    container_height?: number | 'auto';
     /** Render de popup personalizado (devuelve HTML string o false). */
     popup?: (ctx: { task: GanttTaskInput }) => string | false | void;
   }

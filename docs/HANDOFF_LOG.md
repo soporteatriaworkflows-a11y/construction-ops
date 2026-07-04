@@ -1,8 +1,21 @@
 # Handoff Log
 
-## 2026-07-04 - P1_CLIENT_SAFE_SURFACE - EN RAMA + PR, SIN MERGE
+## 2026-07-04 - P2_GANTT_UX_FIT_TO_WINDOW - EN RAMA + PR, SIN MERGE
 
-- Worktree: D:/ICONIC/SOFTWARE PRESUPUESTOS/construction-ops-p1-client-safe-surface. Rama: feature/p1-client-safe-surface. Base: origin/main post P0A (merge 3022bfd). Sin merge, sin deploy, sin tag.
+- Worktree: D:/ICONIC/SOFTWARE PRESUPUESTOS/construction-ops-p2-gantt-ux. Rama: feature/p2-gantt-ux-fit-window. Base: origin/main post P1 (merge 8819818). Sin merge, sin deploy, sin tag. UI-only.
+- Gantt (components/planning/gantt-chart.tsx): controles nuevos de zoom (Alejar / % / Acercar / Restablecer / "Ajustar a ventana"); "Ajustar a ventana" es el estado por defecto (el cronograma entra al ancho visible, con clamp de legibilidad). Selector de escala Dia/Semana/Mes intacto. Filas mas compactas (barra 22px, padding 12) y encabezados reducidos; etiquetas de meses en espanol (language: 'es'). Contenedor con alto maximo 65vh y scroll controlado.
+- Logica pura nueva: modules/planning/gantt-zoom.ts (clamp/zoom in-out/column width/rango de dias/fit), exportada por el barril y testeada sin DOM. Anchos base mas compactos que los defaults de frappe (Day 38/Week 90/Month 110 vs 45/140/120).
+- Roles: consulta y obra conservan Gantt y ganan zoom/fit; nada de lo ocultado por P1 (rendimientos, cantidad, cuadrilla, vinculos BOQ/APU) se re-expone; admin/gerencia/presupuestos sin cambios de flujo. CERO cambios en matrices de permisos, role-map, budget-surface o module-access.
+- Housekeeping: se elimina import LayoutGrid sin uso en workspace/page.tsx (residuo de P1); se corrige el titulo de la entrada P1 en este log (ya RELEASED).
+- Tests: nuevos tests/unit/planning/gantt-zoom.test.ts (helper puro) y tests/regression/gantt-ux-static.test.ts (controles presentes + client-safe de P1 no revertido).
+- Restricciones: sin Supabase Cloud, db push, migraciones, RLS, Vercel envs, DATABASE_URL, SMTP, usuarios reales, deploy, tag, merge, role-map, DB enum, construction-ops-1rqh, V5.7B, portal cliente, PDF presentacion ni auditoria 6D.
+
+---
+
+## 2026-07-04 - P1_CLIENT_SAFE_SURFACE - RELEASED (PR #49, merge 8819818)
+
+- RELEASED 2026-07-04: PR #49 mergeado con merge commit 8819818 en origin/main; deployment Production success; smoke sin sesion verde (login 200, protegidas 307, body limpio). Auditoria tecnica independiente previa al merge (Fable): diff app-only confirmado, QA re-ejecutado completo.
+- Worktree: D:/ICONIC/SOFTWARE PRESUPUESTOS/construction-ops-p1-client-safe-surface. Rama: feature/p1-client-safe-surface. Base: origin/main post P0A (merge 3022bfd).
 - Superficie cliente: el simulador comercial del workspace de presupuesto queda visible solo para admin/gerencia/presupuestos; consulta/cliente, obra y compras no lo ven.
 - Dashboard scoped: roles scoped usan proyecto asignado como entrada por defecto y no reciben el selector global "Todos los proyectos"; admin/gerencia/presupuestos conservan vista global.
 - Cronograma/trazabilidad: consulta conserva Gantt, tareas generales, fechas, avance, estado y responsable; se ocultan rendimientos, cantidad/cuadrilla y vinculos BOQ/APU en tabs y panel de detalle client-safe.
