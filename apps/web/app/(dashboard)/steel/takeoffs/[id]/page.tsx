@@ -7,10 +7,19 @@ import { EmptyState } from '@/components/shared/empty-state';
 import { MOCK_STEEL_TAKEOFFS } from '@/lib/steel/mock-data';
 import { buildWorkspaceLinesForTakeoff } from '@/lib/steel/domain-bridge';
 import { formatDecimal } from '@/lib/steel/format';
+import { isManualTakeoffId } from '@/lib/steel/manual-takeoff';
 import { SteelStatusBadge } from '../../_components/steel-status-badge';
+import { ManualTakeoffWorkspace } from '../_components/manual-takeoff-workspace';
 
 export default async function SteelTakeoffWorkspacePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+
+  // Takeoffs manuales F3: viven en localStorage del navegador, así que el
+  // servidor no puede resolverlos — delega el workspace completo al cliente.
+  if (isManualTakeoffId(id)) {
+    return <ManualTakeoffWorkspace takeoffId={id} />;
+  }
+
   const takeoff = MOCK_STEEL_TAKEOFFS.find((t) => t.id === id);
   if (!takeoff) {
     notFound();
