@@ -42,11 +42,18 @@ function workbookText(wb: ReturnType<typeof buildSteelManualExcelWorkbook>): str
 
 describe('manual-excel-export (F4A)', () => {
   it('sanitizeExcelCellText neutraliza formula injection en strings', () => {
-    expect(sanitizeExcelCellText('=SUM(A1:A2)')).toBe("'=SUM(A1:A2)");
-    expect(sanitizeExcelCellText('+57')).toBe("'+57");
-    expect(sanitizeExcelCellText('-10')).toBe("'-10");
+    expect(sanitizeExcelCellText('=SUM(1,1)')).toBe("'=SUM(1,1)");
+    expect(sanitizeExcelCellText('+1')).toBe("'+1");
+    expect(sanitizeExcelCellText('-1')).toBe("'-1");
     expect(sanitizeExcelCellText('@cmd')).toBe("'@cmd");
-    expect(sanitizeExcelCellText('5#5600')).toBe('5#5600');
+    expect(sanitizeExcelCellText('\t=SUM(1,1)')).toBe("'\t=SUM(1,1)");
+    expect(sanitizeExcelCellText('\r=SUM(1,1)')).toBe("'\r=SUM(1,1)");
+    expect(sanitizeExcelCellText('\n=SUM(1,1)')).toBe("'\n=SUM(1,1)");
+    expect(sanitizeExcelCellText('   =SUM(1,1)')).toBe("'   =SUM(1,1)");
+    expect(sanitizeExcelCellText('\t+1')).toBe("'\t+1");
+    expect(sanitizeExcelCellText('\r@cmd')).toBe("'\r@cmd");
+    expect(sanitizeExcelCellText('texto normal')).toBe('texto normal');
+    expect(sanitizeExcelCellText('texto, con "comillas"\ny salto')).toBe('texto, con "comillas"\ny salto');
   });
 
   it('crea las siete hojas requeridas con nombres estables', () => {
@@ -58,6 +65,66 @@ describe('manual-excel-export (F4A)', () => {
     });
 
     expect(wb.worksheets.map((ws) => ws.name)).toEqual(STEEL_MANUAL_EXCEL_SHEETS);
+  });
+
+  it('genera workbook valido con 0 lineas y totales sin rangos invalidos', () => {
+    const wb = buildSteelManualExcelWorkbook({
+      takeoff: takeoff(),
+      lines: [],
+      generatedAt: new Date('2026-07-04T12:00:00.000Z'),
+    });
+
+    expect(wb.worksheets.map((ws) => ws.name)).toEqual(STEEL_MANUAL_EXCEL_SHEETS);
+    const resumen = wb.getWorksheet('00_RESUMEN')!;
+    expect(resumen.getCell('B9').value).toMatchObject({ formula: '0' });
+    expect(resumen.getCell('B10').value).toMatchObject({ formula: '0' });
+    expect(resumen.getCell('B11').value).toMatchObject({ formula: '0' });
+    expect(wb.getWorksheet('01_CANTIDADES')!.rowCount).toBe(1);
+  });
+
+  it('incluye headers minimos de alertas, plan de corte y sobrantes', () => {
+    const records = [
+      line({ id: 'e1', originalDescription: '5#5600' }),
+      line({ id: 'e2', originalDescription: 'texto libre' }),
+    ];
+    const lines = computeManualLines(records);
+    const wb = buildSteelManualExcelWorkbook({
+      takeoff: takeoff(records),
+      lines,
+      generatedAt: new Date('2026-07-04T12:00:00.000Z'),
+    });
+
+    expect(wb.getWorksheet('02_ALERTAS')!.getRow(1).values).toMatchObject([
+      ,
+      'linea',
+      'severidad',
+      'codigo',
+      'mensaje',
+      'explicacion',
+      'accion sugerida',
+    ]);
+    expect(wb.getWorksheet('03_PLAN_CORTE')!.getRow(1).values).toMatchObject([
+      ,
+      'grupo compatible',
+      'material',
+      'longitud comercial',
+      'cortes asignados',
+      'elementos destino',
+      'sobrante',
+      'estado sobrante',
+    ]);
+    expect(wb.getWorksheet('04_SOBRANTES')!.getRow(1).values).toMatchObject([
+      ,
+      'material',
+      'longitud sobrante',
+      'peso sobrante',
+      'origen',
+      'posible destino',
+      'estado',
+      'ahorro ml',
+      'ahorro kg',
+      'ahorro COP mock',
+    ]);
   });
 
   it('mantiene numeros como numeros e incluye formulas seguras para ml/kg/subtotales', () => {

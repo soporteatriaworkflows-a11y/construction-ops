@@ -45,7 +45,7 @@ export interface ManualExcelExportInput {
 }
 
 export function sanitizeExcelCellText(value: string): string {
-  return /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+  return /^[=+\-@]/.test(value.trimStart()) ? `'${value}` : value;
 }
 
 export function buildSteelManualExcelFileName(takeoff: Pick<ManualTakeoffRecord, 'id' | 'name'>): string {
