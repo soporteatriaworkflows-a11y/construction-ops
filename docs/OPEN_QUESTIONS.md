@@ -404,3 +404,32 @@ _Sin blockers activos._
   proyecto (como ahora) o por versión de presupuesto emitida (proyección aún
   más estrecha)? La infraestructura de grants soporta ampliar a
   `estimate_version_id` nullable en el futuro sin romper el modelo actual.
+
+## V5_6_6B_ROLE_MATRIX_AND_COMPRAS_WRITE_SURFACE_HARDENING (2026-07-03)
+
+> Contrato: `docs/design-references/V5_6_6_ROLE_MATRIX.md`.
+
+### Decisiones aprobadas (registradas)
+- `obra` será scoped por proyecto en **V5.6.6C** (grants internos).
+- `compras` podrá ser scoped por proyecto en **V5.6.6C** según asignación
+  de admin (reutilizando `project_access_grants`).
+- `presupuestos` queda **allow-all** por ahora.
+- V5.6.6B NO implementa grants internos; sí retira de la superficie de
+  `compras` la edición de presupuesto/capítulos/precios/AIU (app-layer,
+  helper `server/access/budget-surface.ts` + backstop en server actions).
+
+### Fases pendientes derivadas de la matriz
+- **V5.6.6C — grants internos**: extender RPCs grant/revoke a destinos
+  obra/compras + helper RLS `is_scoped_role` (requiere migración y
+  harness; deny-by-default para obra, según asignación para compras).
+- **V5.6.6D — auditoría de dominio**: tabla `change_audit_log`
+  append-only (actor/before/after/reason/project/version) con triggers en
+  BOQ/AIU/capítulos/cantidades/cronograma/precios/imports; `reason`
+  obligatorio para obra.
+- **V5.8A portal cliente / V5.8B PDF presentación**: ver diseño V5.6.6/V5.8.
+- Emisión/publicación de versiones por `presupuestos`: HOY se mantiene
+  (flujo operativo); la separación estricta "solo admin/gerencia
+  aprueban/publican" se decide e implementa junto con V5.8A + V5.6.6D.
+- Q-WRITE-1 (DB, ya registrada arriba) sigue abierta: V5.6.6B endurece la
+  superficie app-layer de compras; el espejo RLS por rol interno se
+  evalúa tras 6C/6D.

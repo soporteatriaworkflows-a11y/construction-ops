@@ -34,4 +34,11 @@ export interface AuthenticatedViewer {
    * `toViewerContext` y en los route handlers de exports.
    */
   projectGrants?: ProjectGrants;
+  /**
+   * V5.6.6B: rol de `profiles` (DB) para gates de SUPERFICIE por acción
+   * (p. ej. compras no edita presupuesto/AIU aunque su ViewerRole sea
+   * `internal`). Opcional por los literales demo existentes; deny-by-default
+   * en los helpers de `server/access/budget-surface.ts`.
+   */
+  profileRole?: ProfileRole;
 }

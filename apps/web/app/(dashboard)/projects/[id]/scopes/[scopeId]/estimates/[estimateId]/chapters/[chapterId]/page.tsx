@@ -19,6 +19,7 @@ import { resolveViewer } from '@/server/auth/resolve-viewer';
 import { getEstimatesWriteRepository, ChapterNotFoundError } from '@/server/estimates';
 import type { BoqItemReviewView } from '@/lib/estimates/review-types';
 import { isCreationModeEnabled } from '../../../../../../../mode-guard';
+import { canArchiveBudgetItems, canEditBudgetSurface } from '@/server/access/budget-surface';
 import { ArchiveControls } from '../../archive-controls';
 
 interface PageProps {
@@ -37,7 +38,6 @@ export default async function ChapterDetailPage({ params, searchParams }: PagePr
   const itemEditHref = (itemId: string) => `${chapterBase}/items/${itemId}/edit`;
   const chapterEditHref = `${chapterBase}/edit`;
   const archiveToggleHref = `${chapterBase}${showArchived ? '' : '?archived=1'}`;
-  const canEdit = isCreationModeEnabled();
 
   let viewer: Awaited<ReturnType<typeof resolveViewer>>;
   try {
@@ -45,6 +45,9 @@ export default async function ChapterDetailPage({ params, searchParams }: PagePr
   } catch {
     notFound();
   }
+
+  // V5.6.6B: gate de modo + gate de ROL (compras/obra/consulta solo lectura).
+  const canEdit = isCreationModeEnabled() && canEditBudgetSurface(viewer.profileRole);
 
   const repo = getEstimatesWriteRepository();
   let chapter: Awaited<ReturnType<typeof repo.getChapterById>>;
@@ -68,7 +71,8 @@ export default async function ChapterDetailPage({ params, searchParams }: PagePr
   } catch {
     versionEditable = false;
   }
-  const canArchive = canEdit && versionEditable;
+  const canArchive =
+    isCreationModeEnabled() && canArchiveBudgetItems(viewer.profileRole) && versionEditable;
 
   let items: BoqItemReviewView[] = [];
   let itemsError: string | null = null;

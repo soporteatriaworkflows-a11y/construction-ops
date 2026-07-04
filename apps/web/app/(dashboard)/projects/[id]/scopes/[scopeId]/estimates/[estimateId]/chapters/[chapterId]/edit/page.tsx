@@ -15,6 +15,7 @@ import {
   EstimateNotFoundError,
 } from '@/server/estimates';
 import { isCreationModeEnabled } from '../../../../../../../../mode-guard';
+import { canEditBudgetSurface } from '@/server/access/budget-surface';
 import { ChapterForm } from '../../../chapter-form';
 
 interface PageProps {
@@ -63,7 +64,7 @@ export default async function EditChapterPage({ params }: PageProps) {
         mode="edit"
         estimateId={estimateId}
         estimateHref={estimateHref}
-        canWrite={isCreationModeEnabled()}
+        canWrite={isCreationModeEnabled() && canEditBudgetSurface(viewer.profileRole)}
         editable={chapter.editable}
         initial={{ chapterId: chapter.id, code: chapter.code, name: chapter.name }}
         origin={{ sourceCode: chapter.sourceCode, sourceRow: chapter.sourceRow, isManual: chapter.isManual }}

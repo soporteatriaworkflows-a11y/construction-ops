@@ -16,6 +16,7 @@ import { resolveViewer } from '@/server/auth/resolve-viewer';
 import { getEstimatesWriteRepository, EstimateNotFoundError } from '@/server/estimates';
 import { getEstimateImportStatus } from '@/server/estimates/import';
 import { isCreationModeEnabled } from '../../../../../../mode-guard';
+import { canImportBudgetData } from '@/server/access/budget-surface';
 import { ImportFlow } from './import-flow';
 
 export const dynamic = 'force-dynamic';
@@ -44,7 +45,8 @@ export default async function ImportEstimatePage({ params }: PageProps) {
     notFound();
   }
 
-  const canCreate = isCreationModeEnabled();
+  // V5.6.6B: gate de modo + gate de ROL (solo editores de presupuesto).
+  const canCreate = isCreationModeEnabled() && canImportBudgetData(viewer.profileRole);
   const status = await getEstimateImportStatus(viewer, estimateId).catch(() => null);
 
   const breadcrumb = (

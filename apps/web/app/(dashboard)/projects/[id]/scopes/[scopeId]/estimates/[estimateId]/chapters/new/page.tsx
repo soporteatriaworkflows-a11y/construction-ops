@@ -11,6 +11,7 @@ import { PageHeader } from '@/components/shared/page-header';
 import { resolveViewer } from '@/server/auth/resolve-viewer';
 import { getEstimatesWriteRepository, EstimateNotFoundError } from '@/server/estimates';
 import { isCreationModeEnabled } from '../../../../../../../mode-guard';
+import { canEditBudgetSurface } from '@/server/access/budget-surface';
 import { ChapterForm } from '../../chapter-form';
 
 const LOCKED = ['approved', 'issued', 'archived'];
@@ -56,7 +57,7 @@ export default async function NewChapterPage({ params }: PageProps) {
         mode="create"
         estimateId={estimateId}
         estimateHref={estimateHref}
-        canWrite={isCreationModeEnabled()}
+        canWrite={isCreationModeEnabled() && canEditBudgetSurface(viewer.profileRole)}
         editable={editable}
       />
     </div>

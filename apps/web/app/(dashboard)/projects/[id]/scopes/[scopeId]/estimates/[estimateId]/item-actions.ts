@@ -25,6 +25,7 @@ import type { BoqItemInput, BoqItemUpdateInput } from '@/lib/estimates/boq-edit-
 import { resolveAuthenticatedViewer } from '@/server/auth/resolve-viewer';
 import { AuthError } from '@/server/auth/errors';
 import { isCreationModeEnabled } from '../../../../../mode-guard';
+import { canEditBudgetSurface } from '@/server/access/budget-surface';
 
 export type ItemActionResult =
   | { ok: true; itemId: string; chapterId: string; subtotal: string; financial: FinancialSummary }
@@ -64,7 +65,12 @@ function mapError(e: unknown): ItemActionResult {
 
 async function resolveOrError() {
   try {
-    return { viewer: await resolveAuthenticatedViewer() };
+    const viewer = await resolveAuthenticatedViewer();
+    // V5.6.6B: backstop de rol (compras/obra/consulta no editan BOQ).
+    if (!canEditBudgetSurface(viewer.profileRole)) {
+      return { error: 'Tu rol no permite editar el presupuesto.' };
+    }
+    return { viewer };
   } catch (e) {
     return { error: e instanceof AuthError ? (AUTH_MESSAGES[e.reason] ?? 'Error de autenticación.') : 'Error al verificar la sesión.' };
   }
