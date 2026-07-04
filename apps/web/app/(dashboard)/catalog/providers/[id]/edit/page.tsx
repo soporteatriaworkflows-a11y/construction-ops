@@ -25,6 +25,22 @@ export const dynamic = 'force-dynamic';
 // management=gerencia. consulta (client) y obra (site) quedan fuera.
 const EDIT_ROLES = ['management', 'internal'];
 
+type ProviderEditLoadResult =
+  | { status: 'ok'; provider: ProviderView }
+  | { status: 'forbidden' };
+
+async function loadProviderForEdit(id: string): Promise<ProviderEditLoadResult> {
+  const viewer = await resolveAuthenticatedViewer();
+  if (!EDIT_ROLES.includes(viewer.role)) {
+    return { status: 'forbidden' };
+  }
+
+  return {
+    status: 'ok',
+    provider: await getProviderRepository().getProviderById(viewer, id),
+  };
+}
+
 export default async function EditProviderPage({
   params,
 }: {
@@ -56,35 +72,37 @@ export default async function EditProviderPage({
     );
   }
 
-  let provider: ProviderView;
+  let loadResult: ProviderEditLoadResult;
   try {
-    const viewer = await resolveAuthenticatedViewer();
-    if (!EDIT_ROLES.includes(viewer.role)) {
-      return (
-        <div>
-          <PageHeader title="Editar proveedor" />
-          <div
-            className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
-            role="alert"
-          >
-            Tu rol no permite editar proveedores.
-          </div>
-          <div className="mt-4">
-            <Link href="/catalog/providers">
-              <Button variant="outline" size="sm">
-                <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-                Volver a proveedores
-              </Button>
-            </Link>
-          </div>
-        </div>
-      );
-    }
-    provider = await getProviderRepository().getProviderById(viewer, id);
+    loadResult = await loadProviderForEdit(id);
   } catch (e) {
     if (e instanceof ProviderNotFoundError) notFound();
     throw e;
   }
+
+  if (loadResult.status === 'forbidden') {
+    return (
+      <div>
+        <PageHeader title="Editar proveedor" />
+        <div
+          className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+          role="alert"
+        >
+          Tu rol no permite editar proveedores.
+        </div>
+        <div className="mt-4">
+          <Link href="/catalog/providers">
+            <Button variant="outline" size="sm">
+              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+              Volver a proveedores
+            </Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const { provider } = loadResult;
 
   return (
     <div>
