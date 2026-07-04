@@ -16,7 +16,7 @@ import { EmptyState } from '@/components/shared/empty-state';
 import { resolveViewer } from '@/server/auth/resolve-viewer';
 import { resolveAuthenticatedViewer } from '@/server/auth/resolve-viewer';
 import { resolveAuthMode } from '@/lib/supabase/env';
-import { requireModuleAccess } from '@/server/access';
+import { checkModuleAccess } from '@/server/access';
 import { getObservationRepository, getProviderRepository } from '@/server/pricing';
 import type { ResourcePriceHistoryRow } from '@/server/pricing';
 import { getMonitorRepository } from '@/server/pricing/monitor';
@@ -59,14 +59,33 @@ function redactHistoryRows(rows: ResourcePriceHistoryRow[]): ResourcePriceHistor
   }));
 }
 
+
+function PriceIntelligenceDenied() {
+  return (
+    <div>
+      <PageHeader
+        title="Inteligencia de precios"
+        breadcrumb={
+          <Link href="/catalog" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
+            <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
+            Catalogo
+          </Link>
+        }
+      />
+      <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="alert">
+        Esta accion esta disponible para perfiles autorizados de analisis de precios. Tu perfil no tiene acceso a esta vista. Solicita autorizacion a gerencia o administracion.
+      </div>
+    </div>
+  );
+}
+
 interface PageProps {
   params: Promise<{ resourceId: string }>;
 }
 
 export default async function PriceIntelligencePage({ params }: PageProps) {
-  // V5.6.2: guard de módulo server-side. `price-intelligence` =
-  // admin/gerencia/compras (deny-by-default para el resto).
-  await requireModuleAccess('price-intelligence');
+  const access = await checkModuleAccess('price-intelligence');
+  if (!access.ok) return <PriceIntelligenceDenied />;
   const { resourceId } = await params;
 
   let historyRows: ResourcePriceHistoryRow[] = [];

@@ -32,11 +32,12 @@ export type { WorkspaceTask } from './schedule-workspace-filter';
 interface Props {
   tasks: WorkspaceTask[];
   canSeeCriticalPath: boolean;
+  clientSafe?: boolean;
   /** Solicita editar la tarea (la shell cambia a la pestaña de edición). */
   onRequestEdit?: (taskId: string) => void;
 }
 
-export function ScheduleWorkspace({ tasks, canSeeCriticalPath, onRequestEdit }: Props) {
+export function ScheduleWorkspace({ tasks, canSeeCriticalPath, clientSafe = false, onRequestEdit }: Props) {
   const groups = useMemo(() => groupByChapter(tasks), [tasks]);
 
   const [search, setSearch] = useState('');
@@ -115,27 +116,29 @@ export function ScheduleWorkspace({ tasks, canSeeCriticalPath, onRequestEdit }: 
                 <option value="delayed">Atrasadas</option>
               </select>
             </div>
-            <div>
-              <label htmlFor="wsProd" className="mb-1 block text-xs font-medium text-gray-600">Rendimiento</label>
-              <select id="wsProd" value={productivityFilter} onChange={(e) => setProductivityFilter(e.target.value as ProductivityFilter)} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
-                <option value="all">Todos</option>
-                <option value="apu">Con rendimiento APU</option>
-                <option value="manual">Manual (sin APU)</option>
-                <option value="unknown">APU sin rendimiento</option>
-              </select>
-            </div>
+            {!clientSafe && (
+              <div>
+                <label htmlFor="wsProd" className="mb-1 block text-xs font-medium text-gray-600">Rendimiento</label>
+                <select id="wsProd" value={productivityFilter} onChange={(e) => setProductivityFilter(e.target.value as ProductivityFilter)} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+                  <option value="all">Todos</option>
+                  <option value="apu">Con rendimiento APU</option>
+                  <option value="manual">Manual (sin APU)</option>
+                  <option value="unknown">APU sin rendimiento</option>
+                </select>
+              </div>
+            )}
             <button type="button" onClick={clearFilters} disabled={!filtersActive} className="rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50">
               Limpiar filtros
             </button>
           </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            {noApuCount > 0 && (
+            {!clientSafe && noApuCount > 0 && (
               <button type="button" onClick={() => toggleProductivityChip('manual')} aria-pressed={productivityFilter === 'manual'} className={chipClass(productivityFilter === 'manual')}>
                 ⚠ {noApuCount} sin APU
               </button>
             )}
-            {noYieldCount > 0 && (
+            {!clientSafe && noYieldCount > 0 && (
               <button type="button" onClick={() => toggleProductivityChip('unknown')} aria-pressed={productivityFilter === 'unknown'} className={chipClass(productivityFilter === 'unknown')}>
                 ⚠ {noYieldCount} sin rendimiento
               </button>
@@ -164,7 +167,7 @@ export function ScheduleWorkspace({ tasks, canSeeCriticalPath, onRequestEdit }: 
                     <ChevronRight className={`h-4 w-4 shrink-0 text-gray-500 transition-transform ${isOpen ? 'rotate-90' : ''}`} aria-hidden="true" />
                     {group.wbsCode !== '—' && <span className="font-mono text-xs text-gray-500">{group.wbsCode}</span>}
                     <span className="truncate font-semibold text-gray-800">{group.name}</span>
-                    {agg.withWarnings > 0 && <span title={`${agg.withWarnings} con advertencia`} className="h-2 w-2 shrink-0 rounded-full bg-amber-400" aria-label="con advertencias" />}
+                    {!clientSafe && agg.withWarnings > 0 && <span title={`${agg.withWarnings} con advertencia`} className="h-2 w-2 shrink-0 rounded-full bg-amber-400" aria-label="con advertencias" />}
                     <span className="ml-auto flex shrink-0 items-center gap-2 text-xs text-gray-500">
                       <span className="tabular-nums">{agg.completed}/{agg.total}</span>
                       <span className="h-1.5 w-16 overflow-hidden rounded-full bg-gray-200" aria-hidden="true">
@@ -188,7 +191,7 @@ export function ScheduleWorkspace({ tasks, canSeeCriticalPath, onRequestEdit }: 
                                 {isDelayed(t) && <span className="shrink-0 rounded-full bg-red-100 px-1.5 text-[10px] font-semibold text-red-700">atrasada</span>}
                                 {t.isCritical && <span className="shrink-0 rounded-full bg-red-100 px-1.5 text-[10px] font-semibold text-red-700">crítica</span>}
                               </span>
-                              <ProductivityDot source={t.productivitySource} />
+                              {!clientSafe && <ProductivityDot source={t.productivitySource} />}
                               <span className="w-10 shrink-0 text-right text-xs tabular-nums text-gray-600">{formatNumber(t.progressPct, 0)}%</span>
                               <span className="hidden shrink-0 sm:block"><ScheduleStatusBadge status={t.status} /></span>
                             </button>
@@ -207,7 +210,7 @@ export function ScheduleWorkspace({ tasks, canSeeCriticalPath, onRequestEdit }: 
 
       {/* ── Zona detalle: panel de la tarea seleccionada ───────────────────── */}
       <aside className="lg:sticky lg:top-4 lg:self-start">
-        <TaskDetailPanel task={selected} canSeeCriticalPath={canSeeCriticalPath} onRequestEdit={onRequestEdit} />
+        <TaskDetailPanel task={selected} canSeeCriticalPath={canSeeCriticalPath} clientSafe={clientSafe} onRequestEdit={onRequestEdit} />
       </aside>
     </div>
   );
@@ -233,10 +236,12 @@ function ProductivityDot({ source }: { source: string | null | undefined }) {
 function TaskDetailPanel({
   task,
   canSeeCriticalPath,
+  clientSafe,
   onRequestEdit,
 }: {
   task: WorkspaceTask | null;
   canSeeCriticalPath: boolean;
+  clientSafe: boolean;
   onRequestEdit?: (taskId: string) => void;
 }) {
   if (!task) {
@@ -244,7 +249,7 @@ function TaskDetailPanel({
       <div className="flex min-h-[200px] flex-col items-center justify-center rounded-md border border-dashed border-gray-300 bg-gray-50 p-6 text-center">
         <p className="text-sm font-medium text-gray-700">Selecciona una tarea</p>
         <p className="mt-1 text-xs text-gray-500">
-          para ver detalle, avance, duración, responsable, rendimiento y vínculos BOQ/APU.
+          {clientSafe ? 'para ver detalle, avance, fechas y responsable.' : 'para ver detalle, avance, duracion, responsable, rendimiento y vinculos BOQ/APU.'}
         </p>
       </div>
     );
@@ -272,20 +277,20 @@ function TaskDetailPanel({
           <dd className="mt-0.5"><ScheduleStatusBadge status={task.status} /></dd>
         </div>
         <Field label="Responsable" value={task.responsible ?? '—'} />
-        {(task.crewLabel || task.crewSize) && (
+        {!clientSafe && (task.crewLabel || task.crewSize) && (
           <Field label="Cuadrilla" value={`${task.crewLabel ?? ''}${task.crewSize ? ` (${formatNumber(task.crewSize, 1)})` : ''}`.trim() || '—'} />
         )}
         {canSeeCriticalPath && task.totalFloatDays !== undefined && (
           <Field label="Holgura" value={`${formatNumber(task.totalFloatDays, 0)} d`} />
         )}
-        {isActivity && (task.quantitySnapshot || task.unitSnapshot) && (
+        {!clientSafe && isActivity && (task.quantitySnapshot || task.unitSnapshot) && (
           <Field label="Cantidad" value={`${task.quantitySnapshot ? Number(task.quantitySnapshot).toLocaleString('es-CO') : '—'} ${task.unitSnapshot ?? ''}`.trim()} />
         )}
       </dl>
 
-      {isActivity && (
+      {!clientSafe && isActivity && (
         <div>
-          <p className="text-xs text-gray-500">Rendimiento y vínculos</p>
+          <p className="text-xs text-gray-500">Rendimiento y vinculos</p>
           <div className="mt-1 flex flex-wrap items-center gap-2">
             <ProductivityTag source={task.productivitySource} />
             <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs ${task.boqItemId ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-400'}`}>BOQ {task.boqItemId ? '✓' : '—'}</span>
@@ -295,10 +300,10 @@ function TaskDetailPanel({
       )}
 
       {/* Advertencias específicas de la tarea. */}
-      {task.productivitySource === 'manual' && (
+      {!clientSafe && task.productivitySource === 'manual' && (
         <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">⚠ Sin APU vinculado: duración manual (mínima).</p>
       )}
-      {task.productivitySource === 'unknown' && (
+      {!clientSafe && task.productivitySource === 'unknown' && (
         <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">⚠ APU sin rendimiento laboral usable: duración manual (mínima).</p>
       )}
       {isDelayed(task) && (

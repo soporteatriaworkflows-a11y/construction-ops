@@ -107,6 +107,7 @@ export default async function BoqWorkspacePage({ params, searchParams }: PagePro
   // V5.6.6B: gate de modo + gate de ROL (compras/obra/consulta solo lectura).
   const canEdit = isCreationModeEnabled() && canEditBudgetSurface(viewer.profileRole);
   const showIndirects = canViewIndirectCosts(viewer.profileRole);
+  const canUseCommercialSimulator = ['admin', 'gerencia', 'presupuestos'].includes(viewer.profileRole ?? '');
   const versionEditable = isVersionEditable(active.status);
   const canMutate = canEdit && versionEditable;
   const statusLabel = ESTIMATE_VERSION_STATUS_LABELS[active.status] ?? active.status;
@@ -222,13 +223,17 @@ export default async function BoqWorkspacePage({ params, searchParams }: PagePro
       </section>
 
       {/* E+F — Simulador comercial (panel separado, sin persistencia) */}
-      <section aria-label="Simulador comercial" className="mt-8">
-        <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-600">
-          <LayoutGrid className="h-4 w-4 text-gray-400" aria-hidden="true" />
-          Estrategia comercial
-        </h2>
-        <CommercialSimulator estimateId={estimateId} baseTotal={financialSummary.grandTotal} />
-      </section>
+      {canUseCommercialSimulator && (
+        <section aria-label="Simulador comercial" className="mt-8">
+          <div className="mb-3">
+            <h2 className="text-sm font-semibold text-gray-700 dark:text-content">Simulador comercial</h2>
+            <p className="text-xs text-gray-500 dark:text-content-muted">
+              Herramienta de estrategia: aplica descuento/margen y genera snapshots privados. No modifica precios base ni versiones.
+            </p>
+          </div>
+          <CommercialSimulator estimateId={estimateId} baseTotal={financialSummary.grandTotal} />
+        </section>
+      )}
     </div>
   );
 }

@@ -21,11 +21,12 @@ interface Props {
   warningCount: number;
   gantt: ReactNode;
   trace: ReactNode;
+  clientSafe?: boolean;
   /** Panel de edición existente (intacto). `null` si el rol no puede gestionar. */
   edit: ReactNode | null;
 }
 
-export function ScheduleDetailShell({ tasks, canSeeCriticalPath, warningCount, gantt, trace, edit }: Props) {
+export function ScheduleDetailShell({ tasks, canSeeCriticalPath, warningCount, gantt, trace, edit, clientSafe = false }: Props) {
   const [tab, setTab] = useState<Tab>('tasks');
 
   const tabs: { id: Tab; label: string; badge?: number; show: boolean }[] = [
@@ -65,6 +66,7 @@ export function ScheduleDetailShell({ tasks, canSeeCriticalPath, warningCount, g
         <ScheduleWorkspace
           tasks={tasks}
           canSeeCriticalPath={canSeeCriticalPath}
+          clientSafe={clientSafe}
           onRequestEdit={edit !== null ? () => setTab('edit') : undefined}
         />
       </div>

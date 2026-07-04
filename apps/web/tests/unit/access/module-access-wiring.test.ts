@@ -37,8 +37,9 @@ describe('ROUTE GUARDS — páginas de módulos internos exigen módulo server-s
     expect(catalogLayout).toMatch(/requireModuleAccess\(\s*['"]catalog['"]\s*\)/);
   });
 
-  it('price-intelligence/page.tsx exige "price-intelligence"', () => {
-    expect(priceIntelPage).toMatch(/requireModuleAccess\(\s*['"]price-intelligence['"]\s*\)/);
+  it('price-intelligence/page.tsx verifica "price-intelligence" y muestra denegacion inline', () => {
+    expect(priceIntelPage).toMatch(/checkModuleAccess\(\s*['"]price-intelligence['"]\s*\)/);
+    expect(priceIntelPage).toContain('PriceIntelligenceDenied');
   });
 
   it('monitoring/page.tsx exige "monitoring"', () => {
