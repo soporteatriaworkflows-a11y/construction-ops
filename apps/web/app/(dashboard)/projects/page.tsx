@@ -30,6 +30,7 @@ import { Button } from '@/components/ui/button';
 import { formatDate } from '@/lib/utils/format';
 import { getReadModel } from '@/server/read-model';
 import { resolveViewer } from '@/server/auth/resolve-viewer';
+import { isScopedProfileRole } from '@/server/auth/types';
 import { isCreationModeEnabled } from './mode-guard';
 
 export default async function ProjectsPage() {
@@ -110,9 +111,10 @@ export default async function ProjectsPage() {
       />
 
       {projects.length === 0 ? (
-        viewer.role === 'client' ? (
-          // V5.6.4: consulta sin proyectos asignados — estado deliberado, sin
-          // CTA de creación (no puede crear) y sin insinuar que "no existen".
+        viewer.role === 'client' || isScopedProfileRole(viewer.profileRole) ? (
+          // V5.6.4 + V5.6.6C: rol scoped (consulta/obra/compras) sin proyectos
+          // asignados — estado deliberado, sin CTA de creación y sin insinuar
+          // que "no existen" proyectos en la organización.
           <EmptyState
             icon={FolderOpen}
             title="Aún no tienes proyectos asignados"

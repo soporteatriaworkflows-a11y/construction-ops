@@ -16,6 +16,25 @@ export type ProfileRole =
   | 'consulta';
 
 /**
+ * V5.6.6C (INTERNAL_PROJECT_GRANTS): roles cuyo alcance de proyectos se
+ * limita a `project_access_grants` (deny-by-default sin asignación explícita;
+ * backfill de continuidad para usuarios existentes en la migración).
+ * admin/gerencia/presupuestos son allow-all por decisión aprobada.
+ */
+export const SCOPED_PROFILE_ROLES: readonly ProfileRole[] = [
+  'consulta',
+  'obra',
+  'compras',
+];
+
+export function isScopedProfileRole(
+  profileRole: string | null | undefined,
+): boolean {
+  if (!profileRole) return false;
+  return (SCOPED_PROFILE_ROLES as readonly string[]).includes(profileRole);
+}
+
+/**
  * Viewer real, resuelto SOLO server-side desde la sesión válida y `profiles`.
  * Espejo de `AuthenticatedViewer` del AUTH_CONTRACT.
  */

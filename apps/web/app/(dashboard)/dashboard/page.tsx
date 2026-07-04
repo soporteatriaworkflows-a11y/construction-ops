@@ -57,6 +57,7 @@ import { formatCountdown } from '@/lib/pricing/monitor-ui';
 import { resolveViewer } from '@/server/auth/resolve-viewer';
 import { resolveAccessActor } from '@/server/access';
 import { canAccessModule, isAccessModule, type AccessModule } from '@/server/access/module-access';
+import { isScopedProfileRole } from '@/server/auth/types';
 import { canUseQuoteAssistant } from '@/lib/access/surface-visibility';
 import { AuthError } from '@/server/auth/errors';
 import { InviteMembershipRecovery } from '@/components/auth/invite-membership-recovery';
@@ -283,10 +284,11 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const canCreate = isCreationModeEnabled();
   const isFixtureMode = resolveSource(process.env.READ_MODEL_SOURCE) === 'fixture';
 
-  // Base sin proyectos: organización recién creada, o (V5.6.4) un usuario
-  // consulta sin proyectos asignados — estado deliberado, nunca un error.
+  // Base sin proyectos: organización recién creada, o (V5.6.4 + V5.6.6C) un
+  // usuario de rol scoped (consulta/obra/compras) sin proyectos asignados —
+  // estado deliberado, nunca un error.
   if (!projectId) {
-    const isConsulta = profileRole === 'consulta';
+    const isConsulta = isScopedProfileRole(profileRole);
     return (
       <div>
         <OperationsHeader

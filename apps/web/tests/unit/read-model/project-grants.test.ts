@@ -65,13 +65,30 @@ describe('project-grants — helper puro (deny-by-default)', () => {
     expect(resolveGrantedProjects(viewer)).toBe('all');
   });
 
-  it('roles NO client ignoran projectGrants (siempre alcance de organización)', () => {
+  it('V5.6.6C: una LISTA de grants restringe a CUALQUIER rol (obra/compras scoped)', () => {
+    // El alcance ya no depende del ViewerRole: los roles internos scoped
+    // (obra→site, compras→internal) llegan con lista resuelta server-side y
+    // quedan restringidos exactamente igual que client.
+    for (const role of ['internal', 'management', 'site'] as const) {
+      const scoped = resolveGrantedProjects({ ...base, role, projectGrants: [PROJECT] });
+      expect(scoped).not.toBe('all');
+      expect((scoped as ReadonlySet<Uuid>).has(PROJECT)).toBe(true);
+      const empty = resolveGrantedProjects({ ...base, role, projectGrants: [] });
+      expect(empty).not.toBe('all');
+      expect((empty as ReadonlySet<Uuid>).size).toBe(0);
+    }
+  });
+
+  it('sin grants resueltos (undefined): fail-closed solo para client; el resto conserva all', () => {
+    // Paridad V5.6.4 + literales demo internos (sin concepto de grants):
+    // los allow-all (admin/gerencia/presupuestos) llegan con 'all' explícito
+    // desde resolve-viewer; undefined solo ocurre en literales demo.
     for (const role of ['internal', 'management', 'site'] as const) {
       expect(resolveGrantedProjects({ ...base, role })).toBe('all');
-      expect(
-        resolveGrantedProjects({ ...base, role, projectGrants: [] }),
-      ).toBe('all');
     }
+    const client = resolveGrantedProjects({ ...base, role: 'client' });
+    expect(client).not.toBe('all');
+    expect((client as ReadonlySet<Uuid>).size).toBe(0);
   });
 
   it('filterGrantedProjects intersecta por id', () => {

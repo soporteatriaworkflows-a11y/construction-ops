@@ -18,7 +18,7 @@ import { resolveAuthMode, type AppAuthMode } from '@/lib/supabase/env';
 import { getSessionClaims } from './session';
 import { mapProfileRoleToViewerRole } from './role-map';
 import { AuthError } from './errors';
-import type { AuthenticatedViewer, ProfileRole } from './types';
+import { isScopedProfileRole, type AuthenticatedViewer, type ProfileRole } from './types';
 
 /**
  * Resuelve el `AuthenticatedViewer` real desde la sesión de Supabase y la fila
@@ -51,14 +51,14 @@ export async function resolveAuthenticatedViewer(): Promise<AuthenticatedViewer>
     throw new AuthError('no_membership', 'El perfil no tiene organización.');
   }
 
-  // V5.6.4 (CLIENT_PROJECT_SCOPE): solo `client` queda restringido por
-  // proyecto; sus grants se leen RLS-bound (fila propia). Deny-by-default:
-  // ante cualquier error de lectura (p. ej. migración aún no aplicada) el
-  // alcance es la lista vacía (0 proyectos), nunca fail-open.
-  const projectGrants: ProjectGrants =
-    role === 'client'
-      ? await resolveClientProjectGrants(supabase, data.id as string)
-      : 'all';
+  // V5.6.4 + V5.6.6C (INTERNAL_PROJECT_GRANTS): los roles SCOPED (consulta,
+  // obra, compras) quedan restringidos a sus proyectos asignados; sus grants
+  // se leen RLS-bound (fila propia). Deny-by-default: ante cualquier error de
+  // lectura el alcance es la lista vacía (0 proyectos), nunca fail-open.
+  // admin/gerencia/presupuestos: allow-all (decisión aprobada V5.6.6C).
+  const projectGrants: ProjectGrants = isScopedProfileRole(data.role as string)
+    ? await resolveClientProjectGrants(supabase, data.id as string)
+    : 'all';
 
   return {
     userId: session.userId,
@@ -106,8 +106,11 @@ export function toViewerContext(v: AuthenticatedViewer): ViewerContext {
     organizationId: v.organizationId,
     profileId: v.profileId,
     role: v.role,
-    // Normalización fail-closed: un viewer `client` sin grants resueltos ⇒ [].
-    projectGrants: v.projectGrants ?? (v.role === 'client' ? [] : 'all'),
+    // Normalización fail-closed: un viewer `client` o de rol scoped
+    // (obra/compras, V5.6.6C) sin grants resueltos ⇒ [].
+    projectGrants:
+      v.projectGrants ??
+      (v.role === 'client' || isScopedProfileRole(v.profileRole) ? [] : 'all'),
     // V5.6.6B: acarrea el rol de profiles para gates de superficie.
     profileRole: v.profileRole,
   };

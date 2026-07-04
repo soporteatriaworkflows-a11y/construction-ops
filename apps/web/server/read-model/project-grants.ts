@@ -26,12 +26,20 @@ export type GrantedProjects = 'all' | ReadonlySet<Uuid>;
 
 /**
  * Resuelve el alcance de proyectos del `viewer`. PURA (sin I/O).
- * Deny-by-default para `client`: `undefined`/`[]` ⇒ conjunto vacío.
+ *
+ * V5.6.6C (INTERNAL_PROJECT_GRANTS): el alcance ya no depende del ViewerRole
+ * sino de los grants resueltos server-side — los roles internos SCOPED
+ * (obra/compras) llegan con una LISTA de proyectos igual que `client`, y los
+ * allow-all (admin/gerencia/presupuestos) llegan con `'all'`.
+ *  - `projectGrants` lista ⇒ ese conjunto exacto (cualquier rol).
+ *  - `projectGrants` 'all' ⇒ sin restricción.
+ *  - `projectGrants` ausente ⇒ fail-closed SOLO para `client` (paridad
+ *    V5.6.4); para el resto conserva 'all' (literales demo internos).
  */
 export function resolveGrantedProjects(viewer: ViewerContext): GrantedProjects {
-  if (viewer.role !== 'client') return 'all';
   if (viewer.projectGrants === 'all') return 'all';
-  return new Set(viewer.projectGrants ?? []);
+  if (viewer.projectGrants !== undefined) return new Set(viewer.projectGrants);
+  return viewer.role === 'client' ? new Set<Uuid>() : 'all';
 }
 
 /** ¿El `projectId` está dentro del alcance del `viewer`? */
