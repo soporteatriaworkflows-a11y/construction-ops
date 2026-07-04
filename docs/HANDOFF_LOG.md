@@ -1,5 +1,15 @@
 # Handoff Log
 
+## 2026-07-03 - STEEL_OPS_UIX_HEAVY_WAVE + HARDENING - PR #38 - Fable UIX
+
+- Rama `feature/steel-ops-uix-heavy-wave` (desde `feature/steel-ops-fable-uix` + merge de `origin/feature/steel-ops-f1-domain`; `origin/main` ya era ancestro). PR #38 abierto contra main, SIN merge. `docs/F1_DOMAIN_CONTRACT.md` sigue sin trackear, excluido de todos los commits.
+- Oleada 1 (implementación): 9 pantallas preview bajo `app/(dashboard)/steel/*` gateadas por `STEEL_OPS_UIX_PREVIEW` (env + rol admin/gerencia/presupuestos vía `lib/steel/preview-gate.ts`, `notFound()` en layout), mocks sanitizados (`lib/steel/mock-data.ts`), puente al dominio real F1 (`lib/steel/domain-bridge.ts`: parser, calculadora, alertas, clasificador D5, FFD), 17 tests nuevos. Cero ediciones a archivos compartidos (`server/access`, sidebar, ACCESS_MODULES, command palette), cero DB/Supabase/RLS/.env.
+- Oleada 2 (hardening/polish por Fable): corrección de bug real (ahorro COP era `m × COP/kg`; ahora `ml × kg/m × COP/kg` en `computeOffcutSavings`); hub con propuesta de valor + KPIs de ahorro y líneas por revisar; review center con fuente/lo-leído/lo-calculado/veredicto OK-Revisar-Crítico; optimización agrupada por varilla/perfil con advertencia FFD heurístico; pedidos con totales kg/ml y vigencias vencidas resaltadas; catálogo con estados de precio espejo del pipeline real (estimado/proveedor/aprobado/vencido); boq-link con riesgos (A8/A9/A10) y acciones mock; settings sin inputs falsos; accesibilidad (aria-current, scope=col, aria-pressed, min-width en tablas). 4 tests nuevos.
+- QA final: typecheck 0 · lint 0 · suite completa 2524/2524 (42 skipped pre-existentes).
+- Detalle completo: `docs/STEEL_OPS_UIX_HEAVY_WAVE_HANDOFF.md`. Secuencia recomendada: merge #36 → merge #35 → rebase #38 (diff queda solo-UIX) → evaluar merge #38 flag-off.
+
+---
+
 ## 2026-07-03 - STEEL_OPS_F2_DATA_RLS_BLUEPRINT - EN RAMA + PR, DOCS-ONLY (agent-orchestrator + oleada F2)
 
 - Worktree separado: C:/OPS_AGENT/construction-ops-steel-f2-data. Rama: feature/steel-ops-f2-data-blueprint (base origin/main = 894d049). NO se tocó feature/steel-ops-uix-heavy-wave (PR #38, Fable UIX).
