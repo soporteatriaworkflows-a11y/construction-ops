@@ -74,6 +74,39 @@ export function newManualTakeoffId(
   return `${MANUAL_TAKEOFF_ID_PREFIX}${now().toString(36)}-${random().toString(36).slice(2, 7)}`;
 }
 
+/** Id fijo del takeoff demo local para probar la lectura asistida (F6A). */
+export const DEMO_INTAKE_TAKEOFF_ID = `${MANUAL_TAKEOFF_ID_PREFIX}demo-lectura`;
+
+/**
+ * Garantiza que exista el takeoff demo de lectura asistida (pura e
+ * idempotente): si ya está en los registros los devuelve intactos; si no,
+ * lo agrega vacío en `draft`. Solo localStorage — jamás DB.
+ */
+export function ensureDemoIntakeTakeoff(
+  records: readonly ManualTakeoffRecord[],
+  today: string = new Date().toISOString().slice(0, 10),
+): { records: readonly ManualTakeoffRecord[]; id: string; created: boolean } {
+  if (records.some((takeoff) => takeoff.id === DEMO_INTAKE_TAKEOFF_ID)) {
+    return { records, id: DEMO_INTAKE_TAKEOFF_ID, created: false };
+  }
+  return {
+    records: [
+      ...records,
+      {
+        id: DEMO_INTAKE_TAKEOFF_ID,
+        name: 'Demo — lectura asistida PDF/plano',
+        projectName: 'Demo local',
+        scopeLabel: 'Prueba de lectura asistida',
+        status: 'draft',
+        createdAt: today,
+        lines: [],
+      },
+    ],
+    id: DEMO_INTAKE_TAKEOFF_ID,
+    created: true,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Ciclo de vida del takeoff manual (draft → in_review → approved → locked)
 // ---------------------------------------------------------------------------

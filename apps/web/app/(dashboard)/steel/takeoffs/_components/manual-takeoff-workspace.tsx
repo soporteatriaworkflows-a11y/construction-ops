@@ -10,6 +10,7 @@
 
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { ArrowLeft, ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/shared/page-header';
@@ -24,6 +25,7 @@ import {
   canTransitionManualTakeoff,
   computeManualLines,
   computeManualTotals,
+  ensureDemoIntakeTakeoff,
   MANUAL_TAKEOFF_STATUS_TRANSITIONS,
   MANUAL_TAKEOFF_TRANSITION_LABEL,
   type ManualCutPlanResult,
@@ -31,6 +33,7 @@ import {
   type ManualOrderDraft,
   type ManualTakeoffRecord,
 } from '@/lib/steel/manual-takeoff';
+import { loadManualTakeoffs } from '@/lib/steel/manual-store';
 import { useManualTakeoffs, writeManualTakeoffs } from '@/lib/steel/use-manual-takeoffs';
 import type { SteelTakeoffStatusView } from '@/lib/steel/types';
 import { SteelStatusBadge } from '../../_components/steel-status-badge';
@@ -58,6 +61,7 @@ function SectionTitle({ step, title }: { step: number; title: string }) {
 }
 
 export function ManualTakeoffWorkspace({ takeoffId }: { takeoffId: string }) {
+  const router = useRouter();
   const { takeoffs, hydrated } = useManualTakeoffs();
   const [planResult, setPlanResult] = useState<ManualCutPlanResult | null>(null);
   const [order, setOrder] = useState<ManualOrderDraft | null>(null);
@@ -72,7 +76,9 @@ export function ManualTakeoffWorkspace({ takeoffId }: { takeoffId: string }) {
   const referenceDate = new Date().toISOString().slice(0, 10);
 
   function updateTakeoff(mutate: (current: ManualTakeoffRecord) => ManualTakeoffRecord) {
-    writeManualTakeoffs(takeoffs.map((t) => (t.id === takeoffId ? mutate(t) : t)));
+    // Siempre sobre el store fresco (no el snapshot renderizado): robusto ante
+    // hidratación tardía y cambios desde otra pestaña.
+    writeManualTakeoffs(loadManualTakeoffs().map((t) => (t.id === takeoffId ? mutate(t) : t)));
   }
 
   function handleAddLine(line: Omit<ManualLineRecord, 'id'>) {
@@ -117,8 +123,20 @@ export function ManualTakeoffWorkspace({ takeoffId }: { takeoffId: string }) {
     setOrder(buildManualOrderDraft(takeoff.name, planResult.plan));
   }
 
+  function handleOpenDemo() {
+    const ensured = ensureDemoIntakeTakeoff(loadManualTakeoffs());
+    if (ensured.created) writeManualTakeoffs(ensured.records);
+    router.push(`/steel/takeoffs/${ensured.id}`);
+  }
+
   if (!hydrated) {
-    return <p className="text-sm text-iconic-graphite/50">Cargando takeoff local…</p>;
+    return (
+      <p className="text-sm text-iconic-graphite/50">
+        Leyendo el takeoff guardado en este navegador… Si este mensaje no desaparece, recarga la
+        página sin caché (Ctrl+Shift+R): suele deberse a una versión anterior abierta en la
+        pestaña.
+      </p>
+    );
   }
 
   if (!takeoff) {
@@ -126,10 +144,15 @@ export function ManualTakeoffWorkspace({ takeoffId }: { takeoffId: string }) {
       <EmptyState
         icon={ClipboardList}
         title="Takeoff manual no encontrado en este navegador"
-        description="Los takeoffs manuales del preview F3 se guardan en localStorage: solo existen en el navegador donde se crearon."
+        description="Los takeoffs manuales del preview F3 se guardan en localStorage: solo existen en el navegador donde se crearon. Puedes volver a la lista para crear uno, o abrir el takeoff demo de lectura asistida."
         action={
           <Button asChild variant="outline">
             <Link href="/steel/takeoffs">Volver a takeoffs</Link>
+          </Button>
+        }
+        secondaryAction={
+          <Button type="button" variant="ghost" onClick={handleOpenDemo}>
+            Probar lectura asistida desde PDF/plano
           </Button>
         }
       />
@@ -192,8 +215,8 @@ export function ManualTakeoffWorkspace({ takeoffId }: { takeoffId: string }) {
         />
       </div>
 
-      <section className="mb-8" aria-label="Importar desde PDF o plano">
-        <SectionTitle step={1} title="Importar desde PDF/plano (preview)" />
+      <section className="mb-8" aria-label="Lectura asistida desde PDF o plano">
+        <SectionTitle step={1} title="Lectura asistida desde PDF/plano (preview)" />
         <ManualPdfIntakeSection disabled={!canEdit} onAddApproved={handleAddLines} />
       </section>
 
