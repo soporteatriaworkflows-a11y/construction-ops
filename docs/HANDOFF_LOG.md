@@ -1,5 +1,16 @@
 # Handoff Log
 
+## 2026-07-03 - STEEL_OPS_F2_DATA_RLS_BLUEPRINT - EN RAMA + PR, DOCS-ONLY (agent-orchestrator + oleada F2)
+
+- Worktree separado: C:/OPS_AGENT/construction-ops-steel-f2-data. Rama: feature/steel-ops-f2-data-blueprint (base origin/main = 894d049). NO se tocó feature/steel-ops-uix-heavy-wave (PR #38, Fable UIX).
+- Oleada multiagente F2 real (subagentes en paralelo con archivos propios): Agente 0 orquestador + A1 Data Model + A2 RLS + A3 Pricing Integration + A4 APU/BOQ Integration + A5 Import/Source + A6 Migration Safety + A7 QA + A8 Risk. Desarrolla la fase F2 del blueprint padre docs/design-references/STEEL_OPS_V1_BLUEPRINT.md.
+- Entregables (4 docs nuevos, SOLO documentación): docs/STEEL_OPS_F2_DATA_RLS_BLUEPRINT.md (principal: principios, integración precios/proveedores y APU/BOQ, desviaciones vs V1, decisiones abiertas D-F2-1…D-F2-4), docs/STEEL_OPS_F2_SCHEMA_DRAFT.md (15 entidades steel_* con campos/FKs/índices/constraints/estados/auditoría + steel_specs como 16ª de soporte P-01 + estrategia de archivos fuente con SHA-256/Storage privado/confidence/needs_review), docs/STEEL_OPS_F2_RLS_TEST_PLAN.md (RLS ENABLE+FORCE desde migración 1, matriz por rol con consulta en deny total, lecturas/escrituras separadas sin FOR ALL, steel_actions append-only, sección [ST] del harness con 26 checks, FORCE count 43→58/59, plan de pruebas F2 en 9 grupos), docs/STEEL_OPS_F2_MIGRATION_SAFETY_PLAN.md (4 migraciones: tablas vacías → RLS → seeds revisables → integración; gate STEEL_OPS_DB_APPLY_GATE espejo de V5_6_5A; rollback flag-off + módulo droppable sin FKs entrantes; doble candado STEEL_OPS_ENABLED + ACCESS_MODULES.steel; registro de riesgos con mitigaciones).
+- Principios verificados contra el esquema real (DATABASE_SCHEMA.md): fuente única de precios = resources/suppliers/supplier_products/price_observations + resource_price_observations (steel solo emite observaciones pending vía quotes, source_type='quotation'); jerarquía única = project_scopes; steel jamás escribe boq_items (consumo vía RPCs existentes); snapshots inmutables en takeoff locked y pedido approved.
+- Restricciones respetadas: sin código ejecutable, sin migraciones reales, sin Supabase/db push, sin RLS real, sin .env, sin Vercel, sin deploy, sin producción, sin tocar UIX/app/(dashboard)/steel/modules/steel/APU/BOQ/catálogo.
+- SIGUIENTE: revisión humana del paquete F2 → congelar contrato → oleada de implementación EN RAMA (migraciones gated) según el safety plan. STOP: PR contra main SIN merge.
+
+---
+
 ## 2026-07-03 - ICONIC_OPS_V5_6_6A_ADMIN_ACCESS_ROLE_PROVIDER_FIX - EN RAMA + PR (agent-frontend-boq/access)
 
 - Base `origin/main = b77dc8d` (post PR #32). Worktree: D:/ICONIC/SOFTWARE PRESUPUESTOS/construction-ops-v566a. Rama: feature/v5-6-6a-admin-access-role-provider-fix. UI-only: sin migraciones, sin RLS, sin Cloud, sin tocar matriz de permisos.
