@@ -64,7 +64,9 @@ const BOQ_LINK_STATUS_VARIANT: Record<string, BadgeVariant> = {
 };
 
 const PRICE_STATUS_VARIANT: Record<string, BadgeVariant> = {
-  vigente: 'success',
+  estimado: 'secondary',
+  proveedor: 'warning',
+  aprobado: 'success',
   vencido: 'destructive',
   sin_precio: 'outline',
 };
@@ -123,7 +125,24 @@ export const BOQ_LINK_STATUS_LABEL: Record<string, string> = {
 };
 
 export const PRICE_STATUS_LABEL: Record<string, string> = {
-  vigente: 'Vigente',
+  estimado: 'Estimado',
+  proveedor: 'Proveedor',
+  aprobado: 'Aprobado',
   vencido: 'Vencido',
   sin_precio: 'Sin precio',
 };
+
+/** Etiqueta corta de familia de acero para la UI. */
+export const STEEL_FAMILY_LABEL: Record<string, string> = {
+  rebar: 'Refuerzo',
+  structural_steel: 'Estructura metálica',
+  mesh: 'Malla',
+  accessory: 'Accesorio',
+  other: 'Otro',
+};
+
+/** ¿La vigencia ya pasó respecto a la fecha de referencia? (comparación ISO yyyy-mm-dd). */
+export function isExpired(validUntil: string | undefined, referenceDate: string): boolean {
+  if (!validUntil) return false;
+  return validUntil < referenceDate;
+}

@@ -45,17 +45,17 @@ export default async function SteelTakeoffWorkspacePage({ params }: { params: Pr
           <table className="w-full min-w-[900px] text-sm">
             <thead className="bg-brand-50/60 text-left text-xs uppercase tracking-wide text-iconic-graphite/60">
               <tr>
-                <th className="px-3 py-2">Elemento</th>
-                <th className="px-3 py-2">Familia</th>
-                <th className="px-3 py-2">Descripción original</th>
-                <th className="px-3 py-2">Interpretación</th>
-                <th className="px-3 py-2">№/perfil</th>
-                <th className="px-3 py-2 text-right">Long. corte (m)</th>
-                <th className="px-3 py-2 text-right">Cant.</th>
-                <th className="px-3 py-2 text-right">Total ml</th>
-                <th className="px-3 py-2 text-right">Total kg</th>
-                <th className="px-3 py-2">Estado</th>
-                <th className="px-3 py-2">Alertas</th>
+                <th scope="col" className="px-3 py-2">Elemento</th>
+                <th scope="col" className="px-3 py-2">Familia</th>
+                <th scope="col" className="px-3 py-2">Descripción original</th>
+                <th scope="col" className="px-3 py-2">Interpretación</th>
+                <th scope="col" className="px-3 py-2">№/perfil</th>
+                <th scope="col" className="px-3 py-2 text-right">Long. corte (m)</th>
+                <th scope="col" className="px-3 py-2 text-right">Cant.</th>
+                <th scope="col" className="px-3 py-2 text-right">Total ml</th>
+                <th scope="col" className="px-3 py-2 text-right">Total kg</th>
+                <th scope="col" className="px-3 py-2">Estado</th>
+                <th scope="col" className="px-3 py-2">Alertas</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-iconic-soft-blue/20">

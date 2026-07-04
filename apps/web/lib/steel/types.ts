@@ -61,6 +61,13 @@ export interface SteelProfileLineView {
   assumedWastePct: DecimalString;
 }
 
+/**
+ * Estados de precio espejo del pipeline real de pricing de ICONIC OPS
+ * (`estimated | supplier | approved`) + `vencido` (derivado de `valid_until`,
+ * aporte de Steel según blueprint §14) + `sin_precio` (ausencia).
+ */
+export type SteelPriceStatusView = 'estimado' | 'proveedor' | 'aprobado' | 'vencido' | 'sin_precio';
+
 export interface SteelSpecView {
   id: string;
   family: SteelFamily;
@@ -68,7 +75,7 @@ export interface SteelSpecView {
   reference: string;
   unit: string;
   supplierName: string;
-  priceStatus: 'vigente' | 'vencido' | 'sin_precio';
+  priceStatus: SteelPriceStatusView;
   priceCop?: DecimalString;
   validUntil?: string;
 }
@@ -89,6 +96,7 @@ export interface SteelOrderLineView {
   familyLabel: string;
   commercialLengthM: DecimalString;
   commercialUnits: DecimalString;
+  totalKg: DecimalString;
   supplierName: string;
   unitPriceCop: DecimalString;
   validUntil: string;
@@ -100,9 +108,14 @@ export interface SteelOrderView {
   status: SteelOrderStatusView;
   lines: readonly SteelOrderLineView[];
   totalEstimatedCop: DecimalString;
+  totalKg: DecimalString;
+  totalMl: DecimalString;
 }
 
 export type SteelBoqLinkStatusView = 'no_vinculado' | 'sugerido' | 'vinculado';
+
+/** Riesgos presupuestales visibles por vínculo (espejo de alertas A8/A9/A10). */
+export type SteelBoqLinkRiskView = 'sin_precio' | 'sin_actividad' | 'sin_proveedor';
 
 export interface SteelBoqLinkView {
   id: string;
@@ -110,15 +123,24 @@ export interface SteelBoqLinkView {
   suggestedBoqActivity: string;
   suggestedCatalogResource: string;
   status: SteelBoqLinkStatusView;
+  risks: readonly SteelBoqLinkRiskView[];
 }
+
+/** Estado agregado de un ítem del centro de revisión (derivado de confianza + needsReview). */
+export type SteelReviewVerdictView = 'ok' | 'revisar' | 'critico';
 
 export interface SteelReviewItemView {
   id: string;
   elementLabel: string;
   originalDescription: string;
+  sourceLabel: string;
   interpretation: string;
+  /** Lo calculado a partir de la interpretación (ml/kg), separado de "lo leído". */
+  computedTotalMl: DecimalString;
+  computedTotalKg: DecimalString;
   confidenceScore: DecimalString;
   needsReview: boolean;
+  verdict: SteelReviewVerdictView;
   explanation: string;
 }
 

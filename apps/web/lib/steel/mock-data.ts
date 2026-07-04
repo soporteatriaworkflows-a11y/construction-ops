@@ -119,14 +119,21 @@ export const MOCK_STEEL_PROFILE_LINES: readonly SteelProfileLineView[] = [
   },
 ];
 
+/**
+ * Estados de precio espejo del pipeline real (`estimated|supplier|approved`)
+ * + `vencido` (por `valid_until`) + `sin_precio`. Steel NO inventa un modelo
+ * de precios propio: cuando se conecte, estos estados los dará
+ * `price_observations`.
+ */
 export const MOCK_STEEL_SPECS: readonly SteelSpecView[] = [
-  { id: 'spec-rebar-3', family: 'rebar', label: 'Varilla corrugada #3', reference: 'REBAR-3', unit: 'kg', supplierName: 'Aceros del Valle', priceStatus: 'vigente', priceCop: '4200', validUntil: '2026-08-15' },
-  { id: 'spec-rebar-4', family: 'rebar', label: 'Varilla corrugada #4', reference: 'REBAR-4', unit: 'kg', supplierName: 'Aceros del Valle', priceStatus: 'vigente', priceCop: '4150', validUntil: '2026-08-15' },
+  { id: 'spec-rebar-3', family: 'rebar', label: 'Varilla corrugada #3', reference: 'REBAR-3', unit: 'kg', supplierName: 'Aceros del Valle', priceStatus: 'aprobado', priceCop: '4200', validUntil: '2026-08-15' },
+  { id: 'spec-rebar-4', family: 'rebar', label: 'Varilla corrugada #4', reference: 'REBAR-4', unit: 'kg', supplierName: 'Aceros del Valle', priceStatus: 'proveedor', priceCop: '4150', validUntil: '2026-08-15' },
   { id: 'spec-rebar-5', family: 'rebar', label: 'Varilla corrugada #5', reference: 'REBAR-5', unit: 'kg', supplierName: 'Ferretería Central', priceStatus: 'vencido', priceCop: '4180', validUntil: '2026-06-01' },
   { id: 'spec-rebar-6', family: 'rebar', label: 'Varilla corrugada #6', reference: 'REBAR-6', unit: 'kg', supplierName: 'Ferretería Central', priceStatus: 'sin_precio' },
-  { id: 'spec-ipe-200', family: 'structural_steel', label: 'Perfil IPE 200', reference: 'IPE-200', unit: 'kg', supplierName: 'Proveedor Acero Andino', priceStatus: 'vigente', priceCop: '5300', validUntil: '2026-09-01' },
-  { id: 'spec-tubo-100', family: 'structural_steel', label: 'Tubo estructural 100x100x4', reference: 'TUBO-100x100x4', unit: 'kg', supplierName: 'Proveedor Acero Andino', priceStatus: 'vigente', priceCop: '5600', validUntil: '2026-09-01' },
+  { id: 'spec-ipe-200', family: 'structural_steel', label: 'Perfil IPE 200', reference: 'IPE-200', unit: 'kg', supplierName: 'Proveedor Acero Andino', priceStatus: 'aprobado', priceCop: '5300', validUntil: '2026-09-01' },
+  { id: 'spec-tubo-100', family: 'structural_steel', label: 'Tubo estructural 100x100x4', reference: 'TUBO-100x100x4', unit: 'kg', supplierName: 'Proveedor Acero Andino', priceStatus: 'estimado', priceCop: '5600', validUntil: '2026-09-01' },
   { id: 'spec-platina-200', family: 'structural_steel', label: 'Platina 200x10', reference: 'PLAT-200x10', unit: 'kg', supplierName: 'Proveedor Acero Andino', priceStatus: 'sin_precio' },
+  { id: 'spec-malla-q138', family: 'mesh', label: 'Malla electrosoldada Q-138', reference: 'MALLA-Q138', unit: 'unit', supplierName: 'Aceros del Valle', priceStatus: 'estimado', priceCop: '98000', validUntil: '2026-07-20' },
 ];
 
 /** Sobrantes fuera de los estados que produce el optimizador (`available`/`final_waste`) — estados de flujo posterior, aún no modelados en F1. */
@@ -142,9 +149,11 @@ export const MOCK_STEEL_ORDERS: readonly SteelOrderView[] = [
     name: 'Pedido refuerzo — Torre A, piso 2',
     status: 'draft',
     totalEstimatedCop: '18450000',
+    totalKg: '1893.4',
+    totalMl: '414',
     lines: [
-      { id: 'ol-1', familyLabel: 'Varilla #5 (6 m)', commercialLengthM: '6', commercialUnits: '42', supplierName: 'Aceros del Valle', unitPriceCop: '4200', validUntil: '2026-08-15' },
-      { id: 'ol-2', familyLabel: 'Varilla #3 (9 m)', commercialLengthM: '9', commercialUnits: '18', supplierName: 'Ferretería Central', unitPriceCop: '4180', validUntil: '2026-06-01' },
+      { id: 'ol-1', familyLabel: 'Varilla #5 (6 m)', commercialLengthM: '6', commercialUnits: '42', totalKg: '391.1', supplierName: 'Aceros del Valle', unitPriceCop: '4200', validUntil: '2026-08-15' },
+      { id: 'ol-2', familyLabel: 'Varilla #3 (9 m)', commercialLengthM: '9', commercialUnits: '18', totalKg: '90.7', supplierName: 'Ferretería Central', unitPriceCop: '4180', validUntil: '2026-06-01' },
     ],
   },
   {
@@ -152,19 +161,21 @@ export const MOCK_STEEL_ORDERS: readonly SteelOrderView[] = [
     name: 'Pedido perfiles — Bodega nave 1',
     status: 'quoted',
     totalEstimatedCop: '26900000',
+    totalKg: '3918.6',
+    totalMl: '234',
     lines: [
-      { id: 'ol-3', familyLabel: 'IPE 200 (12 m)', commercialLengthM: '12', commercialUnits: '9', supplierName: 'Proveedor Acero Andino', unitPriceCop: '5300', validUntil: '2026-09-01' },
-      { id: 'ol-4', familyLabel: 'Tubo 100x100x4 (9 m)', commercialLengthM: '9', commercialUnits: '14', supplierName: 'Proveedor Acero Andino', unitPriceCop: '5600', validUntil: '2026-09-01' },
+      { id: 'ol-3', familyLabel: 'IPE 200 (12 m)', commercialLengthM: '12', commercialUnits: '9', totalKg: '2419.2', supplierName: 'Proveedor Acero Andino', unitPriceCop: '5300', validUntil: '2026-09-01' },
+      { id: 'ol-4', familyLabel: 'Tubo 100x100x4 (9 m)', commercialLengthM: '9', commercialUnits: '14', totalKg: '1499.4', supplierName: 'Proveedor Acero Andino', unitPriceCop: '5600', validUntil: '2026-09-01' },
     ],
   },
 ];
 
 export const MOCK_STEEL_BOQ_LINKS: readonly SteelBoqLinkView[] = [
-  { id: 'link-1', elementLabel: 'Zapata Z-1', suggestedBoqActivity: 'Cimentación — Zapatas aisladas', suggestedCatalogResource: 'Varilla corrugada #5', status: 'vinculado' },
-  { id: 'link-2', elementLabel: 'Viga de cimentación VC-2', suggestedBoqActivity: 'Cimentación — Vigas de amarre', suggestedCatalogResource: 'Varilla corrugada #3', status: 'sugerido' },
-  { id: 'link-3', elementLabel: 'Columna C-12', suggestedBoqActivity: 'Estructura — Columnas', suggestedCatalogResource: 'Varilla corrugada #5', status: 'sugerido' },
-  { id: 'link-4', elementLabel: 'Correa IPE 200 — Cercha 3', suggestedBoqActivity: 'Estructura metálica — Cerchas', suggestedCatalogResource: 'Perfil IPE 200', status: 'no_vinculado' },
-  { id: 'link-5', elementLabel: 'Malla electrosoldada — Losa sobre terreno', suggestedBoqActivity: 'Placas — Losa sobre terreno', suggestedCatalogResource: 'Malla electrosoldada Q-138', status: 'no_vinculado' },
+  { id: 'link-1', elementLabel: 'Zapata Z-1', suggestedBoqActivity: 'Cimentación — Zapatas aisladas', suggestedCatalogResource: 'Varilla corrugada #5', status: 'vinculado', risks: [] },
+  { id: 'link-2', elementLabel: 'Viga de cimentación VC-2', suggestedBoqActivity: 'Cimentación — Vigas de amarre', suggestedCatalogResource: 'Varilla corrugada #3', status: 'sugerido', risks: ['sin_proveedor'] },
+  { id: 'link-3', elementLabel: 'Columna C-12', suggestedBoqActivity: 'Estructura — Columnas', suggestedCatalogResource: 'Varilla corrugada #5', status: 'sugerido', risks: ['sin_precio'] },
+  { id: 'link-4', elementLabel: 'Correa IPE 200 — Cercha 3', suggestedBoqActivity: 'Estructura metálica — Cerchas', suggestedCatalogResource: 'Perfil IPE 200', status: 'no_vinculado', risks: ['sin_actividad', 'sin_proveedor'] },
+  { id: 'link-5', elementLabel: 'Malla electrosoldada — Losa sobre terreno', suggestedBoqActivity: 'Placas — Losa sobre terreno', suggestedCatalogResource: 'Malla electrosoldada Q-138', status: 'no_vinculado', risks: ['sin_precio', 'sin_actividad'] },
 ];
 
 /** Defaults D3/D5, alineados a `defaultSteelWasteThresholds`/longitudes comerciales de `@/modules/steel` (ver domain-bridge.ts). */

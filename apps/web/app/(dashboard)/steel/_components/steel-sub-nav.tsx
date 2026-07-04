@@ -33,6 +33,7 @@ export function SteelSubNav() {
           <li key={item.href}>
             <Link
               href={item.href}
+              aria-current={isActive(item.href) ? 'page' : undefined}
               className={cn(
                 'inline-flex whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
                 isActive(item.href)

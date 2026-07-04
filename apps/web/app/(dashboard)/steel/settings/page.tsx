@@ -5,17 +5,14 @@ import { MOCK_STEEL_SETTINGS } from '@/lib/steel/mock-data';
 
 function SettingRow({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="flex items-center justify-between border-b border-iconic-soft-blue/20 py-2.5 last:border-0">
-      <div>
+    <div className="flex items-center justify-between gap-3 border-b border-iconic-soft-blue/20 py-2.5 last:border-0">
+      <div className="min-w-0">
         <p className="text-sm text-iconic-ink">{label}</p>
         {hint && <p className="text-xs text-iconic-graphite/50">{hint}</p>}
       </div>
-      <input
-        type="text"
-        defaultValue={value}
-        readOnly
-        className="w-28 rounded-md border border-iconic-soft-blue/50 bg-gray-50 px-2 py-1 text-right text-sm text-iconic-graphite/70"
-      />
+      <span className="shrink-0 rounded-md bg-gray-50 px-2.5 py-1 text-sm font-medium tabular-nums text-iconic-graphite/80 ring-1 ring-inset ring-iconic-soft-blue/40">
+        {value}
+      </span>
     </div>
   );
 }
@@ -27,7 +24,7 @@ export default function SteelSettingsPage() {
     <div>
       <PageHeader
         title="Configuración de Steel Ops"
-        description="Defaults D3/D5 de esta oleada. Mock de solo lectura — sin persistencia; editar aquí no guarda nada todavía."
+        description="Parámetros que gobiernan el cálculo: longitudes comerciales, kerf, sobrante mínimo útil y umbrales de desperdicio. Solo lectura en este preview — la edición llega con la fase de datos."
       />
 
       <InlineCallout tone="info" title="Configurable por proyecto/proveedor/familia" className="mb-4">

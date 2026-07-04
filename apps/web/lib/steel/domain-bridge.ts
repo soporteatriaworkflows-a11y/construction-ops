@@ -23,6 +23,7 @@ import {
   type SteelCalculatedLine,
   type SteelCutInput,
   type SteelCutPlan,
+  type SteelCutPlanBar,
   type SteelLineInput,
 } from '@/modules/steel';
 import {
@@ -194,19 +195,35 @@ export function buildWorkspaceLinesForTakeoff(takeoffId: string): readonly Steel
   return buildAllWorkspaceLines().filter((line) => elementIds.has(line.elementId));
 }
 
-/** Centro de revisión: mismas líneas de refuerzo, proyectadas al shape de revisión documental. */
+/**
+ * Veredicto agregado del ítem de revisión: parse fallido/confianza nula ⇒
+ * crítico; needsReview o confianza < 0.8 ⇒ revisar; resto ⇒ ok.
+ */
+function reviewVerdict(parsed: { confidenceScore: string; needsReview: boolean; steelFamily: string }): 'ok' | 'revisar' | 'critico' {
+  if (parsed.steelFamily === 'other' || toDecimal(parsed.confidenceScore).isZero()) return 'critico';
+  if (parsed.needsReview || toDecimal(parsed.confidenceScore).lt(toDecimal('0.8'))) return 'revisar';
+  return 'ok';
+}
+
+/** Centro de revisión: mismas líneas de refuerzo, con "lo leído" (interpretación) separado de "lo calculado" (ml/kg vía calculadora real). */
 export function buildReviewItems(): readonly SteelReviewItemView[] {
+  const calculatedById = new Map(buildRebarWorkspaceLines().map((line) => [line.id, line]));
   return STEEL_RAW_DESCRIPTIONS.map((raw) => {
     const parsed = parseSteelDescription(raw.originalDescription);
+    const calculated = calculatedById.get(raw.id);
     return {
       id: raw.id,
       elementLabel: elementLabel(raw.elementId),
       originalDescription: raw.originalDescription,
+      sourceLabel: raw.sourceLabel,
       interpretation: parsed.cutLengthM
         ? `${parsed.quantityPerUnit} x ${parsed.repetitions !== '1' ? `${parsed.repetitions} grupos, ` : ''}long. ${parsed.cutLengthM} m`
         : 'Sin interpretacion de longitud',
+      computedTotalMl: calculated?.totalMl ?? '0',
+      computedTotalKg: calculated?.totalKg ?? '0',
       confidenceScore: parsed.confidenceScore,
       needsReview: parsed.needsReview,
+      verdict: reviewVerdict(parsed),
       explanation: parsed.explanation,
     };
   });
@@ -256,14 +273,80 @@ export function buildCutPlans(): SteelOptimizationResult {
   return { rebar, profiles };
 }
 
+/** Peso kg/m del grupo de compatibilidad de un plan de corte (spec sintética rebar o referencia de perfil mock). */
+function unitWeightKgMForSpec(steelSpecId: string): string {
+  const rebarMatch = steelSpecId.match(/^spec-rebar-(\d+)$/);
+  if (rebarMatch) {
+    return findDefaultRebarSpec(Number(rebarMatch[1]))?.unitWeightKgM ?? '0';
+  }
+  return MOCK_STEEL_PROFILE_LINES.find((l) => l.profileReference === steelSpecId)?.unitWeightKgM ?? '0';
+}
+
+/** Precio COP/kg mock para el grupo (vía catálogo mock; fallback referencia refuerzo). */
+function priceCopPerKgForSpec(steelSpecId: string): string {
+  const rebarMatch = steelSpecId.match(/^spec-rebar-(\d+)$/);
+  const reference = rebarMatch ? `REBAR-${rebarMatch[1]}` : steelSpecId;
+  return specPriceCop(reference) ?? '4200';
+}
+
+/** Etiqueta humana del grupo de compatibilidad (para agrupar el plan de corte en la UI). */
+export function specDisplayLabel(steelSpecId: string): string {
+  const rebarMatch = steelSpecId.match(/^spec-rebar-(\d+)$/);
+  if (rebarMatch) return `Varilla #${rebarMatch[1]}`;
+  return steelSpecId.replace(/-/g, ' ');
+}
+
+export interface SteelOffcutSavings {
+  totalMl: string;
+  totalKg: string;
+  totalCop: string;
+}
+
+/**
+ * Ahorro por sobrantes reutilizables: ml sobrante × kg/m del grupo × COP/kg
+ * mock (dimensiones correctas; el COP es referencia, no precio aprobado).
+ */
+export function computeOffcutSavings(plans: readonly SteelCutPlan[]): SteelOffcutSavings {
+  let ml = toDecimal('0');
+  let kg = toDecimal('0');
+  let cop = toDecimal('0');
+  for (const plan of plans) {
+    for (const offcut of plan.offcuts) {
+      const lengthM = toDecimal(offcut.lengthM);
+      const weightKgM = toDecimal(unitWeightKgMForSpec(offcut.steelSpecId));
+      const offcutKg = lengthM.times(weightKgM);
+      ml = ml.plus(lengthM);
+      kg = kg.plus(offcutKg);
+      cop = cop.plus(offcutKg.times(toDecimal(priceCopPerKgForSpec(offcut.steelSpecId))));
+    }
+  }
+  return { totalMl: ml.toFixed(2), totalKg: kg.toFixed(1), totalCop: cop.toFixed(0) };
+}
+
+/** Barras de un plan agrupadas por spec, para que la UI muestre "esta varilla se corta así". */
+export function groupBarsBySpec(plan: SteelCutPlan): readonly { specId: string; specLabel: string; bars: readonly SteelCutPlanBar[] }[] {
+  const groups = new Map<string, SteelCutPlanBar[]>();
+  for (const bar of plan.bars) {
+    const existing = groups.get(bar.steelSpecId);
+    if (existing) {
+      existing.push(bar);
+    } else {
+      groups.set(bar.steelSpecId, [bar]);
+    }
+  }
+  return [...groups.entries()].map(([specId, bars]) => ({ specId, specLabel: specDisplayLabel(specId), bars }));
+}
+
 export interface SteelDashboardKpis {
   totalKg: string;
   totalMl: string;
   totalCommercialUnits: string;
   estimatedWasteKg: string;
   optimizedWasteM: string;
+  estimatedSavingsCop: string;
   criticalAlertsCount: number;
   warningAlertsCount: number;
+  linesPendingReviewCount: number;
   draftOrdersCount: number;
   pendingOrExpiredPricesCount: number;
 }
@@ -272,6 +355,7 @@ export interface SteelDashboardKpis {
 export function computeDashboardKpis(): SteelDashboardKpis {
   const lines = buildAllWorkspaceLines();
   const { rebar, profiles } = buildCutPlans();
+  const savings = computeOffcutSavings([rebar, profiles]);
 
   const totalKg = lines.reduce((acc, l) => acc.plus(toDecimal(l.totalKg)), toDecimal('0'));
   const totalMl = lines.reduce((acc, l) => acc.plus(toDecimal(l.totalMl)), toDecimal('0'));
@@ -295,9 +379,11 @@ export function computeDashboardKpis(): SteelDashboardKpis {
     totalCommercialUnits: totalCommercialUnits.toFixed(0),
     estimatedWasteKg: estimatedWasteKg.toFixed(1),
     optimizedWasteM: optimizedWasteM.toFixed(2),
+    estimatedSavingsCop: savings.totalCop,
     criticalAlertsCount,
     warningAlertsCount,
+    linesPendingReviewCount: lines.filter((l) => l.verificationStatus === 'needs_review').length,
     draftOrdersCount: MOCK_STEEL_ORDERS.filter((o) => o.status === 'draft').length,
-    pendingOrExpiredPricesCount: MOCK_STEEL_SPECS.filter((s) => s.priceStatus !== 'vigente').length,
+    pendingOrExpiredPricesCount: MOCK_STEEL_SPECS.filter((s) => s.priceStatus !== 'aprobado').length,
   };
 }
