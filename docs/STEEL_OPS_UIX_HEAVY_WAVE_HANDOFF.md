@@ -2,7 +2,9 @@
 
 **Fecha:** 2026-07-03 · **Rama:** `feature/steel-ops-uix-heavy-wave` (desde
 `feature/steel-ops-fable-uix`, con merge de `origin/feature/steel-ops-f1-domain`)
-· **Owner:** Fable UIX. **Estado:** PR abierto, sin merge a `main`.
+· **Owner:** Fable UIX. **Estado:** PR #38 abierto, sin merge a `main`.
+**Actualización (misma fecha):** oleada de revisión + hardening + polish por
+Fable sobre la implementación inicial — ver §"Oleada de hardening" al final.
 
 ## Qué se implementó
 
@@ -134,3 +136,90 @@ comportamiento de APU/BOQ/catálogo/export/cantidades existentes.
 - `pnpm --filter web typecheck` → **0 errores**
 - `pnpm --filter web lint` → **0 errores**
 - `pnpm test` (suite completa, incluye `tests/unit/steel/*`) → **191 archivos, 2520 tests pasados, 0 fallidos, 42 skipped (pre-existentes)**
+
+---
+
+## Oleada de hardening + polish (Fable, 2026-07-03)
+
+Revisión crítica de producto/UIX sobre la implementación inicial, con
+correcciones aplicadas (no solo listadas). Mismo alcance seguro: cero DB,
+Supabase, RLS, `.env`, producción, `server/access`, sidebar global.
+
+### Corrección de fondo (bug real)
+
+- **Ahorro COP dimensionalmente incorrecto**: la vista de optimización
+  calculaba ahorro como `metros × precio/kg`. Ahora `computeOffcutSavings()`
+  (en `domain-bridge.ts`) calcula `ml × kg/m del grupo × COP/kg de referencia`
+  y expone ahorro en **ml, kg y COP** por separado. El precio COP sigue siendo
+  referencia mock y así se etiqueta.
+
+### Qué mejoró por pantalla
+
+- **`/steel` (hub)**: franja de propuesta de valor (4 puntos: documento→cantidades,
+  riesgo visible antes del pedido, menos desperdicio, conectado al presupuesto);
+  KPIs reorganizados en dos bandas con título ("Cantidades y desperdicio" /
+  "Revisión y compra"); KPIs nuevos: **ahorro estimado** y **líneas por
+  revisar**; KPIs clicables hacia su pantalla; sección "Estado de los takeoffs"
+  con enlace.
+- **`/steel/review`**: cada caso muestra ahora **fuente (plano/hoja)**,
+  **documento original**, **"lo leído"** (interpretación del parser) y
+  **"lo calculado"** (ml/kg vía calculadora F1) en tres paneles separados;
+  chip de veredicto **OK / Revisar / Crítico** (derivado de confianza +
+  needsReview en `domain-bridge`); feedback visible al accionar (demo);
+  microcopy explícito: "no reemplaza al ingeniero estructural".
+- **`/steel/optimization`**: plan de corte **agrupado por número de
+  varilla/referencia de perfil** (antes: barras sueltas sin contexto);
+  segmentos con longitud visible dentro de la barra; sobrante etiquetado
+  "reutilizable" vs "desperdicio final"; KPIs de ahorro en **ml/kg/COP**;
+  advertencia explícita: *"Optimización heurística determinista (FFD),
+  requiere revisión antes de compra"*; `role="img"` + `aria-label` en cada
+  barra; explicación de compatibilidad del banco de sobrantes.
+- **`/steel/orders`**: totales **kg/ml** por pedido además de COP; **vigencia
+  vencida resaltada por línea** ("Vencida — recotizar", fila en rojo suave,
+  fecha de referencia fija del preview `2026-07-03`); kg por línea; botón de
+  export deshabilitado con explicación de por qué y qué llegará (perfil
+  proveedor sin datos internos); microcopy del ciclo draft→received.
+- **`/steel/catalog`**: estados de precio ahora **espejo del pipeline real**
+  (`estimado`/`proveedor`/`aprobado`/`vencido`/`sin_precio` en vez del
+  inventado "vigente"); columna de vigencia; malla electrosoldada añadida al
+  catálogo; leyenda de qué significa cada estado.
+- **`/steel/boq-link`**: columna de **riesgo** por vínculo (sin precio / sin
+  actividad / sin proveedor, espejo de alertas A8/A9/A10); **acciones mock**
+  vincular/revisar/ignorar con cambio de estado visual; microcopy: "Steel Ops
+  no reemplaza el BOQ: le alimenta cantidades y recursos".
+- **`/steel/settings`**: se eliminaron los inputs falsos (parecían editables);
+  ahora valores de solo lectura con estilo chip.
+- **Accesibilidad transversal**: `aria-current` en la sub-nav, `scope="col"`
+  en encabezados de tablas, `aria-pressed` en botones de acción mock,
+  `aria-disabled` + título explicativo en botones deshabilitados,
+  `min-width` en tablas para scroll horizontal limpio en pantallas pequeñas.
+
+### Cambios de datos/tipos
+
+- `SteelPriceStatusView` = `estimado|proveedor|aprobado|vencido|sin_precio`.
+- `SteelBoqLinkView.risks`, `SteelReviewItemView` ampliado (sourceLabel,
+  computedTotalMl/Kg, verdict), `SteelOrderView.totalKg/totalMl`,
+  `SteelOrderLineView.totalKg`.
+- `domain-bridge.ts`: `computeOffcutSavings`, `groupBarsBySpec`,
+  `specDisplayLabel`, veredicto de revisión, KPI `estimatedSavingsCop` y
+  `linesPendingReviewCount`; "precios pendientes" ahora significa
+  "no aprobados o vencidos" (espejo del pipeline).
+- `format.ts`: `STEEL_FAMILY_LABEL`, `isExpired`, variantes de badge para los
+  estados de precio reales.
+
+### Validaciones de la oleada de hardening
+
+- `pnpm --filter web typecheck` → **0 errores**
+- `pnpm --filter web lint` → **0 errores**
+- Suite completa → **2524 tests pasados, 0 fallidos** (4 tests nuevos:
+  veredicto de revisión, consistencia dimensional del ahorro, partición del
+  agrupador de barras, `isExpired`).
+
+### Próximo paso recomendado
+
+1. Merge de **PR #36** (docs UIX/flag) — sin riesgo, docs-only.
+2. Merge de **PR #35** (dominio F1) — ya validado.
+3. Actualizar/rebase **PR #38** contra `main`: su diff quedará reducido a solo
+   esta oleada UIX (hoy arrastra el contenido de #35/#36 por no estar mergeados).
+4. Evaluar merge de **PR #38** como preview (flag off por defecto: sin efecto
+   en producción).
