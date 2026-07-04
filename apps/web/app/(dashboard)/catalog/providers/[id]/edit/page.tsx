@@ -25,6 +25,22 @@ export const dynamic = 'force-dynamic';
 // management=gerencia. consulta (client) y obra (site) quedan fuera.
 const EDIT_ROLES = ['management', 'internal'];
 
+type ProviderEditLoadResult =
+  | { status: 'ok'; provider: ProviderView }
+  | { status: 'forbidden' };
+
+async function loadProviderForEdit(id: string): Promise<ProviderEditLoadResult> {
+  const viewer = await resolveAuthenticatedViewer();
+  if (!EDIT_ROLES.includes(viewer.role)) {
+    return { status: 'forbidden' };
+  }
+
+  return {
+    status: 'ok',
+    provider: await getProviderRepository().getProviderById(viewer, id),
+  };
+}
+
 export default async function EditProviderPage({
   params,
 }: {
@@ -56,11 +72,15 @@ export default async function EditProviderPage({
     );
   }
 
-  // JSX fuera de try/catch (regla react-hooks/error-boundaries): primero se
-  // resuelven viewer y proveedor; los returns con JSX van después.
-  const viewer = await resolveAuthenticatedViewer();
+  let loadResult: ProviderEditLoadResult;
+  try {
+    loadResult = await loadProviderForEdit(id);
+  } catch (e) {
+    if (e instanceof ProviderNotFoundError) notFound();
+    throw e;
+  }
 
-  if (!EDIT_ROLES.includes(viewer.role)) {
+  if (loadResult.status === 'forbidden') {
     return (
       <div>
         <PageHeader title="Editar proveedor" />
@@ -82,13 +102,7 @@ export default async function EditProviderPage({
     );
   }
 
-  let provider: ProviderView;
-  try {
-    provider = await getProviderRepository().getProviderById(viewer, id);
-  } catch (e) {
-    if (e instanceof ProviderNotFoundError) notFound();
-    throw e;
-  }
+  const { provider } = loadResult;
 
   return (
     <div>
