@@ -10,13 +10,18 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Trash2 } from 'lucide-react';
+import { FileText, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { SurfaceCard } from '@/components/shared/surface-card';
 import { InlineCallout } from '@/components/shared/inline-callout';
-import { newManualTakeoffId, type ManualTakeoffRecord } from '@/lib/steel/manual-takeoff';
+import {
+  ensureDemoIntakeTakeoff,
+  newManualTakeoffId,
+  type ManualTakeoffRecord,
+} from '@/lib/steel/manual-takeoff';
+import { loadManualTakeoffs } from '@/lib/steel/manual-store';
 import { useManualTakeoffs, writeManualTakeoffs } from '@/lib/steel/use-manual-takeoffs';
 import { SteelStatusBadge } from '../../_components/steel-status-badge';
 
@@ -40,15 +45,23 @@ export function ManualTakeoffsSection() {
       createdAt: new Date().toISOString().slice(0, 10),
       lines: [],
     };
-    writeManualTakeoffs([...takeoffs, record]);
+    // Siempre sobre el store fresco (no el snapshot renderizado): evita pisar
+    // lo guardado si el click llega antes de que la vista termine de hidratar.
+    writeManualTakeoffs([...loadManualTakeoffs(), record]);
     router.push(`/steel/takeoffs/${record.id}`);
+  }
+
+  function handleTryIntake() {
+    const ensured = ensureDemoIntakeTakeoff(loadManualTakeoffs());
+    if (ensured.created) writeManualTakeoffs(ensured.records);
+    router.push(`/steel/takeoffs/${ensured.id}`);
   }
 
   function handleDelete(id: string) {
     const target = takeoffs.find((t) => t.id === id);
     if (!target) return;
     if (!window.confirm(`¿Eliminar el takeoff local "${target.name}"? Solo existe en este navegador.`)) return;
-    writeManualTakeoffs(takeoffs.filter((t) => t.id !== id));
+    writeManualTakeoffs(loadManualTakeoffs().filter((t) => t.id !== id));
   }
 
   return (
@@ -60,6 +73,24 @@ export function ManualTakeoffsSection() {
         Flujo F3: se crean y guardan solo en este navegador (localStorage), sin base de datos. Las
         líneas se interpretan y calculan con el dominio real de F1.
       </InlineCallout>
+
+      <SurfaceCard variant="action" className="mb-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-iconic-ink">
+              <FileText className="h-4 w-4 text-iconic-primary" aria-hidden="true" />
+              Lectura asistida desde PDF/plano (F6A)
+            </h3>
+            <p className="mt-1 text-xs text-iconic-graphite/60">
+              Pega texto de un plano y conviértelo en candidatos revisables. Lectura asistida
+              preliminar: no reemplaza revisión técnica ni aprueba cantidades automáticamente.
+            </p>
+          </div>
+          <Button type="button" variant="outline" onClick={handleTryIntake}>
+            Probar lectura asistida desde PDF/plano
+          </Button>
+        </div>
+      </SurfaceCard>
 
       <SurfaceCard variant="status" className="mb-4">
         <form onSubmit={handleCreate} className="grid gap-3 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-end">
@@ -102,7 +133,11 @@ export function ManualTakeoffsSection() {
       </SurfaceCard>
 
       {!hydrated ? (
-        <p className="text-xs text-iconic-graphite/50">Cargando takeoffs locales…</p>
+        <p className="text-xs text-iconic-graphite/50">
+          Leyendo takeoffs guardados en este navegador… Si este mensaje no desaparece, recarga la
+          página sin caché (Ctrl+Shift+R): suele deberse a una versión anterior abierta en la
+          pestaña.
+        </p>
       ) : takeoffs.length === 0 ? (
         <p className="text-xs text-iconic-graphite/50">
           Aún no hay takeoffs manuales en este navegador. Crea el primero con el formulario.

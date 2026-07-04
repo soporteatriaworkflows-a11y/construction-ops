@@ -139,7 +139,7 @@ export function ManualPdfIntakeSection({
         <div>
           <h3 className="flex items-center gap-2 text-sm font-semibold text-iconic-ink dark:text-content">
             <FileText className="h-4 w-4 text-iconic-primary" aria-hidden="true" />
-            Importar desde PDF/plano
+            Lectura asistida desde PDF/plano
           </h3>
           <p className="mt-1 text-xs text-iconic-graphite/70 dark:text-content-muted">
             Lectura asistida preliminar. No reemplaza revision tecnica.

@@ -7347,3 +7347,20 @@ Rama: feature/v5-4-2d-dashboard-project-scope-selector. Base: origin/main = 9fb7
   3. **Test faltante del mandato:** `2X65E#3182` (2 grupos x 65 estribos = 130 via F1) ahora asertado explicitamente.
 - Tests del detector 23 -> 26 (26/26). typecheck 0 · lint 0 · suite completa **2606 passed / 42 skipped / 0 fail**.
 - Restricciones re-verificadas: sin DB/Supabase/RLS/migraciones/.env/deploy/produccion/service role/storage/OCR real/dependencias nuevas/navegacion global/ACCESS_MODULES/NAV_ITEMS; APU/BOQ/catalogo real intactos; todo tras `STEEL_OPS_UIX_PREVIEW`.
+
+---
+
+## 2026-07-04 - STEEL_OPS_F6A_LOCAL_ACCESS_HOTFIX - EN RAMA + PR (sin merge)
+
+- Rama `fix/steel-local-takeoffs-pdf-intake-access`, base `origin/main = 1235b03`. Hotfix de acceso UX a F3/F6A tras reporte de "/steel/takeoffs y /steel/takeoffs/mtk-demo quedan en Cargando".
+- **Diagnostico (reproduccion real):** contra el MISMO dev server local, un navegador limpio (Edge headless, --dump-dom post-JS) hidrata ambas rutas correctamente: la lista muestra estado vacio y `mtk-demo` muestra "Takeoff manual no encontrado". HTML completo, todos los chunks 200. Causa mas probable del atasco reportado: pestana con HTML/chunks de una version anterior (dev server y tab abiertos a traves del pull de F6A; los nombres de chunk de Turbopack cambian) => JS muerto => la UI queda en el estado SSR pre-hidratacion. Recuperacion: recarga sin cache (Ctrl+Shift+R).
+- **Fixes aplicados (defensa + descubribilidad, todos en alcance):**
+  1. Copys de carga con salida: "Leyendo takeoffs guardados... Si este mensaje no desaparece, recarga la pagina sin cache (Ctrl+Shift+R)" en lista y workspace (antes: "Cargando..." sin explicacion, indistinguible de un cuelgue).
+  2. **Anti-perdida de datos (bug latente real):** los handlers escribian `[...takeoffs, ...]` con el snapshot RENDERIZADO; un click antes del flip de hidratacion habria pisado lo guardado con lista vacia. Ahora toda escritura parte de `loadManualTakeoffs()` (store fresco) en crear/eliminar/updateTakeoff.
+  3. **Entrada visible a F6A:** card "Lectura asistida desde PDF/plano (F6A)" en /steel/takeoffs con boton "Probar lectura asistida desde PDF/plano" que crea/abre el takeoff demo local `mtk-demo-lectura` (helper puro idempotente `ensureDemoIntakeTakeoff` en manual-takeoff.ts; solo localStorage).
+  4. Not-found del workspace: agrega boton secundario "Probar lectura asistida desde PDF/plano" (EmptyState.secondaryAction) ademas de "Volver a takeoffs".
+  5. Titulos alineados al contrato F6: seccion paso 1 del workspace y card de intake ahora dicen "Lectura asistida desde PDF/plano".
+- **Tests nuevos** `tests/unit/steel/pdf-intake-access.test.ts` (10): helper demo (creacion/idempotencia/roundtrip persistencia, sin DB), analisis estatico (sin "Cargando" sin salida, entrada visible, seccion F6A cableada, copy obligatorio intacto, escrituras via store fresco, imports sin supabase/@server).
+- **Verificacion navegador real (headless Edge contra dev server):** lista hidratada con entrada F6A y estado vacio; `mtk-demo-lectura` sin datos locales muestra not-found + boton demo.
+- Validaciones: typecheck 0 · lint 0 · suite completa **2617 passed / 42 skipped / 0 fail**.
+- Restricciones: sin DB/Supabase/RLS/migraciones/.env/deploy/produccion/service role/storage/OCR/navegacion global/ACCESS_MODULES/NAV_ITEMS; APU/BOQ/catalogo intactos; todo tras `STEEL_OPS_UIX_PREVIEW`.
