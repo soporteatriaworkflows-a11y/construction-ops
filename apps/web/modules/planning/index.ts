@@ -41,6 +41,8 @@ export {
   toGanttTask,
   indexPredecessors,
   progressToNumber,
+  shortGanttLabel,
+  fullGanttLabel,
 } from './gantt-mapping';
 export type { GanttTask, GanttMappingOptions } from './gantt-mapping';
 export {
@@ -92,10 +94,12 @@ export {
   ganttColumnWidth,
   ganttRangeDays,
   ganttFitZoom,
-  GANTT_ZOOM_MIN,
+  pickDefaultViewMode,
+  GANTT_ZOOM_MIN_BY_MODE,
   GANTT_ZOOM_MAX,
   GANTT_ZOOM_STEP,
   GANTT_ZOOM_DEFAULT,
+  GANTT_DEFAULT_MODE_WEEK_MAX_DAYS,
   GANTT_BASE_COLUMN_WIDTH,
   GANTT_DAYS_PER_COLUMN,
 } from './gantt-zoom';
