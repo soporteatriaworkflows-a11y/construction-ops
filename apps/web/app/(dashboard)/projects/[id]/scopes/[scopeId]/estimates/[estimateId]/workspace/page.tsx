@@ -10,7 +10,7 @@
  */
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, LayoutGrid, PieChart, SlidersHorizontal } from 'lucide-react';
+import { ArrowLeft, PieChart, SlidersHorizontal } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
 import { EstimateVersionBadge } from '@/components/shared/status-badge';
 import { Button } from '@/components/ui/button';
