@@ -83,24 +83,32 @@ export default async function ApuPage({ searchParams }: PageProps) {
   let result: ApuLibraryResult | null = null;
   let error: string | null = null;
   let canMutate = false;
+  let viewer: Awaited<ReturnType<typeof resolveViewer>> | null = null;
 
   try {
-    const viewer = await resolveViewer();
+    viewer = await resolveViewer();
     canMutate = isCreationModeEnabled() && ['management', 'internal'].includes(viewer.role);
-    result = await getApuLibrary(viewer as AuthenticatedViewer, {
-      page,
-      pageSize,
-      search,
-      filter,
-      sort,
-      origin,
-      unit: view === 'cards' ? unit : null,
-      category: view === 'cards' ? category : null,
-      completeness: view === 'cards' ? completeness : null,
-      showArchived: view === 'cards' ? cardsArchived : filter === 'archived',
-    });
   } catch (e) {
-    error = getFriendlyDataLoadError(e, 'No pudimos cargar la biblioteca APU en este momento. Intenta actualizar en unos segundos.');
+    error = getFriendlyDataLoadError(e, 'No pudimos validar tu sesion en este momento. Intenta actualizar en unos segundos.');
+  }
+
+  if (viewer) {
+    try {
+      result = await getApuLibrary(viewer as AuthenticatedViewer, {
+        page,
+        pageSize,
+        search,
+        filter,
+        sort,
+        origin,
+        unit: view === 'cards' ? unit : null,
+        category: view === 'cards' ? category : null,
+        completeness: view === 'cards' ? completeness : null,
+        showArchived: view === 'cards' ? cardsArchived : filter === 'archived',
+      });
+    } catch (e) {
+      error = getFriendlyDataLoadError(e, 'No pudimos cargar la biblioteca APU en este momento. Intenta actualizar en unos segundos.');
+    }
   }
 
   const actions = (
@@ -135,9 +143,14 @@ export default async function ApuPage({ searchParams }: PageProps) {
   if (error) {
     return (
       <div>
-        <PageHeader title="Biblioteca de APU" />
+        <OperationsHeader
+          eyebrow="APU"
+          title="Biblioteca reutilizable"
+          subtitle="Analisis de Precios Unitarios reutilizables por proyecto"
+          actions={actions}
+        />
         <div
-          className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+          className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
           role="alert"
         >
           {error}

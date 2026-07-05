@@ -7440,3 +7440,15 @@ Rama: feature/v5-4-2d-dashboard-project-scope-selector. Base: origin/main = 9fb7
 - **Tests:** `pdf-ocr.test.ts` (21): cobertura buena/pobre/sin_texto, techo OCR, parciales sin inventar, sospecha O/0/I/1/S/5, # perdido sin reconstruccion, dedupe/confirmacion/conflicto, solo-OCR/solo-nativo, no-calculo, ids unicos multi-fuente, aislamiento estatico (sin supabase/server/fetch; tesseract solo dinamico en borde cliente), fallback OCR cableado, copy obligatorio.
 - Validaciones (rama rebasada): typecheck 0 · lint 0 · steel **157/157** · build OK · suite completa **2700 passed / 42 skipped / 0 fail**. Nota: 2 corridas previas de la suite mostraron timeouts flaky en renders @react-pdf (export-branding/export-payload) bajo carga de la maquina (9 Edge headless residuales); pasan aislados y la corrida limpia final paso completa.
 - Restricciones: sin DB/Supabase/RLS/migraciones/storage/subida a servidor/persistencia de PDF/geometria/escala automatica/.env/deploy/produccion/service role/navegacion global/ACCESS_MODULES/NAV_ITEMS; APU/BOQ/catalogo intactos; todo tras `STEEL_OPS_UIX_PREVIEW`; OCR jamas aprueba ni calcula.
+
+---
+
+## 2026-07-04 - P0B_PRODUCTION_STABILITY_AND_ADMIN_APU_REGRESSION - EN RAMA + PR (sin merge)
+
+- Rama `feature/p0b-prod-stability-admin-apu-regression`, base `origin/main = 76c4180`. PR hotfix urgente para estabilidad de produccion y regresion de acciones admin APU/BOQ.
+- **Diagnostico DB:** `postgres` estaba en `max: 10` por instancia serverless contra Supavisor session pool `pool_size: 15`. Se bajo default app-side a 1 conexion por instancia con override opcional `POSTGRES_POOL_MAX` / `DB_POOL_MAX` (sin tocar envs ni `DATABASE_URL`).
+- **Fan-out reducido:** read-model secuencial en carga de computo de presupuesto y catalogo; workspace BOQ secuencial para capitulos/items y resumen/AIU. No se tocaron formulas ni recalculos frontend.
+- **Fallbacks:** APU y Catalogo conservan encabezado operativo y acciones/navegacion cuando la carga pesada falla por saturacion; no se filtran detalles tecnicos al usuario.
+- **Regresion admin APU/BOQ:** workspace BOQ expone bajo `canEdit` existente las acciones `Editar detalle`, `Ver vinculo` y `Abrir APU` cuando hay APU vinculado. Consulta sigue sin acciones internas; compras no gana edicion.
+- **Docs:** `docs/P0B_PRODUCTION_STABILITY_AND_ADMIN_APU_REGRESSION.md`.
+- **Restricciones:** sin Supabase Cloud/db push/RLS/migraciones/Vercel envs/`DATABASE_URL`/deploy/merge/tag; sin role-map ni DB enum; sin tocar PR #54/P2B1, V5.7B, Gantt, D1, portal cliente ni PDF presentacion.

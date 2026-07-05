@@ -442,7 +442,7 @@ export function BoqWorkspace({
               <th className="w-24 px-2 py-1.5 text-right font-medium">Cantidad</th>
               <th className="w-32 px-2 py-1.5 text-right font-medium">V/Unitario</th>
               <th className="w-32 px-2 py-1.5 text-right font-medium">Subtotal</th>
-              {canEdit && <th className="w-36 px-2 py-1.5" />}
+              {canEdit && <th className="w-52 px-2 py-1.5 text-right font-medium">Acciones</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -990,11 +990,28 @@ function ItemRow({
                 )}
                 <Link
                   href={`${basePath}/chapters/${chapterId}/items/${item.id}/edit`}
-                  className="text-[11px] font-medium text-gray-500 hover:underline"
-                  title="Edición completa (mover de capítulo, código, descripción)"
+                  className="text-[11px] font-medium text-iconic-primary hover:underline"
+                  title="Edicion completa: capitulo, codigo, descripcion, unidad, cantidad y precio"
                 >
-                  Completa
+                  Editar detalle
                 </Link>
+                <button
+                  type="button"
+                  onClick={onSelect}
+                  className="text-[11px] font-medium text-gray-600 hover:underline"
+                  title="Ver vinculo APU/BOQ y estado operativo de la partida"
+                >
+                  Ver vinculo
+                </button>
+                {item.apuTemplateId && (
+                  <Link
+                    href={`/apu/${item.apuTemplateId}`}
+                    className="text-[11px] font-medium text-blue-700 hover:underline"
+                    title="Abrir APU vinculado"
+                  >
+                    Abrir APU
+                  </Link>
+                )}
               </>
             )}
           </div>

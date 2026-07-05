@@ -90,18 +90,17 @@ export default async function BoqWorkspacePage({ params, searchParams }: PagePro
   const chapters = await repo.listChaptersByEstimateVersion(viewer, estimateId, {
     includeArchived: true,
   });
-  const data: WorkspaceChapterData[] = await Promise.all(
-    chapters.map(async (chapter) => ({
+  const data: WorkspaceChapterData[] = [];
+  for (const chapter of chapters) {
+    data.push({
       chapter,
       items: await repo.listItemsByChapter(viewer, chapter.id, { includeArchived: true }),
-    })),
-  );
+    });
+  }
 
   // Resumen financiero + AIU + desglose (todo server-derived).
-  const [financialSummary, aiu] = await Promise.all([
-    repo.calculateEstimateFinancialSummary(viewer, estimateId),
-    repo.getEstimateVersionAiu(viewer, estimateId).catch(() => null),
-  ]);
+  const financialSummary = await repo.calculateEstimateFinancialSummary(viewer, estimateId);
+  const aiu = await repo.getEstimateVersionAiu(viewer, estimateId).catch(() => null);
   const breakdown = computeChapterBreakdown(chapters);
 
   // V5.6.6B: gate de modo + gate de ROL (compras/obra/consulta solo lectura).
