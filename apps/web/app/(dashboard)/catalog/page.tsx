@@ -8,7 +8,6 @@
  */
 import Link from 'next/link';
 import { BookOpen } from 'lucide-react';
-import { PageHeader } from '@/components/shared/page-header';
 import { OperationsHeader } from '@/components/shared/operations-header';
 import { KpiCard, KpiBand } from '@/components/shared/kpi-card';
 import { EmptyState } from '@/components/shared/empty-state';
@@ -60,20 +59,6 @@ export default async function CatalogPage({
       : 'No tienes permisos para crear registros. Solicita acceso a un administrador.'
     : null;
 
-  if (error) {
-    return (
-      <div>
-        <PageHeader title="Catálogo de Recursos" />
-        <div
-          className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
-          role="alert"
-          aria-live="assertive"
-        >
-          {error}
-        </div>
-      </div>
-    );
-  }
 
   // CTA primario: importación masiva (flujo principal). La ruta /catalog/import
   // siempre es navegable: explica el modo demo/read-only sin botones rotos.
@@ -112,6 +97,26 @@ export default async function CatalogPage({
       </Button>
     </>
   );
+
+  if (error) {
+    return (
+      <div>
+        <OperationsHeader
+          eyebrow="Catalogo"
+          title="Control de precios"
+          subtitle="Materiales, mano de obra y equipos disponibles para APU y BOQ"
+          actions={headerActions}
+        />
+        <div
+          className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+          role="alert"
+          aria-live="assertive"
+        >
+          {error}
+        </div>
+      </div>
+    );
+  }
 
   const emptyStateAction = (
     <div className="flex flex-col items-center gap-1.5">

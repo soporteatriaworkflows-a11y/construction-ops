@@ -27,6 +27,9 @@ import * as schema from "./schema";
 
 export { schema };
 
+const DEFAULT_POSTGRES_POOL_MAX = 1;
+const MAX_CONFIGURABLE_POSTGRES_POOL = 10;
+
 /** Lee y valida la URL de conexión desde el entorno. */
 function resolveDatabaseUrl(): string {
   const url = process.env.DATABASE_URL;
@@ -37,6 +40,18 @@ function resolveDatabaseUrl(): string {
     );
   }
   return url;
+}
+
+export function resolvePostgresPoolMax(
+  env: { [key: string]: string | undefined } = process.env,
+): number {
+  const raw = env.POSTGRES_POOL_MAX ?? env.DB_POOL_MAX;
+  if (!raw) return DEFAULT_POSTGRES_POOL_MAX;
+
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed < 1) return DEFAULT_POSTGRES_POOL_MAX;
+
+  return Math.min(parsed, MAX_CONFIGURABLE_POSTGRES_POOL);
 }
 
 type DbClient = ReturnType<typeof drizzle<typeof schema>>;
@@ -51,8 +66,9 @@ const globalForDb = globalThis as unknown as {
 export function getSql(): ReturnType<typeof postgres> {
   if (!globalForDb.__cops_sql) {
     globalForDb.__cops_sql = postgres(resolveDatabaseUrl(), {
-      // Supabase usa SSL; postgres.js lo negocia con la URL (sslmode=require).
-      max: 10,
+      // Supavisor en session mode tiene pool bajo; en serverless el fan-out de
+      // lambdas multiplica conexiones. Default conservador, override opcional.
+      max: resolvePostgresPoolMax(),
       prepare: false, // compatible con el pooler de Supabase (PgBouncer).
     });
   }
