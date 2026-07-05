@@ -7538,3 +7538,101 @@ APU/BOQ/catalogo real. Todo tras STEEL_OPS_UIX_PREVIEW (layout steel).
   `pdf-text-extract.test.ts` (el resumen viejo `summarizeElementEvidence`
   fue reemplazado en la UI por `<ElementEvidencePanel`) y helper de tipos de
   `manual-excel-export.test.ts` (Omit del nuevo campo `evidence`).
+
+---
+
+## STEEL_OPS_F7_STRUCTURAL_DRAWING_INTELLIGENCE (2026-07-05)
+
+Rama: feature/steel-ops-f7-structural-drawing-intelligence. Base: main = 63d40bd.
+Sin migracion, sin DB. **Primera capa OPERATIVA de comprension de planos (codigo,
+no docs-only):** implementa en codigo la fundacion F7A-F7C del blueprint del
+PR #59 (docs-only, NO mergeado, usado solo como referencia de diseno).
+
+### Problema que ataca
+La prueba real con 3 PDFs (planta de cimentacion, vigas, pilotes) mostro que
+F6 lee lineas aisladas: sin regiones, sin ejes, sin tablas, sin relaciones.
+Causa raiz verificada: `buildPageLines` descartaba las coordenadas de pdfjs.
+
+### Que se implemento (8 modulos puros + UI + borde cliente)
+- `lib/steel/drawing-spatial-model.ts` — texto POSICIONADO (bbox/rotation/
+  fontSize/method/confidence/tokenId/lineId); estructura PARALELA a la vista
+  de lineas F6 (que queda intacta como fallback); texto sin coordenadas ⇒
+  `layoutConfidence: baja` con razon (no se inventan posiciones).
+- `lib/steel/drawing-page-regions.ts` — regiones tipadas (title_block, notes,
+  legend, table, plan_grid, detail, reinforcement_callout, unknown) por
+  anclas de palabra clave + absorcion por cercania + zonas tipicas; degrada
+  a bloques secuenciales sin coordenadas; toda region con razon+confianza.
+- `lib/steel/drawing-grid-context.ts` — burbujas de eje por TOKEN en bandas
+  de borde (letras/numeros); requiere >=2 de una familia para afirmar grilla
+  (ruido ⇒ gridDetected false con razon); `locateElementInGrid` produce
+  ubicacion SUGERIDA ("cerca de ejes A y 1") con confianza y razon; los ejes
+  dejan de excluirse (falso "falta ubicacion" de F6E corregido).
+- `lib/steel/drawing-element-registry.ts` — nomenclatura ampliada real:
+  VC-EJE-1 / VC EJE 1 / VIGA CIM 1 / ZAPATA Z1 / PILOTE 0 60 (diametro) /
+  COLUMNA C-02; alias tipograficos agrupan, VC-1 vs VC-01 solo se AVISAN
+  (jamas fusion); estados completo/falta_ubicacion/falta_refuerzo/conflicto/
+  requiere_revision con razon.
+- `lib/steel/drawing-nomenclature.ts` — leyenda detectada del propio plano
+  (Q = ... con evidencia literal); simbolo usado sin definicion ⇒ unresolved
+  (jamas se asume "Q = corrugada"); #/@ /L=/E son convenciones F1 (builtin).
+  La leyenda puede vivir en OTRA pagina/plano del plan set.
+- `lib/steel/drawing-table-structure.ts` — tablas MVP por alineacion:
+  filas por Y, columnas por clustering X, headerGuess (CANT., ELEMENTO...),
+  celdas con rowIndex/columnIndex/tableId/sourcePage; sin coordenadas NO se
+  adivinan tablas (nota honesta).
+- `lib/steel/structural-review-findings.ts` — motor de hallazgos:
+  segment_sum_mismatch (35+150+35=220 vs texto 210 ⇒ contradiccion, sin
+  corregir), count_mismatch (19 detectadas vs 16 listadas, diferencia 3) vs
+  graphic_count_unverified (si la evidencia no alcanza SE DICE, no se calla),
+  unresolved_nomenclature, missing_location, missing_reinforcement,
+  conflicting_reinforcement, ocr_symbol_loss ESPECIFICO por lectura
+  ("545600" donde nativo dice "5#5600", sin reconstruir), possible_table,
+  possible_axis_context, low_layout_confidence, complex_notation_unparsed
+  (2x34#7210@15 ⇒ candidato complejo o hallazgo, jamas descarte silencioso).
+  Cada hallazgo: severity/elementKey/fuente/pagina/evidence/explanation/
+  suggestedAction/confidence/blockingForApproval.
+- `lib/steel/structural-drawing-analysis.ts` — orquestador puro multi-plano:
+  un elemento puede tener ubicacion en un plano y refuerzo en otro (registro
+  y nomenclatura cruzan TODAS las fuentes); candidatos F6 = evidencia de
+  refuerzo; conflictos F6C se heredan.
+- `pdf-text-extract-client.ts` — conserva `spatialItems` (bbox/fontSize/
+  rotation desde el transform de pdfjs) en paralelo a la vista F6.
+- UI `structural-review-panel.tsx` — seccion "Revision tecnica del plano" en
+  el intake del workspace: regiones por pagina, elementos con alias/estado,
+  nomenclatura resuelta/no resuelta, hallazgos con acciones (marcar revisado,
+  ignorar, reabrir, vincular a elemento). No bloquea el flujo F6.
+- Evidencia Excel F4A.2: el resumen de hallazgos del elemento se anexa a la
+  `observation` de la evidencia F6E al enviar aprobados (mismo canal, export
+  intacto por duck typing).
+
+### Que NO se hizo (a proposito)
+Sin DB/Supabase/RLS/migraciones/storage/subidas/deploy manual/.env/service
+role; sin navegacion global/ACCESS_MODULES/NAV_ITEMS; sin APU/BOQ/catalogo
+real; sin dependencias nuevas; sin APIs externas ni modelo de vision; sin
+PDFs reales en el repo (fixtures sinteticos); sin escala ni medicion
+geometrica; sin ml/kg/costos (F1 unica calculadora); sin aprobacion
+automatica; sin inventar cantidades/relaciones. Todo tras
+STEEL_OPS_UIX_PREVIEW.
+
+### QA
+- typecheck exit 0; lint exit 0.
+- tests/unit/steel: 258 passed, 26 archivos (+72 tests F7 en 7 archivos
+  nuevos: spatial model, regiones, grilla, registry, nomenclatura, tablas,
+  findings con los 10 casos obligatorios, analisis integrado + guardas
+  estaticas sin DB/fetch/calculadora). F1/F6A/F6B/F6C/F6E intactos.
+- Suite completa corrida antes del PR.
+
+### Limitaciones conocidas (honestas)
+- Regiones/grilla/tablas requieren coordenadas (PDF nativo); OCR y texto
+  pegado degradan a analisis textual con hallazgo low_layout_confidence.
+- El conteo grafico usa rotulos de texto, no geometria dibujada: zapatas
+  repetidas SIN rotulo producen graphic_count_unverified, no conteo.
+- Deteccion de tablas es MVP por alineacion (sin bordes vectoriales del
+  operator list — sub-fase futura).
+- Acciones de revision (revisado/ignorado/vinculo) viven en memoria del
+  navegador (sin persistencia en esta fase).
+
+### SIGUIENTE
+Revision visual con los 3 PDFs reales (flag on) → calibrar umbrales de
+region/grilla → F7D grafo de evidencia + operator list (bordes de tabla,
+lineas de eje vectoriales) → decidir Q-F7-VISION-1 (no bloquea).

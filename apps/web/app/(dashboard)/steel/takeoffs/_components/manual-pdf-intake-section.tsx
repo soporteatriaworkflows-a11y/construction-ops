@@ -68,7 +68,16 @@ import {
   type PlanSourceType,
 } from '@/lib/steel/pdf-text-extract';
 import type { ManualLineRecord } from '@/lib/steel/manual-takeoff';
+import type { SpatialTextItemInput } from '@/lib/steel/drawing-spatial-model';
+import {
+  analyzeStructuralDrawings,
+  elementKeyForCandidateLabel,
+  findingsSummaryForElement,
+  type DrawingAnalysisSourceInput,
+  type StructuralDrawingAnalysis,
+} from '@/lib/steel/structural-drawing-analysis';
 import { ElementEvidencePanel } from './element-evidence-panel';
+import { StructuralReviewPanel } from './structural-review-panel';
 
 const SAMPLE_TEXT = [
   'VC-01 5#5600',
@@ -159,6 +168,8 @@ interface EditablePdfPage extends ExtractedPdfPage {
   ocrText?: string;
   ocrPreview?: string;
   ocrError?: string;
+  /** Items posicionados F7A (solo desde extracción nativa; se pierden al editar el texto). */
+  spatialItems?: SpatialTextItemInput[];
 }
 
 interface PdfSourceState {
@@ -176,7 +187,10 @@ function approvedCount(candidates: readonly PdfIntakeCandidate[]): number {
   return candidates.filter((candidate) => candidate.status === 'approved').length;
 }
 
-function shapeEditablePage(base: ExtractedPdfPage, previous?: Partial<EditablePdfPage>): EditablePdfPage {
+function shapeEditablePage(
+  base: ExtractedPdfPage & { spatialItems?: SpatialTextItemInput[] },
+  previous?: Partial<EditablePdfPage>,
+): EditablePdfPage {
   const suggestion = previous?.sourceType ? undefined : suggestSourceTypeFromText(base.text);
   return {
     ...base,
@@ -188,6 +202,9 @@ function shapeEditablePage(base: ExtractedPdfPage, previous?: Partial<EditablePd
     ocrText: previous?.ocrText,
     ocrPreview: previous?.ocrPreview,
     ocrError: previous?.ocrError,
+    // F7A: al editar el texto a mano las coordenadas dejan de corresponder;
+    // el análisis degrada honesto a texto plano (no se conservan del previo).
+    spatialItems: base.spatialItems,
   };
 }
 
@@ -200,6 +217,7 @@ export function ManualPdfIntakeSection({
 }) {
   const [sources, setSources] = useState<PdfSourceState[]>([]);
   const [mentions, setMentions] = useState<readonly ElementMention[]>([]);
+  const [analysis, setAnalysis] = useState<StructuralDrawingAnalysis | null>(null);
   const [hybridStats, setHybridStats] = useState<HybridComparisonStats | null>(null);
   const [pageNumber, setPageNumber] = useState('1');
   const [sourceText, setSourceText] = useState('');
@@ -350,6 +368,20 @@ export function ManualPdfIntakeSection({
         { fileName: source.fileName },
       ),
     );
+    // F7: comprensión estructural del plan set completo (regiones, ejes,
+    // elementos, nomenclatura, tablas, hallazgos). Puro, en el navegador.
+    const analysisSources: DrawingAnalysisSourceInput[] = readySources.map((source) => ({
+      fileName: source.fileName,
+      pages: source.pages.map((page) => ({
+        pageNumber: page.pageNumber,
+        included: page.included,
+        sourceType: page.sourceType,
+        nativeText: page.text,
+        spatialItems: page.spatialItems,
+        ocrText: page.ocrText,
+      })),
+    }));
+    setAnalysis(analyzeStructuralDrawings(analysisSources, comparison.candidates));
     setCandidates(comparison.candidates);
     setHybridStats(comparison.stats);
     setMentions([...nativeResult.mentions, ...ocrMentions]);
@@ -374,9 +406,23 @@ export function ManualPdfIntakeSection({
   }
 
   function handleDetectManual() {
-    setCandidates(detectPdfIntakeCandidates(sourceText, { pageNumber: manualPage }));
+    const detected = detectPdfIntakeCandidates(sourceText, { pageNumber: manualPage });
+    setCandidates(detected);
     setMentions([]);
     setHybridStats(null);
+    // F7 sobre texto pegado: análisis textual degradado (sin coordenadas),
+    // igual de honesto — nomenclatura, elementos y hallazgos siguen operando.
+    setAnalysis(
+      analyzeStructuralDrawings(
+        [
+          {
+            fileName: 'texto-pegado',
+            pages: [{ pageNumber: manualPage, included: true, nativeText: sourceText, method: 'manual' }],
+          },
+        ],
+        detected,
+      ),
+    );
     setHasDetected(true);
   }
 
@@ -396,7 +442,24 @@ export function ManualPdfIntakeSection({
   function handleAddApproved() {
     // F6E: la evidencia (fuente/página/tipo/método/confianza/observación)
     // viaja adjunta a la línea manual y de ahí al export Excel F4A.2.
-    const lines = approvedCandidatesToManualLines(candidates);
+    // F7: si el elemento del candidato tiene hallazgos técnicos, el resumen
+    // se anexa a la observación (mismo canal, sin tocar el export).
+    const approvedList = candidates.filter((candidate) => candidate.status === 'approved' && candidate.f1Ready);
+    const lines = approvedCandidatesToManualLines(candidates).map((line, index) => {
+      const candidate = approvedList[index];
+      const elementKey = candidate?.elementLabel
+        ? elementKeyForCandidateLabel(candidate.elementLabel)
+        : undefined;
+      const findingSummary = analysis ? findingsSummaryForElement(analysis.findings, elementKey) : undefined;
+      if (!findingSummary || !line.evidence) return line;
+      return {
+        ...line,
+        evidence: {
+          ...line.evidence,
+          observation: [line.evidence.observation, findingSummary].filter(Boolean).join(' · '),
+        },
+      };
+    });
     if (lines.length === 0) return;
     onAddApproved(lines);
     setCandidates((current) =>
@@ -704,6 +767,10 @@ export function ManualPdfIntakeSection({
         <InlineCallout tone="info" className="mt-4">
           No hay informacion suficiente para cantidad automatica; se requiere seleccion, calibracion o revision manual.
         </InlineCallout>
+      )}
+
+      {hasDetected && analysis && (
+        <StructuralReviewPanel analysis={analysis} disabled={disabled} />
       )}
 
       {showElementPanel && (
