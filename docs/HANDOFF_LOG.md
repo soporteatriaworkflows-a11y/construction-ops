@@ -7478,3 +7478,51 @@ Rama: feature/v5-4-2d-dashboard-project-scope-selector. Base: origin/main = 9fb7
 - **Regresion admin APU/BOQ:** workspace BOQ expone bajo `canEdit` existente las acciones `Editar detalle`, `Ver vinculo` y `Abrir APU` cuando hay APU vinculado. Consulta sigue sin acciones internas; compras no gana edicion.
 - **Docs:** `docs/P0B_PRODUCTION_STABILITY_AND_ADMIN_APU_REGRESSION.md`.
 - **Restricciones:** sin Supabase Cloud/db push/RLS/migraciones/Vercel envs/`DATABASE_URL`/deploy/merge/tag; sin role-map ni DB enum; sin tocar PR #54/P2B1, V5.7B, Gantt, D1, portal cliente ni PDF presentacion.
+
+---
+
+## STEEL_OPS_F6E_ELEMENT_EVIDENCE_LINKING (2026-07-05)
+
+Rama: feature/steel-ops-f6e-element-linking. Base: main = f5ded62. Sin migracion, sin DB.
+
+### Alcance (redefinido por la duena del producto)
+F6E = "Element Evidence Linking / Vinculacion por elemento" (el roadmap
+original decia bbox por pagina; ese alcance pasa a una sub-fase futura,
+ver nota en `docs/STEEL_OPS_F6_ROADMAP.md`).
+
+### Que se implemento
+- `apps/web/lib/steel/element-evidence-linking.ts` (modelo PURO): agrupa
+  candidatos F6A/F6C + menciones F6B por CODIGO de elemento (pareo textual,
+  VC-01 = VC-01; VC-1 vs VC-01 se AVISA como parecido, jamas se fusiona).
+  Evidencia multiple por elemento (ubicacion/ejes, refuerzo/despiece,
+  detalle/corte, tabla/cuadro, notas, sin clasificar) con metodo
+  (native_text/ocr/manual). Conflictos OCR-vs-nativo (marcados por F6C o
+  detectados cruzando paginas con la varilla REAL del parser F1) se marcan
+  y NUNCA se resuelven solos. Estados: listo_para_revision, falta_ubicacion,
+  falta_refuerzo, falta_detalle, conflicto_entre_fuentes,
+  solo_candidato_parcial, aprobado_para_takeoff (solo por accion humana).
+- `element-evidence-panel.tsx`: seccion "Evidencia por elemento" dentro del
+  intake del workspace F3 con acciones: aprobar grupo (solo convertibles),
+  descartar evidencia (descarta el candidato), marcar requiere revision.
+- Evidencia viaja a F3/F4A.2: `ManualLineRecord.evidence` nuevo (fuente,
+  pagina, tipo fuente, metodo, confianza, fragmento, observacion), persiste
+  en localStorage (`manual-store`) y el export Excel F4A.2 la recoge en
+  CONTROL_LECTURA/EVIDENCIAS/01_CANTIDADES sin cambios en el export.
+  El envio de aprobados usa `approvedCandidatesToManualLines` (F6E);
+  `pdfIntakeCandidatesToManualLines` (F6A) queda intacto.
+
+### Que NO se hizo (a proposito)
+Sin DB/Supabase/RLS/migraciones/storage/subidas; sin geometria ni escala
+automatica; sin medicion desde lineas; sin aprobacion automatica; sin
+fusion de datos entre fuentes; sin calculo ml/kg/costo (F1 unica
+calculadora); sin navegacion global/ACCESS_MODULES/NAV_ITEMS; sin
+APU/BOQ/catalogo real. Todo tras STEEL_OPS_UIX_PREVIEW (layout steel).
+
+### QA
+- typecheck exit 0; lint exit 0.
+- tests/unit/steel: 186 passed (18 archivos; +29 en
+  `element-evidence-linking.test.ts`). Suite completa corrida antes del PR.
+- Tests preexistentes ajustados SOLO en cableado estatico:
+  `pdf-text-extract.test.ts` (el resumen viejo `summarizeElementEvidence`
+  fue reemplazado en la UI por `<ElementEvidencePanel`) y helper de tipos de
+  `manual-excel-export.test.ts` (Omit del nuevo campo `evidence`).

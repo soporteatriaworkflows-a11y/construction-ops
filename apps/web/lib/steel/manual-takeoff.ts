@@ -37,6 +37,26 @@ import type { SteelPriceStatusView, SteelTakeoffStatusView } from './types';
 // Registros persistibles (solo INPUTS; todo lo derivado se recalcula con F1)
 // ---------------------------------------------------------------------------
 
+/** Método de lectura de la evidencia adjunta a una línea (F6E). */
+export type ManualLineEvidenceMethod = 'native_text' | 'ocr' | 'manual';
+
+/**
+ * Evidencia de origen de una línea manual (F6E): fuente, página, tipo de
+ * fuente, método de lectura, confianza y observación. Es SOLO trazabilidad —
+ * jamás alimenta cálculo alguno (F1 sigue siendo la única calculadora).
+ * Los nombres están alineados con `ManualExcelLineEvidence` (F4A.2) para que
+ * el export Excel la recoja tal cual en CONTROL_LECTURA/EVIDENCIAS.
+ */
+export interface ManualLineEvidence {
+  sourceFileName?: string;
+  pageNumber?: number;
+  sourceType?: string;
+  readingMethod?: ManualLineEvidenceMethod;
+  confidence?: string;
+  originalFragment?: string;
+  observation?: string;
+}
+
 /**
  * Línea manual tal como se guarda localmente. Deliberadamente NO persiste
  * ml/kg/alertas: una sola fuente de verdad para cálculos (regla global #1) —
@@ -49,6 +69,8 @@ export interface ManualLineRecord {
   assumedWastePct: DecimalString;
   /** Nº de varilla asignado a mano cuando el parser no lo infiere (ej. `15 + 35 + 15`). */
   manualBarNumber?: number;
+  /** Evidencia de origen (F6E): de qué PDF/página/método salió la línea. */
+  evidence?: ManualLineEvidence;
 }
 
 export interface ManualTakeoffRecord {

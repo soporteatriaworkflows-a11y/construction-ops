@@ -13,12 +13,17 @@ import {
   type ManualTakeoffRecord,
 } from '@/lib/steel/manual-takeoff';
 
-type ManualLineRecordWithEvidence = ManualLineRecord & { evidence?: ManualExcelLineEvidence };
+// El export F4A.2 acepta evidencia laxa (duck typing); desde F6E la línea
+// manual también trae `evidence` tipada, así que se reemplaza (Omit) para
+// poder probar los casos de sanitización con valores hostiles.
+type ManualLineRecordWithEvidence = Omit<ManualLineRecord, 'evidence'> & {
+  evidence?: ManualExcelLineEvidence;
+};
 
 function line(
   overrides: Partial<ManualLineRecordWithEvidence> & Pick<ManualLineRecord, 'id' | 'originalDescription'>,
 ): ManualLineRecord {
-  return { assumedWastePct: '5', ...overrides } as ManualLineRecordWithEvidence;
+  return { assumedWastePct: '5', ...overrides } as unknown as ManualLineRecord;
 }
 
 function takeoff(lines: readonly ManualLineRecord[] = []): ManualTakeoffRecord {

@@ -19,6 +19,15 @@ de uso, pero ninguna se salta la revisión humana ni los techos de confianza.
 | **F6F** — Geometría/cotas con calibración de escala | Visor con calibración: usuario marca una cota conocida → factor de escala → **verificación obligatoria con segunda cota independiente** → medición de segmentos seleccionados por el usuario → candidato `media` con la calibración como evidencia | F6E | F6-S2 estricto: sin doble cota verificada no hay medición; calibración por página (no por archivo); registro de quién calibró | páginas T5 dejan de ser `no_interpretable` para longitudes |
 | **F6G** — Asistencia multimodal avanzada | Modelo de visión como *sugeridor*: propone regiones, transcripciones y agrupaciones con evidencia bbox; jamás aprueba, jamás es fuente única de un número (tope `baja`, F6-S9); evaluación de costo por página y privacidad del plano antes de habilitar | F6E; decisión explícita de la usuaria (planos = datos sensibles del proyecto) | anti-alucinación R8: toda lectura de visión exige confirmación humana contra la imagen; opt-in por organización | ayuda en planos difíciles (T6/T7) sin ceder el control |
 
+> **Nota de re-alcance (2026-07-05, decisión de la dueña del producto):**
+> la sub-fase entregada como **F6E** es *Element Evidence Linking*
+> (agrupación de candidatos/evidencias por elemento estructural con estados
+> de completitud y conflictos, sin fusión ni aprobación automática — ver
+> `apps/web/lib/steel/element-evidence-linking.ts` y HANDOFF_LOG
+> `STEEL_OPS_F6E_ELEMENT_EVIDENCE_LINKING`). El alcance "Zonas/BBox por
+> página" descrito en la tabla queda como sub-fase futura y conserva sus
+> gates.
+
 ## Qué NO está en el roadmap F6 (para que nadie lo asuma)
 
 - Persistencia DB/RLS de candidatos (contrato en blueprint §8; se
