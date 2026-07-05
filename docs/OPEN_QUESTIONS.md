@@ -445,3 +445,17 @@ _Sin blockers activos._
 - Q-WRITE-1 (DB, ya registrada arriba) sigue abierta: V5.6.6B endurece la
   superficie app-layer de compras; el espejo RLS por rol interno se
   evalúa tras 6C/6D.
+
+## STEEL_OPS_F7 (2026-07-05)
+
+- **Q-F7-VISION-1:** ¿Se aprueba EN PRINCIPIO que la fase F7E use un modelo
+  de vision multimodal externo como *sugeridor* para regiones dificiles o
+  paginas escaneadas, bajo estos gates: opt-in por takeoff/region, los planos
+  salen del navegador solo hacia el proveedor aprobado, API key solo en
+  entorno server (proxy interno minimo), presupuesto por pagina + tope
+  mensual, tope de confianza `baja` y confirmacion humana contra la imagen?
+  ¿O Steel Ops debe permanecer 100 % local? No bloquea F7A-F7D.
+  Detalle: docs/STEEL_OPS_F7_VISION_AND_LAYOUT_STRATEGY.md §4.
+- **Q-F7-HOTFIX-1:** ¿Visto bueno al hotfix F6C-HF1 (advertencias OCR por
+  candidato + correccion contextual guiada, sin autocompletar `#`)?
+  Detalle: docs/STEEL_OPS_F7_ROADMAP.md (seccion hotfix).
