@@ -1,5 +1,17 @@
 # Handoff Log
 
+## 2026-07-05 - STEEL_OPS_F8_AEC_EXTRACTION_ENGINE_SPIKE - EN RAMA + PR, SIN MERGE - Fable
+
+- Rama `feature/steel-ops-f8-aec-extraction-engine-spike` (base `origin/main = b6f9c20`, post F7.1 #61). Spike exploratorio: investigación + prototipo aislado + decisión técnica. PR `research(steel): evaluate AEC extraction engines for structural plans`, SIN merge.
+- Entregable principal: `docs/STEEL_OPS_F8_AEC_EXTRACTION_ENGINE_SPIKE.md` — matriz de investigación (F7/pdfjs+tesseract, Lift/Datalab, Marker/Surya, Autodesk APS Model Derivative, ODA, LibreDWG, ezdxf, web-ifc/IfcOpenShell, APIs multimodales) con licencias/costos/privacidad/GPU verificados por fuentes; arquitectura de 4 capas (F7 interno → External JSON Bridge → CAD/DXF/IFC → Vision opt-in) sobre un contrato único; tabla de criterios; recomendación clara.
+- Prototipo (Opción 1, DXF): `apps/web/lib/steel/research/dxf-extraction-spike.ts` — parser DXF ASCII en TS puro (TEXT/MTEXT/INSERT/LWPOLYLINE, capas, coordenadas), fixture SINTÉTICO generado por código, detección VC-2/Z-01/P-03 reutilizando el registro F7, conteo gráfico por bloques vs conteo textual de cuadros y discrepancia crítica "3 dibujadas vs 4 listadas". CERO dependencias nuevas instaladas (decisión documentada: ezdxf/Marker/LibreDWG no entran por Python/GPL/innecesidad).
+- Schema profesional: `apps/web/lib/steel/research/steel-ext-2-schema.ts` — `steel-ext-2` (project/planSet/sourceDocuments/pages/elements/reinforcement{longitudinalBars,stirrups,hooks,laps}/tableRows/axisContext/graphicCounts/textCounts/discrepancies/unresolvedNomenclature/sourceEvidence; evidencia obligatoria por dato: fuente/página/región/bbox/método/confianza/evidenceText/needsReview/warnings) + JSON Schema draft-07 copiable + validador de invariantes que rechaza auto-aprobación.
+- Recomendación F8A: motor CAD/DXF propio primero (costo $0, privacidad total, ataca la causa raíz: el PDF destruye capas/bloques/entidades) + subir el bridge BYO-JSON a steel-ext-2; DWG vía export DXF u ODA File Converter (gratuito, local, fuera del repo); IFC (web-ifc, MPL-2.0) segunda ola; visión multimodal opt-in cuarta capa. Descartados como dependencia: LibreDWG y Marker (GPL-3), ODA SDK (contrato/C++), Lift self-hosted (GPU + pesos <$2M).
+- QA: tests spike 12/12 verdes; research/ aislado (ningún archivo de producción lo importa); sin tocar F7, UI, flag, DB, Supabase, RLS, storage, .env, nav global; sin PDFs/DXF reales (fixture sintético en código); sin credenciales.
+- SIGUIENTE: revisión del doc F8 por la usuaria → decidir F8A (intake .dxf gateado + bridge v2 + comparador unificado). STOP: PR sin merge.
+
+---
+
 ## 2026-07-05 - P2B3_GANTT_PANEL_DURATION_EDIT - EN RAMA + PR, SIN MERGE
 
 - Worktree: D:/ICONIC/SOFTWARE PRESUPUESTOS/construction-ops-p2b3-duration-edit. Rama: feature/p2b3-gantt-duration-edit. Base: origin/main post P2B2 (0205f93, incluye steel #57). Sin merge, sin deploy, sin tag. UI-only + action EXISTENTE.
