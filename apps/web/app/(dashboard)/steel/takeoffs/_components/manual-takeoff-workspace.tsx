@@ -25,6 +25,7 @@ import {
   canTransitionManualTakeoff,
   computeManualLines,
   computeManualTotals,
+  effectiveCommercialLengths,
   ensureDemoIntakeTakeoff,
   MANUAL_TAKEOFF_STATUS_TRANSITIONS,
   MANUAL_TAKEOFF_TRANSITION_LABEL,
@@ -115,7 +116,20 @@ export function ManualTakeoffWorkspace({ takeoffId }: { takeoffId: string }) {
   }
 
   function handleGeneratePlan() {
-    setPlanResult(buildManualCutPlan(computedLines));
+    // F7.1: el optimizador usa las longitudes comerciales configuradas del
+    // takeoff (el pedido proveedor hereda las barras del plan).
+    setPlanResult(
+      buildManualCutPlan(computedLines, {
+        commercialLengthsM: effectiveCommercialLengths(takeoff),
+      }),
+    );
+    setOrder(null);
+  }
+
+  function handleChangeCommercialLengths(next: readonly string[]) {
+    updateTakeoff((current) => ({ ...current, commercialLengthsM: next }));
+    // Cambió la configuración: el plan/pedido previos quedan obsoletos.
+    setPlanResult(null);
     setOrder(null);
   }
 
@@ -254,7 +268,14 @@ export function ManualTakeoffWorkspace({ takeoffId }: { takeoffId: string }) {
 
           <section className="mb-8" aria-label="Plan de corte">
             <SectionTitle step={5} title="Plan de corte (FFD) y banco de sobrantes" />
-            <ManualCutPlanSection lines={computedLines} planResult={planResult} onGenerate={handleGeneratePlan} />
+            <ManualCutPlanSection
+              lines={computedLines}
+              planResult={planResult}
+              commercialLengths={effectiveCommercialLengths(takeoff)}
+              canEditLengths={canEdit}
+              onChangeCommercialLengths={handleChangeCommercialLengths}
+              onGenerate={handleGeneratePlan}
+            />
           </section>
 
           <section className="mb-8" aria-label="Pedido proveedor">

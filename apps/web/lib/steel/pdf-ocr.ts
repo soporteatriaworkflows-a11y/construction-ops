@@ -120,6 +120,24 @@ export function hasLostHashSuspicion(ocrText: string): boolean {
 export const OCR_LOST_HASH_WARNING =
   'El OCR suele confundir el simbolo # de la notacion de despiece: si ves algo como "545600" o "74E:+3200" donde el plano dice "5#5600" o "74E#3200", corrige el texto OCR antes de detectar. No se reconstruye automaticamente para no inventar.';
 
+/**
+ * ¿`ocrToken` es una variante CORRUPTA de `nativeFragment` por pérdida del
+ * símbolo `#`? (# omitido: "55600"; # leído como otro carácter: "545600").
+ * Comparación de lectura, jamás reconstrucción.
+ */
+export function isOcrSymbolLossVariant(nativeFragment: string, ocrToken: string): boolean {
+  const native = nativeFragment.toUpperCase().replace(/\s+/g, '');
+  const ocr = ocrToken.toUpperCase().replace(/\s+/g, '');
+  if (!native.includes('#') || ocr.includes('#') || native === ocr) return false;
+  const escaped = native.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`^${escaped.replace('#', '[^#]?')}$`).test(ocr);
+}
+
+/** Advertencia ESPECÍFICA por candidato cuando el OCR corrompió su lectura. */
+export function ocrSymbolLossCandidateWarning(nativeText: string, ocrReading: string): string {
+  return `El OCR leyo "${ocrReading}" donde el texto nativo dice "${nativeText}": se conserva la lectura nativa y la variante OCR se descarta de la lista (no se reconstruye ni se degrada el candidato nativo).`;
+}
+
 // ---------------------------------------------------------------------------
 // 3. Candidatos desde OCR (con techo de confianza) y comparación nativo↔OCR
 // ---------------------------------------------------------------------------
@@ -190,6 +208,8 @@ export interface HybridComparisonStats {
   /** Detectado por ambos métodos (se conserva el nativo, anotado). */
   confirmedByBoth: number;
   conflicts: number;
+  /** Lecturas OCR corruptas del # detectadas y descartadas (F7.1): el nativo manda. */
+  symbolLossDiscarded: number;
 }
 
 export interface HybridComparisonResult {
@@ -219,6 +239,10 @@ export const OCR_CONFLICT_WARNING =
  * Compara candidatos nativos y OCR SIN fusionar datos:
  * - misma lectura por ambos métodos ⇒ se conserva el nativo, anotado como
  *   confirmado (el duplicado OCR se descarta de la lista).
+ * - lectura OCR que es variante CORRUPTA del # de un nativo (F7.1) ⇒ se
+ *   descarta la variante, el nativo conserva estado/confianza y recibe una
+ *   advertencia ESPECÍFICA (no banner genérico). El OCR complementa, no
+ *   reemplaza: nunca degrada una lectura nativa por su propia corrupción.
  * - lectura solo-OCR ⇒ entra capada a baja confianza.
  * - mismo elemento+varilla+página con texto distinto ⇒ CONFLICTO en ambos.
  */
@@ -228,7 +252,13 @@ export function compareHybridCandidates(
 ): HybridComparisonResult {
   const nativeKeys = new Set(nativeCandidates.map(dedupeKey));
   const merged: PdfIntakeCandidate[] = nativeCandidates.map((candidate) => ({ ...candidate }));
-  const stats: HybridComparisonStats = { nativeOnly: 0, ocrOnly: 0, confirmedByBoth: 0, conflicts: 0 };
+  const stats: HybridComparisonStats = {
+    nativeOnly: 0,
+    ocrOnly: 0,
+    confirmedByBoth: 0,
+    conflicts: 0,
+    symbolLossDiscarded: 0,
+  };
 
   const confirmedKeys = new Set<string>();
   const conflictedIds = new Set<string>();
@@ -239,6 +269,21 @@ export function compareHybridCandidates(
       confirmedKeys.add(key);
       stats.confirmedByBoth += 1;
       continue; // duplicado: el nativo manda; no se agrega dos veces
+    }
+
+    // F7.1: variante corrupta del # de una lectura nativa ⇒ el nativo manda.
+    const lossTarget = merged.find(
+      (native) =>
+        native.evidence.method !== 'ocr' &&
+        isOcrSymbolLossVariant(native.candidateText, ocrCandidate.candidateText),
+    );
+    if (lossTarget) {
+      stats.symbolLossDiscarded += 1;
+      const warning = ocrSymbolLossCandidateWarning(lossTarget.candidateText, ocrCandidate.candidateText);
+      if (!lossTarget.warnings.includes(warning)) {
+        lossTarget.warnings = [...lossTarget.warnings, warning];
+      }
+      continue; // la variante corrupta NO entra: sería ruido duplicado
     }
 
     const signature = conflictSignature(ocrCandidate);

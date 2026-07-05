@@ -41,7 +41,8 @@ export type StructuralFindingType =
   | 'graphic_count_unverified'
   | 'ocr_symbol_loss'
   | 'low_layout_confidence'
-  | 'complex_notation_unparsed';
+  | 'complex_notation_unparsed'
+  | 'title_block_noise';
 
 export type StructuralFindingSeverity = 'info' | 'warning' | 'critical';
 
@@ -76,6 +77,7 @@ export const STRUCTURAL_FINDING_TYPE_LABEL: Record<StructuralFindingType, string
   ocr_symbol_loss: 'Simbolo perdido por OCR',
   low_layout_confidence: 'Layout con baja confianza',
   complex_notation_unparsed: 'Notacion compleja sin normalizar',
+  title_block_noise: 'Posible rotulo / metadato del plano',
 };
 
 const SEVERITY_ORDER: Record<StructuralFindingSeverity, number> = {
@@ -339,9 +341,26 @@ export function buildStructuralReviewFindings(input: StructuralFindingsInput): S
     });
   }
 
-  // 2. Estados de elementos: faltantes y conflictos (registro F7-D).
+  // 2. Estados de elementos: faltantes, conflictos y ruido de rótulo (F7.1).
   for (const record of input.registry) {
     const firstMention = record.sourceMentions[0];
+    if (record.suspectedTitleBlockOnly) {
+      findings.push({
+        id: '',
+        type: 'title_block_noise',
+        severity: 'info',
+        elementKey: record.elementKey,
+        sourceFileName: firstMention?.sourceFileName,
+        pageNumber: firstMention?.pageNumber,
+        evidence: record.sourceMentions.slice(0, 3).map((m) => `p.${m.pageNumber}: "${m.lineText}"`),
+        explanation: `${record.displayLabel}: ${record.reviewStatusReason}`,
+        suggestedAction:
+          'Confirmar contra el plano: si es un elemento real, vincula su mencion tecnica (planta/despiece); si es el nombre del plano, ignora este codigo.',
+        confidence: 'media',
+        blockingForApproval: false,
+      });
+      continue;
+    }
     if (record.reviewStatus === 'conflicto') {
       findings.push({
         id: '',

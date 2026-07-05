@@ -81,6 +81,56 @@ export interface ManualTakeoffRecord {
   status: SteelTakeoffStatusView;
   createdAt: string;
   lines: readonly ManualLineRecord[];
+  /**
+   * Longitudes comerciales disponibles para ESTE takeoff (F7.1, editable):
+   * el mercado/proveedor puede cambiar (6/9/12 hoy; 7.5 mañana). Ausente ⇒
+   * defaults del preview. Solo configura el optimizador FFD/pedido — jamás
+   * altera cálculos F1 de ml/kg.
+   */
+  commercialLengthsM?: readonly DecimalString[];
+}
+
+// ---------------------------------------------------------------------------
+// Longitudes comerciales configurables (F7.1)
+// ---------------------------------------------------------------------------
+
+/** Default del preview (paridad con MOCK_STEEL_SETTINGS): 6/9/12 m. */
+export const DEFAULT_COMMERCIAL_LENGTHS_M: readonly DecimalString[] =
+  MOCK_STEEL_SETTINGS.commercialLengthsM;
+
+/** Tope físico razonable: una barra comercial no supera los 24 m. */
+export const MAX_COMMERCIAL_LENGTH_M = 24;
+
+/**
+ * Valida una longitud comercial digitada. Rechaza vacío, no numérico, 0,
+ * negativos y valores fuera del rango físico razonable.
+ */
+export function validateCommercialLengthInput(
+  raw: string,
+): { ok: true; lengthM: DecimalString } | { ok: false; reason: string } {
+  const trimmed = raw.trim().replace(',', '.');
+  if (trimmed.length === 0) return { ok: false, reason: 'Escribe una longitud en metros.' };
+  const value = Number(trimmed);
+  if (!Number.isFinite(value)) return { ok: false, reason: 'La longitud debe ser un número (metros).' };
+  if (value <= 0) return { ok: false, reason: 'La longitud debe ser mayor que 0 m.' };
+  if (value > MAX_COMMERCIAL_LENGTH_M) {
+    return { ok: false, reason: `La longitud supera el máximo razonable (${MAX_COMMERCIAL_LENGTH_M} m).` };
+  }
+  return { ok: true, lengthM: toDecimal(trimmed).toFixed() };
+}
+
+/**
+ * Longitudes efectivas del takeoff: configuradas y válidas, o el default.
+ * Nunca devuelve lista vacía (el optimizador necesita al menos una).
+ */
+export function effectiveCommercialLengths(
+  takeoff: Pick<ManualTakeoffRecord, 'commercialLengthsM'> | undefined,
+): readonly DecimalString[] {
+  const configured = (takeoff?.commercialLengthsM ?? []).filter(
+    (length) => validateCommercialLengthInput(length).ok,
+  );
+  if (configured.length === 0) return DEFAULT_COMMERCIAL_LENGTHS_M;
+  return [...new Set(configured)].sort((a, b) => toDecimal(a).cmp(toDecimal(b)));
 }
 
 export const MANUAL_TAKEOFF_ID_PREFIX = 'mtk-';
@@ -350,7 +400,10 @@ export function rebarCutSpecId(barNumber: number): string {
   return `spec-rebar-${barNumber}`;
 }
 
-export function buildManualCutPlan(lines: readonly ManualComputedLine[]): ManualCutPlanResult {
+export function buildManualCutPlan(
+  lines: readonly ManualComputedLine[],
+  options: { commercialLengthsM?: readonly DecimalString[] } = {},
+): ManualCutPlanResult {
   const eligible = lines.filter((l) => l.cutPlanEligible);
   const excluded = lines
     .filter((l) => !l.cutPlanEligible)
@@ -370,8 +423,15 @@ export function buildManualCutPlan(lines: readonly ManualComputedLine[]): Manual
     treatment: 'none',
   }));
 
+  // F7.1: las longitudes comerciales son configurables por takeoff (mercado/
+  // proveedor cambia); sin configuración se mantiene el default 6/9/12.
+  const commercialLengthsM =
+    options.commercialLengthsM && options.commercialLengthsM.length > 0
+      ? options.commercialLengthsM
+      : DEFAULT_COMMERCIAL_LENGTHS_M;
+
   const plan = optimizeSteelCutsFFD(cuts, {
-    commercialLengthsM: MOCK_STEEL_SETTINGS.commercialLengthsM,
+    commercialLengthsM,
     kerfM: MOCK_STEEL_SETTINGS.kerfRebarM,
     minimumUsefulOffcutM: MOCK_STEEL_SETTINGS.minimumUsefulOffcutRebarM,
   });
