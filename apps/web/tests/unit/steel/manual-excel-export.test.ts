@@ -3,6 +3,7 @@ import {
   STEEL_MANUAL_EXCEL_SHEETS,
   buildSteelManualExcelWorkbook,
   sanitizeExcelCellText,
+  type ManualExcelLineEvidence,
 } from '@/lib/steel/manual-excel-export';
 import {
   buildManualCutPlan,
@@ -12,8 +13,12 @@ import {
   type ManualTakeoffRecord,
 } from '@/lib/steel/manual-takeoff';
 
-function line(overrides: Partial<ManualLineRecord> & Pick<ManualLineRecord, 'id' | 'originalDescription'>): ManualLineRecord {
-  return { assumedWastePct: '5', ...overrides };
+type ManualLineRecordWithEvidence = ManualLineRecord & { evidence?: ManualExcelLineEvidence };
+
+function line(
+  overrides: Partial<ManualLineRecordWithEvidence> & Pick<ManualLineRecord, 'id' | 'originalDescription'>,
+): ManualLineRecord {
+  return { assumedWastePct: '5', ...overrides } as ManualLineRecordWithEvidence;
 }
 
 function takeoff(lines: readonly ManualLineRecord[] = []): ManualTakeoffRecord {
@@ -56,7 +61,7 @@ describe('manual-excel-export (F4A)', () => {
     expect(sanitizeExcelCellText('texto, con "comillas"\ny salto')).toBe('texto, con "comillas"\ny salto');
   });
 
-  it('crea las siete hojas requeridas con nombres estables', () => {
+  it('crea las hojas requeridas con nombres estables', () => {
     const records = [line({ id: 'e1', originalDescription: '5#5600' })];
     const wb = buildSteelManualExcelWorkbook({
       takeoff: takeoff(records),
@@ -82,7 +87,7 @@ describe('manual-excel-export (F4A)', () => {
     expect(wb.getWorksheet('01_CANTIDADES')!.rowCount).toBe(1);
   });
 
-  it('incluye headers minimos de alertas, plan de corte y sobrantes', () => {
+  it('incluye headers minimos de alertas, plan de corte, sobrantes y evidencias', () => {
     const records = [
       line({ id: 'e1', originalDescription: '5#5600' }),
       line({ id: 'e2', originalDescription: 'texto libre' }),
@@ -125,6 +130,20 @@ describe('manual-excel-export (F4A)', () => {
       'ahorro kg',
       'ahorro COP mock',
     ]);
+    expect(wb.getWorksheet('EVIDENCIAS')!.getRow(1).values).toMatchObject([
+      ,
+      'linea / item',
+      'elemento',
+      'descripcion original',
+      'archivo fuente',
+      'pagina',
+      'tipo fuente',
+      'metodo lectura',
+      'confianza',
+      'fragmento original',
+      'observaciones',
+      'estado revision',
+    ]);
   });
 
   it('mantiene numeros como numeros e incluye formulas seguras para ml/kg/subtotales', () => {
@@ -148,6 +167,8 @@ describe('manual-excel-export (F4A)', () => {
     expect(typeof cantidades!.getCell('F2').value).toBe('number');
     expect(cantidades!.getCell('K2').value).toMatchObject({ formula: 'F2*G2*H2' });
     expect(cantidades!.getCell('L2').value).toMatchObject({ formula: 'J2*G2*H2' });
+    expect(cantidades!.getCell('O1').value).toBe('fuente');
+    expect(cantidades!.getCell('T1').value).toBe('observacion');
 
     const resumen = wb.getWorksheet('00_RESUMEN');
     expect(resumen!.getCell('B9').value).toMatchObject({ formula: "SUM('01_CANTIDADES'!K2:K3)" });
@@ -172,6 +193,127 @@ describe('manual-excel-export (F4A)', () => {
     expect(typeof cantidades.getCell('F3').value).toBe('number');
   });
 
+  it('exporta CONTROL_LECTURA y EVIDENCIAS sin romper lineas sin evidencia', () => {
+    const records = [
+      line({ id: 'e1', originalDescription: '5#5600' }),
+      line({ id: 'e2', originalDescription: '74E#3200' }),
+    ];
+    const wb = buildSteelManualExcelWorkbook({
+      takeoff: takeoff(records),
+      lines: computeManualLines(records),
+      generatedAt: new Date('2026-07-04T12:00:00.000Z'),
+    });
+
+    const control = wb.getWorksheet('CONTROL_LECTURA')!;
+    expect(control.getCell('B2').value).toBe('Takeoff Excel');
+    expect(control.getCell('B6').value).toBe(2);
+    expect(control.getCell('B7').value).toBe(0);
+    expect(control.getCell('B8').value).toBe(2);
+    expect(control.getCell('B9').value).toBe(0);
+
+    const evidencias = wb.getWorksheet('EVIDENCIAS')!;
+    expect(evidencias.rowCount).toBe(3);
+    expect(evidencias.getCell('D2').value).toBe('');
+    expect(evidencias.getCell('G2').value).toBe('unknown');
+    expect(evidencias.getCell('K2').value).toBe('unreviewed');
+  });
+
+  it('exporta evidencia opcional en CONTROL_LECTURA, EVIDENCIAS y columnas finales de cantidades', () => {
+    const records = [
+      line({
+        id: 'e1',
+        originalDescription: '5#5600',
+        evidence: {
+          sourceFileName: 'plano-estructural.pdf',
+          pageNumber: 4,
+          sourceType: 'manual_selection',
+          readingMethod: 'manual',
+          confidence: '0.92',
+          originalFragment: 'Zapata Z-1 5#5600',
+          observation: 'Revisado contra detalle S-04',
+          reviewStatus: 'approved',
+        },
+      }),
+      line({
+        id: 'e2',
+        originalDescription: '74E#3200',
+        evidence: {
+          sourceFileName: 'plano-estructural.pdf',
+          pageNumber: 5,
+          sourceType: 'native_text',
+          readingMethod: 'native_text',
+          confidence: '0.45',
+          originalFragment: 'Estribos 74E#3200',
+          observation: 'Confirmar separacion',
+          reviewStatus: 'needs_review',
+        },
+      }),
+    ];
+    const wb = buildSteelManualExcelWorkbook({
+      takeoff: takeoff(records),
+      lines: computeManualLines(records),
+      generatedAt: new Date('2026-07-04T12:00:00.000Z'),
+    });
+
+    const control = wb.getWorksheet('CONTROL_LECTURA')!;
+    expect(control.getCell('B7').value).toBe(2);
+    expect(control.getCell('B8').value).toBe(0);
+    expect(control.getCell('B9').value).toBe(1);
+
+    const cantidades = wb.getWorksheet('01_CANTIDADES')!;
+    expect(cantidades.getCell('O2').value).toBe('plano-estructural.pdf');
+    expect(cantidades.getCell('P2').value).toBe('4');
+    expect(cantidades.getCell('Q2').value).toBe('manual_selection');
+    expect(cantidades.getCell('R2').value).toBe('manual');
+    expect(cantidades.getCell('S2').value).toBe('0.92');
+    expect(cantidades.getCell('T2').value).toBe('Revisado contra detalle S-04');
+
+    const evidencias = wb.getWorksheet('EVIDENCIAS')!;
+    expect(evidencias.getCell('D3').value).toBe('plano-estructural.pdf');
+    expect(evidencias.getCell('E3').value).toBe('5');
+    expect(evidencias.getCell('F3').value).toBe('native_text');
+    expect(evidencias.getCell('G3').value).toBe('native_text');
+    expect(evidencias.getCell('H3').value).toBe('0.45');
+    expect(evidencias.getCell('I3').value).toBe('Estribos 74E#3200');
+    expect(evidencias.getCell('J3').value).toBe('Confirmar separacion');
+    expect(evidencias.getCell('K3').value).toBe('needs_review');
+  });
+
+  it('sanitiza texto peligroso en evidencia sin afectar formulas internas', () => {
+    const records = [
+      line({
+        id: 'e1',
+        originalDescription: '5#5600',
+        evidence: {
+          sourceFileName: '=cmd.xlsx',
+          pageNumber: '\t=SUM(1,1)',
+          sourceType: '+pdf',
+          readingMethod: 'manual',
+          confidence: '-1',
+          originalFragment: '@fragment',
+          observation: '   =SUM(1,1)',
+          reviewStatus: '=approved',
+        },
+      }),
+    ];
+    const wb = buildSteelManualExcelWorkbook({
+      takeoff: takeoff(records),
+      lines: computeManualLines(records),
+      generatedAt: new Date('2026-07-04T12:00:00.000Z'),
+    });
+    const cantidades = wb.getWorksheet('01_CANTIDADES')!;
+    const evidencias = wb.getWorksheet('EVIDENCIAS')!;
+
+    expect(cantidades.getCell('K2').value).toMatchObject({ formula: 'F2*G2*H2' });
+    expect(cantidades.getCell('O2').value).toBe("'=cmd.xlsx");
+    expect(cantidades.getCell('P2').value).toBe("'\t=SUM(1,1)");
+    expect(cantidades.getCell('Q2').value).toBe("'+pdf");
+    expect(cantidades.getCell('S2').value).toBe("'-1");
+    expect(cantidades.getCell('T2').value).toBe("'   =SUM(1,1)");
+    expect(evidencias.getCell('I2').value).toBe("'@fragment");
+    expect(evidencias.getCell('K2').value).toBe("'=approved");
+  });
+
   it('no incluye tokens de DB/Supabase/RLS/produccion/deploy ni secretos', () => {
     const records = [line({ id: 'e1', originalDescription: '5#5600' })];
     const wb = buildSteelManualExcelWorkbook({
@@ -181,7 +323,7 @@ describe('manual-excel-export (F4A)', () => {
     });
     const haystack = workbookText(wb);
 
-    for (const forbidden of ['supabase', 'rls', 'service_role', 'anon_key', '.env', 'database_url', 'production', 'deploy']) {
+    for (const forbidden of ['supabase', 'rls', 'service_role', 'anon_key', '.env', 'database_url', 'production', 'deploy', 'storage']) {
       expect(haystack).not.toContain(forbidden);
     }
   });
