@@ -7538,3 +7538,50 @@ APU/BOQ/catalogo real. Todo tras STEEL_OPS_UIX_PREVIEW (layout steel).
   `pdf-text-extract.test.ts` (el resumen viejo `summarizeElementEvidence`
   fue reemplazado en la UI por `<ElementEvidencePanel`) y helper de tipos de
   `manual-excel-export.test.ts` (Omit del nuevo campo `evidence`).
+
+---
+
+## STEEL_OPS_F7_DRAWING_UNDERSTANDING_DOCS (2026-07-05)
+
+Rama: feature/steel-ops-f7-drawing-understanding-docs. Base: main = 0205f93.
+**Docs-only: cero codigo, cero dependencias, cero deploy.**
+
+### Contexto
+La duena probo F6B/F6C/F6E con 3 PDFs reales (planta de cimentacion, vigas
+de cimentacion con detalles/tablas/flejado, pilotes). El flujo funciona
+tecnicamente pero aun no supera el costo de digitar: lee lineas aisladas en
+vez de entender el plano. Se pauso "mas extraccion" y se pidio recalibracion.
+
+### Entregado (4 docs nuevos)
+- `STEEL_OPS_F7_REAL_PDF_TEST_FINDINGS.md` — auditoria honesta F6A-F6E:
+  sintoma -> causa raiz en codigo (advertencia # generica por pagina; OCR de
+  pagina completa a ~144dpi; coordenadas de pdfjs/tesseract DESCARTADAS al
+  aplanar a lineas; ELEMENT_CODE_PATTERN no reconoce VC-EJE-1/O/50x60/CANT.;
+  ejes excluidos en vez de usados como ubicacion; pipeline linea->candidato).
+- `STEEL_OPS_F7_DRAWING_UNDERSTANDING_BLUEPRINT.md` — arquitectura F7:
+  PositionedText (bbox/rotacion/tamano), regiones de pagina, modelo de
+  ejes/grilla, registro de elementos con alias, grafo de evidencia (evolucion
+  de F6E), comprension de tablas, estacion de revision humana. Reglas duras
+  F7-S1..S8 (sin inventar, sin medir por escala, todo local por defecto,
+  F1 unica calculadora, fallback F6 siempre).
+- `STEEL_OPS_F7_VISION_AND_LAYOUT_STRATEGY.md` — comparacion de 4 opciones
+  (solo local / vision multimodal / Document AI-Azure / hibrido).
+  Recomendacion: fundacion local F7A-F7D sin dependencias nuevas; vision
+  multimodal SOLO como F7E opt-in con gate de privacidad/costo/key (requiere
+  aprobacion explicita, registrada como pregunta abierta); Document AI
+  descartado (dominio equivocado para planos CAD).
+- `STEEL_OPS_F7_ROADMAP.md` — fases F7A (layout espacial + OCR por zona),
+  F7B (ejes/grilla + nomenclatura real), F7C (tablas por fila con CANT.),
+  F7D (grafo de evidencia), F7E (vision con gate), F7F (estrategia DWG/IFC).
+  Incluye hotfix F6C-HF1 (advertencias OCR especificas por candidato +
+  correccion contextual guiada) PROPUESTO y NO implementado, pendiente de
+  visto bueno.
+
+### Reglas respetadas
+Sin DB/Supabase/RLS/migraciones/storage/subidas/APIs nuevas/dependencias
+nuevas; sin codigo tocado; sin promesas de lectura automatica definitiva;
+sin escala para cantidades; sin relaciones inventadas.
+
+### Proximo paso sugerido
+1) Visto bueno u observaciones al hotfix F6C-HF1. 2) Aprobar arranque F7A.
+3) Responder pregunta abierta de vision externa (no bloquea F7A-F7D).
