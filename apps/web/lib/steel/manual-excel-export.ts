@@ -20,6 +20,8 @@ import {
 export const STEEL_MANUAL_EXCEL_SHEETS = [
   '00_RESUMEN',
   '01_CANTIDADES',
+  'CONTROL_LECTURA',
+  'EVIDENCIAS',
   '02_ALERTAS',
   '03_PLAN_CORTE',
   '04_SOBRANTES',
@@ -35,6 +37,19 @@ const BAND_FILL = 'FFEAF2F8';
 const BORDER = 'FFB7C9D6';
 
 type CellValue = string | number | null | undefined | ExcelJS.CellValue;
+
+export type ManualExcelEvidenceReadingMethod = 'manual' | 'native_text' | 'ocr' | 'unknown';
+
+export interface ManualExcelLineEvidence {
+  sourceFileName?: string;
+  pageNumber?: string | number;
+  sourceType?: string;
+  readingMethod?: ManualExcelEvidenceReadingMethod | string;
+  confidence?: string | number;
+  originalFragment?: string;
+  observation?: string;
+  reviewStatus?: string;
+}
 
 export interface ManualExcelExportInput {
   takeoff: ManualTakeoffRecord;
@@ -70,6 +85,8 @@ export function buildSteelManualExcelWorkbook(input: ManualExcelExportInput): Ex
 
   addResumenSheet(wb, input.takeoff, input.lines, planResult.plan, order, generatedAt);
   addCantidadesSheet(wb, input.takeoff, input.lines);
+  addControlLecturaSheet(wb, input.takeoff, input.lines, generatedAt);
+  addEvidenciasSheet(wb, input.takeoff, input.lines);
   addAlertasSheet(wb, input.lines);
   addPlanCorteSheet(wb, input.lines, planResult.plan);
   addSobrantesSheet(wb, planResult.plan);
@@ -89,6 +106,10 @@ function text(value: string | undefined | null): string {
   return sanitizeExcelCellText(value ?? '');
 }
 
+function cellText(value: string | number | undefined | null): string {
+  return text(value == null ? '' : String(value));
+}
+
 function num(value: string | number | undefined | null, decimals = 2): number {
   try {
     return toDecimal(String(value ?? 0)).toDecimalPlaces(decimals).toNumber();
@@ -99,6 +120,41 @@ function num(value: string | number | undefined | null, decimals = 2): number {
 
 function formula(formulaText: string, result: number): ExcelJS.CellValue {
   return { formula: formulaText, result };
+}
+
+type EvidenceCarrier = Partial<ManualExcelLineEvidence> & {
+  evidence?: Partial<ManualExcelLineEvidence>;
+  sourceFile?: string;
+  page?: string | number;
+  method?: string;
+  fragment?: string;
+  notes?: string;
+};
+
+function lineEvidence(line: ManualComputedLine): ManualExcelLineEvidence {
+  const record = line.record as EvidenceCarrier;
+  const direct = line as EvidenceCarrier;
+  const nested = record.evidence ?? direct.evidence ?? {};
+  return {
+    sourceFileName: nested.sourceFileName ?? record.sourceFileName ?? direct.sourceFileName ?? record.sourceFile ?? direct.sourceFile,
+    pageNumber: nested.pageNumber ?? record.pageNumber ?? direct.pageNumber ?? record.page ?? direct.page,
+    sourceType: nested.sourceType ?? record.sourceType ?? direct.sourceType,
+    readingMethod: nested.readingMethod ?? record.readingMethod ?? direct.readingMethod ?? record.method ?? direct.method,
+    confidence: nested.confidence ?? record.confidence ?? direct.confidence,
+    originalFragment: nested.originalFragment ?? record.originalFragment ?? direct.originalFragment ?? record.fragment ?? direct.fragment,
+    observation: nested.observation ?? record.observation ?? direct.observation ?? record.notes ?? direct.notes,
+    reviewStatus: nested.reviewStatus ?? record.reviewStatus ?? direct.reviewStatus,
+  };
+}
+
+function hasEvidence(evidence: ManualExcelLineEvidence): boolean {
+  return Object.values(evidence).some((value) => value !== undefined && value !== null && String(value).trim() !== '');
+}
+
+function isLowConfidence(evidence: ManualExcelLineEvidence): boolean {
+  if (evidence.confidence === undefined || evidence.confidence === null || String(evidence.confidence).trim() === '') return false;
+  const value = Number(String(evidence.confidence).replace(',', '.'));
+  return Number.isFinite(value) && value < 0.7;
 }
 
 function styleHeader(row: ExcelJS.Row): void {
@@ -202,6 +258,67 @@ function totalWasteMl(lines: readonly ManualComputedLine[]): number {
   return lines.reduce((acc, line) => acc + num(line.calculated.estimatedWasteMl), 0);
 }
 
+function addControlLecturaSheet(
+  wb: ExcelJS.Workbook,
+  takeoff: ManualTakeoffRecord,
+  lines: readonly ManualComputedLine[],
+  generatedAt: Date,
+): void {
+  const ws = wb.addWorksheet('CONTROL_LECTURA');
+  ws.addRow(['campo', 'valor', 'nota']);
+  const evidences = lines.map(lineEvidence);
+  const totalWithEvidence = evidences.filter(hasEvidence).length;
+  const totalLowConfidence = evidences.filter(isLowConfidence).length;
+  const rows: [string, CellValue, string?][] = [
+    ['Takeoff', text(takeoff.name)],
+    ['Fecha export', generatedAt.toISOString().slice(0, 10)],
+    ['Estado', text(takeoff.status)],
+    ['Advertencia', 'Borrador para revision tecnica', 'No usar como aprobacion automatica.'],
+    ['Total lineas', lines.length],
+    ['Total lineas con evidencia', totalWithEvidence],
+    ['Total lineas sin evidencia', lines.length - totalWithEvidence],
+    ['Total lineas de baja confianza', totalLowConfidence, 'Confianza de evidencia menor a 0.70.'],
+    ['Nota', 'No reemplaza aprobacion tecnica.'],
+  ];
+  rows.forEach((row) => ws.addRow(row));
+  finishTable(ws, [34, 28, 58]);
+}
+
+function addEvidenciasSheet(wb: ExcelJS.Workbook, takeoff: ManualTakeoffRecord, lines: readonly ManualComputedLine[]): void {
+  const ws = wb.addWorksheet('EVIDENCIAS');
+  ws.addRow([
+    'linea / item',
+    'elemento',
+    'descripcion original',
+    'archivo fuente',
+    'pagina',
+    'tipo fuente',
+    'metodo lectura',
+    'confianza',
+    'fragmento original',
+    'observaciones',
+    'estado revision',
+  ]);
+
+  lines.forEach((line) => {
+    const evidence = lineEvidence(line);
+    ws.addRow([
+      text(line.record.id),
+      text(takeoff.scopeLabel),
+      text(line.record.originalDescription),
+      cellText(evidence.sourceFileName),
+      cellText(evidence.pageNumber),
+      cellText(evidence.sourceType),
+      cellText(evidence.readingMethod ?? 'unknown'),
+      cellText(evidence.confidence),
+      cellText(evidence.originalFragment),
+      cellText(evidence.observation),
+      cellText(evidence.reviewStatus ?? line.calculated.verificationStatus ?? 'unreviewed'),
+    ]);
+  });
+  finishTable(ws, [18, 22, 30, 28, 10, 16, 16, 12, 46, 42, 18]);
+}
+
 function addCantidadesSheet(wb: ExcelJS.Workbook, takeoff: ManualTakeoffRecord, lines: readonly ManualComputedLine[]): void {
   const ws = wb.addWorksheet('01_CANTIDADES');
   ws.addRow([
@@ -219,6 +336,12 @@ function addCantidadesSheet(wb: ExcelJS.Workbook, takeoff: ManualTakeoffRecord, 
     'kg total',
     'unidades comerciales',
     'estado revision',
+    'fuente',
+    'pagina',
+    'tipo fuente',
+    'metodo',
+    'confianza',
+    'observacion',
   ]);
 
   lines.forEach((line, index) => {
@@ -227,6 +350,7 @@ function addCantidadesSheet(wb: ExcelJS.Workbook, takeoff: ManualTakeoffRecord, 
     const repetitions = num(line.calculated.repetitions, 0);
     const cutLength = num(line.calculated.cutLengthM);
     const kgUnit = pieces * repetitions > 0 ? num(line.calculated.totalKg, 6) / (pieces * repetitions) : 0;
+    const evidence = lineEvidence(line);
     ws.addRow([
       text(line.record.id),
       text(takeoff.scopeLabel),
@@ -242,12 +366,18 @@ function addCantidadesSheet(wb: ExcelJS.Workbook, takeoff: ManualTakeoffRecord, 
       formula(`J${rowNumber}*G${rowNumber}*H${rowNumber}`, num(line.calculated.totalKg, 6)),
       num(line.calculated.commercialUnitsRequired, 0),
       text(line.calculated.verificationStatus ?? 'unreviewed'),
+      cellText(evidence.sourceFileName),
+      cellText(evidence.pageNumber),
+      cellText(evidence.sourceType),
+      cellText(evidence.readingMethod),
+      cellText(evidence.confidence),
+      cellText(evidence.observation),
     ]);
   });
   [6, 9, 10, 11, 12].forEach((col) => {
     ws.getColumn(col).numFmt = col === 10 || col === 12 ? KG_FMT : NUM_FMT;
   });
-  finishTable(ws, [16, 24, 28, 46, 14, 14, 10, 12, 12, 12, 12, 12, 18, 18]);
+  finishTable(ws, [16, 24, 28, 46, 14, 14, 10, 12, 12, 12, 12, 12, 18, 18, 26, 10, 14, 14, 12, 34]);
 }
 
 function addAlertasSheet(wb: ExcelJS.Workbook, lines: readonly ManualComputedLine[]): void {
