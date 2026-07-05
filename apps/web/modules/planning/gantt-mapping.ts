@@ -30,7 +30,13 @@ import type {
 /** Barra de tarea en la forma que consume `frappe-gantt`. */
 export interface GanttTask {
   id: Uuid;
+  /**
+   * Etiqueta CORTA de la barra (P2B1): `wbsCode` cuando existe; frappe la
+   * dibuja dentro de la barra si cabe. El nombre completo viaja en `fullName`.
+   */
   name: string;
+  /** Nombre completo ("WBS · nombre") para popup/panel; frappe lo ignora. */
+  fullName: string;
   start: IsoDate;
   end: IsoDate;
   /** Avance 0..100 (presentación; redondeado desde `progressPct`). */
@@ -39,6 +45,29 @@ export interface GanttTask {
   dependencies: string;
   /** Clases CSS para estilizar (hito, crítica, estado, etc.). */
   custom_class: string;
+}
+
+/** Longitud máxima del fallback de etiqueta corta cuando no hay `wbsCode`. */
+const SHORT_LABEL_MAX_CHARS = 14;
+
+/**
+ * Etiqueta corta de la barra (P2B1): `wbsCode` si es significativo (no vacío y
+ * no el placeholder `—`); si no, el nombre truncado a un largo seguro con
+ * elipsis. Nunca devuelve cadena vacía (frappe renderiza el label siempre).
+ */
+export function shortGanttLabel(task: Pick<ScheduleTaskView, 'wbsCode' | 'name'>): string {
+  const wbs = task.wbsCode.trim();
+  if (wbs !== '' && wbs !== '—') return wbs;
+  const name = task.name.trim();
+  if (name.length <= SHORT_LABEL_MAX_CHARS) return name || '·';
+  return `${name.slice(0, SHORT_LABEL_MAX_CHARS - 1).trimEnd()}…`;
+}
+
+/** Nombre completo para popup/panel: "WBS · nombre" (o solo nombre sin WBS). */
+export function fullGanttLabel(task: Pick<ScheduleTaskView, 'wbsCode' | 'name'>): string {
+  const wbs = task.wbsCode.trim();
+  if (wbs !== '' && wbs !== '—') return `${wbs} · ${task.name}`;
+  return task.name;
 }
 
 /** Opciones del mapeo (qué resaltar según permisos del rol). */
@@ -110,7 +139,8 @@ export function toGanttTask(
   const isCritical = criticalSet.has(task.id);
   return {
     id: task.id,
-    name: `${task.wbsCode} · ${task.name}`,
+    name: shortGanttLabel(task),
+    fullName: fullGanttLabel(task),
     start: task.plannedStart,
     end: task.plannedEnd,
     progress: progressToNumber(task.progressPct),

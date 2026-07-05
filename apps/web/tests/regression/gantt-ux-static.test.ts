@@ -48,6 +48,28 @@ describe('P2_GANTT_UX static wiring', () => {
     expect(helper).not.toContain('window.');
   });
 
+  it('P2B1: la barra usa etiqueta corta y el nombre completo viaja en fullName', () => {
+    const mapping = read('modules/planning/gantt-mapping.ts');
+    expect(mapping).toContain('name: shortGanttLabel(task)');
+    expect(mapping).toContain('fullName: fullGanttLabel(task)');
+    const chart = read('components/planning/gantt-chart.tsx');
+    expect(chart).toContain('fullName');
+    const css = read('components/planning/gantt-chart.css');
+    expect(css).toContain('.gantt .bar-wrapper .bar-label.big');
+  });
+
+  it('P2B1: zoom minimo por escala y escala inicial por rango', () => {
+    const helper = read('modules/planning/gantt-zoom.ts');
+    expect(helper).toContain('GANTT_ZOOM_MIN_BY_MODE');
+    expect(helper).toContain('Day: 0.5');
+    expect(helper).toContain('Week: 0.35');
+    expect(helper).toContain('Month: 0.35');
+    expect(helper).toContain('export function pickDefaultViewMode');
+    const chart = read('components/planning/gantt-chart.tsx');
+    expect(chart).toContain('pickDefaultViewMode(ganttRangeDays(tasks))');
+    expect(chart).toContain('GANTT_ZOOM_MIN_BY_MODE[viewMode]');
+  });
+
   it('P1 client-safe no se revierte: gates de consulta en planning intactos', () => {
     const page = read('app/(dashboard)/planning/[scheduleId]/page.tsx');
     const shell = read('app/(dashboard)/planning/[scheduleId]/schedule-detail-shell.tsx');

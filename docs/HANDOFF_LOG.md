@@ -1,8 +1,21 @@
 # Handoff Log
 
-## 2026-07-04 - P2_GANTT_UX_FIT_TO_WINDOW - EN RAMA + PR, SIN MERGE
+## 2026-07-04 - P2B1_GANTT_COMPACT_ZOOM_SMART_LABELS - EN RAMA + PR, SIN MERGE
 
-- Worktree: D:/ICONIC/SOFTWARE PRESUPUESTOS/construction-ops-p2-gantt-ux. Rama: feature/p2-gantt-ux-fit-window. Base: origin/main post P1 (merge 8819818). Sin merge, sin deploy, sin tag. UI-only.
+- Worktree: D:/ICONIC/SOFTWARE PRESUPUESTOS/construction-ops-p2b1-gantt-labels. Rama: feature/p2b1-gantt-compact-labels. Base: origin/main post P2 (b618410, incluye steel #52). Sin merge, sin deploy, sin tag. UI-only.
+- Zoom por escala (gantt-zoom.ts): minimo POR ESCALA aprobado en P2B — Dia 0.5, Semana 0.35, Mes 0.35 (GANTT_ZOOM_MIN_BY_MODE reemplaza el minimo global 0.5); clamp maximo 2.5 intacto; el zoom manual se clampa a la escala actual al cambiar de escala.
+- Escala inicial inteligente: nueva funcion pura pickDefaultViewMode(rangeDays) — Semana hasta 120 dias, Mes para rangos mayores; gantt-chart la usa cuando el consumidor no pasa initialViewMode (la page no lo pasa). Selector Dia/Semana/Mes intacto.
+- Labels inteligentes (gantt-mapping.ts): la barra recibe como name la etiqueta CORTA (shortGanttLabel: wbsCode; fallback nombre truncado a 14 chars con elipsis, nunca vacio) y el nombre completo viaja en fullName (fullGanttLabel: "WBS · nombre"); el popup del Gantt muestra fullName. CSS: label dentro de barra en blanco 11px; label externo (frappe .big) atenuado gris 10px.
+- Roles: cero cambios de datos ni permisos — el mapeo sigue recibiendo las mismas tareas ya filtradas por rol; ruta critica via custom_class intacta; P1 y P2 sin revertir (guardas estaticas ampliadas).
+- Tests: gantt-zoom.test.ts actualizado a firmas por escala + pickDefaultViewMode; nuevo gantt-mapping-labels.test.ts; gantt-ux-static.test.ts ampliado con asserts P2B1.
+- Restricciones: sin Supabase Cloud, db push, migraciones, RLS, Vercel envs, DATABASE_URL, SMTP, usuarios reales, deploy, tag, merge, role-map, DB enum, construction-ops-1rqh, V5.7B, portal cliente, PDF presentacion, 6D ni librerias nuevas.
+
+---
+
+## 2026-07-04 - P2_GANTT_UX_FIT_TO_WINDOW - RELEASED (PR #51, merge 39735f7)
+
+- RELEASED 2026-07-04: PR #51 mergeado con merge commit 39735f7 en origin/main; deployment Production success; smoke sin sesion verde. Auditoria tecnica independiente previa al merge.
+- Worktree: D:/ICONIC/SOFTWARE PRESUPUESTOS/construction-ops-p2-gantt-ux. Rama: feature/p2-gantt-ux-fit-window. Base: origin/main post P1 (merge 8819818). UI-only.
 - Gantt (components/planning/gantt-chart.tsx): controles nuevos de zoom (Alejar / % / Acercar / Restablecer / "Ajustar a ventana"); "Ajustar a ventana" es el estado por defecto (el cronograma entra al ancho visible, con clamp de legibilidad). Selector de escala Dia/Semana/Mes intacto. Filas mas compactas (barra 22px, padding 12) y encabezados reducidos; etiquetas de meses en espanol (language: 'es'). Contenedor con alto maximo 65vh y scroll controlado.
 - Logica pura nueva: modules/planning/gantt-zoom.ts (clamp/zoom in-out/column width/rango de dias/fit), exportada por el barril y testeada sin DOM. Anchos base mas compactos que los defaults de frappe (Day 38/Week 90/Month 110 vs 45/140/120).
 - Roles: consulta y obra conservan Gantt y ganan zoom/fit; nada de lo ocultado por P1 (rendimientos, cantidad, cuadrilla, vinculos BOQ/APU) se re-expone; admin/gerencia/presupuestos sin cambios de flujo. CERO cambios en matrices de permisos, role-map, budget-surface o module-access.

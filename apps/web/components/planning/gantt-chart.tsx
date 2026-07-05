@@ -27,12 +27,14 @@ import type { GanttTask, GanttZoomViewMode } from '@/modules/planning';
 import {
   GANTT_ZOOM_DEFAULT,
   GANTT_ZOOM_MAX,
-  GANTT_ZOOM_MIN,
+  GANTT_ZOOM_MIN_BY_MODE,
+  clampGanttZoom,
   ganttColumnWidth,
   ganttFitZoom,
   ganttRangeDays,
   ganttZoomIn,
   ganttZoomOut,
+  pickDefaultViewMode,
 } from '@/modules/planning';
 
 /** Modos de vista expuestos al usuario. */
@@ -44,15 +46,18 @@ const FALLBACK_CONTAINER_WIDTH = 960;
 
 interface GanttChartProps {
   tasks: readonly GanttTask[];
-  /** Modo de vista inicial. */
+  /** Modo de vista inicial; si se omite, se elige por rango (P2B1). */
   initialViewMode?: ViewMode;
 }
 
-export function GanttChart({ tasks, initialViewMode = 'Week' }: GanttChartProps) {
+export function GanttChart({ tasks, initialViewMode }: GanttChartProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const ganttRef = useRef<unknown>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode);
+  // Escala inicial inteligente: Semana para rangos cortos, Mes para largos.
+  const [viewMode, setViewMode] = useState<ViewMode>(
+    () => initialViewMode ?? pickDefaultViewMode(ganttRangeDays(tasks)),
+  );
   // `'fit'` = ajustar a ventana (default); número = zoom manual (1 = 100%).
   const [zoom, setZoom] = useState<number | 'fit'>('fit');
   const [containerWidth, setContainerWidth] = useState<number | null>(null);
@@ -61,6 +66,7 @@ export function GanttChart({ tasks, initialViewMode = 'Week' }: GanttChartProps)
   const headingId = useId();
 
   const rangeDays = useMemo(() => ganttRangeDays(tasks), [tasks]);
+  // El zoom manual se clampa a la escala ACTUAL (los mínimos son por escala).
   const effectiveZoom =
     zoom === 'fit'
       ? ganttFitZoom(
@@ -68,7 +74,7 @@ export function GanttChart({ tasks, initialViewMode = 'Week' }: GanttChartProps)
           rangeDays,
           containerWidth ?? FALLBACK_CONTAINER_WIDTH,
         )
-      : zoom;
+      : clampGanttZoom(zoom, viewMode as GanttZoomViewMode);
   const columnWidth = ganttColumnWidth(viewMode as GanttZoomViewMode, effectiveZoom);
 
   // Mide el ancho visible del contenedor para "Ajustar a ventana" (incluye
@@ -113,8 +119,12 @@ export function GanttChart({ tasks, initialViewMode = 'Week' }: GanttChartProps)
           padding: 12,
           upper_header_height: 36,
           lower_header_height: 26,
+          // El popup muestra el NOMBRE COMPLETO; la barra solo lleva la
+          // etiqueta corta (P2B1). `fullName` viaja en el objeto de la barra.
           popup: ({ task }) =>
-            `<div class="gantt-popup"><strong>${escapeHtml(task.name)}</strong>` +
+            `<div class="gantt-popup"><strong>${escapeHtml(
+              (task as { fullName?: string }).fullName ?? task.name,
+            )}</strong>` +
             `<div>${escapeHtml(task.start)} → ${escapeHtml(task.end)}</div>` +
             `<div>Avance: ${task.progress ?? 0}%</div></div>`,
         });
@@ -180,8 +190,8 @@ export function GanttChart({ tasks, initialViewMode = 'Week' }: GanttChartProps)
           >
             <button
               type="button"
-              onClick={() => setZoom(ganttZoomOut(effectiveZoom))}
-              disabled={effectiveZoom <= GANTT_ZOOM_MIN}
+              onClick={() => setZoom(ganttZoomOut(effectiveZoom, viewMode as GanttZoomViewMode))}
+              disabled={effectiveZoom <= GANTT_ZOOM_MIN_BY_MODE[viewMode]}
               aria-label="Alejar"
               title="Alejar"
               className="rounded px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
@@ -196,7 +206,7 @@ export function GanttChart({ tasks, initialViewMode = 'Week' }: GanttChartProps)
             </span>
             <button
               type="button"
-              onClick={() => setZoom(ganttZoomIn(effectiveZoom))}
+              onClick={() => setZoom(ganttZoomIn(effectiveZoom, viewMode as GanttZoomViewMode))}
               disabled={effectiveZoom >= GANTT_ZOOM_MAX}
               aria-label="Acercar"
               title="Acercar"
