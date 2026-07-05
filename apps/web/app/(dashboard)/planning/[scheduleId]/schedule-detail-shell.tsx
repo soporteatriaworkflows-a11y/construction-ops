@@ -12,22 +12,31 @@
 import { useState, type MouseEvent, type ReactNode } from 'react';
 import { ScheduleWorkspace } from './schedule-workspace';
 import { TaskDetailPanel } from './task-detail-panel';
+import { GanttDurationForm } from './gantt-duration-form';
 import type { WorkspaceTask } from './schedule-workspace-filter';
 
 type Tab = 'tasks' | 'gantt' | 'trace' | 'edit';
 
 interface Props {
+  /** Id del cronograma (P2B3: destino de `updateTaskAction` desde el panel). */
+  scheduleId: string;
   tasks: WorkspaceTask[];
   canSeeCriticalPath: boolean;
   warningCount: number;
   gantt: ReactNode;
   trace: ReactNode;
   clientSafe?: boolean;
+  /**
+   * P2B3: habilita editar la DURACIÓN desde el panel del Gantt. La page lo
+   * deriva del gate ESTRUCTURAL existente (`canManage` = admin/gerencia/
+   * presupuestos) y excluye cronogramas archivados. El servidor re-valida.
+   */
+  canEditDuration?: boolean;
   /** Panel de edición existente (intacto). `null` si el rol no puede gestionar. */
   edit: ReactNode | null;
 }
 
-export function ScheduleDetailShell({ tasks, canSeeCriticalPath, warningCount, gantt, trace, edit, clientSafe = false }: Props) {
+export function ScheduleDetailShell({ scheduleId, tasks, canSeeCriticalPath, warningCount, gantt, trace, edit, clientSafe = false, canEditDuration = false }: Props) {
   const [tab, setTab] = useState<Tab>('tasks');
   // P2B2: tarea seleccionada desde una barra del Gantt (panel lateral).
   const [ganttTaskId, setGanttTaskId] = useState<string | null>(null);
@@ -96,7 +105,7 @@ export function ScheduleDetailShell({ tasks, canSeeCriticalPath, warningCount, g
           <div className="min-w-0 max-h-[70vh] overflow-auto" onClick={handleGanttClick}>
             {gantt}
           </div>
-          <aside className="lg:sticky lg:top-4 lg:self-start" aria-label="Detalle de la actividad seleccionada">
+          <aside className="lg:sticky lg:top-4 lg:self-start space-y-4" aria-label="Detalle de la actividad seleccionada">
             <TaskDetailPanel
               task={ganttSelected}
               canSeeCriticalPath={canSeeCriticalPath}
@@ -104,6 +113,10 @@ export function ScheduleDetailShell({ tasks, canSeeCriticalPath, warningCount, g
               emptyTitle="Selecciona una actividad del Gantt"
               emptyHint="para ver su detalle."
             />
+            {/* P2B3: solo gate estructural; capitulos e hitos no tienen duracion editable. */}
+            {canEditDuration && ganttSelected && ganttSelected.taskType !== 'chapter' && !ganttSelected.isMilestone && (
+              <GanttDurationForm key={ganttSelected.id} scheduleId={scheduleId} task={ganttSelected} />
+            )}
           </aside>
         </div>
       )}

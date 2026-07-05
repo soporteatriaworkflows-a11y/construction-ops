@@ -93,6 +93,26 @@ describe('P2_GANTT_UX static wiring', () => {
     expect(workspace).toContain("import { TaskDetailPanel } from './task-detail-panel'");
   });
 
+  it('P2B3: edicion de duracion en panel Gantt gateada por el permiso estructural existente', () => {
+    const page = read('app/(dashboard)/planning/[scheduleId]/page.tsx');
+    // El gate viene de canManage (admin/gerencia/presupuestos) y excluye archivados:
+    // consulta, obra y compras NUNCA reciben canEditDuration=true.
+    expect(page).toContain("canEditDuration={canManage && schedule.status !== 'archived'}");
+    const shell = read('app/(dashboard)/planning/[scheduleId]/schedule-detail-shell.tsx');
+    expect(shell).toContain('canEditDuration = false');
+    expect(shell).toContain("{canEditDuration && ganttSelected && ganttSelected.taskType !== 'chapter' && !ganttSelected.isMilestone && (");
+    const form = read('app/(dashboard)/planning/[scheduleId]/gantt-duration-form.tsx');
+    // Reusa la action existente (sin action nueva, sin permisos nuevos).
+    expect(form).toContain('updateTaskAction(scheduleId, task.id, { durationDays: parsed })');
+    expect(form).toContain('min={1}');
+    expect(form).toContain('parsed >= 1');
+    expect(form).toContain('Editar duración');
+    expect(form).toContain('Duración en días');
+    expect(form).toContain('Guardar duración');
+    // Sin heuristicas de duracion en P2B3 (eso es P2B4).
+    expect(form).not.toContain('duration-criteria');
+  });
+
   it('P1 client-safe no se revierte: gates de consulta en planning intactos', () => {
     const page = read('app/(dashboard)/planning/[scheduleId]/page.tsx');
     const shell = read('app/(dashboard)/planning/[scheduleId]/schedule-detail-shell.tsx');

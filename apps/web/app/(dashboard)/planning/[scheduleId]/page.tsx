@@ -263,6 +263,7 @@ export default async function ScheduleDetailPage({
 
       {/* Workspace maestro-detalle con pestañas (Tareas / Gantt / Trazabilidad / Edición). */}
       <ScheduleDetailShell
+        scheduleId={schedule.id}
         tasks={workspaceTasks}
         canSeeCriticalPath={canSeeCriticalPath}
         warningCount={isClientSafe ? 0 : noApu + noYield}
@@ -270,6 +271,7 @@ export default async function ScheduleDetailPage({
         trace={traceNode}
         edit={editNode}
         clientSafe={isClientSafe}
+        canEditDuration={canManage && schedule.status !== 'archived'}
       />
     </div>
   );
