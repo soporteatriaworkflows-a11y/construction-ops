@@ -14,7 +14,7 @@
  */
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Check, Copy, FileText, Layers, ScanText, Search, Trash2, Undo2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -25,7 +25,6 @@ import { InlineCallout } from '@/components/shared/inline-callout';
 import {
   canApprovePdfIntakeCandidate,
   detectPdfIntakeCandidates,
-  pdfIntakeCandidatesToManualLines,
   reevaluatePdfIntakeCandidateText,
   type PdfIntakeCandidate,
   type PdfIntakeCandidateStatus,
@@ -33,11 +32,14 @@ import {
   type PdfIntakeFieldKey,
 } from '@/lib/steel/pdf-intake-candidates';
 import {
+  approveElementGroup,
+  approvedCandidatesToManualLines,
+  markElementGroupNeedsReview,
+} from '@/lib/steel/element-evidence-linking';
+import {
   collectElementMentions,
   detectPlanSetCandidates,
-  summarizeElementEvidence,
   type ElementMention,
-  type PlanSourceRef,
 } from '@/lib/steel/pdf-plan-set';
 import {
   classifyPageCoverage,
@@ -66,6 +68,7 @@ import {
   type PlanSourceType,
 } from '@/lib/steel/pdf-text-extract';
 import type { ManualLineRecord } from '@/lib/steel/manual-takeoff';
+import { ElementEvidencePanel } from './element-evidence-panel';
 
 const SAMPLE_TEXT = [
   'VC-01 5#5600',
@@ -173,11 +176,6 @@ function approvedCount(candidates: readonly PdfIntakeCandidate[]): number {
   return candidates.filter((candidate) => candidate.status === 'approved').length;
 }
 
-function sourceRefLabel(ref: PlanSourceRef): string {
-  const type = ref.sourceType ? PLAN_SOURCE_TYPE_LABEL[ref.sourceType] : 'Fuente';
-  return `${type}: ${ref.fileName ?? 'texto pegado'} p.${ref.pageNumber}`;
-}
-
 function shapeEditablePage(base: ExtractedPdfPage, previous?: Partial<EditablePdfPage>): EditablePdfPage {
   const suggestion = previous?.sourceType ? undefined : suggestSourceTypeFromText(base.text);
   return {
@@ -226,10 +224,7 @@ export function ManualPdfIntakeSection({
   const partialCoverage = readySources.some((source) =>
     source.pages.some((page) => page.coverage.level === 'parcial' || page.coverage.level === 'pobre'),
   );
-  const elementGroups = useMemo(
-    () => (hasDetected ? summarizeElementEvidence(candidates, mentions) : []),
-    [hasDetected, candidates, mentions],
-  );
+  const showElementPanel = hasDetected && (candidates.length > 0 || mentions.length > 0);
 
   async function handleFileSelected(file: File | null) {
     setCopied(false);
@@ -399,7 +394,9 @@ export function ManualPdfIntakeSection({
   }
 
   function handleAddApproved() {
-    const lines = pdfIntakeCandidatesToManualLines(candidates);
+    // F6E: la evidencia (fuente/página/tipo/método/confianza/observación)
+    // viaja adjunta a la línea manual y de ahí al export Excel F4A.2.
+    const lines = approvedCandidatesToManualLines(candidates);
     if (lines.length === 0) return;
     onAddApproved(lines);
     setCandidates((current) =>
@@ -709,46 +706,18 @@ export function ManualPdfIntakeSection({
         </InlineCallout>
       )}
 
-      {elementGroups.length > 0 && (
-        <div className="mt-4 rounded-lg border border-iconic-soft-blue/40 p-3">
-          <h4 className="text-xs font-semibold uppercase tracking-wide text-iconic-graphite/60">
-            Evidencia por elemento (pareo textual por codigo — revisa antes de confiar)
-          </h4>
-          <ul className="mt-2 space-y-2">
-            {elementGroups.map((group) => (
-              <li key={group.elementKey} className="rounded-md border border-iconic-soft-blue/30 p-2 text-xs">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="font-semibold text-iconic-ink">{group.elementLabel}</span>
-                  <span className="text-iconic-graphite/50">
-                    {group.candidateIds.length} candidato(s) de acero
-                  </span>
-                  {group.steelSources.map((ref) => (
-                    <Badge key={`s-${sourceRefLabel(ref)}`} variant="success">
-                      {sourceRefLabel(ref)}
-                    </Badge>
-                  ))}
-                  {group.locationSources.map((ref) => (
-                    <Badge key={`l-${sourceRefLabel(ref)}`} variant="secondary">
-                      {sourceRefLabel(ref)}
-                    </Badge>
-                  ))}
-                  {group.detailSources.map((ref) => (
-                    <Badge key={`d-${sourceRefLabel(ref)}`} variant="secondary">
-                      {sourceRefLabel(ref)}
-                    </Badge>
-                  ))}
-                </div>
-                {group.missingHints.length > 0 && (
-                  <ul className="mt-1 list-disc pl-4 text-[11px] text-amber-700 dark:text-amber-400">
-                    {group.missingHints.map((hint) => (
-                      <li key={hint}>{hint}</li>
-                    ))}
-                  </ul>
-                )}
-              </li>
-            ))}
-          </ul>
-        </div>
+      {showElementPanel && (
+        <ElementEvidencePanel
+          candidates={candidates}
+          mentions={mentions}
+          disabled={disabled}
+          onApproveGroup={(link) => setCandidates((current) => approveElementGroup(link, current))}
+          onMarkGroupNeedsReview={(link) =>
+            setCandidates((current) => markElementGroupNeedsReview(link, current))
+          }
+          onDiscardCandidate={(candidateId) => setStatus(candidateId, 'discarded')}
+          onRestoreCandidate={(candidateId) => setStatus(candidateId, 'pending')}
+        />
       )}
 
       {candidates.length > 0 && (

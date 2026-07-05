@@ -169,8 +169,9 @@ describe('aislamiento F6B (analisis estatico)', () => {
   it('la UI expone el plan set: fuentes, clasificacion por pagina y evidencia por elemento', () => {
     expect(section).toContain('Fuentes del takeoff');
     expect(section).toContain('PLAN_SOURCE_TYPES');
-    expect(section).toContain('summarizeElementEvidence');
-    expect(section).toContain('Evidencia por elemento');
+    // Desde F6E la evidencia por elemento vive en su propio panel de revision
+    // (element-evidence-panel.tsx) montado por la seccion de intake.
+    expect(section).toContain('<ElementEvidencePanel');
     expect(section).toContain('NO une planos automaticamente');
   });
 });

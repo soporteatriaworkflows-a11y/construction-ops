@@ -11,7 +11,7 @@
  * I/O y se protegen contra SSR y JSON corrupto (fail-safe: lista vacía).
  */
 import type { SteelTakeoffStatusView } from './types';
-import type { ManualLineRecord, ManualTakeoffRecord } from './manual-takeoff';
+import type { ManualLineEvidence, ManualLineRecord, ManualTakeoffRecord } from './manual-takeoff';
 
 export const MANUAL_TAKEOFFS_STORAGE_KEY = 'steel-ops-preview.manual-takeoffs.v1';
 
@@ -19,6 +19,31 @@ const VALID_STATUSES: readonly SteelTakeoffStatusView[] = ['draft', 'in_review',
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0;
+}
+
+const EVIDENCE_METHODS = ['native_text', 'ocr', 'manual'] as const;
+
+/** Evidencia F6E: solo trazabilidad; campos corruptos se descartan sin lanzar. */
+function parseEvidence(raw: unknown): ManualLineEvidence | undefined {
+  if (typeof raw !== 'object' || raw === null) return undefined;
+  const source = raw as Record<string, unknown>;
+  const str = (value: unknown): string | undefined =>
+    typeof value === 'string' && value.trim().length > 0 ? value : undefined;
+  const evidence: ManualLineEvidence = {
+    sourceFileName: str(source.sourceFileName),
+    pageNumber:
+      typeof source.pageNumber === 'number' && Number.isFinite(source.pageNumber)
+        ? source.pageNumber
+        : undefined,
+    sourceType: str(source.sourceType),
+    readingMethod: EVIDENCE_METHODS.includes(source.readingMethod as (typeof EVIDENCE_METHODS)[number])
+      ? (source.readingMethod as ManualLineEvidence['readingMethod'])
+      : undefined,
+    confidence: str(source.confidence),
+    originalFragment: str(source.originalFragment),
+    observation: str(source.observation),
+  };
+  return Object.values(evidence).some((value) => value !== undefined) ? evidence : undefined;
 }
 
 function parseLine(raw: unknown): ManualLineRecord | undefined {
@@ -36,6 +61,7 @@ function parseLine(raw: unknown): ManualLineRecord | undefined {
       ? line.assumedWastePct
       : '0',
     manualBarNumber,
+    evidence: parseEvidence(line.evidence),
   };
 }
 
