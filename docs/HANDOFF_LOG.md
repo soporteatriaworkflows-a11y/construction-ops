@@ -1,6 +1,18 @@
 # Handoff Log
 
-## 2026-07-05 - P2B2_GANTT_TASK_SIDE_PANEL - EN RAMA + PR, SIN MERGE
+## 2026-07-05 - P2B3_GANTT_PANEL_DURATION_EDIT - EN RAMA + PR, SIN MERGE
+
+- Worktree: D:/ICONIC/SOFTWARE PRESUPUESTOS/construction-ops-p2b3-duration-edit. Rama: feature/p2b3-gantt-duration-edit. Base: origin/main post P2B2 (0205f93, incluye steel #57). Sin merge, sin deploy, sin tag. UI-only + action EXISTENTE.
+- Edicion controlada de duracion desde el panel del Gantt: nuevo gantt-duration-form.tsx (input entero min 1, boton "Guardar duracion", loading, mensaje exito/error) montado en schedule-detail-shell bajo el TaskDetailPanel, una tarea por vez.
+- Action: reusa updateTaskAction(scheduleId, taskId, { durationDays }) — el servidor valida >= 1, re-verifica permiso estructural (canManageSchedules; RPC/RLS detras), recalcula fecha fin/dependencias y revalida la pagina. CERO actions nuevas.
+- Gate: la page pasa canEditDuration = canManage && status !== 'archived' (gate estructural EXISTENTE: admin/gerencia/presupuestos). Consulta, obra y compras NO ven el formulario (duracion solo lectura, sin mensajes agresivos). Capitulos e hitos excluidos en la shell; archivados excluidos en la page y bloqueados server-side.
+- Sin heuristicas/rangos/alertas de duracion ni indicador global (P2B4); sin motivo obligatorio (6D); sin permisos nuevos; sin tocar costos/precios/AIU/BOQ/APU/rendimientos.
+- Tests: bloque estatico P2B3 en gantt-ux-static (gate por canManage, exclusion hito/capitulo, action con durationDays, min 1, copy, sin heuristicas).
+- Restricciones: sin Supabase Cloud, db push, migraciones, RLS, Vercel envs, DATABASE_URL, SMTP, usuarios reales, deploy, tag, merge, role-map, DB enum, construction-ops-1rqh, V5.7B, portal cliente, PDF presentacion, 6D ni librerias nuevas.
+
+---
+
+## 2026-07-05 - P2B2_GANTT_TASK_SIDE_PANEL - RELEASED (PR #56, merge e631766)
 
 - Worktree: D:/ICONIC/SOFTWARE PRESUPUESTOS/construction-ops-p2b2-gantt-panel. Rama: feature/p2b2-gantt-task-panel. Base: origin/main post P2B1 (merge 7c00e09). Sin merge, sin deploy, sin tag. UI-only.
 - Extraccion: TaskDetailPanel (antes funcion local de schedule-workspace.tsx) ahora vive en app/(dashboard)/planning/[scheduleId]/task-detail-panel.tsx con Field/ProductivityTag; mismo contenido visual/semantico en la pestania Tareas (cero cambios de comportamiento alli) + empty state configurable (emptyTitle/emptyHint).
