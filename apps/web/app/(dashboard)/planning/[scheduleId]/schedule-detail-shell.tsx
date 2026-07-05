@@ -9,8 +9,9 @@
  */
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useState, type MouseEvent, type ReactNode } from 'react';
 import { ScheduleWorkspace } from './schedule-workspace';
+import { TaskDetailPanel } from './task-detail-panel';
 import type { WorkspaceTask } from './schedule-workspace-filter';
 
 type Tab = 'tasks' | 'gantt' | 'trace' | 'edit';
@@ -28,6 +29,22 @@ interface Props {
 
 export function ScheduleDetailShell({ tasks, canSeeCriticalPath, warningCount, gantt, trace, edit, clientSafe = false }: Props) {
   const [tab, setTab] = useState<Tab>('tasks');
+  // P2B2: tarea seleccionada desde una barra del Gantt (panel lateral).
+  const [ganttTaskId, setGanttTaskId] = useState<string | null>(null);
+  const ganttSelected = ganttTaskId
+    ? (tasks.find((t) => t.id === ganttTaskId) ?? null)
+    : null;
+
+  // Delegación de click sobre el Gantt: frappe-gantt@1.2.2 no expone `on_click`,
+  // pero renderiza cada barra como `.bar-wrapper` con `data-id` = id de la
+  // tarea (UUID, que frappe conserva intacto). Si la librería cambiara su DOM
+  // interno o el click no cae en una barra, simplemente no se selecciona nada.
+  const handleGanttClick = (event: MouseEvent<HTMLDivElement>) => {
+    const target = event.target as Element | null;
+    const bar = target?.closest?.('.bar-wrapper');
+    const taskId = bar?.getAttribute('data-id');
+    if (taskId && tasks.some((t) => t.id === taskId)) setGanttTaskId(taskId);
+  };
 
   const tabs: { id: Tab; label: string; badge?: number; show: boolean }[] = [
     { id: 'tasks', label: 'Tareas', show: true },
@@ -71,8 +88,25 @@ export function ScheduleDetailShell({ tasks, canSeeCriticalPath, warningCount, g
         />
       </div>
 
-      {/* Gantt: se monta solo al abrir la pestaña (evita carga pesada por defecto). */}
-      {tab === 'gantt' && <div className="max-h-[70vh] overflow-auto">{gantt}</div>}
+      {/* Gantt: se monta solo al abrir la pestaña (evita carga pesada por defecto).
+          P2B2: Gantt a la izquierda + panel de la actividad seleccionada a la
+          derecha (debajo en pantallas angostas). Panel SOLO lectura aquí. */}
+      {tab === 'gantt' && (
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="min-w-0 max-h-[70vh] overflow-auto" onClick={handleGanttClick}>
+            {gantt}
+          </div>
+          <aside className="lg:sticky lg:top-4 lg:self-start" aria-label="Detalle de la actividad seleccionada">
+            <TaskDetailPanel
+              task={ganttSelected}
+              canSeeCriticalPath={canSeeCriticalPath}
+              clientSafe={clientSafe}
+              emptyTitle="Selecciona una actividad del Gantt"
+              emptyHint="para ver su detalle."
+            />
+          </aside>
+        </div>
+      )}
 
       {tab === 'trace' && <div>{trace}</div>}
 

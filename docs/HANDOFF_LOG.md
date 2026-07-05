@@ -1,6 +1,19 @@
 # Handoff Log
 
-## 2026-07-04 - P2B1_GANTT_COMPACT_ZOOM_SMART_LABELS - EN RAMA + PR, SIN MERGE
+## 2026-07-05 - P2B2_GANTT_TASK_SIDE_PANEL - EN RAMA + PR, SIN MERGE
+
+- Worktree: D:/ICONIC/SOFTWARE PRESUPUESTOS/construction-ops-p2b2-gantt-panel. Rama: feature/p2b2-gantt-task-panel. Base: origin/main post P2B1 (merge 7c00e09). Sin merge, sin deploy, sin tag. UI-only.
+- Extraccion: TaskDetailPanel (antes funcion local de schedule-workspace.tsx) ahora vive en app/(dashboard)/planning/[scheduleId]/task-detail-panel.tsx con Field/ProductivityTag; mismo contenido visual/semantico en la pestania Tareas (cero cambios de comportamiento alli) + empty state configurable (emptyTitle/emptyHint).
+- Seleccion desde Gantt: en schedule-detail-shell.tsx, delegacion de click sobre el contenedor del Gantt — closest('.bar-wrapper') + data-id (frappe-gantt@1.2.2 conserva UUIDs intactos); valida que el id exista en tasks; degrada sin error si frappe cambia su DOM o el click no cae en barra.
+- Layout pestania Gantt: grid lg:grid-cols-[minmax(0,1fr)_320px] — Gantt izquierda, panel derecha (sticky; debajo en pantallas angostas). Empty state: "Selecciona una actividad del Gantt / para ver su detalle."
+- SIN edicion en P2B2: el panel del Gantt NO recibe onRequestEdit (guarda estatica lo verifica); la edicion de duracion llega en P2B3. Sin heuristicas de duracion (P2B4).
+- Roles: panel client-safe identico a P1 — consulta ve codigo/nombre/capitulo/fechas/duracion/responsable/estado/avance y NO ve cuadrilla/cantidad/rendimiento/vinculos BOQ/APU ni advertencias de rendimiento; obra/compras sin permisos nuevos; admin/gerencia/presupuestos ven lo mismo que ya veian. CERO cambios en matrices, role-map o server.
+- Tests: client-safe-surface-static y gantt-ux-static actualizados (gates del panel apuntan al archivo extraido, con cobertura equivalente) + 2 bloques nuevos P2B2 (seleccion data-id, panel sin edicion, gates del panel extraido).
+- Restricciones: sin Supabase Cloud, db push, migraciones, RLS, Vercel envs, DATABASE_URL, SMTP, usuarios reales, deploy, tag, merge, role-map, DB enum, construction-ops-1rqh, V5.7B, portal cliente, PDF presentacion, 6D ni librerias nuevas.
+
+---
+
+## 2026-07-04 - P2B1_GANTT_COMPACT_ZOOM_SMART_LABELS - RELEASED (PR #54, merge 7c00e09)
 
 - Worktree: D:/ICONIC/SOFTWARE PRESUPUESTOS/construction-ops-p2b1-gantt-labels. Rama: feature/p2b1-gantt-compact-labels. Base: origin/main post P2 (b618410, incluye steel #52). Sin merge, sin deploy, sin tag. UI-only.
 - Zoom por escala (gantt-zoom.ts): minimo POR ESCALA aprobado en P2B — Dia 0.5, Semana 0.35, Mes 0.35 (GANTT_ZOOM_MIN_BY_MODE reemplaza el minimo global 0.5); clamp maximo 2.5 intacto; el zoom manual se clampa a la escala actual al cambiar de escala.
