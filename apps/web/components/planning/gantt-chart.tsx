@@ -30,6 +30,7 @@ import {
   GANTT_ZOOM_MIN_BY_MODE,
   clampGanttZoom,
   ganttColumnWidth,
+  ganttContainerHeight,
   ganttFitZoom,
   ganttRangeDays,
   ganttZoomIn,
@@ -76,6 +77,10 @@ export function GanttChart({ tasks, initialViewMode }: GanttChartProps) {
         )
       : clampGanttZoom(zoom, viewMode as GanttZoomViewMode);
   const columnWidth = ganttColumnWidth(viewMode as GanttZoomViewMode, effectiveZoom);
+  // P2C1: alto de la caja de scroll interna de frappe (`container_height`).
+  // El propio `.gantt-container` scrollea en AMBAS direcciones, así que la
+  // barra horizontal queda pegada al borde inferior del viewport visible.
+  const containerHeight = ganttContainerHeight(tasks.length);
 
   // Mide el ancho visible del contenedor para "Ajustar a ventana" (incluye
   // recálculo al redimensionar; el umbral evita re-renders por ruido de px).
@@ -114,6 +119,7 @@ export function GanttChart({ tasks, initialViewMode }: GanttChartProps) {
           infinite_padding: false,
           language: 'es',
           column_width: columnWidth,
+          container_height: containerHeight,
           // Filas compactas: barra 22px + padding 12px (frappe default: 30+18).
           bar_height: 22,
           padding: 12,
@@ -141,7 +147,7 @@ export function GanttChart({ tasks, initialViewMode }: GanttChartProps) {
     return () => {
       cancelled = true;
     };
-  }, [tasks, viewMode, columnWidth]);
+  }, [tasks, viewMode, columnWidth, containerHeight]);
 
   if (tasks.length === 0) {
     return (
@@ -255,14 +261,15 @@ export function GanttChart({ tasks, initialViewMode }: GanttChartProps) {
         </div>
       )}
 
-      <div
-        ref={scrollRef}
-        className="max-h-[65vh] overflow-auto rounded-md border border-gray-200 bg-white"
-      >
+      {/* P2C1: este wrapper YA NO scrollea — la caja de scroll es el propio
+          `.gantt-container` de frappe (container_height numérico). Se conserva
+          como caja de medición del ancho para "Ajustar a ventana". */}
+      <div ref={scrollRef} className="overflow-hidden rounded-md border border-gray-200 bg-white">
         {/* frappe-gantt inyecta el SVG dentro de este contenedor. */}
         <div ref={containerRef} className="frappe-gantt-container" aria-hidden={!ready} />
       </div>
 
+      {/* Leyenda SIEMPRE debajo del Gantt, por fuera del área scrolleable. */}
       <GanttLegend />
     </section>
   );

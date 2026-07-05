@@ -94,6 +94,7 @@ export {
   ganttColumnWidth,
   ganttRangeDays,
   ganttFitZoom,
+  ganttContainerHeight,
   pickDefaultViewMode,
   GANTT_ZOOM_MIN_BY_MODE,
   GANTT_ZOOM_MAX,
@@ -102,5 +103,7 @@ export {
   GANTT_DEFAULT_MODE_WEEK_MAX_DAYS,
   GANTT_BASE_COLUMN_WIDTH,
   GANTT_DAYS_PER_COLUMN,
+  GANTT_VIEWPORT_MIN_HEIGHT,
+  GANTT_VIEWPORT_MAX_HEIGHT,
 } from './gantt-zoom';
 export type { GanttZoomViewMode } from './gantt-zoom';

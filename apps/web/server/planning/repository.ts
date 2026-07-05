@@ -80,6 +80,19 @@ export interface DependencyRow {
   lagDays: DecimalString;
 }
 
+/** Contexto de negocio de un cronograma (P2C1): nombres para el header. */
+export interface ScheduleContextRow {
+  versionId: Uuid;
+  versionNumber: number;
+  versionStatus: string;
+  estimateId: Uuid | null;
+  estimateName: string | null;
+  scopeId: Uuid | null;
+  scopeName: string | null;
+  projectId: Uuid | null;
+  projectName: string | null;
+}
+
 export class PlanningRepository {
   private readonly clientFactory: () => Promise<SupabaseClient>;
 
@@ -125,6 +138,52 @@ export class PlanningRepository {
       });
     }
     return out;
+  }
+
+  /**
+   * Contexto de negocio de la versión de un cronograma (P2C1): version →
+   * estimate → scope → project, SOLO nombres/ids para el header. UNA consulta
+   * anidada RLS-bound (patrón de `loadGeneratorSource`); sin montos.
+   */
+  async getScheduleContext(estimateVersionId: Uuid): Promise<ScheduleContextRow | null> {
+    const supabase = await this.clientFactory();
+    const { data, error } = await supabase
+      .from('estimate_versions')
+      .select(
+        'id, version_number, status, estimates(id, name, project_scope_id, project_scopes(id, name, project_id, projects(id, name)))',
+      )
+      .eq('id', estimateVersionId)
+      .maybeSingle();
+    if (error) throw new Error(`planning_context_read_failed: ${error.code ?? 'unknown'}`);
+    if (!data) return null;
+    const row = data as {
+      id: string;
+      version_number: number;
+      status: string;
+      estimates?: {
+        id?: string;
+        name?: string;
+        project_scopes?: {
+          id?: string;
+          name?: string;
+          projects?: { id?: string; name?: string } | null;
+        } | null;
+      } | null;
+    };
+    const estimate = row.estimates ?? null;
+    const scope = estimate?.project_scopes ?? null;
+    const project = scope?.projects ?? null;
+    return {
+      versionId: row.id,
+      versionNumber: row.version_number,
+      versionStatus: row.status,
+      estimateId: estimate?.id ?? null,
+      estimateName: estimate?.name ?? null,
+      scopeId: scope?.id ?? null,
+      scopeName: scope?.name ?? null,
+      projectId: project?.id ?? null,
+      projectName: project?.name ?? null,
+    };
   }
 
   /** Capítulos + ítems BOQ + rendimiento APU laboral de una versión (fuente del generador). */

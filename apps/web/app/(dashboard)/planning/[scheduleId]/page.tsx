@@ -10,7 +10,7 @@ import { ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
 import { Badge } from '@/components/ui/badge';
 import { resolveAuthenticatedViewer } from '@/server/auth/resolve-viewer';
-import { getScheduleDetailForViewer, displayWbs, ScheduleNotFoundError } from '@/server/planning';
+import { getScheduleDetailForViewer, getScheduleContextForViewer, displayWbs, ScheduleNotFoundError } from '@/server/planning';
 import { buildPlanningViewModel, mapScheduleToGantt } from '@/modules/planning';
 import { PlanningSummary } from '@/components/planning/planning-summary';
 import { ScheduleTable } from '@/components/planning/schedule-table';
@@ -61,6 +61,10 @@ export default async function ScheduleDetailPage({
   if (!detail) notFound();
 
   const { schedule, summary, rawTasks, canManage, canSeeCriticalPath } = detail;
+  // P2C1: contexto de negocio (proyecto/alcance/presupuesto) para el header.
+  // Lectura ligera SECUENCIAL (una consulta anidada, disciplina P0B); si falla
+  // o falta la cadena, degrada a fallback amable sin tumbar la página.
+  const context = await getScheduleContextForViewer(schedule.estimateVersionId);
   const isClientSafe = viewerProfileRole === 'consulta';
   const vm = buildPlanningViewModel(summary, {
     canSeeCriticalPath,
@@ -245,10 +249,46 @@ export default async function ScheduleDetailPage({
       <PageHeader
         title={schedule.name}
         description={`${summary.tasks.length} tareas · ${summary.milestones.length} hitos · ${schedule.startDate} → ${schedule.endDate ?? '—'}`}
+        breadcrumb={
+          // P2C1: contexto claro — SOLO nombres y navegación, sin montos.
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-500">
+            <span>
+              Proyecto:{' '}
+              <Link href={`/projects/${schedule.projectId}`} className="font-medium text-blue-700 hover:underline">
+                {context?.projectName ?? 'Proyecto'}
+              </Link>
+            </span>
+            <span aria-hidden="true">·</span>
+            <span>Alcance: {context?.scopeName ?? 'Alcance no definido'}</span>
+            <span aria-hidden="true">·</span>
+            <span>
+              Presupuesto:{' '}
+              {context?.estimateName
+                ? `${context.estimateName} · v${context.versionNumber}`
+                : 'No disponible'}
+            </span>
+          </div>
+        }
         actions={
-          <Badge variant={schedule.status === 'archived' ? 'outline' : 'secondary'}>
-            {STATUS_LABEL[schedule.status] ?? schedule.status}
-          </Badge>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant={schedule.status === 'archived' ? 'outline' : 'secondary'}>
+              {STATUS_LABEL[schedule.status] ?? schedule.status}
+            </Badge>
+            <Link
+              href={`/projects/${schedule.projectId}`}
+              className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Ver proyecto
+            </Link>
+            {context?.estimateId && context.scopeId && context.projectId && (
+              <Link
+                href={`/projects/${context.projectId}/scopes/${context.scopeId}/estimates/${context.estimateId}/workspace`}
+                className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Ver presupuesto
+              </Link>
+            )}
+          </div>
         }
       />
 

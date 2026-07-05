@@ -29,6 +29,7 @@ import {
 import {
   PlanningRepository,
   type GeneratorSourceRow,
+  type ScheduleContextRow,
   type ScheduleRow,
   type ScheduleTaskRow,
 } from './repository';
@@ -212,6 +213,23 @@ export async function getScheduleDetailForViewer(
     canManage: canManageSchedules(viewer.role),
     canSeeCriticalPath: viewer.role !== 'client',
   };
+}
+
+/**
+ * Contexto de negocio del cronograma para el header (P2C1): nombres de
+ * proyecto/alcance/presupuesto/versión. NUNCA lanza: cualquier fallo de
+ * lectura degrada a `null` y la página muestra el fallback amable
+ * ("Alcance no definido"); el cronograma nunca se cae por el contexto.
+ */
+export async function getScheduleContextForViewer(
+  estimateVersionId: Uuid,
+  repo: PlanningRepository = new PlanningRepository(),
+): Promise<ScheduleContextRow | null> {
+  try {
+    return await repo.getScheduleContext(estimateVersionId);
+  } catch {
+    return null;
+  }
 }
 
 /** Actualiza una tarea (avance/estado y, con permiso de gestión, duración/cuadrilla). */

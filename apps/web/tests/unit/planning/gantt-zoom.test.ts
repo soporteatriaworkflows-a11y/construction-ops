@@ -13,7 +13,10 @@ import {
   GANTT_ZOOM_DEFAULT,
   GANTT_ZOOM_MAX,
   GANTT_ZOOM_MIN_BY_MODE,
+  GANTT_VIEWPORT_MIN_HEIGHT,
+  GANTT_VIEWPORT_MAX_HEIGHT,
   clampGanttZoom,
+  ganttContainerHeight,
   ganttColumnWidth,
   ganttFitZoom,
   ganttRangeDays,
@@ -96,6 +99,27 @@ describe('ganttColumnWidth', () => {
     expect(ganttColumnWidth('Week', 0.35)).toBe(Math.round(90 * 0.35));
     // En Día 0.35 se clampa a 0.5: 38 * 0.5 = 19.
     expect(ganttColumnWidth('Day', 0.35)).toBe(19);
+  });
+});
+
+describe('ganttContainerHeight', () => {
+  it('clampa a los limites del viewport', () => {
+    expect(GANTT_VIEWPORT_MIN_HEIGHT).toBe(240);
+    expect(GANTT_VIEWPORT_MAX_HEIGHT).toBe(560);
+    expect(ganttContainerHeight(0)).toBe(GANTT_VIEWPORT_MIN_HEIGHT);
+    expect(ganttContainerHeight(1)).toBe(GANTT_VIEWPORT_MIN_HEIGHT);
+    expect(ganttContainerHeight(500)).toBe(GANTT_VIEWPORT_MAX_HEIGHT);
+  });
+
+  it('crece con el numero de barras entre los limites', () => {
+    // 10 barras: 72 + 340 + 18 = 430.
+    expect(ganttContainerHeight(10)).toBe(430);
+    expect(ganttContainerHeight(10)).toBeGreaterThan(ganttContainerHeight(5));
+  });
+
+  it('valores no finitos o negativos caen al minimo', () => {
+    expect(ganttContainerHeight(Number.NaN)).toBe(GANTT_VIEWPORT_MIN_HEIGHT);
+    expect(ganttContainerHeight(-3)).toBe(GANTT_VIEWPORT_MIN_HEIGHT);
   });
 });
 

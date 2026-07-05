@@ -102,7 +102,10 @@ export function ScheduleDetailShell({ scheduleId, tasks, canSeeCriticalPath, war
           derecha (debajo en pantallas angostas). Panel SOLO lectura aquí. */}
       {tab === 'gantt' && (
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="min-w-0 max-h-[70vh] overflow-auto" onClick={handleGanttClick}>
+          {/* P2C1: sin overflow propio — la caja de scroll vive DENTRO del
+              GanttChart (container_height de frappe); controles y leyenda
+              quedan fuera del área scrolleable. */}
+          <div className="min-w-0" onClick={handleGanttClick}>
             {gantt}
           </div>
           <aside className="lg:sticky lg:top-4 lg:self-start space-y-4" aria-label="Detalle de la actividad seleccionada">

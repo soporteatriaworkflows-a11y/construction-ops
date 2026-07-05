@@ -8,6 +8,7 @@ export {
   loadScheduleCreationData,
   listSchedulesForViewer,
   getScheduleDetailForViewer,
+  getScheduleContextForViewer,
   updateScheduleTask,
   addScheduleDependency,
   archiveScheduleForViewer,
@@ -34,6 +35,7 @@ export { PlanningRepository } from './repository';
 export type {
   ScheduleRow,
   ScheduleTaskRow,
+  ScheduleContextRow,
   GeneratorSourceRow,
   ProjectVersionOption,
 } from './repository';
