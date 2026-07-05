@@ -175,11 +175,9 @@ export class DrizzleReadModelRepository implements ReadModelPort {
     lastUpdatedAt: string,
     builtArea: string | null,
   ): Promise<EstimateComputationInput> {
-    const [chapters, items, rules] = await Promise.all([
-      this.repo.chaptersByVersion(versionId),
-      this.repo.boqItemsByVersion(versionId),
-      this.repo.indirectRulesByVersion(versionId),
-    ]);
+    const chapters = await this.repo.chaptersByVersion(versionId);
+    const items = await this.repo.boqItemsByVersion(versionId);
+    const rules = await this.repo.indirectRulesByVersion(versionId);
 
     const rawChapters: RawChapter[] = chapters.map((c) => ({
       id: c.id,
@@ -633,10 +631,8 @@ export class DrizzleReadModelRepository implements ReadModelPort {
 
   async listCatalogResources(viewer: ViewerContext): Promise<CatalogResourceView[]> {
     return this.read(viewer, async () => {
-    const [resources, observations] = await Promise.all([
-      this.repo.resources(viewer.organizationId),
-      this.repo.resourcePriceObservationsByOrg(viewer.organizationId),
-    ]);
+    const resources = await this.repo.resources(viewer.organizationId);
+    const observations = await this.repo.resourcePriceObservationsByOrg(viewer.organizationId);
 
     // Agrupa observaciones por recurso (estado resuelto en dominio puro).
     const obsByResource = new Map<Uuid, PriceObservationRow[]>();

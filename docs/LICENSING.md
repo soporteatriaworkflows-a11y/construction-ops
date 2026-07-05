@@ -105,6 +105,15 @@ Gestor: pnpm 11.5.0 (Corepack). Lockfile: `pnpm-lock.yaml`.
 > solo en navegador (no engorda el bundle inicial ni corre en server); el
 > archivo jamás se sube ni persiste. Alternativas descartadas: `mupdf`
 > (AGPL — prohibida), `pdf-parse` (solo Node/server).
+> **`tesseract.js` ^7.0.0 (Apache-2.0)** instalado en STEEL_OPS F6C
+> (`feature/steel-ops-f6c-hybrid-ocr-review`): OCR CLIENT-SIDE (WASM) sobre la
+> página del PDF renderizada en canvas, por página elegida por el usuario. La
+> imagen jamás sale del navegador. Nota: en el primer uso descarga worker/core
+> WASM (~3-5 MB) y el modelo de idioma (~2-3 MB) desde el CDN de jsDelivr
+> (assets estáticos, sin datos del usuario; cacheado por el navegador). Script
+> de postinstall NO aprobado en pnpm (no se necesita para uso browser).
+> Alternativas descartadas: `scribe.js-ocr` (AGPL — prohibida), TextDetector
+> API (solo Chrome, experimental).
 
 ## Notas de licencias transitivas (Oleada 3C — 2026-06-01)
 
