@@ -218,7 +218,8 @@ describe('manual-excel-export (F4A)', () => {
 
     const evidencias = wb.getWorksheet('EVIDENCIAS')!;
     expect(evidencias.rowCount).toBe(3);
-    expect(evidencias.getCell('D2').value).toBe('');
+    // F7.1: sin fuente se dice explícitamente, nunca celda vacía.
+    expect(evidencias.getCell('D2').value).toBe('fuente no disponible');
     expect(evidencias.getCell('G2').value).toBe('unknown');
     expect(evidencias.getCell('K2').value).toBe('unreviewed');
   });

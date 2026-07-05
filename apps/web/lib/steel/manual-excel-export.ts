@@ -11,6 +11,8 @@ import { MOCK_STEEL_SETTINGS, MOCK_STEEL_SPECS } from './mock-data';
 import {
   buildManualCutPlan,
   buildManualOrderDraft,
+  DEFAULT_COMMERCIAL_LENGTHS_M,
+  effectiveCommercialLengths,
   type ManualComputedLine,
   type ManualCutPlanResult,
   type ManualOrderDraft,
@@ -32,9 +34,20 @@ export const STEEL_MANUAL_EXCEL_SHEETS = [
 const NUM_FMT = '#,##0.00';
 const KG_FMT = '#,##0.000';
 const COP_FMT = '"$"#,##0';
-const HEADER_FILL = 'FF1F4E79';
-const BAND_FILL = 'FFEAF2F8';
-const BORDER = 'FFB7C9D6';
+
+// Paleta ICONIC (identidad visual de la plataforma; F7.1):
+// navy #020148 · blue #005DD6 · cyan #00B8FF · dark #1B1F3E + neutros.
+const ICONIC_NAVY = 'FF020148';
+const ICONIC_BLUE = 'FF005DD6';
+const ICONIC_CYAN = 'FF00B8FF';
+const ICONIC_DARK = 'FF1B1F3E';
+const HEADER_FILL = ICONIC_NAVY;
+const BAND_FILL = 'FFF0F6FF'; // azul muy suave para zebra
+const BORDER = 'FFC9D8F0';
+// Acentos suaves para estados/confianza (legibles, no chillones).
+const SOFT_GREEN = 'FFE2F5E9';
+const SOFT_AMBER = 'FFFFF3D6';
+const SOFT_RED = 'FFFBE2E2';
 
 type CellValue = string | number | null | undefined | ExcelJS.CellValue;
 
@@ -75,7 +88,9 @@ export function buildSteelManualExcelFileName(takeoff: Pick<ManualTakeoffRecord,
 }
 
 export function buildSteelManualExcelWorkbook(input: ManualExcelExportInput): ExcelJS.Workbook {
-  const planResult = input.planResult ?? buildManualCutPlan(input.lines);
+  const planResult =
+    input.planResult ??
+    buildManualCutPlan(input.lines, { commercialLengthsM: effectiveCommercialLengths(input.takeoff) });
   const order = input.order ?? buildManualOrderDraft(input.takeoff.name, planResult.plan);
   const generatedAt = input.generatedAt ?? new Date();
   const wb = new ExcelJS.Workbook();
@@ -91,7 +106,12 @@ export function buildSteelManualExcelWorkbook(input: ManualExcelExportInput): Ex
   addPlanCorteSheet(wb, input.lines, planResult.plan);
   addSobrantesSheet(wb, planResult.plan);
   addPedidoSheet(wb, order);
-  addConfiguracionSheet(wb);
+  addConfiguracionSheet(wb, input.takeoff);
+
+  // Identidad ICONIC en las pestañas (navy para resumen, blue para datos).
+  wb.worksheets.forEach((ws, index) => {
+    ws.properties.tabColor = { argb: index === 0 ? ICONIC_NAVY : ICONIC_BLUE };
+  });
 
   return wb;
 }
@@ -162,9 +182,35 @@ function styleHeader(row: ExcelJS.Row): void {
     cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_FILL } };
     cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-    cell.border = thinBorder();
+    cell.border = {
+      ...thinBorder(),
+      // Acento cyan ICONIC bajo el encabezado (línea de marca).
+      bottom: { style: 'medium', color: { argb: ICONIC_CYAN } },
+    };
   });
-  row.height = 22;
+  row.height = 24;
+}
+
+/** Relleno suave para celdas de estado/confianza (verde/ámbar/rojo). */
+function softFill(cell: ExcelJS.Cell, argb: string): void {
+  cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb } };
+}
+
+/** Colorea la celda de confianza según el valor (≥0.85 / ≥0.6 / menor). */
+function styleConfidenceCell(cell: ExcelJS.Cell, confidence: string | number | undefined): void {
+  if (confidence === undefined || confidence === null || String(confidence).trim() === '') return;
+  const value = Number(String(confidence).replace(',', '.'));
+  if (!Number.isFinite(value)) return;
+  softFill(cell, value >= 0.85 ? SOFT_GREEN : value >= 0.6 ? SOFT_AMBER : SOFT_RED);
+}
+
+/** Colorea severidad/estado con acentos suaves ICONIC. */
+function styleStatusCell(cell: ExcelJS.Cell, status: string | undefined): void {
+  if (!status) return;
+  const normalized = status.toLowerCase();
+  if (/critical|conflicto|error|rechaz/.test(normalized)) softFill(cell, SOFT_RED);
+  else if (/warning|needs_review|pendiente|revision|unreviewed/.test(normalized)) softFill(cell, SOFT_AMBER);
+  else if (/ok|verified|aprobado|available|info/.test(normalized)) softFill(cell, SOFT_GREEN);
 }
 
 function thinBorder(): Partial<ExcelJS.Borders> {
@@ -187,7 +233,9 @@ function finishTable(ws: ExcelJS.Worksheet, widths: readonly number[], headerRow
     row.eachCell({ includeEmpty: true }, (cell) => {
       cell.border = thinBorder();
       cell.alignment = { vertical: 'top', wrapText: true };
-      if (rowNumber % 2 === 0) {
+      // El zebra NO pisa los acentos de confianza/estado ya aplicados.
+      const alreadyFilled = Boolean((cell.fill as ExcelJS.FillPattern | undefined)?.fgColor);
+      if (rowNumber % 2 === 0 && !alreadyFilled) {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: BAND_FILL } };
       }
     });
@@ -203,11 +251,15 @@ function addResumenSheet(
   generatedAt: Date,
 ): void {
   const ws = wb.addWorksheet('00_RESUMEN', { views: [{ showGridLines: false }] });
-  ws.columns = [{ width: 34 }, { width: 24 }, { width: 24 }];
+  ws.columns = [{ width: 34 }, { width: 26 }, { width: 30 }];
+  // Banner ICONIC: navy con texto blanco y acento cyan (fila 2 vacía existente).
   ws.mergeCells('A1:C1');
-  ws.getCell('A1').value = 'Steel Ops - Export Excel manual';
-  ws.getCell('A1').font = { bold: true, size: 15, color: { argb: HEADER_FILL } };
-  ws.getCell('A1').alignment = { horizontal: 'center' };
+  const banner = ws.getCell('A1');
+  banner.value = 'ICONIC · Steel Ops — Takeoff de acero (export tecnico)';
+  banner.font = { bold: true, size: 15, color: { argb: 'FFFFFFFF' } };
+  banner.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: ICONIC_NAVY } };
+  banner.alignment = { horizontal: 'center', vertical: 'middle' };
+  ws.getRow(1).height = 30;
 
   const totalCritical = lines.flatMap((l) => l.alerts).filter((a) => a.severity === 'critical').length;
   const savings = computeOffcutSavings([plan]);
@@ -241,6 +293,17 @@ function addResumenSheet(
   ws.getCell('A18').value = 'Nota';
   ws.getCell('B18').value = 'Borrador para revision interna/proveedor; no reemplaza aprobacion tecnica.';
   ws.mergeCells('B18:C18');
+
+  // Franja de acento cyan ICONIC bajo el banner (al final: las filas ya están
+  // fijas y tocar A2 antes de los addRow desplazaría B10/B14/A18).
+  ['A2', 'B2', 'C2'].forEach((address) => {
+    ws.getCell(address).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: ICONIC_CYAN } };
+  });
+  ws.getRow(2).height = 4;
+  // Etiquetas de campo en dark ICONIC para jerarquía visual.
+  for (let rowNumber = 4; rowNumber <= 16; rowNumber += 1) {
+    ws.getCell(`A${rowNumber}`).font = { bold: true, color: { argb: ICONIC_DARK } };
+  }
 }
 
 function totalFormula(rowCount: number, column: string): string {
@@ -302,11 +365,11 @@ function addEvidenciasSheet(wb: ExcelJS.Workbook, takeoff: ManualTakeoffRecord, 
 
   lines.forEach((line) => {
     const evidence = lineEvidence(line);
-    ws.addRow([
+    const row = ws.addRow([
       text(line.record.id),
       text(takeoff.scopeLabel),
       text(line.record.originalDescription),
-      cellText(evidence.sourceFileName),
+      cellText(evidence.sourceFileName || 'fuente no disponible'),
       cellText(evidence.pageNumber),
       cellText(evidence.sourceType),
       cellText(evidence.readingMethod ?? 'unknown'),
@@ -315,6 +378,8 @@ function addEvidenciasSheet(wb: ExcelJS.Workbook, takeoff: ManualTakeoffRecord, 
       cellText(evidence.observation),
       cellText(evidence.reviewStatus ?? line.calculated.verificationStatus ?? 'unreviewed'),
     ]);
+    styleConfidenceCell(row.getCell(8), evidence.confidence);
+    styleStatusCell(row.getCell(11), String(evidence.reviewStatus ?? line.calculated.verificationStatus ?? 'unreviewed'));
   });
   finishTable(ws, [18, 22, 30, 28, 10, 16, 16, 12, 46, 42, 18]);
 }
@@ -351,7 +416,7 @@ function addCantidadesSheet(wb: ExcelJS.Workbook, takeoff: ManualTakeoffRecord, 
     const cutLength = num(line.calculated.cutLengthM);
     const kgUnit = pieces * repetitions > 0 ? num(line.calculated.totalKg, 6) / (pieces * repetitions) : 0;
     const evidence = lineEvidence(line);
-    ws.addRow([
+    const row = ws.addRow([
       text(line.record.id),
       text(takeoff.scopeLabel),
       text(line.record.originalDescription),
@@ -373,6 +438,8 @@ function addCantidadesSheet(wb: ExcelJS.Workbook, takeoff: ManualTakeoffRecord, 
       cellText(evidence.confidence),
       cellText(evidence.observation),
     ]);
+    styleStatusCell(row.getCell(14), String(line.calculated.verificationStatus ?? 'unreviewed'));
+    styleConfidenceCell(row.getCell(19), evidence.confidence);
   });
   [6, 9, 10, 11, 12].forEach((col) => {
     ws.getColumn(col).numFmt = col === 10 || col === 12 ? KG_FMT : NUM_FMT;
@@ -384,7 +451,7 @@ function addAlertasSheet(wb: ExcelJS.Workbook, lines: readonly ManualComputedLin
   const ws = wb.addWorksheet('02_ALERTAS');
   ws.addRow(['linea', 'severidad', 'codigo', 'mensaje', 'explicacion', 'accion sugerida']);
   lines.flatMap((line) => line.alerts.map((alert) => ({ line, alert }))).forEach(({ line, alert }) => {
-    ws.addRow([
+    const row = ws.addRow([
       text(line.record.originalDescription),
       text(alert.severity),
       text(alert.code),
@@ -392,6 +459,7 @@ function addAlertasSheet(wb: ExcelJS.Workbook, lines: readonly ManualComputedLin
       text(alertExplanation(alert)),
       text(alertAction(alert)),
     ]);
+    styleStatusCell(row.getCell(2), alert.severity);
   });
   finishTable(ws, [28, 14, 12, 48, 52, 46]);
 }
@@ -514,11 +582,21 @@ function addPedidoSheet(wb: ExcelJS.Workbook, order: ManualOrderDraft): void {
   finishTable(ws, [24, 28, 10, 22, 14, 14, 20, 18, 16, 16]);
 }
 
-function addConfiguracionSheet(wb: ExcelJS.Workbook): void {
+function addConfiguracionSheet(wb: ExcelJS.Workbook, takeoff: ManualTakeoffRecord): void {
   const ws = wb.addWorksheet('06_CONFIGURACION');
   ws.addRow(['parametro', 'valor', 'nota']);
+  // F7.1: las longitudes comerciales exportadas son las del TAKEOFF (editables),
+  // con nota explícita de si son configuradas o el default del preview.
+  const configuredLengths = effectiveCommercialLengths(takeoff);
+  const isDefaultLengths =
+    configuredLengths.length === DEFAULT_COMMERCIAL_LENGTHS_M.length &&
+    configuredLengths.every((length, index) => length === DEFAULT_COMMERCIAL_LENGTHS_M[index]);
   const rows: [string, CellValue, string][] = [
-    ['longitudes comerciales', MOCK_STEEL_SETTINGS.commercialLengthsM.join(' / '), 'm'],
+    [
+      'longitudes comerciales',
+      configuredLengths.join(' / '),
+      isDefaultLengths ? 'm (default del preview)' : 'm (configuradas en este takeoff)',
+    ],
     ['kerf refuerzo', num(MOCK_STEEL_SETTINGS.kerfRebarM), 'm'],
     ['kerf perfiles', num(MOCK_STEEL_SETTINGS.kerfProfilesM, 3), 'm'],
     ['desperdicio warning refuerzo', num(MOCK_STEEL_SETTINGS.wasteWarningPctRebar), '%'],

@@ -51,6 +51,15 @@ describe('extractElementMentions (nomenclatura ampliada F7)', () => {
     expect(extractElementMentions('Z1')).toHaveLength(0);
     expect(extractElementMentions('ver detalle Z1 en plano')).toHaveLength(0);
   });
+
+  it('acepta Z-01/P-03/C-02 a secas (guion + prefijo estructural conocido)', () => {
+    expect(extractElementMentions('Z-01 4#5450')[0]?.elementKey).toBe('Z-01');
+    expect(extractElementMentions('P-03 74E#3200')[0]?.elementKey).toBe('P-03');
+    expect(extractElementMentions('C-02 estribos #3 @15')[0]?.elementKey).toBe('C-02');
+    // Una letra que no es prefijo estructural (posible eje) sigue fuera.
+    expect(extractElementMentions('A-1')).toHaveLength(0);
+    expect(extractElementMentions('B-2')).toHaveLength(0);
+  });
 });
 
 describe('buildElementRegistry (alias conservadores y estados honestos)', () => {

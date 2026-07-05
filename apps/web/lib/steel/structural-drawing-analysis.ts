@@ -23,7 +23,13 @@ import {
   type SpatialTextItemInput,
   type SpatialTextLine,
 } from './drawing-spatial-model';
-import { classifyPageRegions, regionOfLine, type PageRegionResult } from './drawing-page-regions';
+import {
+  classifyPageRegions,
+  classifyTitleBlockNoise,
+  regionOfLine,
+  TITLE_BLOCK_NOISE_REASON,
+  type PageRegionResult,
+} from './drawing-page-regions';
 import {
   detectGridContext,
   locateElementInGrid,
@@ -33,11 +39,12 @@ import {
 import {
   buildElementRegistry,
   extractElementMentions,
+  extractSectionSpecs,
   type ElementRecord,
   type ElementSourceMention,
 } from './drawing-element-registry';
 import { resolveNomenclature, type NomenclatureReport } from './drawing-nomenclature';
-import { detectTableStructures, type TableDetectionResult } from './drawing-table-structure';
+import { detectTableStructures, tableOfLine, type TableDetectionResult } from './drawing-table-structure';
 import {
   buildStructuralReviewFindings,
   type StructuralFinding,
@@ -89,10 +96,23 @@ export function elementKeyForCandidateLabel(label: string): string | undefined {
 function collectMentionsFromLines(
   lines: readonly SpatialTextLine[],
   regionResult: PageRegionResult | undefined,
+  tables?: TableDetectionResult,
 ): ElementSourceMention[] {
   const mentions: ElementSourceMention[] = [];
   for (const line of lines) {
-    for (const match of extractElementMentions(line.text)) {
+    const elementMatches = extractElementMentions(line.text);
+    if (elementMatches.length === 0) continue;
+    const region = regionResult ? regionOfLine(regionResult.regions, line.lineId) : undefined;
+    const table = tables ? tableOfLine(tables.tables, line.lineId) : undefined;
+    const noise = classifyTitleBlockNoise(line.text);
+    const sections = extractSectionSpecs(line.text);
+    for (const match of elementMatches) {
+      // Sección de la misma línea con prefijo compatible ("VC-2" + "VC-(50x60)")
+      // o sección sin prefijo cuando la línea tiene un solo elemento.
+      const prefix = match.elementKey.split('-')[0];
+      const section =
+        sections.find((s) => s.prefix && s.prefix === prefix)?.section ??
+        (elementMatches.length === 1 ? sections.find((s) => !s.prefix)?.section : undefined);
       mentions.push({
         elementKey: match.elementKey,
         rawLabel: match.rawLabel,
@@ -101,7 +121,12 @@ function collectMentionsFromLines(
         lineId: line.lineId,
         lineText: line.text,
         method: line.method,
-        regionType: regionResult ? regionOfLine(regionResult.regions, line.lineId)?.regionType : undefined,
+        regionType: region?.regionType,
+        regionTitle: region?.titleText,
+        tableId: table?.tableId,
+        sectionSpec: section,
+        titleBlockNoise: noise.noise || undefined,
+        noiseReason: noise.reason,
         bbox: line.bbox,
       });
     }
@@ -153,10 +178,10 @@ export function analyzeStructuralDrawings(
   const gridContexts = spatialPages.map((page) => detectGridContext(page));
   const tableResults = spatialPages.map((page) => detectTableStructures(page));
 
-  // Menciones de elementos: nativas (con región) + OCR (sin región, método ocr).
+  // Menciones de elementos: nativas (con región/tabla) + OCR (sin región).
   const mentions: ElementSourceMention[] = [];
   spatialPages.forEach((page, index) => {
-    mentions.push(...collectMentionsFromLines(page.lines, regionResults[index]));
+    mentions.push(...collectMentionsFromLines(page.lines, regionResults[index], tableResults[index]));
   });
   for (const page of ocrPages) {
     mentions.push(...collectMentionsFromLines(page.lines, undefined));
@@ -165,6 +190,7 @@ export function analyzeStructuralDrawings(
   // Ubicación por grilla: cada mención con bbox se cruza con la grilla de su página.
   const locationContexts: ElementLocationContext[] = [];
   const keysWithGridLocation = new Set<string>();
+  const axisContextByKey = new Map<string, string[]>();
   const locatedMentionKeys = new Set<string>();
   for (const mention of mentions) {
     if (!mention.bbox) continue;
@@ -185,6 +211,10 @@ export function analyzeStructuralDrawings(
     locationContexts.push(location);
     if (location.locationConfidence !== 'no_ubicable') {
       keysWithGridLocation.add(mention.elementKey);
+      const existing = axisContextByKey.get(mention.elementKey) ?? [];
+      axisContextByKey.set(mention.elementKey, [
+        ...new Set([...existing, ...location.nearbyAxisLabels]),
+      ]);
     }
   }
 
@@ -210,6 +240,7 @@ export function analyzeStructuralDrawings(
     keysWithSteelCandidates,
     conflictsByKey,
     keysWithGridLocation,
+    axisContextByKey,
   });
 
   // Nomenclatura: cruza TODAS las líneas del plan set (la leyenda puede vivir
@@ -259,4 +290,53 @@ export function findingsSummaryForElement(
 /** ¿La página tiene análisis espacial real (coordenadas) o solo texto? */
 export function analysisHasSpatialLayout(analysis: StructuralDrawingAnalysis): boolean {
   return analysis.spatialPages.some((page) => hasUsableLayout(page));
+}
+
+// ---------------------------------------------------------------------------
+// Penalización de candidatos nacidos en el rótulo (F7.1)
+// ---------------------------------------------------------------------------
+
+/**
+ * Penaliza candidatos F6 cuya línea de origen parece rótulo/metadato del
+ * plano ("VC-7 ING. MARIO…", direcciones con CALLE/CARRERA): advertencia con
+ * la frase canónica + revisión + techo de confianza. NO descarta:
+ * - si el elemento del candidato TAMBIÉN aparece en región técnica
+ *   (`technicalElementKeys`), solo se anota la advertencia sin degradar;
+ * - el humano siempre puede aprobar tras revisar.
+ */
+export function penalizeTitleBlockCandidates(
+  candidates: readonly PdfIntakeCandidate[],
+  options: { technicalElementKeys?: ReadonlySet<string> } = {},
+): PdfIntakeCandidate[] {
+  return candidates.map((candidate) => {
+    const noise = classifyTitleBlockNoise(candidate.evidence.lineText);
+    if (!noise.noise) return candidate;
+    const key = candidate.elementLabel ? elementKeyForCandidateLabel(candidate.elementLabel) : undefined;
+    const hasTechnicalEvidence = key ? options.technicalElementKeys?.has(key) === true : false;
+    const warning = hasTechnicalEvidence
+      ? `${noise.reason} El elemento tambien aparece en region tecnica: se conserva sin penalizar.`
+      : `${noise.reason} Verifica antes de aprobar: puede ser el nombre del plano, no un dato tecnico.`;
+    if (candidate.warnings.includes(warning)) return candidate;
+    if (hasTechnicalEvidence) {
+      return { ...candidate, warnings: [...candidate.warnings, warning] };
+    }
+    return {
+      ...candidate,
+      warnings: [...candidate.warnings, warning],
+      confidenceLevel:
+        candidate.confidenceLevel === 'high' || candidate.confidenceLevel === 'medium'
+          ? 'low'
+          : candidate.confidenceLevel,
+      confidenceScore: String(Math.min(Number(candidate.confidenceScore), 0.4)),
+      confidenceReason: `${candidate.confidenceReason} ${TITLE_BLOCK_NOISE_REASON}`,
+      status: candidate.status === 'discarded' ? 'discarded' : 'needs_review',
+    };
+  });
+}
+
+/** Claves de elementos con evidencia técnica real (no solo rótulo). */
+export function technicalElementKeysOf(registry: readonly ElementRecord[]): Set<string> {
+  return new Set(
+    registry.filter((record) => !record.suspectedTitleBlockOnly).map((record) => record.elementKey),
+  );
 }
