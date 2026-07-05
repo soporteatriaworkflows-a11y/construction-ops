@@ -119,6 +119,8 @@ export interface ExtractedPdfPage {
   hasText: boolean;
   /** Escalas anotadas detectadas — SOLO contexto, jamás cálculo (F6-S2). */
   scaleNotes: string[];
+  /** Nº de operaciones de dibujo de la página (señal F6C de texto oculto). */
+  drawingOpCount?: number;
 }
 
 export function shapeExtractedPage(pageNumber: number, rawText: string): ExtractedPdfPage {

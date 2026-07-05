@@ -40,6 +40,8 @@ export interface PdfIntakeEvidence {
   readonly fileName?: string;
   /** Tipo de fuente de la página dentro del plan set (F6B): planta, despiece… */
   readonly sourceType?: PlanSourceType;
+  /** Método de lectura del texto (F6C): capa nativa del PDF u OCR asistido. */
+  readonly method: 'native_text' | 'ocr';
   /** Regla de detección que produjo el candidato, en lenguaje humano. */
   readonly detectionReason: string;
 }
@@ -62,12 +64,16 @@ export interface PdfIntakeCandidate {
   /** true solo si `candidateText` es parseable por F1 sin datos faltantes. */
   f1Ready: boolean;
   status: PdfIntakeCandidateStatus;
+  /** Cruce nativo↔OCR (F6C): confirmado por ambos métodos o en conflicto. */
+  crossCheck?: 'confirmed_by_ocr' | 'conflict';
 }
 
 export interface PdfIntakeDetectOptions {
   pageNumber?: number;
   fileName?: string;
   sourceType?: PlanSourceType;
+  /** Método de lectura del texto de origen (default: capa nativa). */
+  method?: 'native_text' | 'ocr';
 }
 
 // ---------------------------------------------------------------------------
@@ -720,6 +726,7 @@ export function detectPdfIntakeCandidates(
           pageNumber,
           fileName: options.fileName,
           sourceType: options.sourceType,
+          method: options.method ?? 'native_text',
           detectionReason: RULE_REASON[raw.rule],
         },
         candidateText: core.candidateText,

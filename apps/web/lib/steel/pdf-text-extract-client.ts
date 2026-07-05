@@ -29,7 +29,9 @@ export async function extractPdfTextInBrowser(data: ArrayBuffer): Promise<PdfExt
     import.meta.url,
   ).toString();
 
-  const loadingTask = pdfjs.getDocument({ data });
+  // pdfjs TRANSFIERE el buffer a su worker (queda "detached"): se le pasa una
+  // copia para que el ArrayBuffer del caller siga usable (p. ej. OCR F6C).
+  const loadingTask = pdfjs.getDocument({ data: data.slice(0) });
   const doc = await loadingTask.promise;
   try {
     const pageCount = doc.numPages;
@@ -46,7 +48,16 @@ export async function extractPdfTextInBrowser(data: ArrayBuffer): Promise<PdfExt
         const transform = item.transform as number[];
         items.push({ str: item.str, x: Number(transform[4] ?? 0), y: Number(transform[5] ?? 0) });
       }
-      pages.push(shapeExtractedPage(pageNumber, buildPageLines(items)));
+      // Señal F6C: cuánta geometría dibuja la página (texto SHX convertido a
+      // curvas produce muchas rutas y poco texto nativo).
+      let drawingOpCount = 0;
+      try {
+        const opList = await page.getOperatorList();
+        drawingOpCount = opList.fnArray.filter((fn: number) => fn === pdfjs.OPS.constructPath).length;
+      } catch {
+        // Sin señal de dibujo: la cobertura se clasifica solo por texto.
+      }
+      pages.push({ ...shapeExtractedPage(pageNumber, buildPageLines(items)), drawingOpCount });
       page.cleanup();
     }
 

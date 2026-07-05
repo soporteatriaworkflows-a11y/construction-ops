@@ -1,21 +1,21 @@
 /**
- * manual-pdf-intake-section.tsx — Lectura asistida desde PDF/plano (F6A+F6B).
+ * manual-pdf-intake-section.tsx — Lectura asistida desde PDF/plano
+ * (F6A detector + F6B plan set + F6C estación híbrida nativo/OCR).
  *
- * F6B = PLAN SET: un takeoff real se alimenta de varios planos (planta de
- * cimentación, cuadros, despieces, cortes/detalles, notas). Cada PDF se lee
- * EN el navegador (pdfjs-dist por import dinámico, solo capa de texto
- * seleccionable) y jamás se sube, persiste o envía a servidor. Las páginas se
- * clasifican por tipo de fuente (corregible); los candidatos conservan
- * archivo/página/tipo; la evidencia se agrupa por elemento SIN inventar
- * relaciones entre planos (pareo textual por código + revisión humana).
- * No se interpreta geometría, escala ni cotas visuales: la escala escrita es
- * solo contexto. La detección es F6A; la conversión entrega INPUT de F3 y F1
- * hace todo el cálculo.
+ * Estación de revisión: cada PDF del plan set se lee EN el navegador
+ * (pdfjs-dist, capa de texto seleccionable) y, cuando la cobertura nativa es
+ * pobre (típico de AutoCAD con textos SHX convertidos a geometría), el
+ * usuario puede pedir OCR asistido POR PÁGINA (tesseract.js, también en el
+ * navegador; la imagen jamás sale de aquí). Nativo y OCR se comparan sin
+ * fusionar datos: confirmaciones, solo-nativo, solo-OCR y conflictos quedan
+ * explícitos para revisión humana. El OCR nunca aprueba, nunca calcula,
+ * nunca usa escala ni geometría. La conversión entrega INPUT de F3 y F1 hace
+ * todo el cálculo.
  */
 'use client';
 
 import { useMemo, useRef, useState } from 'react';
-import { Check, Copy, FileText, Layers, Search, Trash2, Undo2 } from 'lucide-react';
+import { Check, Copy, FileText, Layers, ScanText, Search, Trash2, Undo2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,11 +33,25 @@ import {
   type PdfIntakeFieldKey,
 } from '@/lib/steel/pdf-intake-candidates';
 import {
+  collectElementMentions,
   detectPlanSetCandidates,
   summarizeElementEvidence,
   type ElementMention,
   type PlanSourceRef,
 } from '@/lib/steel/pdf-plan-set';
+import {
+  classifyPageCoverage,
+  compareHybridCandidates,
+  detectPlanSetOcrCandidates,
+  hasLostHashSuspicion,
+  HIDDEN_TEXT_WARNING,
+  OCR_LOST_HASH_WARNING,
+  OCR_UNAVAILABLE_MESSAGE,
+  PAGE_COVERAGE_LABEL,
+  type HybridComparisonStats,
+  type OcrPageStatus,
+  type PageCoverage,
+} from '@/lib/steel/pdf-ocr';
 import {
   classifyPdfExtraction,
   isAcceptablePdfFile,
@@ -119,10 +133,29 @@ const FILE_STATUS_VARIANT: Record<PdfIntakeFileStatus, 'default' | 'success' | '
   error: 'destructive',
 };
 
+const COVERAGE_VARIANT: Record<PageCoverage['level'], 'success' | 'warning' | 'secondary' | 'destructive'> = {
+  buena: 'success',
+  parcial: 'warning',
+  pobre: 'warning',
+  sin_texto: 'destructive',
+};
+
+const OCR_STATUS_LABEL: Record<OcrPageStatus, string> = {
+  pendiente: 'OCR pendiente',
+  leyendo: 'OCR leyendo…',
+  completado: 'OCR completado',
+  error: 'OCR con error',
+};
+
 interface EditablePdfPage extends ExtractedPdfPage {
   included: boolean;
   sourceType: PlanSourceType;
   suggestionReason?: string;
+  coverage: PageCoverage;
+  ocrStatus: OcrPageStatus;
+  ocrText?: string;
+  ocrPreview?: string;
+  ocrError?: string;
 }
 
 interface PdfSourceState {
@@ -145,6 +178,21 @@ function sourceRefLabel(ref: PlanSourceRef): string {
   return `${type}: ${ref.fileName ?? 'texto pegado'} p.${ref.pageNumber}`;
 }
 
+function shapeEditablePage(base: ExtractedPdfPage, previous?: Partial<EditablePdfPage>): EditablePdfPage {
+  const suggestion = previous?.sourceType ? undefined : suggestSourceTypeFromText(base.text);
+  return {
+    ...base,
+    included: previous?.included ?? base.hasText,
+    sourceType: previous?.sourceType ?? suggestion?.type ?? 'otro',
+    suggestionReason: previous?.sourceType ? previous?.suggestionReason : suggestion?.reason,
+    coverage: classifyPageCoverage(base, { drawingOpCount: base.drawingOpCount }),
+    ocrStatus: previous?.ocrStatus ?? 'pendiente',
+    ocrText: previous?.ocrText,
+    ocrPreview: previous?.ocrPreview,
+    ocrError: previous?.ocrError,
+  };
+}
+
 export function ManualPdfIntakeSection({
   disabled,
   onAddApproved,
@@ -154,19 +202,29 @@ export function ManualPdfIntakeSection({
 }) {
   const [sources, setSources] = useState<PdfSourceState[]>([]);
   const [mentions, setMentions] = useState<readonly ElementMention[]>([]);
+  const [hybridStats, setHybridStats] = useState<HybridComparisonStats | null>(null);
   const [pageNumber, setPageNumber] = useState('1');
   const [sourceText, setSourceText] = useState('');
   const [candidates, setCandidates] = useState<readonly PdfIntakeCandidate[]>([]);
   const [hasDetected, setHasDetected] = useState(false);
   const [copied, setCopied] = useState(false);
   const nextSourceId = useRef(0);
+  // Bytes del PDF por fuente (solo memoria, para renderizar la página al pedir OCR).
+  const pdfBytes = useRef(new Map<string, ArrayBuffer>());
 
   const manualPage = Math.max(1, Number(pageNumber) || 1);
   const approved = approvedCount(candidates);
-  const readySources = sources.filter((source) => source.status === 'extracted');
+  const readySources = sources.filter((source) => source.status === 'extracted' || source.status === 'no_text');
   const includedPagesCount = readySources.reduce(
-    (acc, source) => acc + source.pages.filter((page) => page.included && page.text.trim().length > 0).length,
+    (acc, source) =>
+      acc +
+      source.pages.filter(
+        (page) => page.included && (page.text.trim().length > 0 || (page.ocrText ?? '').trim().length > 0),
+      ).length,
     0,
+  );
+  const partialCoverage = readySources.some((source) =>
+    source.pages.some((page) => page.coverage.level === 'parcial' || page.coverage.level === 'pobre'),
   );
   const elementGroups = useMemo(
     () => (hasDetected ? summarizeElementEvidence(candidates, mentions) : []),
@@ -192,7 +250,7 @@ export function ManualPdfIntakeSection({
     ]);
     try {
       const data = await file.arrayBuffer();
-      // pdfjs-dist se carga aquí, bajo demanda, solo en el navegador.
+      pdfBytes.current.set(id, data);
       const { extractPdfTextInBrowser } = await import('@/lib/steel/pdf-text-extract-client');
       const result = await extractPdfTextInBrowser(data);
       const summary = classifyPdfExtraction(result.pages);
@@ -204,15 +262,7 @@ export function ManualPdfIntakeSection({
                 status: summary.status,
                 pageCount: result.pageCount,
                 truncated: result.truncated,
-                pages: result.pages.map((page) => {
-                  const suggestion = suggestSourceTypeFromText(page.text);
-                  return {
-                    ...page,
-                    included: page.hasText,
-                    sourceType: suggestion?.type ?? 'otro',
-                    suggestionReason: suggestion?.reason,
-                  };
-                }),
+                pages: result.pages.map((page) => shapeEditablePage(page)),
               }
             : source,
         ),
@@ -233,6 +283,7 @@ export function ManualPdfIntakeSection({
   }
 
   function removeSource(id: string) {
+    pdfBytes.current.delete(id);
     setSources((current) => current.filter((source) => source.id !== id));
   }
 
@@ -247,21 +298,66 @@ export function ManualPdfIntakeSection({
   }
 
   function handlePageTextEdit(sourceId: string, page: number, nextText: string) {
-    patchPage(sourceId, page, (current) => ({
-      ...shapeExtractedPage(current.pageNumber, nextText),
-      included: current.included,
-      sourceType: current.sourceType,
-      suggestionReason: current.suggestionReason,
-    }));
+    patchPage(sourceId, page, (current) => shapeEditablePage(shapeExtractedPage(current.pageNumber, nextText), current));
+  }
+
+  async function handleOcrPage(sourceId: string, page: number) {
+    const data = pdfBytes.current.get(sourceId);
+    if (!data) {
+      patchPage(sourceId, page, (current) => ({ ...current, ocrStatus: 'error', ocrError: OCR_UNAVAILABLE_MESSAGE }));
+      return;
+    }
+    patchPage(sourceId, page, (current) => ({ ...current, ocrStatus: 'leyendo', ocrError: undefined }));
+    try {
+      const { ocrPdfPageInBrowser } = await import('@/lib/steel/pdf-ocr-client');
+      const result = await ocrPdfPageInBrowser(data, page);
+      patchPage(sourceId, page, (current) => ({
+        ...current,
+        ocrStatus: 'completado',
+        ocrText: result.text,
+        ocrPreview: result.previewDataUrl,
+        included: true,
+      }));
+    } catch (error) {
+      console.error('[steel] OCR asistido fallo', error);
+      const detail = error instanceof Error && error.message ? ` (detalle: ${error.message.slice(0, 160)})` : '';
+      patchPage(sourceId, page, (current) => ({
+        ...current,
+        ocrStatus: 'error',
+        ocrError: `${OCR_UNAVAILABLE_MESSAGE}${detail}`,
+      }));
+    }
+  }
+
+  function handleOcrTextEdit(sourceId: string, page: number, nextText: string) {
+    patchPage(sourceId, page, (current) => ({ ...current, ocrText: nextText }));
   }
 
   function handleDetectFromPlanSet() {
     if (includedPagesCount === 0) return;
-    const result = detectPlanSetCandidates(
+    const nativeResult = detectPlanSetCandidates(
       readySources.map((source) => ({ fileName: source.fileName, pages: source.pages })),
     );
-    setCandidates(result.candidates);
-    setMentions(result.mentions);
+    const ocrCandidates = detectPlanSetOcrCandidates(
+      readySources.map((source) => ({
+        fileName: source.fileName,
+        pages: source.pages
+          .filter((page) => page.included && (page.ocrText ?? '').trim().length > 0)
+          .map((page) => ({ pageNumber: page.pageNumber, ocrText: page.ocrText ?? '', sourceType: page.sourceType })),
+      })),
+    );
+    const comparison = compareHybridCandidates(nativeResult.candidates, ocrCandidates);
+    const ocrMentions = readySources.flatMap((source) =>
+      collectElementMentions(
+        source.pages
+          .filter((page) => (page.ocrText ?? '').trim().length > 0)
+          .map((page) => ({ pageNumber: page.pageNumber, text: page.ocrText ?? '', sourceType: page.sourceType })),
+        { fileName: source.fileName },
+      ),
+    );
+    setCandidates(comparison.candidates);
+    setHybridStats(comparison.stats);
+    setMentions([...nativeResult.mentions, ...ocrMentions]);
     setHasDetected(true);
   }
 
@@ -285,6 +381,7 @@ export function ManualPdfIntakeSection({
   function handleDetectManual() {
     setCandidates(detectPdfIntakeCandidates(sourceText, { pageNumber: manualPage }));
     setMentions([]);
+    setHybridStats(null);
     setHasDetected(true);
   }
 
@@ -322,15 +419,17 @@ export function ManualPdfIntakeSection({
             Lectura asistida preliminar. No reemplaza revision tecnica.
           </p>
         </div>
-        <Badge variant="secondary">Preview local F6A/F6B</Badge>
+        <Badge variant="secondary">Preview local F6A/F6B/F6C</Badge>
       </div>
 
-      <InlineCallout tone="warning" className="mb-4" title="Solo texto seleccionable — sin OCR ni persistencia">
-        No se aprueban cantidades automaticamente. Solo se extrae texto seleccionable del PDF.
-        El sistema no interpreta geometria, escala ni cotas visuales en esta fase: si el plano
-        (p. ej. exportado de AutoCAD) trae la escala escrita, se muestra como contexto pero jamas
-        se usa para calcular longitudes. Los PDF quedan en tu navegador: no se suben, no se
-        guardan y no se envian a servidor.
+      <InlineCallout tone="warning" className="mb-4" title="Solo texto (nativo u OCR asistido) — sin persistencia">
+        <span>No se aprueban cantidades automaticamente. </span>
+        <span>Solo se extrae texto seleccionable del PDF.</span>
+        <span> Si lo pides, se agrega OCR asistido por pagina sobre la pagina renderizada. </span>
+        <span>El OCR puede confundirse; revisa antes de aprobar. </span>
+        <span>El sistema no interpreta geometria, escala ni cotas visuales en esta fase. </span>
+        <span>No se interpretan cotas visuales ni escala en esta fase; la escala escrita se muestra solo como contexto. </span>
+        <span>Los PDF quedan en tu navegador: no se suben, no se guardan y no se envian a servidor.</span>
       </InlineCallout>
 
       <div>
@@ -359,6 +458,12 @@ export function ManualPdfIntakeSection({
           }}
         />
       </div>
+
+      {partialCoverage && (
+        <InlineCallout tone="info" className="mt-3" title="El PDF tiene texto seleccionable parcial.">
+          {HIDDEN_TEXT_WARNING}
+        </InlineCallout>
+      )}
 
       {sources.length > 0 && (
         <ul className="mt-3 space-y-3">
@@ -394,11 +499,12 @@ export function ManualPdfIntakeSection({
               )}
               {source.status === 'no_text' && (
                 <InlineCallout tone="warning" className="mt-2" title="Este PDF no contiene texto seleccionable suficiente">
-                  {PDF_NO_TEXT_MESSAGE} No se inventan cantidades desde lineas dibujadas.
+                  {PDF_NO_TEXT_MESSAGE} No se inventan cantidades desde lineas dibujadas. Puedes
+                  intentar OCR asistido por pagina.
                 </InlineCallout>
               )}
 
-              {source.status === 'extracted' && source.pages.length > 0 && (
+              {(source.status === 'extracted' || source.status === 'no_text') && source.pages.length > 0 && (
                 <ul className="mt-2 space-y-2">
                   {source.pages.map((page) => (
                     <li key={page.pageNumber} className="rounded-md border border-iconic-soft-blue/30 p-2">
@@ -440,26 +546,91 @@ export function ManualPdfIntakeSection({
                         {page.suggestionReason && (
                           <span className="text-[11px] text-iconic-graphite/50">sugerido: {page.suggestionReason}</span>
                         )}
-                        <span className="text-iconic-graphite/50">{page.charCount} caracteres</span>
-                        {!page.hasText && <Badge variant="warning">sin texto seleccionable</Badge>}
+                        <Badge variant={COVERAGE_VARIANT[page.coverage.level]}>
+                          {PAGE_COVERAGE_LABEL[page.coverage.level]}
+                        </Badge>
+                        <span className="text-iconic-graphite/50">
+                          {page.coverage.nativeLineCount} lineas · {page.coverage.nativeCandidateCount} candidatos nativos
+                        </span>
                         {page.scaleNotes.map((note) => (
                           <Badge key={note} variant="secondary">
                             Escala anotada {note} — solo contexto, no se usa para calcular
                           </Badge>
                         ))}
                       </div>
+
+                      {page.coverage.suspectedHiddenText && (
+                        <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400">{HIDDEN_TEXT_WARNING}</p>
+                      )}
+
+                      <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => void handleOcrPage(source.id, page.pageNumber)}
+                          disabled={disabled || page.ocrStatus === 'leyendo'}
+                        >
+                          <ScanText className="h-3.5 w-3.5" aria-hidden="true" />
+                          {page.ocrStatus === 'completado' ? 'Repetir OCR' : 'Leer con OCR asistido'}
+                        </Button>
+                        <Badge variant={page.ocrStatus === 'completado' ? 'success' : page.ocrStatus === 'error' ? 'destructive' : 'secondary'}>
+                          {OCR_STATUS_LABEL[page.ocrStatus]}
+                        </Badge>
+                        {page.ocrStatus === 'leyendo' && (
+                          <span className="text-[11px] text-iconic-graphite/50">
+                            Primera vez: descarga el motor OCR (~5-8 MB) y puede tardar.
+                          </span>
+                        )}
+                      </div>
+                      {page.ocrStatus === 'error' && (
+                        <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400">{page.ocrError}</p>
+                      )}
+
                       {page.hasText && (
                         <details className="mt-1">
                           <summary className="cursor-pointer text-[11px] text-iconic-graphite/60">
-                            Ver/editar texto de la pagina
+                            Ver/editar texto nativo de la pagina
                           </summary>
                           <textarea
                             value={page.text}
                             onChange={(event) => handlePageTextEdit(source.id, page.pageNumber, event.target.value)}
                             className="mt-1 min-h-24 w-full rounded-md border border-gray-300 bg-white px-3 py-2 font-mono text-xs text-gray-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 dark:border-line dark:bg-surface-soft dark:text-content"
                             disabled={disabled}
-                            aria-label={`Texto extraido de la pagina ${page.pageNumber} de ${source.fileName}`}
+                            aria-label={`Texto nativo de la pagina ${page.pageNumber} de ${source.fileName}`}
                           />
+                        </details>
+                      )}
+
+                      {page.ocrStatus === 'completado' && (
+                        <details className="mt-1" open>
+                          <summary className="cursor-pointer text-[11px] text-iconic-graphite/60">
+                            Texto OCR de la pagina (editable) — comparalo con el nativo
+                          </summary>
+                          <div className="mt-1 grid gap-2 lg:grid-cols-[200px_minmax(0,1fr)]">
+                            {page.ocrPreview && (
+                              // eslint-disable-next-line @next/next/no-img-element -- data URL en memoria (preview local, sin red)
+                              <img
+                                src={page.ocrPreview}
+                                alt={`Pagina ${page.pageNumber} renderizada (contexto de revision)`}
+                                className="w-full rounded border border-iconic-soft-blue/30"
+                              />
+                            )}
+                            <div>
+                              <textarea
+                                value={page.ocrText ?? ''}
+                                onChange={(event) => handleOcrTextEdit(source.id, page.pageNumber, event.target.value)}
+                                className="min-h-24 w-full rounded-md border border-amber-300 bg-amber-50/40 px-3 py-2 font-mono text-xs text-gray-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:border-amber-700 dark:bg-surface-soft dark:text-content"
+                                disabled={disabled}
+                                aria-label={`Texto OCR de la pagina ${page.pageNumber} de ${source.fileName}`}
+                              />
+                              {hasLostHashSuspicion(page.ocrText ?? '') && (
+                                <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400">
+                                  {OCR_LOST_HASH_WARNING}
+                                </p>
+                              )}
+                            </div>
+                          </div>
                         </details>
                       )}
                     </li>
@@ -475,12 +646,23 @@ export function ManualPdfIntakeSection({
         <div className="mt-3 flex flex-wrap gap-2">
           <Button type="button" onClick={handleDetectFromPlanSet} disabled={disabled || includedPagesCount === 0}>
             <Search className="h-4 w-4" aria-hidden="true" />
-            Detectar candidatos del plan set
+            Detectar candidatos del plan set (nativo + OCR)
           </Button>
           <Button type="button" variant="outline" onClick={handleCopyExtracted} disabled={disabled || includedPagesCount === 0}>
             <Copy className="h-3.5 w-3.5" aria-hidden="true" />
             {copied ? 'Copiado' : 'Copiar texto extraido'}
           </Button>
+        </div>
+      )}
+
+      {hybridStats && hasDetected && (
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+          <Badge variant="default">Solo nativo: {hybridStats.nativeOnly}</Badge>
+          <Badge variant="secondary">Solo OCR: {hybridStats.ocrOnly}</Badge>
+          <Badge variant="success">Confirmados por ambos: {hybridStats.confirmedByBoth}</Badge>
+          <Badge variant={hybridStats.conflicts > 0 ? 'destructive' : 'secondary'}>
+            Conflictos nativo/OCR: {hybridStats.conflicts}
+          </Badge>
         </div>
       )}
 
@@ -628,8 +810,15 @@ export function ManualPdfIntakeSection({
                       )}
                     </td>
                     <td className="max-w-52 px-3 py-2 align-top text-xs">
+                      <div className="flex flex-wrap gap-1">
+                        <Badge variant={candidate.evidence.method === 'ocr' ? 'warning' : 'secondary'}>
+                          {candidate.evidence.method === 'ocr' ? 'OCR' : 'Texto nativo'}
+                        </Badge>
+                        {candidate.crossCheck === 'confirmed_by_ocr' && <Badge variant="success">Confirmado por OCR</Badge>}
+                        {candidate.crossCheck === 'conflict' && <Badge variant="destructive">Conflicto nativo/OCR</Badge>}
+                      </div>
                       {candidate.evidence.fileName && (
-                        <p className="truncate font-medium text-iconic-graphite/70" title={candidate.evidence.fileName}>
+                        <p className="mt-1 truncate font-medium text-iconic-graphite/70" title={candidate.evidence.fileName}>
                           {candidate.evidence.fileName}
                         </p>
                       )}
