@@ -70,6 +70,29 @@ describe('P2_GANTT_UX static wiring', () => {
     expect(chart).toContain('GANTT_ZOOM_MIN_BY_MODE[viewMode]');
   });
 
+  it('P2B2: seleccion de barra por data-id y panel lateral en la pestania Gantt', () => {
+    const shell = read('app/(dashboard)/planning/[scheduleId]/schedule-detail-shell.tsx');
+    expect(shell).toContain(".closest?.('.bar-wrapper')");
+    expect(shell).toContain("getAttribute('data-id')");
+    expect(shell).toContain('onClick={handleGanttClick}');
+    expect(shell).toContain('lg:grid-cols-[minmax(0,1fr)_320px]');
+    expect(shell).toContain('emptyTitle="Selecciona una actividad del Gantt"');
+    // Panel del Gantt SIN edicion en P2B2: no se pasa onRequestEdit en esa pestania.
+    const ganttPanelBlock = shell.slice(shell.indexOf("tab === 'gantt'"), shell.indexOf("tab === 'trace'"));
+    expect(ganttPanelBlock).toContain('TaskDetailPanel');
+    expect(ganttPanelBlock).not.toContain('onRequestEdit');
+  });
+
+  it('P2B2: TaskDetailPanel extraido conserva los gates client-safe', () => {
+    const panel = read('app/(dashboard)/planning/[scheduleId]/task-detail-panel.tsx');
+    expect(panel).toContain('{!clientSafe && (task.crewLabel || task.crewSize) && (');
+    expect(panel).toContain('{!clientSafe && isActivity && (task.quantitySnapshot || task.unitSnapshot) && (');
+    expect(panel).toContain("{!clientSafe && task.productivitySource === 'manual' && (");
+    expect(panel).toContain("{!clientSafe && task.productivitySource === 'unknown' && (");
+    const workspace = read('app/(dashboard)/planning/[scheduleId]/schedule-workspace.tsx');
+    expect(workspace).toContain("import { TaskDetailPanel } from './task-detail-panel'");
+  });
+
   it('P1 client-safe no se revierte: gates de consulta en planning intactos', () => {
     const page = read('app/(dashboard)/planning/[scheduleId]/page.tsx');
     const shell = read('app/(dashboard)/planning/[scheduleId]/schedule-detail-shell.tsx');
@@ -79,8 +102,9 @@ describe('P2_GANTT_UX static wiring', () => {
     expect(page).toContain('clientSafe={isClientSafe}');
     expect(shell).toContain("{ id: 'gantt', label: 'Gantt', show: true }");
     expect(shell).toContain('clientSafe={clientSafe}');
-    expect(workspace).toContain('{!clientSafe && isActivity && (');
     expect(workspace).toContain('{!clientSafe && <ProductivityDot source={t.productivitySource} />}');
+    const panel = read('app/(dashboard)/planning/[scheduleId]/task-detail-panel.tsx');
+    expect(panel).toContain('{!clientSafe && isActivity && (');
   });
 
   it('P1 client-safe no se revierte: simulador comercial sigue gateado', () => {

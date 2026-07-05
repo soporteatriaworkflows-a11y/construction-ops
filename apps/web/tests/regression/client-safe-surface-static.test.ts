@@ -34,8 +34,13 @@ describe('P1_CLIENT_SAFE_SURFACE static wiring', () => {
     expect(shell).toContain("{ id: 'gantt', label: 'Gantt', show: true }");
     expect(shell).toContain('clientSafe={clientSafe}');
     expect(workspace).toContain('{!clientSafe && (');
-    expect(workspace).toContain('{!clientSafe && isActivity && (');
     expect(workspace).toContain('{!clientSafe && <ProductivityDot source={t.productivitySource} />}');
+    // P2B2: el panel de detalle vive extraido en task-detail-panel.tsx con los
+    // mismos gates client-safe (cantidad/cuadrilla/rendimiento/vinculos).
+    const detailPanel = readApp('(dashboard)/planning/[scheduleId]/task-detail-panel.tsx');
+    expect(detailPanel).toContain('{!clientSafe && isActivity && (');
+    expect(detailPanel).toContain('{!clientSafe && (task.crewLabel || task.crewSize) && (');
+    expect(detailPanel).toContain("{!clientSafe && task.productivitySource === 'manual' && (");
   });
 
   it('price intelligence muestra mensaje claro sin cambiar la matriz de permisos', () => {
