@@ -136,7 +136,14 @@ export function parseDxfFile(content: string): DxfParseResult {
     }
     const layer = fields['8'] ?? '0';
     const handle = fields['5'];
-    const base = { layer, handle };
+    const colorIndex = fields['62'] !== undefined ? Number.parseInt(fields['62'], 10) : undefined;
+    const trueColor = fields['420'] !== undefined ? Number.parseInt(fields['420'], 10) : undefined;
+    const base = {
+      layer,
+      handle,
+      colorIndex: Number.isFinite(colorIndex) ? colorIndex : undefined,
+      trueColor: Number.isFinite(trueColor) ? trueColor : undefined,
+    };
     const x = num(fields['10']);
     const y = num(fields['20']);
     const z = num(fields['30']);

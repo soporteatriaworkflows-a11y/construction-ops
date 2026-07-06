@@ -20,7 +20,7 @@ import type {
   DxfInsertEntity,
   DxfTextEntity,
 } from './dxf-entities';
-import { isDxfTextEntity } from './dxf-entities';
+import { isDxfTextEntity, isRedEntity } from './dxf-entities';
 import type { DxfParseSuccess } from './dxf-parser';
 
 // ---------------------------------------------------------------------------
@@ -48,6 +48,11 @@ export interface DxfElementCandidate {
   /** 0–1 según fuerza de la señal (capa semántica > capa genérica). */
   confidence: number;
   warnings: readonly string[];
+  /** Color ACI de la entidad de origen (1 = rojo), si el DXF lo trae. */
+  colorIndex?: number;
+  trueColor?: number;
+  /** true cuando el color rojo reforzó la confianza (señal, no verdad). */
+  redSignal?: boolean;
 }
 
 export interface DxfBlockCount {
@@ -122,6 +127,16 @@ export function isGenericLayer(layer: string): boolean {
   return GENERIC_LAYER_PATTERN.test(layer.trim());
 }
 
+/** ¿La capa tiene nombre con semántica estructural? (señal, no verdad). */
+export function isStructuralLayer(layer: string): boolean {
+  return SEMANTIC_LAYER_PATTERN.test(layer);
+}
+
+/** ¿La capa es de rótulo/carátula? */
+export function isTitleLayer(layer: string): boolean {
+  return TITLE_LAYER_PATTERN.test(layer);
+}
+
 export function assessLayers(parse: DxfParseSuccess): DxfLayerAssessment {
   const suspicious: string[] = [];
   const semantic: string[] = [];
@@ -178,6 +193,8 @@ const BLOCK_NAME_KIND: ReadonlyArray<{ pattern: RegExp; kind: ElementKind }> = [
 const CONF_SEMANTIC_LAYER = 0.95;
 const CONF_NAMED_LAYER = 0.9;
 const CONF_GENERIC_LAYER = 0.75;
+/** Refuerzo por color rojo (señal estructural típica; jamás decide sola). */
+const RED_SIGNAL_BONUS = 0.05;
 export const CONF_TEXT_REPETITION_COUNT = 0.5;
 
 const GENERIC_LAYER_WARNING =
@@ -197,6 +214,10 @@ function hasPoint(entity: { x?: number; y?: number }): entity is { x: number; y:
 }
 
 /** Radio de vecindad: 5% de la diagonal del dibujo (mínimo 10 unidades). */
+export function dxfNeighborhoodRadius(entities: readonly DxfEntity[]): number {
+  return neighborhoodRadius(entities);
+}
+
 function neighborhoodRadius(entities: readonly DxfEntity[]): number {
   let minX = Infinity;
   let minY = Infinity;
@@ -325,6 +346,12 @@ export function extractDxfStructure(parse: DxfParseSuccess): DxfStructuralExtrac
       const section = SECTION_PATTERN.exec(line) ?? nearbyTexts.map((t) => SECTION_PATTERN.exec(t)).find(Boolean) ?? undefined;
       const diameter = DIAMETER_PATTERN.exec(line);
 
+      // Color rojo = señal estructural típica de planos reales: refuerza la
+      // confianza (nunca decide sola; el filtro por color es de la usuaria).
+      const red = isRedEntity(entity);
+      const baseConfidence = semantic && !generic ? CONF_SEMANTIC_LAYER : generic ? CONF_GENERIC_LAYER : CONF_NAMED_LAYER;
+      const confidence = Math.min(CONF_SEMANTIC_LAYER, baseConfidence + (red ? RED_SIGNAL_BONUS : 0));
+
       byKey.set(mention.elementKey, {
         elementKey: mention.elementKey,
         elementType: KIND_TO_DXF_TYPE[mention.kind ?? 'otro'],
@@ -336,8 +363,11 @@ export function extractDxfStructure(parse: DxfParseSuccess): DxfStructuralExtrac
         coordinates: point,
         nearbyTexts,
         nearbyInserts,
-        confidence: semantic && !generic ? CONF_SEMANTIC_LAYER : generic ? CONF_GENERIC_LAYER : CONF_NAMED_LAYER,
+        confidence,
         warnings,
+        colorIndex: entity.colorIndex,
+        trueColor: entity.trueColor,
+        redSignal: red || undefined,
       });
     }
   }

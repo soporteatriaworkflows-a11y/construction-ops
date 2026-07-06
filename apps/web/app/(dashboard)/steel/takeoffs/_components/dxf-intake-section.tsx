@@ -37,6 +37,18 @@ import {
   DXF_COMPARISON_STATUS_LABEL,
   type DxfComparisonStatus,
 } from '@/lib/steel/dxf/dxf-pdf-comparison';
+import {
+  buildBeamSchedule,
+  beamScheduleRowToManualLines,
+  BEAM_SCHEDULE_STATUS_LABEL,
+  type BeamScheduleRow,
+} from '@/lib/steel/dxf/beam-schedule';
+import {
+  DXF_FILTER_MODE_LABEL,
+  matchesDxfFilter,
+  type DxfEntityFilter,
+  type DxfFilterMode,
+} from '@/lib/steel/dxf/dxf-entity-filter';
 
 const RECOMMENDATION_VARIANT: Record<CadDrawingQualityReport['recommendation'], 'success' | 'warning' | 'secondary' | 'destructive'> = {
   usable: 'success',
@@ -67,7 +79,14 @@ interface LoadedDxf {
   extraction: DxfStructuralExtraction;
   quality: CadDrawingQualityReport;
   detection: DxfNotationDetection;
+  beamSchedule: readonly BeamScheduleRow[];
 }
+
+const BEAM_STATUS_VARIANT: Record<BeamScheduleRow['status'], 'success' | 'warning' | 'secondary'> = {
+  ok: 'success',
+  missing_location: 'secondary',
+  requires_review: 'warning',
+};
 
 function yesNo(value: boolean): string {
   return value ? 'Sí' : 'No';
@@ -88,11 +107,51 @@ export function DxfIntakeSection({
   const [parseError, setParseError] = useState<string | null>(null);
   const [approvedIds, setApprovedIds] = useState<ReadonlySet<string>>(new Set());
   const [addedCount, setAddedCount] = useState<number | null>(null);
+  // F8B: filtro manual de lectura por capa/color (solo cambia lo VISIBLE).
+  const [filterMode, setFilterMode] = useState<DxfFilterMode>('all');
+  const [selectedLayers, setSelectedLayers] = useState<ReadonlySet<string>>(new Set());
+  const [selectedColors, setSelectedColors] = useState<ReadonlySet<number>>(new Set());
+  const [includeTitleBlock, setIncludeTitleBlock] = useState(true);
+  const [beamSentKey, setBeamSentKey] = useState<string | null>(null);
 
   const comparison = useMemo(() => {
     if (!loaded || !pdfAnalysis) return null;
     return compareDxfWithPdfAnalysis(loaded.extraction.elements, pdfAnalysis);
   }, [loaded, pdfAnalysis]);
+
+  const activeFilter = useMemo<DxfEntityFilter>(
+    () => ({
+      mode: filterMode,
+      layers: [...selectedLayers],
+      colorIndexes: [...selectedColors],
+      includeTitleBlock,
+    }),
+    [filterMode, selectedLayers, selectedColors, includeTitleBlock],
+  );
+
+  const visibleElements = useMemo(
+    () =>
+      (loaded?.extraction.elements ?? []).filter((element) =>
+        matchesDxfFilter({ layer: element.sourceLayer, colorIndex: element.colorIndex }, activeFilter),
+      ),
+    [loaded, activeFilter],
+  );
+
+  const visibleBeams = useMemo(
+    () =>
+      (loaded?.beamSchedule ?? []).filter((row) =>
+        matchesDxfFilter({ layer: row.layer, colorIndex: row.colorIndex }, activeFilter),
+      ),
+    [loaded, activeFilter],
+  );
+
+  const availableColors = useMemo(() => {
+    const colors = new Set<number>();
+    for (const entity of loaded?.parse.entities ?? []) {
+      if (entity.colorIndex !== undefined) colors.add(entity.colorIndex);
+    }
+    return [...colors].sort((a, b) => a - b);
+  }, [loaded]);
 
   async function handleFile(file: File | undefined) {
     setParseError(null);
@@ -113,7 +172,39 @@ export function DxfIntakeSection({
       extraction,
       quality: buildCadQualityReport(parse, extraction),
       detection: detectDxfNotationCandidates(parse, file.name),
+      beamSchedule: buildBeamSchedule(parse, extraction),
     });
+    setFilterMode('all');
+    setSelectedLayers(new Set());
+    setSelectedColors(new Set());
+    setIncludeTitleBlock(true);
+    setBeamSentKey(null);
+  }
+
+  function toggleLayer(layer: string) {
+    setSelectedLayers((current) => {
+      const next = new Set(current);
+      if (next.has(layer)) next.delete(layer);
+      else next.add(layer);
+      return next;
+    });
+  }
+
+  function toggleColor(color: number) {
+    setSelectedColors((current) => {
+      const next = new Set(current);
+      if (next.has(color)) next.delete(color);
+      else next.add(color);
+      return next;
+    });
+  }
+
+  function handleSendBeamRow(row: BeamScheduleRow) {
+    if (!loaded) return;
+    const lines = beamScheduleRowToManualLines(row, loaded.fileName);
+    if (lines.length === 0) return;
+    onAddApproved(lines);
+    setBeamSentKey(`${row.elementKey}:${lines.length}`);
   }
 
   function toggleApproved(id: string) {
@@ -217,8 +308,139 @@ export function DxfIntakeSection({
             )}
           </div>
 
+          {/* Filtro manual por capa/color (F8B): solo cambia lo visible */}
+          <div className="rounded border border-iconic-soft-blue/30 p-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-semibold">Filtrar entidades CAD:</span>
+              {(Object.keys(DXF_FILTER_MODE_LABEL) as DxfFilterMode[]).map((mode) => (
+                <Button
+                  key={mode}
+                  type="button"
+                  size="sm"
+                  variant={filterMode === mode ? 'default' : 'outline'}
+                  onClick={() => setFilterMode(mode)}
+                  aria-pressed={filterMode === mode}
+                >
+                  {DXF_FILTER_MODE_LABEL[mode]}
+                </Button>
+              ))}
+              <label className="flex items-center gap-1 text-[11px]">
+                <input
+                  type="checkbox"
+                  checked={includeTitleBlock}
+                  onChange={(event) => setIncludeTitleBlock(event.target.checked)}
+                />
+                Incluir rótulo
+              </label>
+            </div>
+            {filterMode === 'custom' && (
+              <div className="mt-1.5 space-y-1 text-[11px]">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-iconic-graphite/50">Capas:</span>
+                  {loaded.parse.layers.map((layer) => (
+                    <label key={layer} className="flex items-center gap-1">
+                      <input type="checkbox" checked={selectedLayers.has(layer)} onChange={() => toggleLayer(layer)} />
+                      {layer}
+                    </label>
+                  ))}
+                </div>
+                {availableColors.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-iconic-graphite/50">Color ACI:</span>
+                    {availableColors.map((color) => (
+                      <label key={color} className="flex items-center gap-1">
+                        <input type="checkbox" checked={selectedColors.has(color)} onChange={() => toggleColor(color)} />
+                        {color === 1 ? '1 (rojo)' : color}
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            <p className="mt-1 text-[11px] text-iconic-graphite/50">
+              El filtro cambia la lista visible ({visibleElements.length} de {loaded.extraction.elements.length}{' '}
+              elementos); no borra datos. Capa y color son señales, no verdad absoluta.
+            </p>
+          </div>
+
+          {/* Listado de vigas detectadas (F8B — Beam Schedule) */}
+          {visibleBeams.length > 0 && (
+            <div className="overflow-x-auto rounded border border-iconic-soft-blue/30 p-2">
+              <p className="font-semibold">Listado de vigas detectadas ({visibleBeams.length})</p>
+              <table className="mt-1 w-full min-w-[820px] text-left text-[11px]">
+                <caption className="sr-only">Listado de vigas detectadas en el DXF</caption>
+                <thead>
+                  <tr className="border-b border-iconic-soft-blue/30 text-iconic-graphite/50">
+                    <th scope="col" className="py-1 pr-2">Elemento</th>
+                    <th scope="col" className="py-1 pr-2">Eje/Ubicación</th>
+                    <th scope="col" className="py-1 pr-2">Sección</th>
+                    <th scope="col" className="py-1 pr-2">Refuerzo longitudinal</th>
+                    <th scope="col" className="py-1 pr-2">Estribos/Flejes</th>
+                    <th scope="col" className="py-1 pr-2">Longitud/Observación</th>
+                    <th scope="col" className="py-1 pr-2">Capa/Color</th>
+                    <th scope="col" className="py-1 pr-2">Confianza</th>
+                    <th scope="col" className="py-1 pr-2">Estado</th>
+                    <th scope="col" className="py-1">Acción</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleBeams.map((row) => (
+                    <tr key={row.elementKey} className="border-b border-iconic-soft-blue/15 align-top">
+                      <td className="py-1 pr-2 font-medium">{row.elementKey}</td>
+                      <td className="py-1 pr-2">{row.location ?? '—'}</td>
+                      <td className="py-1 pr-2">{row.sectionSpec ?? '—'}</td>
+                      <td className="py-1 pr-2">{row.longitudinalBars.join(', ') || '—'}</td>
+                      <td className="py-1 pr-2">
+                        {row.stirrups.length === 0
+                          ? '—'
+                          : row.stirrups.map((s) => (
+                              <div key={s.raw}>
+                                <code>{s.raw}</code>
+                                {s.normalized && s.normalized !== s.raw && (
+                                  <span className="text-iconic-graphite/50"> → {s.normalized}</span>
+                                )}
+                              </div>
+                            ))}
+                      </td>
+                      <td className="py-1 pr-2 text-iconic-graphite/60">{row.lengthObservation ?? row.statusReasons[0] ?? '—'}</td>
+                      <td className="py-1 pr-2">
+                        {row.layer}
+                        {row.colorIndex !== undefined ? ` · c${row.colorIndex}` : ''}
+                        {row.redSignal ? ' 🔴' : ''}
+                      </td>
+                      <td className="py-1 pr-2">{(row.confidence * 100).toFixed(0)}%</td>
+                      <td className="py-1 pr-2">
+                        <Badge variant={BEAM_STATUS_VARIANT[row.status]}>{BEAM_SCHEDULE_STATUS_LABEL[row.status]}</Badge>
+                      </td>
+                      <td className="py-1">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleSendBeamRow(row)}
+                          disabled={disabled || (row.stirrups.length === 0 && row.longitudinalBars.length === 0)}
+                        >
+                          Enviar al takeoff
+                        </Button>
+                        {beamSentKey?.startsWith(`${row.elementKey}:`) && (
+                          <Badge variant="success" className="ml-1">
+                            {beamSentKey.split(':')[1]} línea(s)
+                          </Badge>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="mt-1 text-[11px] text-iconic-graphite/50">
+                Fuente: DXF ({loaded.fileName}). Enviar una fila agrega SOLO los tokens interpretables por F1
+                como líneas del takeoff con evidencia <code>dxf</code>; nada se aprueba solo.
+              </p>
+            </div>
+          )}
+
           {/* Elementos detectados */}
-          {loaded.extraction.elements.length > 0 && (
+          {visibleElements.length > 0 && (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[560px] text-left text-[11px]">
                 <caption className="sr-only">Elementos estructurales detectados en el DXF</caption>
@@ -234,12 +456,16 @@ export function DxfIntakeSection({
                   </tr>
                 </thead>
                 <tbody>
-                  {loaded.extraction.elements.map((element) => (
+                  {visibleElements.map((element) => (
                     <tr key={element.elementKey} className="border-b border-iconic-soft-blue/15 align-top">
                       <td className="py-1 pr-2 font-medium">{element.elementKey}</td>
                       <td className="py-1 pr-2">{ELEMENT_TYPE_LABEL[element.elementType] ?? element.elementType}</td>
                       <td className="py-1 pr-2">{element.sectionSpec ?? element.diameter ?? '—'}</td>
-                      <td className="py-1 pr-2">{element.sourceLayer}</td>
+                      <td className="py-1 pr-2">
+                        {element.sourceLayer}
+                        {element.colorIndex !== undefined ? ` · c${element.colorIndex}` : ''}
+                        {element.redSignal ? ' 🔴' : ''}
+                      </td>
                       <td className="py-1 pr-2">
                         {element.coordinates ? `(${element.coordinates.x.toFixed(1)}, ${element.coordinates.y.toFixed(1)})` : '—'}
                       </td>
