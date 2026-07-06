@@ -151,6 +151,33 @@ describe('P2_GANTT_UX static wiring', () => {
     expect(service).toContain('return null;');
   });
 
+  it('P2C4a: advertencias de duracion gateadas client-safe en el panel', () => {
+    const panel = read('app/(dashboard)/planning/[scheduleId]/task-detail-panel.tsx');
+    expect(panel).toContain('classifyActivityDurationCategory(task.name, task.chapterName)');
+    // La advertencia SOLO se muestra a roles internos (mismo patron P1).
+    expect(panel).toContain('{!clientSafe && durationWarning && (');
+    // Solo actividades: capitulos e hitos no reciben criterio.
+    expect(panel).toContain('isActivity && !task.isMilestone');
+  });
+
+  it('P2C4a: indicador global interno con copy aprobado; consulta no lo ve', () => {
+    const page = read('app/(dashboard)/planning/[scheduleId]/page.tsx');
+    expect(page).toContain('buildScheduleDurationReport(workspaceTasks)');
+    expect(page).toContain("{!isClientSafe && (durationReport.outOfRangeCount > 0 || schedule.status === 'draft') && (");
+    expect(page).toContain('Este cronograma dura {durationReport.totalDays}');
+    expect(page).toContain('Revisar antes de publicar.');
+    expect(page).toContain('Cronograma en borrador con datos estimados.');
+    const criteria = read('modules/planning/duration-criteria.ts');
+    expect(criteria).toContain('Duración inusualmente alta');
+    expect(criteria).toContain('Duración inusualmente baja');
+    // Modulo puro: sin DOM ni servidor.
+    expect(criteria).not.toContain('document.');
+    expect(criteria).not.toContain("'use server'");
+    // El generador NO cambia en P2C4a (el fallback por categoria es P2C4b).
+    const generator = read('modules/planning/generator.ts');
+    expect(generator).not.toContain('duration-criteria');
+  });
+
   it('P1 client-safe no se revierte: gates de consulta en planning intactos', () => {
     const page = read('app/(dashboard)/planning/[scheduleId]/page.tsx');
     const shell = read('app/(dashboard)/planning/[scheduleId]/schedule-detail-shell.tsx');

@@ -10,6 +10,17 @@
 - P5 Excel formula-first (`manual-excel-export.ts`): 01_CANTIDADES re-diagramada — diámetro (F), longitud (G), cantidad (H), SON (I) EDITABLES; kg/ml (J) por VLOOKUP a nueva hoja `CONFIG_VARILLAS` (diámetro/kg-ml/longitud comercial activa, editable offline); ml unidad K=G, kg unidad L=G*J, ml total M=G*H*I, kg total N=M*J, long comercial O por VLOOKUP, varillas comerciales P=CEILING(M/O), desperdicio Q=P*O-M; resumen suma M/N/P. Cambiar un dígito offline recalcula todo. Estilo ICONIC, sanitización y hojas existentes intactos (tests de letras actualizados al nuevo layout).
 - Tests: +38 nuevos (13 notación/segmentos, 10 beam schedule, 8 color/filtro, 9 formula-first — quedó en 9 tras dedupe) y 2 suites Excel existentes actualizadas. Suite completa verde (ver PR). Smoke manual con DXF real local (fuera del repo, jamás commiteado) ejecutado y borrado.
 - Restricciones: sin DB/Supabase/RLS/migraciones/storage/.env/APIs externas/keys/dependencias nuevas; DXF jamás sube a servidor; sin archivos reales en Git; flag `STEEL_OPS_UIX_PREVIEW` intacto; F1 única calculadora EN LA APP (el Excel lleva fórmulas para edición offline por mandato); nada se auto-aprueba.
+---
+
+## 2026-07-06 - P2C4A_DURATION_WARNINGS_GLOBAL_INDICATOR - EN RAMA + PR, SIN MERGE
+
+- Worktree: D:/ICONIC/SOFTWARE PRESUPUESTOS/construction-ops-p2c4a-duration-warnings. Rama: feature/p2c4a-duration-warnings. Base: origin/main post P2C1+F8A (671231d). Sin merge, sin deploy, sin tag. App-layer puro + UI.
+- Nuevo modulo PURO modules/planning/duration-criteria.ts: 12 categorias (preliminares, excavacion, cimentacion, estructura, mamposteria, cubierta, electricas, hidrosanitarias, panetes/acabados, carpinteria, pintura, limpieza/entrega) con min/typical/max calibrables; clasificacion por keywords conservadoras en espanol (normalizadas sin acentos; orden de tabla evita cruces; sin coincidencia = sin advertencia); evaluateActivityDuration (low/ok/high, bordes inclusivos); getDurationWarningCopy ("Duracion inusualmente alta/baja ... Revisar antes de publicar"); buildScheduleDurationReport (totalDays inclusivo + outOfRange/high/low + items; solo actividades, excluye capitulos/hitos; nunca lanza).
+- Panel de tarea: advertencia ambar suave cuando la actividad clasifica y esta fuera de rango — gateada con !clientSafe (consulta NO la ve; obra/compras/admin/gerencia/presupuestos si, read-only). Mismo patron visual de las advertencias existentes.
+- Indicador global en la pagina (bajo el resumen, solo roles internos): "Este cronograma dura {N} dias. Hay {X} actividad(es) fuera del rango sugerido (· altas · bajas). Revisar antes de publicar." + "Cronograma en borrador con datos estimados." cuando status=draft. Sin warnings y sin draft ⇒ no se muestra nada.
+- NO bloquea nada: sin cambios al generador (fallback por categoria = P2C4b), sin server actions, sin fechas, sin clamps, sin permisos nuevos.
+- Tests: +18 unit (duration-criteria) + 2 bloques estaticos P2C4a (gate client-safe del panel; indicador global + copy + generador sin tocar).
+- Restricciones: sin Supabase Cloud, db push, migraciones, RLS, Vercel envs, DATABASE_URL, SMTP, usuarios reales, deploy, tag, merge, role-map, DB enum, construction-ops-1rqh, V5.7B, portal cliente, PDF presentacion, 6D ni librerias nuevas.
 
 ---
 
@@ -25,7 +36,7 @@
 
 ---
 
-## 2026-07-05 - P2C1_GANTT_VIEWPORT_CONTEXT - EN RAMA + PR, SIN MERGE
+## 2026-07-05 - P2C1_GANTT_VIEWPORT_CONTEXT - RELEASED (PR #63, merge e406839)
 
 - Worktree: D:/ICONIC/SOFTWARE PRESUPUESTOS/construction-ops-p2c1-gantt-context. Rama: feature/p2c1-gantt-viewport-context. Base: origin/main post P2B3 (3e96501, incluye steel #60). Sin merge, sin deploy, sin tag. UI + lectura ligera.
 - Viewport Gantt: la caja de scroll ahora es el propio .gantt-container de frappe via container_height NUMERICO (helper puro ganttContainerHeight: 72 + 34*barras + 18, clamp 240-560px). La barra horizontal queda pegada al borde inferior del viewport visible, sin bajar todo el grid. Se elimino el scroll anidado: wrapper de gantt-chart pasa a overflow-hidden (solo medicion de ancho para fit) y la shell pierde el max-h-[70vh] overflow-auto de la pestana Gantt.
