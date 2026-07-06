@@ -23,7 +23,7 @@ import {
   STEEL_EXT2_JSON_SCHEMA,
   STEEL_EXT2_SCHEMA_VERSION,
   validateSteelExt2Invariants,
-} from '@/lib/steel/research/steel-ext-2-schema';
+} from '@/lib/steel/structural-extraction-v2';
 
 const DXF = buildSyntheticFoundationDxf();
 

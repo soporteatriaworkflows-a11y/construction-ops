@@ -46,6 +46,8 @@ import { ManualCutPlanSection } from './manual-cut-plan-section';
 import { ManualOrderSection } from './manual-order-section';
 import { ManualExportSection } from './manual-export-section';
 import { ManualPdfIntakeSection } from './manual-pdf-intake-section';
+import { DxfIntakeSection } from './dxf-intake-section';
+import type { StructuralDrawingAnalysis } from '@/lib/steel/structural-drawing-analysis';
 
 function newLineId(): string {
   return `line-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
@@ -67,6 +69,8 @@ export function ManualTakeoffWorkspace({ takeoffId }: { takeoffId: string }) {
   const { takeoffs, hydrated } = useManualTakeoffs();
   const [planResult, setPlanResult] = useState<ManualCutPlanResult | null>(null);
   const [order, setOrder] = useState<ManualOrderDraft | null>(null);
+  // F8A: análisis F7 expuesto por la sección PDF para la comparación DXF↔PDF.
+  const [pdfAnalysis, setPdfAnalysis] = useState<StructuralDrawingAnalysis | null>(null);
 
   const takeoff = takeoffs.find((t) => t.id === takeoffId);
 
@@ -232,7 +236,12 @@ export function ManualTakeoffWorkspace({ takeoffId }: { takeoffId: string }) {
 
       <section className="mb-8" aria-label="Lectura asistida desde PDF o plano">
         <SectionTitle step={1} title="Lectura asistida desde PDF/plano (preview)" />
-        <ManualPdfIntakeSection disabled={!canEdit} onAddApproved={handleAddLines} />
+        <ManualPdfIntakeSection
+          disabled={!canEdit}
+          onAddApproved={handleAddLines}
+          onAnalysisChange={setPdfAnalysis}
+        />
+        <DxfIntakeSection disabled={!canEdit} pdfAnalysis={pdfAnalysis} onAddApproved={handleAddLines} />
       </section>
 
       <section className="mb-8" aria-label="Agregar líneas">

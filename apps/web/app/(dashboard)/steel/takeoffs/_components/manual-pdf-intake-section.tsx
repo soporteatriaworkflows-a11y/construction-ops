@@ -214,9 +214,12 @@ function shapeEditablePage(
 export function ManualPdfIntakeSection({
   disabled,
   onAddApproved,
+  onAnalysisChange,
 }: {
   disabled?: boolean;
   onAddApproved: (lines: readonly Omit<ManualLineRecord, 'id'>[]) => void;
+  /** F8A: expone el análisis F7 vigente para la comparación DXF ↔ PDF. */
+  onAnalysisChange?: (analysis: StructuralDrawingAnalysis | null) => void;
 }) {
   const [sources, setSources] = useState<PdfSourceState[]>([]);
   const [mentions, setMentions] = useState<readonly ElementMention[]>([]);
@@ -392,6 +395,7 @@ export function ManualPdfIntakeSection({
       technicalElementKeys: technicalElementKeysOf(analysisResult.registry),
     });
     setAnalysis(analysisResult);
+    onAnalysisChange?.(analysisResult);
     setCandidates(penalized);
     setHybridStats(comparison.stats);
     setMentions([...nativeResult.mentions, ...ocrMentions]);
@@ -449,17 +453,17 @@ export function ManualPdfIntakeSection({
     setHybridStats(null);
     // F7 sobre texto pegado: análisis textual degradado (sin coordenadas),
     // igual de honesto — nomenclatura, elementos y hallazgos siguen operando.
-    setAnalysis(
-      analyzeStructuralDrawings(
-        [
-          {
-            fileName: 'texto-pegado',
-            pages: [{ pageNumber: manualPage, included: true, nativeText: sourceText, method: 'manual' }],
-          },
-        ],
-        detected,
-      ),
+    const manualAnalysis = analyzeStructuralDrawings(
+      [
+        {
+          fileName: 'texto-pegado',
+          pages: [{ pageNumber: manualPage, included: true, nativeText: sourceText, method: 'manual' }],
+        },
+      ],
+      detected,
     );
+    setAnalysis(manualAnalysis);
+    onAnalysisChange?.(manualAnalysis);
     setHasDetected(true);
   }
 

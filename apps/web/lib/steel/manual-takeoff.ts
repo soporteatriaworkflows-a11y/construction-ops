@@ -37,8 +37,8 @@ import type { SteelPriceStatusView, SteelTakeoffStatusView } from './types';
 // Registros persistibles (solo INPUTS; todo lo derivado se recalcula con F1)
 // ---------------------------------------------------------------------------
 
-/** Método de lectura de la evidencia adjunta a una línea (F6E). */
-export type ManualLineEvidenceMethod = 'native_text' | 'ocr' | 'manual';
+/** Método de lectura de la evidencia adjunta a una línea (F6E; `dxf` = F8A). */
+export type ManualLineEvidenceMethod = 'native_text' | 'ocr' | 'manual' | 'dxf';
 
 /**
  * Evidencia de origen de una línea manual (F6E): fuente, página, tipo de
