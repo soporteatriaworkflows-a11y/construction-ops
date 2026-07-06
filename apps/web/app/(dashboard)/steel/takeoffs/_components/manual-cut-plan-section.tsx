@@ -5,21 +5,141 @@
  */
 'use client';
 
-import { Scissors } from 'lucide-react';
+import { useState } from 'react';
+import { Plus, Ruler, Scissors, X } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { InlineCallout } from '@/components/shared/inline-callout';
 import { computeOffcutSavings, groupBarsBySpec } from '@/lib/steel/domain-bridge';
 import { formatCop, formatDecimal } from '@/lib/steel/format';
-import type { ManualComputedLine, ManualCutPlanResult } from '@/lib/steel/manual-takeoff';
+import {
+  DEFAULT_COMMERCIAL_LENGTHS_M,
+  validateCommercialLengthInput,
+  type ManualComputedLine,
+  type ManualCutPlanResult,
+} from '@/lib/steel/manual-takeoff';
 import { SteelStatusBadge } from '../../_components/steel-status-badge';
+
+/**
+ * Editor de longitudes comerciales del takeoff (F7.1): chips + alta/baja con
+ * validación. El mercado cambia (proveedor/disponibilidad/desperdicio
+ * asumido), así que 6/9/12 es solo el default — no una constante.
+ */
+function CommercialLengthsEditor({
+  lengths,
+  canEdit,
+  onChange,
+}: {
+  lengths: readonly string[];
+  canEdit: boolean;
+  onChange: (next: readonly string[]) => void;
+}) {
+  const [draft, setDraft] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const isDefault =
+    lengths.length === DEFAULT_COMMERCIAL_LENGTHS_M.length &&
+    lengths.every((length, index) => length === DEFAULT_COMMERCIAL_LENGTHS_M[index]);
+
+  function handleAdd() {
+    const result = validateCommercialLengthInput(draft);
+    if (!result.ok) {
+      setError(result.reason);
+      return;
+    }
+    if (lengths.includes(result.lengthM)) {
+      setError(`La longitud ${result.lengthM} m ya está en la lista.`);
+      return;
+    }
+    setError(null);
+    setDraft('');
+    onChange([...lengths, result.lengthM].sort((a, b) => Number(a) - Number(b)));
+  }
+
+  function handleRemove(length: string) {
+    if (lengths.length <= 1) {
+      setError('Debe quedar al menos una longitud comercial disponible.');
+      return;
+    }
+    setError(null);
+    onChange(lengths.filter((l) => l !== length));
+  }
+
+  return (
+    <div className="mb-3 rounded-lg border border-iconic-soft-blue/40 p-3">
+      <h4 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-iconic-graphite/60">
+        <Ruler className="h-3.5 w-3.5" aria-hidden="true" />
+        Longitudes comerciales
+      </h4>
+      <p className="mt-1 text-[11px] text-iconic-graphite/60">
+        Longitudes de barra disponibles para el plan de corte y el pedido. Editables por takeoff:
+        hoy 6/9/12 m, mañana puede cambiar por proveedor, disponibilidad o decisión de asumir
+        desperdicio. Se guardan en este navegador.
+      </p>
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        {lengths.map((length) => (
+          <Badge key={length} variant="secondary" className="gap-1">
+            {formatDecimal(length)} m
+            {canEdit && (
+              <button
+                type="button"
+                onClick={() => handleRemove(length)}
+                aria-label={`Quitar longitud comercial ${length} m`}
+                className="ml-0.5 rounded hover:text-red-600"
+              >
+                <X className="h-3 w-3" aria-hidden="true" />
+              </button>
+            )}
+          </Badge>
+        ))}
+        {isDefault && <span className="text-[11px] text-iconic-graphite/50">(default del preview)</span>}
+      </div>
+      {canEdit && (
+        <div className="mt-2 flex flex-wrap items-end gap-2">
+          <div className="w-32">
+            <Label htmlFor="commercial-length-input">Agregar (m)</Label>
+            <Input
+              id="commercial-length-input"
+              type="number"
+              min="0.5"
+              step="0.5"
+              value={draft}
+              placeholder="7.5"
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  handleAdd();
+                }
+              }}
+              className="mt-1"
+            />
+          </div>
+          <Button type="button" size="sm" variant="outline" onClick={handleAdd}>
+            <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+            Agregar longitud
+          </Button>
+          {error && <p className="text-[11px] text-red-600">{error}</p>}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function ManualCutPlanSection({
   lines,
   planResult,
+  commercialLengths,
+  canEditLengths,
+  onChangeCommercialLengths,
   onGenerate,
 }: {
   lines: readonly ManualComputedLine[];
   planResult: ManualCutPlanResult | null;
+  commercialLengths: readonly string[];
+  canEditLengths: boolean;
+  onChangeCommercialLengths: (next: readonly string[]) => void;
   onGenerate: () => void;
 }) {
   const eligibleCount = lines.filter((l) => l.cutPlanEligible).length;
@@ -27,6 +147,12 @@ export function ManualCutPlanSection({
 
   return (
     <div>
+      <CommercialLengthsEditor
+        lengths={commercialLengths}
+        canEdit={canEditLengths}
+        onChange={onChangeCommercialLengths}
+      />
+
       <div className="mb-3 flex flex-wrap items-center gap-3">
         <Button type="button" onClick={onGenerate} disabled={eligibleCount === 0}>
           <Scissors className="h-4 w-4" aria-hidden="true" />
@@ -58,8 +184,9 @@ export function ManualCutPlanSection({
         <>
           <InlineCallout tone="info" className="mb-3">
             Optimización FFD (first-fit decreasing) con longitudes comerciales{' '}
-            {['6', '9', '12'].join(' / ')} m: heurística buena, no necesariamente el óptimo absoluto.
-            Desperdicio final del plan: {formatDecimal(planResult.plan.totalWasteM)} m.
+            {commercialLengths.map((l) => formatDecimal(l)).join(' / ')} m: heurística buena, no
+            necesariamente el óptimo absoluto. Desperdicio final del plan:{' '}
+            {formatDecimal(planResult.plan.totalWasteM)} m.
           </InlineCallout>
 
           {planResult.plan.rejectedCuts.length > 0 && (

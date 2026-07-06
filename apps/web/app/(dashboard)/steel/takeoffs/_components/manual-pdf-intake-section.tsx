@@ -15,7 +15,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { Check, Copy, FileText, Layers, ScanText, Search, Trash2, Undo2 } from 'lucide-react';
+import { Check, ClipboardCopy, Copy, FileText, Layers, ScanText, Search, Trash2, Undo2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -54,6 +54,7 @@ import {
   type OcrPageStatus,
   type PageCoverage,
 } from '@/lib/steel/pdf-ocr';
+import { detectOcrSymbolLoss } from '@/lib/steel/structural-review-findings';
 import {
   classifyPdfExtraction,
   isAcceptablePdfFile,
@@ -73,6 +74,8 @@ import {
   analyzeStructuralDrawings,
   elementKeyForCandidateLabel,
   findingsSummaryForElement,
+  penalizeTitleBlockCandidates,
+  technicalElementKeysOf,
   type DrawingAnalysisSourceInput,
   type StructuralDrawingAnalysis,
 } from '@/lib/steel/structural-drawing-analysis';
@@ -224,6 +227,7 @@ export function ManualPdfIntakeSection({
   const [candidates, setCandidates] = useState<readonly PdfIntakeCandidate[]>([]);
   const [hasDetected, setHasDetected] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copiedEvidenceId, setCopiedEvidenceId] = useState<string | null>(null);
   const nextSourceId = useRef(0);
   // Bytes del PDF por fuente (solo memoria, para renderizar la página al pedir OCR).
   const pdfBytes = useRef(new Map<string, ArrayBuffer>());
@@ -381,8 +385,14 @@ export function ManualPdfIntakeSection({
         ocrText: page.ocrText,
       })),
     }));
-    setAnalysis(analyzeStructuralDrawings(analysisSources, comparison.candidates));
-    setCandidates(comparison.candidates);
+    const analysisResult = analyzeStructuralDrawings(analysisSources, comparison.candidates);
+    // F7.1: candidatos nacidos en líneas de rótulo/dirección se penalizan con
+    // razón visible, salvo que el elemento tenga evidencia técnica real.
+    const penalized = penalizeTitleBlockCandidates(comparison.candidates, {
+      technicalElementKeys: technicalElementKeysOf(analysisResult.registry),
+    });
+    setAnalysis(analysisResult);
+    setCandidates(penalized);
     setHybridStats(comparison.stats);
     setMentions([...nativeResult.mentions, ...ocrMentions]);
     setHasDetected(true);
@@ -405,8 +415,35 @@ export function ManualPdfIntakeSection({
     }
   }
 
+  async function copyEvidence(candidate: PdfIntakeCandidate) {
+    // F7.1: trazabilidad copiable — fuente/página/tipo/método/confianza/fragmento.
+    const text = [
+      `Fragmento: "${candidate.evidence.originalText}"`,
+      `Linea completa: "${candidate.evidence.lineText}"`,
+      `Fuente: ${candidate.evidence.fileName ?? 'no disponible (texto pegado/manual)'}`,
+      `Pagina: ${candidate.evidence.pageNumber} · linea ${candidate.evidence.lineIndex + 1}`,
+      candidate.evidence.sourceType
+        ? `Tipo de fuente: ${PLAN_SOURCE_TYPE_LABEL[candidate.evidence.sourceType]}`
+        : undefined,
+      `Metodo: ${candidate.evidence.method === 'ocr' ? 'OCR' : candidate.evidence.fileName ? 'texto nativo' : 'texto pegado/manual'}`,
+      `Confianza: ${candidate.confidenceScore} (${candidate.confidenceReason})`,
+      `Regla de deteccion: ${candidate.evidence.detectionReason}`,
+    ]
+      .filter((part): part is string => Boolean(part))
+      .join('\n');
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedEvidenceId(candidate.id);
+      window.setTimeout(() => setCopiedEvidenceId(null), 2000);
+    } catch {
+      // Portapapeles bloqueado: la evidencia sigue visible en la tabla.
+    }
+  }
+
   function handleDetectManual() {
-    const detected = detectPdfIntakeCandidates(sourceText, { pageNumber: manualPage });
+    const detected = penalizeTitleBlockCandidates(
+      detectPdfIntakeCandidates(sourceText, { pageNumber: manualPage }),
+    );
     setCandidates(detected);
     setMentions([]);
     setHybridStats(null);
@@ -684,11 +721,37 @@ export function ManualPdfIntakeSection({
                                 disabled={disabled}
                                 aria-label={`Texto OCR de la pagina ${page.pageNumber} de ${source.fileName}`}
                               />
-                              {hasLostHashSuspicion(page.ocrText ?? '') && (
-                                <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400">
-                                  {OCR_LOST_HASH_WARNING}
-                                </p>
-                              )}
+                              {(() => {
+                                // F7.1: advertencias del # ESPECÍFICAS por lectura
+                                // (nativo vs OCR de esta página), no banner genérico.
+                                const losses = detectOcrSymbolLoss({
+                                  nativeLines: page.text
+                                    .split(/\r?\n/)
+                                    .filter((t) => t.trim().length > 0)
+                                    .map((t) => ({ text: t })),
+                                  ocrText: page.ocrText ?? '',
+                                  pageNumber: page.pageNumber,
+                                  sourceFileName: source.fileName,
+                                });
+                                if (losses.length > 0) {
+                                  return (
+                                    <ul className="mt-1 list-disc pl-4 text-[11px] text-amber-700 dark:text-amber-400">
+                                      {losses.map((loss) => (
+                                        <li key={loss.evidence.join('|')}>
+                                          {loss.evidence.join(' vs ')} — se mantiene la lectura nativa; corrige el
+                                          texto OCR si vas a usarlo.
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  );
+                                }
+                                // Sin texto nativo con qué comparar: pista general.
+                                return page.text.trim().length === 0 && hasLostHashSuspicion(page.ocrText ?? '') ? (
+                                  <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400">
+                                    {OCR_LOST_HASH_WARNING}
+                                  </p>
+                                ) : null;
+                              })()}
                             </div>
                           </div>
                         </details>
@@ -723,6 +786,11 @@ export function ManualPdfIntakeSection({
           <Badge variant={hybridStats.conflicts > 0 ? 'destructive' : 'secondary'}>
             Conflictos nativo/OCR: {hybridStats.conflicts}
           </Badge>
+          {hybridStats.symbolLossDiscarded > 0 && (
+            <Badge variant="warning">
+              Variantes # corruptas descartadas: {hybridStats.symbolLossDiscarded} (el nativo manda)
+            </Badge>
+          )}
         </div>
       )}
 
@@ -848,15 +916,17 @@ export function ManualPdfIntakeSection({
                     <td className="max-w-52 px-3 py-2 align-top text-xs">
                       <div className="flex flex-wrap gap-1">
                         <Badge variant={candidate.evidence.method === 'ocr' ? 'warning' : 'secondary'}>
-                          {candidate.evidence.method === 'ocr' ? 'OCR' : 'Texto nativo'}
+                          {candidate.evidence.method === 'ocr' ? 'OCR' : candidate.evidence.fileName ? 'Texto nativo' : 'Texto pegado/manual'}
                         </Badge>
                         {candidate.crossCheck === 'confirmed_by_ocr' && <Badge variant="success">Confirmado por OCR</Badge>}
                         {candidate.crossCheck === 'conflict' && <Badge variant="destructive">Conflicto nativo/OCR</Badge>}
                       </div>
-                      {candidate.evidence.fileName && (
+                      {candidate.evidence.fileName ? (
                         <p className="mt-1 truncate font-medium text-iconic-graphite/70" title={candidate.evidence.fileName}>
                           {candidate.evidence.fileName}
                         </p>
+                      ) : (
+                        <p className="mt-1 text-iconic-graphite/50">Fuente no disponible (texto pegado/manual)</p>
                       )}
                       <p>
                         Pag. {candidate.evidence.pageNumber}, linea {candidate.evidence.lineIndex + 1}
@@ -873,6 +943,17 @@ export function ManualPdfIntakeSection({
                       <p className="mt-1 text-[11px] text-iconic-graphite/50">
                         {candidate.evidence.detectionReason}
                       </p>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="mt-1 h-6 px-1.5 text-[11px]"
+                        onClick={() => void copyEvidence(candidate)}
+                        aria-label={`Copiar evidencia de ${candidate.evidence.originalText}`}
+                      >
+                        <ClipboardCopy className="h-3 w-3" aria-hidden="true" />
+                        {copiedEvidenceId === candidate.id ? 'Copiada' : 'Copiar evidencia'}
+                      </Button>
                     </td>
                     <td className="px-3 py-2 align-top">
                       <Badge variant={CONFIDENCE_VARIANT[candidate.confidenceLevel]}>

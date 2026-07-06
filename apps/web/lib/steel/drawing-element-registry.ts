@@ -14,7 +14,7 @@
  * revisión honestos (completo / falta_ubicacion / falta_refuerzo / conflicto /
  * requiere_revision). No calcula nada; no aprueba nada.
  */
-import type { PageRegionType } from './drawing-page-regions';
+import { classifyTitleBlockNoise, TITLE_BLOCK_NOISE_REASON, type PageRegionType } from './drawing-page-regions';
 import { normalizeDrawingText, type SpatialBBox, type SpatialTextMethod } from './drawing-spatial-model';
 
 // ---------------------------------------------------------------------------
@@ -96,6 +96,35 @@ function kindFromPrefix(prefix: string): ElementKind | undefined {
 /** Códigos de eje puros ("EJE A", "EJE 1"): ubicación, no elemento. */
 const PURE_AXIS_PATTERN = /^EJES?[-\s][A-Z0-9]{1,3}$/;
 
+/**
+ * Prefijos que NUNCA son elementos estructurales: ejes, nomenclatura urbana
+ * (CRA 55, CLL 14, AV 3), teléfonos/NIT, escala y numeración de plano.
+ * Evita que "CALLE 14 ... ENTRE CARRERAS 55 Y 56" contamine el elementKey.
+ */
+const FORBIDDEN_ELEMENT_PREFIXES = new Set([
+  'EJE',
+  'EJES',
+  'CRA',
+  'CLL',
+  'KR',
+  'KRA',
+  'AV',
+  'AVE',
+  'DG',
+  'TV',
+  'TEL',
+  'CEL',
+  'NIT',
+  'ESC',
+  'NO',
+  'N',
+  'LOTE',
+  'MZ',
+  'CASA',
+  'AÑO',
+  'ANO',
+]);
+
 const ELEMENT_WORDS_SOURCE = Object.keys(ELEMENT_WORD_KIND).join('|');
 
 const MENTION_RULES: readonly MentionRule[] = [
@@ -163,14 +192,22 @@ const MENTION_RULES: readonly MentionRule[] = [
       const suffix = (m[4] ?? '').toUpperCase();
       if (!prefix || !digits) return undefined;
       const raw = (m[0] ?? '').trim();
-      // Sin palabra de elemento, un código pegado tipo "Z1"/"C2" o un prefijo
-      // de una letra es demasiado ambiguo (¿zona?, ¿nota?): solo se acepta
-      // pegado/una letra cuando la palabra confirma (ZAPATA Z1). Los códigos
-      // con separador y prefijo ≥2 letras (VC-01, VC 01) sí son elementos.
-      const hasSeparator = /[-.\s]/.test(raw.replace(word ?? '', '').trim());
-      if (!word && (!hasSeparator || prefix.length < 2)) return undefined;
+      // Sin palabra de elemento, un código pegado tipo "Z1"/"C2" es demasiado
+      // ambiguo (¿zona?, ¿nota?): solo se acepta pegado cuando la palabra
+      // confirma (ZAPATA Z1). Con separador: prefijo ≥2 letras (VC-01, VC 01)
+      // siempre; prefijo de UNA letra solo con GUION y prefijo estructural
+      // conocido (Z-01, P-03, C-02) — "A-1" (eje) o "Y 5" siguen fuera.
+      const codeOnly = raw.replace(word ?? '', '').trim();
+      const hasSeparator = /[-.\s]/.test(codeOnly);
+      if (!word) {
+        if (prefix.length < 2) {
+          if (!codeOnly.includes('-') || !PREFIX_KIND[prefix]) return undefined;
+        } else if (!hasSeparator) {
+          return undefined;
+        }
+      }
       if (PURE_AXIS_PATTERN.test(canonicalKey(raw))) return undefined;
-      if (prefix === 'EJE' || prefix === 'EJES') return undefined;
+      if (FORBIDDEN_ELEMENT_PREFIXES.has(prefix)) return undefined;
       return {
         rawLabel: raw,
         elementKey: `${prefix}-${digits}${suffix}`,
@@ -179,6 +216,43 @@ const MENTION_RULES: readonly MentionRule[] = [
     },
   },
 ];
+
+// ---------------------------------------------------------------------------
+// Secciones (50x60) — evidencia del elemento, JAMÁS parte del elementKey
+// ---------------------------------------------------------------------------
+
+export interface SectionSpecMatch {
+  /** Prefijo asociado si viene pegado ("VC-(50x60)" ⇒ VC). */
+  prefix?: string;
+  /** Sección normalizada "50x60". */
+  section: string;
+  rawText: string;
+}
+
+/** VC-(50x60) · VC (50X60) · 50x60 suelto — dimensiones de sección. */
+const SECTION_SPEC_PATTERN = /(?:\b([A-ZÑ]{1,4})[-\s]*)?\(?\b(\d{2,3})\s*[X×]\s*(\d{2,3})\b\)?/g;
+
+/**
+ * Extrae especificaciones de sección de una línea. "VC-2 VC-(50x60)" produce
+ * la sección 50x60 asociada al prefijo VC: es EVIDENCIA de sección del
+ * elemento VC-2, no un elemento "VC-50" ni parte del código.
+ */
+export function extractSectionSpecs(lineText: string): SectionSpecMatch[] {
+  const normalized = normalizeDrawingText(lineText);
+  const sections: SectionSpecMatch[] = [];
+  SECTION_SPEC_PATTERN.lastIndex = 0;
+  for (const match of normalized.matchAll(SECTION_SPEC_PATTERN)) {
+    const width = match[2];
+    const height = match[3];
+    if (!width || !height) continue;
+    sections.push({
+      prefix: match[1]?.toUpperCase(),
+      section: `${width}x${height}`,
+      rawText: (match[0] ?? '').trim(),
+    });
+  }
+  return sections;
+}
 
 /**
  * Extrae TODAS las menciones de elementos de una línea con la nomenclatura
@@ -217,6 +291,15 @@ export interface ElementSourceMention {
   lineText: string;
   method: SpatialTextMethod;
   regionType?: PageRegionType;
+  /** Título de la región donde aparece ("DETALLE VC-01", "CUADRO DE…"). */
+  regionTitle?: string;
+  /** Tabla detectada a la que pertenece la línea, si alguna. */
+  tableId?: string;
+  /** Sección "50x60" vista en la MISMA línea con prefijo compatible. */
+  sectionSpec?: string;
+  /** true si la línea parece rótulo/metadato (dirección, ING., escala…). */
+  titleBlockNoise?: boolean;
+  noiseReason?: string;
   bbox?: SpatialBBox;
 }
 
@@ -240,17 +323,30 @@ export interface ElementRecord {
   /** Etiqueta más descriptiva vista. */
   displayLabel: string;
   kind?: ElementKind;
+  /** Sección vista junto al código ("50x60") — evidencia, no parte del key. */
+  sectionSpec?: string;
   /** Formas distintas vistas del mismo código (variantes tipográficas). */
   aliases: readonly string[];
   sourceMentions: readonly ElementSourceMention[];
   /** Tipos de región donde el elemento aparece (evidencia disponible). */
   evidenceTypes: readonly PageRegionType[];
+  /** Ejes cercanos sugeridos por la grilla (contexto, no dato del plano). */
+  nearbyAxisLabels: readonly string[];
+  /** Títulos de detalles/cortes donde el elemento aparece mencionado. */
+  detailReferences: readonly string[];
+  /** Ids de tablas detectadas donde el elemento aparece. */
+  tableReferences: readonly string[];
   /** Qué evidencia falta, en lenguaje humano. */
   missingEvidence: readonly string[];
   /** Conflictos declarados por quien construye el registro (no se resuelven). */
   conflicts: readonly string[];
   /** Claves que PARECEN el mismo elemento (VC-1 vs VC-01): aviso, no fusión. */
   similarElementKeys: readonly string[];
+  /**
+   * true si TODAS las menciones parecen rótulo/metadato (dirección, ING.,
+   * escala): el "elemento" probablemente es el nombre del plano.
+   */
+  suspectedTitleBlockOnly: boolean;
   reviewStatus: ElementReviewStatus;
   reviewStatusReason: string;
 }
@@ -282,6 +378,8 @@ export interface BuildElementRegistryInput {
   conflictsByKey?: ReadonlyMap<string, readonly string[]>;
   /** Claves con contexto de ubicación derivado de la grilla (F7B). */
   keysWithGridLocation?: ReadonlySet<string>;
+  /** Etiquetas de ejes cercanos por clave (contexto sugerido F7B). */
+  axisContextByKey?: ReadonlyMap<string, readonly string[]>;
 }
 
 const LOCATION_REGIONS: readonly PageRegionType[] = ['plan_grid'];
@@ -312,8 +410,30 @@ export function buildElementRegistry(input: BuildElementRegistryInput): ElementR
           .map((m) => extractElementMentions(m.rawLabel).find((e) => e.elementKey === elementKey)?.kind)
           .filter((k): k is ElementKind => k !== undefined),
       );
+
+      // F7.1: separar menciones TÉCNICAS de menciones de rótulo/metadato.
+      // "VC-2 … CALLE 14 ENTRE CARRERAS 55 Y 56" nombra el plano, no aporta
+      // evidencia técnica; si el código también aparece en región técnica,
+      // esa evidencia manda y el elemento se conserva con normalidad.
+      const isNoiseMention = (m: ElementSourceMention): boolean =>
+        m.titleBlockNoise === true ||
+        m.regionType === 'title_block' ||
+        classifyTitleBlockNoise(m.lineText).noise;
+      const technicalMentions = mentions.filter((m) => !isNoiseMention(m));
+      const suspectedTitleBlockOnly = technicalMentions.length === 0;
+      const evidenceMentions = suspectedTitleBlockOnly ? [] : technicalMentions;
+
       const evidenceTypes = [...new Set(
-        mentions.map((m) => m.regionType).filter((r): r is PageRegionType => r !== undefined),
+        evidenceMentions.map((m) => m.regionType).filter((r): r is PageRegionType => r !== undefined),
+      )];
+      const sectionSpec = mentions.map((m) => m.sectionSpec).find((s): s is string => Boolean(s));
+      const detailReferences = [...new Set(
+        evidenceMentions
+          .filter((m) => m.regionType === 'detail' && m.regionTitle)
+          .map((m) => m.regionTitle!),
+      )];
+      const tableReferences = [...new Set(
+        evidenceMentions.map((m) => m.tableId).filter((t): t is string => Boolean(t)),
       )];
 
       const hasGridLocation = input.keysWithGridLocation?.has(elementKey) ?? false;
@@ -322,18 +442,18 @@ export function buildElementRegistry(input: BuildElementRegistryInput): ElementR
       const hasLocationEvidence =
         hasGridLocation ||
         evidenceTypes.some((r) => LOCATION_REGIONS.includes(r)) ||
-        mentions.some((m) => /\bEJES?\s+[A-Z0-9]{1,3}\b/.test(normalizeDrawingText(m.lineText)));
+        evidenceMentions.some((m) => /\bEJES?\s+[A-Z0-9]{1,3}\b/.test(normalizeDrawingText(m.lineText)));
       const hasSteel = input.keysWithSteelCandidates?.has(elementKey) ?? false;
       const hasReinforcementEvidence =
         hasSteel || evidenceTypes.some((r) => REINFORCEMENT_REGIONS.includes(r));
 
       const missingEvidence: string[] = [];
-      if (!hasLocationEvidence) {
+      if (!suspectedTitleBlockOnly && !hasLocationEvidence) {
         missingEvidence.push(
           'Ubicacion: el elemento no aparece en planta/grilla ni junto a un eje; vincula la fuente de ubicacion.',
         );
       }
-      if (!hasReinforcementEvidence) {
+      if (!suspectedTitleBlockOnly && !hasReinforcementEvidence) {
         missingEvidence.push(
           'Refuerzo: no hay despiece, tabla ni candidato de acero asociado a este elemento.',
         );
@@ -348,7 +468,10 @@ export function buildElementRegistry(input: BuildElementRegistryInput): ElementR
 
       let reviewStatus: ElementReviewStatus;
       let reviewStatusReason: string;
-      if (conflicts.length > 0) {
+      if (suspectedTitleBlockOnly) {
+        reviewStatus = 'requiere_revision';
+        reviewStatusReason = `${TITLE_BLOCK_NOISE_REASON} Todas las menciones de este codigo parecen rotulado/metadato (direccion, responsables, escala); confirma si es un elemento real o el nombre del plano.`;
+      } else if (conflicts.length > 0) {
         reviewStatus = 'conflicto';
         reviewStatusReason = conflicts[0]!;
       } else if (!hasReinforcementEvidence) {
@@ -357,7 +480,7 @@ export function buildElementRegistry(input: BuildElementRegistryInput): ElementR
       } else if (!hasLocationEvidence) {
         reviewStatus = 'falta_ubicacion';
         reviewStatusReason = 'Con refuerzo pero sin evidencia de ubicacion (planta/ejes).';
-      } else if (mentions.every((m) => m.method === 'ocr')) {
+      } else if (evidenceMentions.every((m) => m.method === 'ocr')) {
         reviewStatus = 'requiere_revision';
         reviewStatusReason = 'Toda la evidencia proviene de OCR: verificar contra el plano original.';
       } else {
@@ -369,12 +492,17 @@ export function buildElementRegistry(input: BuildElementRegistryInput): ElementR
         elementKey,
         displayLabel,
         kind: kinds.size === 1 ? [...kinds][0] : undefined,
+        sectionSpec,
         aliases,
         sourceMentions: mentions,
         evidenceTypes,
+        nearbyAxisLabels: input.axisContextByKey?.get(elementKey) ?? [],
+        detailReferences,
+        tableReferences,
         missingEvidence,
         conflicts,
         similarElementKeys: findSimilarKeys(elementKey, allKeys),
+        suspectedTitleBlockOnly,
         reviewStatus,
         reviewStatusReason,
       };

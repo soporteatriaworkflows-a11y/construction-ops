@@ -13,7 +13,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Check, EyeOff, Link2, Microscope, Undo2 } from 'lucide-react';
+import { Check, ClipboardCopy, EyeOff, Link2, Microscope, Undo2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
@@ -29,6 +29,7 @@ import {
   type StructuralFindingSeverity,
 } from '@/lib/steel/structural-review-findings';
 import type { StructuralDrawingAnalysis } from '@/lib/steel/structural-drawing-analysis';
+import { ExternalExtractionSection } from './external-extraction-section';
 
 const SEVERITY_LABEL: Record<StructuralFindingSeverity, string> = {
   critical: 'Critico',
@@ -56,6 +57,12 @@ const REGION_VARIANT: Partial<Record<PageRegionType, 'success' | 'warning' | 'se
 
 type FindingReviewState = 'pendiente' | 'revisado' | 'ignorado';
 
+/** Fuente visible SIEMPRE: nombre+página o "fuente no disponible" (nunca vacío). */
+function formatSource(fileName: string | undefined, pageNumber: number | undefined): string {
+  if (pageNumber === undefined && !fileName) return 'Fuente no disponible';
+  return `${fileName ?? 'fuente no disponible'}${pageNumber !== undefined ? ` · p.${pageNumber}` : ''}`;
+}
+
 export function StructuralReviewPanel({
   analysis,
   disabled,
@@ -65,6 +72,28 @@ export function StructuralReviewPanel({
 }) {
   const [reviewState, setReviewState] = useState<Record<string, FindingReviewState>>({});
   const [manualLinks, setManualLinks] = useState<Record<string, string>>({});
+  const [copiedFindingId, setCopiedFindingId] = useState<string | null>(null);
+
+  async function copyFindingEvidence(finding: StructuralFinding) {
+    const text = [
+      `Hallazgo: ${STRUCTURAL_FINDING_TYPE_LABEL[finding.type]} (${finding.severity})`,
+      finding.elementKey ? `Elemento: ${finding.elementKey}` : undefined,
+      `Fuente: ${formatSource(finding.sourceFileName, finding.pageNumber)}`,
+      `Explicacion: ${finding.explanation}`,
+      ...finding.evidence.map((item) => `Evidencia: ${item}`),
+      `Accion sugerida: ${finding.suggestedAction}`,
+      `Confianza: ${finding.confidence}`,
+    ]
+      .filter((part): part is string => Boolean(part))
+      .join('\n');
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedFindingId(finding.id);
+      window.setTimeout(() => setCopiedFindingId(null), 2000);
+    } catch {
+      // Portapapeles bloqueado: la evidencia sigue visible en pantalla.
+    }
+  }
 
   const findingState = (finding: StructuralFinding): FindingReviewState =>
     reviewState[finding.id] ?? 'pendiente';
@@ -171,10 +200,18 @@ export function StructuralReviewPanel({
               </thead>
               <tbody className="divide-y divide-iconic-soft-blue/20">
                 {analysis.registry.map((record) => (
-                  <tr key={record.elementKey}>
+                  <tr key={record.elementKey} className={record.suspectedTitleBlockOnly ? 'opacity-70' : undefined}>
                     <td className="px-2 py-1.5 align-top">
                       <span className="font-medium">{record.displayLabel}</span>
                       {record.kind && <span className="ml-1 text-iconic-graphite/50">({record.kind})</span>}
+                      {record.sectionSpec && (
+                        <Badge variant="secondary" className="ml-1">Seccion {record.sectionSpec}</Badge>
+                      )}
+                      {record.suspectedTitleBlockOnly && (
+                        <p className="mt-0.5 text-[11px] text-amber-700 dark:text-amber-400">
+                          Posible rotulo / metadato del plano (direccion, responsables, escala).
+                        </p>
+                      )}
                       {record.similarElementKeys.length > 0 && (
                         <p className="mt-0.5 text-[11px] text-amber-700 dark:text-amber-400">
                           Parecido a {record.similarElementKeys.join(', ')} — no se fusiona automaticamente.
@@ -183,10 +220,19 @@ export function StructuralReviewPanel({
                     </td>
                     <td className="px-2 py-1.5 align-top text-iconic-graphite/70">
                       {record.aliases.join(' · ')}
-                      <p className="text-[11px] text-iconic-graphite/50">
-                        {record.sourceMentions.length} mencion(es) en{' '}
-                        {[...new Set(record.sourceMentions.map((m) => `p.${m.pageNumber}`))].join(', ')}
-                      </p>
+                      <ul className="mt-0.5 space-y-0.5 text-[11px] text-iconic-graphite/50">
+                        {record.sourceMentions.slice(0, 4).map((m, i) => (
+                          <li key={`${m.lineId ?? i}-${m.pageNumber}`}>
+                            {formatSource(m.sourceFileName, m.pageNumber)}
+                            {m.regionType ? ` · ${PAGE_REGION_TYPE_LABEL[m.regionType]}` : ''}
+                            {` · ${m.method === 'ocr' ? 'OCR' : m.method === 'manual' ? 'manual' : 'nativo'}`}
+                            {m.titleBlockNoise ? ' · ⚠ rotulo' : ''}
+                          </li>
+                        ))}
+                        {record.sourceMentions.length > 4 && (
+                          <li>… y {record.sourceMentions.length - 4} mencion(es) mas</li>
+                        )}
+                      </ul>
                     </td>
                     <td className="px-2 py-1.5 align-top">
                       <div className="flex flex-wrap gap-1">
@@ -195,7 +241,20 @@ export function StructuralReviewPanel({
                             {PAGE_REGION_TYPE_LABEL[type]}
                           </Badge>
                         ))}
+                        {record.nearbyAxisLabels.length > 0 && (
+                          <Badge variant="default">Ejes cercanos: {record.nearbyAxisLabels.join(', ')}</Badge>
+                        )}
                       </div>
+                      {record.detailReferences.length > 0 && (
+                        <p className="mt-0.5 text-[11px] text-iconic-graphite/50">
+                          Detalles: {record.detailReferences.join(' · ')}
+                        </p>
+                      )}
+                      {record.tableReferences.length > 0 && (
+                        <p className="mt-0.5 text-[11px] text-iconic-graphite/50">
+                          Tablas: {record.tableReferences.join(' · ')}
+                        </p>
+                      )}
                       {record.missingEvidence.map((missing) => (
                         <p key={missing} className="mt-0.5 text-[11px] text-amber-700 dark:text-amber-400">
                           {missing}
@@ -284,11 +343,9 @@ export function StructuralReviewPanel({
                     {(finding.elementKey ?? linkedKey) && (
                       <Badge variant="default">{finding.elementKey ?? linkedKey}</Badge>
                     )}
-                    {finding.pageNumber !== undefined && (
-                      <span className="text-iconic-graphite/50">
-                        {finding.sourceFileName ? `${finding.sourceFileName} · ` : ''}p.{finding.pageNumber}
-                      </span>
-                    )}
+                    <span className="text-iconic-graphite/50">
+                      {formatSource(finding.sourceFileName, finding.pageNumber)}
+                    </span>
                     {finding.blockingForApproval && state === 'pendiente' && (
                       <Badge variant="destructive">Resolver antes de aprobar</Badge>
                     )}
@@ -318,6 +375,16 @@ export function StructuralReviewPanel({
                     >
                       <Check className="h-3.5 w-3.5" aria-hidden="true" />
                       Marcar revisado
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => void copyFindingEvidence(finding)}
+                      disabled={disabled}
+                    >
+                      <ClipboardCopy className="h-3.5 w-3.5" aria-hidden="true" />
+                      {copiedFindingId === finding.id ? 'Evidencia copiada' : 'Copiar evidencia'}
                     </Button>
                     <Button
                       type="button"
@@ -369,6 +436,8 @@ export function StructuralReviewPanel({
           </ul>
         )}
       </div>
+
+      <ExternalExtractionSection analysis={analysis} disabled={disabled} />
 
       <p className="mt-3 text-[11px] text-iconic-graphite/50">
         F7 no produce cantidades, metros ni costos: detecta contexto, faltantes y contradicciones

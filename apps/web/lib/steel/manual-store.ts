@@ -65,6 +65,16 @@ function parseLine(raw: unknown): ManualLineRecord | undefined {
   };
 }
 
+/** Longitudes comerciales F7.1: solo strings numéricos > 0; corruptos se descartan. */
+function parseCommercialLengths(raw: unknown): readonly string[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const lengths = raw.filter(
+    (value): value is string =>
+      typeof value === 'string' && Number.isFinite(Number(value)) && Number(value) > 0,
+  );
+  return lengths.length > 0 ? lengths : undefined;
+}
+
 function parseTakeoff(raw: unknown): ManualTakeoffRecord | undefined {
   if (typeof raw !== 'object' || raw === null) return undefined;
   const takeoff = raw as Record<string, unknown>;
@@ -83,6 +93,7 @@ function parseTakeoff(raw: unknown): ManualTakeoffRecord | undefined {
     status,
     createdAt: typeof takeoff.createdAt === 'string' ? takeoff.createdAt : '',
     lines,
+    commercialLengthsM: parseCommercialLengths(takeoff.commercialLengthsM),
   };
 }
 

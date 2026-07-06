@@ -111,6 +111,70 @@ const REGION_ANCHOR_RULES: readonly RegionAnchorRule[] = [
 const TITLE_BLOCK_PATTERN =
   /\bESC(?:ALA)?\.?\s*1\s*:\s*\d+|\bPROYECTO\b|\bDIBUJ[OÓ]\b|\bREVIS[OÓ]\b|\bAPROB[OÓ]\b|\bFECHA\b|\bPLANO\s*(?:No\.?|N[°º])|\bCONTIENE\b|\bPROPIETARIO\b|\bING\.\s|\bARQ\.\s/i;
 
+// ---------------------------------------------------------------------------
+// Ruido de rótulo / metadato del plano (F7.1)
+// ---------------------------------------------------------------------------
+
+/** Frase canónica visible cuando un texto se clasifica como rótulo/metadato. */
+export const TITLE_BLOCK_NOISE_REASON =
+  'Texto descartado como posible rótulo / metadato del plano.';
+
+interface NoiseRule {
+  pattern: RegExp;
+  detail: string;
+}
+
+/**
+ * Señales de que una LÍNEA pertenece al rótulo/metadatos y no a información
+ * técnica: responsables (ING./ARQ./DIBUJÓ), direcciones (CALLE/CARRERA/CRA),
+ * escala/fecha/número de plano/propietario/revisión. Los planos reales traen
+ * cosas como "VC-7 ING. MARIO ..." o "VC-2 VC-(50x60) CALLE 14 OESTE ENTRE
+ * CARRERAS 55 Y 56": el código del elemento es real, pero la línea es el
+ * NOMBRE del plano, no un dato técnico.
+ */
+const TITLE_BLOCK_NOISE_RULES: readonly NoiseRule[] = [
+  {
+    pattern: /\b(?:ING|ARQ)\.?\s+[A-ZÁÉÍÓÚÑ]{2,}|\b(?:INGENIER[OA]|ARQUITECT[OA])\b/i,
+    detail: 'nombre de responsable profesional (ING./ARQ.)',
+  },
+  {
+    pattern: /\b(?:DIBUJ[OÓ]|DISEÑ[OÓ]|REVIS[OÓ]|APROB[OÓ]|CALCUL[OÓ]|INTERVENTOR|PROPIETARIO|CONSTRUCTOR[A]?)\b/i,
+    detail: 'campo de responsables del rotulado',
+  },
+  {
+    pattern: /\b(?:CALLE|CARRERA|CRA|CLL|KRA?|AVENIDA|AV|DIAGONAL|DG|TRANSVERSAL|TV)\.?\s*\d+[A-Z]?\b|\bENTRE\s+(?:CALLES?|CARRERAS?)\b|\b(?:BARRIO|MUNICIPIO|VEREDA|LOTE|MANZANA|MZ)\b/i,
+    detail: 'dirección / ubicación urbana (calle, carrera, barrio…)',
+  },
+  {
+    pattern: /\bESC(?:ALA)?\.?\s*1\s*:\s*\d+/i,
+    detail: 'escala anotada del rotulado',
+  },
+  {
+    pattern: /\bFECHA\b|\bPLANO\s*(?:No\.?|N[°º])|\bLAMINA\b|\bHOJA\s+\d+\s+DE\s+\d+|\bREVISI[OÓ]N\b|\bVERSI[OÓ]N\b/i,
+    detail: 'metadato de plano (fecha, número de lámina, revisión)',
+  },
+];
+
+export interface TitleBlockNoiseCheck {
+  noise: boolean;
+  /** Frase canónica + detalle del patrón que disparó la clasificación. */
+  reason?: string;
+}
+
+/**
+ * Clasifica si un texto parece rótulo/metadato del plano. NO elimina nada:
+ * quien la usa penaliza (advertencia + revisión) y conserva la evidencia.
+ * Un elemento que además aparece en región técnica NUNCA se pierde por esto.
+ */
+export function classifyTitleBlockNoise(text: string): TitleBlockNoiseCheck {
+  for (const rule of TITLE_BLOCK_NOISE_RULES) {
+    if (rule.pattern.test(text)) {
+      return { noise: true, reason: `${TITLE_BLOCK_NOISE_REASON} Señal: ${rule.detail}.` };
+    }
+  }
+  return { noise: false };
+}
+
 /** Señales de llamado de acero: notación de despiece o separaciones. */
 const REINFORCEMENT_PATTERN = /#\s*\d{1,2}|@\s*\d|\bESTRIBOS?\b|\bFLEJES?\b|\bVARILLAS?\b|\bREFUERZO\b/i;
 
@@ -259,6 +323,25 @@ function classifyWithLayout(page: SpatialPage): PageRegionResult {
     });
   }
 
+  // 2b. Ruido de rótulo fuera de la zona típica: responsables, direcciones y
+  //     metadatos también viven en franjas laterales o títulos del plano.
+  const noiseLines = page.lines.filter(
+    (line) => !assigned.has(line.lineId) && classifyTitleBlockNoise(line.normalizedText).noise,
+  );
+  if (noiseLines.length > 0) {
+    noiseLines.forEach((line) => assigned.add(line.lineId));
+    regions.push({
+      regionId: nextId(),
+      pageNumber: page.pageNumber,
+      sourceFileName: page.sourceFileName,
+      regionType: 'title_block',
+      bbox: unionBBox(noiseLines.map((l) => l.bbox).filter((b): b is SpatialBBox => b !== undefined)),
+      lineIds: noiseLines.map((l) => l.lineId),
+      reason: `${noiseLines.length} línea(s) con señales de rótulo/metadato (responsables, dirección, escala, fecha) fuera de la zona típica.`,
+      confidence: 'media',
+    });
+  }
+
   // 3. Etiquetas de eje sueltas: tokens cortos aislados (A, B, 1, 2…) son
   //    contexto de planta/grilla, no ruido. Se cuentan TOKENS (varias
   //    burbujas de una banda comparten renglón).
@@ -342,6 +425,14 @@ function classifySequential(page: SpatialPage): PageRegionResult {
     if (rule) {
       flush();
       current = { type: rule.type, title: line.text, reason: `Ancla "${line.text}" (${rule.reason})`, lineIds: [line.lineId] };
+      continue;
+    }
+    // Ruido de rótulo en modo secuencial: bloque title_block propio, para que
+    // el registro de elementos pueda penalizarlo aunque no haya coordenadas.
+    if (classifyTitleBlockNoise(line.normalizedText).noise) {
+      flush();
+      current = { type: 'title_block', reason: 'Señales de rótulo/metadato del plano', lineIds: [line.lineId] };
+      flush();
       continue;
     }
     if (!current) {

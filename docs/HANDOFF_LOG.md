@@ -3,17 +3,28 @@
 ## 2026-07-05 - P2C1_GANTT_VIEWPORT_CONTEXT - EN RAMA + PR, SIN MERGE
 
 - Worktree: D:/ICONIC/SOFTWARE PRESUPUESTOS/construction-ops-p2c1-gantt-context. Rama: feature/p2c1-gantt-viewport-context. Base: origin/main post P2B3 (3e96501, incluye steel #60). Sin merge, sin deploy, sin tag. UI + lectura ligera.
-- Viewport Gantt: la caja de scroll ahora es el propio .gantt-container de frappe via container_height NUMERICO (helper puro ganttContainerHeight: 72 + 34*barras + 18, clamp 240-560px) — la barra horizontal queda pegada al borde inferior del viewport visible, sin bajar todo el grid. Se elimino el scroll anidado: wrapper de gantt-chart pasa a overflow-hidden (solo medicion de ancho para fit) y la shell pierde el max-h-[70vh] overflow-auto de la pestania Gantt.
+- Viewport Gantt: la caja de scroll ahora es el propio .gantt-container de frappe via container_height NUMERICO (helper puro ganttContainerHeight: 72 + 34*barras + 18, clamp 240-560px). La barra horizontal queda pegada al borde inferior del viewport visible, sin bajar todo el grid. Se elimino el scroll anidado: wrapper de gantt-chart pasa a overflow-hidden (solo medicion de ancho para fit) y la shell pierde el max-h-[70vh] overflow-auto de la pestana Gantt.
 - Leyenda/controles: quedan fuera del area scrolleable por construccion (la leyenda ya se renderizaba despues del wrapper; al quitar el scroll externo queda abajo y fija).
-- Header contexto: breadcrumb "Proyecto {link} · Alcance: {nombre|Alcance no definido} · Presupuesto: {nombre · vN | No disponible}" + acciones "Ver proyecto" (siempre, schedule.projectId) y "Ver presupuesto" (solo con cadena completa; ruta workspace con estimateId REAL de estimates, no versionId). SOLO nombres y navegacion, sin montos: client-safe.
-- Lectura: PlanningRepository.getScheduleContext (UNA consulta anidada RLS-bound version→estimate→scope→project, patron loadGeneratorSource) + getScheduleContextForViewer en service que NUNCA lanza (fallo ⇒ null ⇒ fallback amable). Secuencial, disciplina P0B.
+- Header contexto: breadcrumb "Proyecto {link} - Alcance: {nombre|Alcance no definido} - Presupuesto: {nombre vN | No disponible}" + acciones "Ver proyecto" (siempre, schedule.projectId) y "Ver presupuesto" (solo con cadena completa; ruta workspace con estimateId REAL de estimates, no versionId). SOLO nombres y navegacion, sin montos: client-safe.
+- Lectura: PlanningRepository.getScheduleContext (UNA consulta anidada RLS-bound version -> estimate -> scope -> project, patron loadGeneratorSource) + getScheduleContextForViewer en service que NUNCA lanza (fallo => null => fallback amable). Secuencial, disciplina P0B.
 - Sin drag/resize de barras, sin heuristicas/alertas de duracion, sin indicador global (P2C2/P2C4); sin cambios de permisos ni datos nuevos a consulta.
 - Tests: gantt-ux-static actualizado (container_height reemplaza max-h-[65vh]; leyenda tras el contenedor) + 2 bloques P2C1 (viewport sin scroll anidado; header/fallbacks/select solo-nombres) + 3 unit tests ganttContainerHeight.
 - Restricciones: sin Supabase Cloud, db push, migraciones, RLS, Vercel envs, DATABASE_URL, SMTP, usuarios reales, deploy, tag, merge, role-map, DB enum, construction-ops-1rqh, V5.7B, portal cliente, PDF presentacion, 6D ni librerias nuevas.
 
 ---
+## 2026-07-05 - STEEL_OPS_F8_AEC_EXTRACTION_ENGINE_SPIKE - EN RAMA + PR, SIN MERGE - Fable
 
-## 2026-07-05 - P2B3_GANTT_PANEL_DURATION_EDIT - RELEASED (PR #58, merge 63d40bd)
+- Rama `feature/steel-ops-f8-aec-extraction-engine-spike` (base `origin/main = b6f9c20`, post F7.1 #61). Spike exploratorio: investigación + prototipo aislado + decisión técnica. PR `research(steel): evaluate AEC extraction engines for structural plans`, SIN merge.
+- Entregable principal: `docs/STEEL_OPS_F8_AEC_EXTRACTION_ENGINE_SPIKE.md` — matriz de investigación (F7/pdfjs+tesseract, Lift/Datalab, Marker/Surya, Autodesk APS Model Derivative, ODA, LibreDWG, ezdxf, web-ifc/IfcOpenShell, APIs multimodales) con licencias/costos/privacidad/GPU verificados por fuentes; arquitectura de 4 capas (F7 interno → External JSON Bridge → CAD/DXF/IFC → Vision opt-in) sobre un contrato único; tabla de criterios; recomendación clara.
+- Prototipo (Opción 1, DXF): `apps/web/lib/steel/research/dxf-extraction-spike.ts` — parser DXF ASCII en TS puro (TEXT/MTEXT/INSERT/LWPOLYLINE, capas, coordenadas), fixture SINTÉTICO generado por código, detección VC-2/Z-01/P-03 reutilizando el registro F7, conteo gráfico por bloques vs conteo textual de cuadros y discrepancia crítica "3 dibujadas vs 4 listadas". CERO dependencias nuevas instaladas (decisión documentada: ezdxf/Marker/LibreDWG no entran por Python/GPL/innecesidad).
+- Schema profesional: `apps/web/lib/steel/research/steel-ext-2-schema.ts` — `steel-ext-2` (project/planSet/sourceDocuments/pages/elements/reinforcement{longitudinalBars,stirrups,hooks,laps}/tableRows/axisContext/graphicCounts/textCounts/discrepancies/unresolvedNomenclature/sourceEvidence; evidencia obligatoria por dato: fuente/página/región/bbox/método/confianza/evidenceText/needsReview/warnings) + JSON Schema draft-07 copiable + validador de invariantes que rechaza auto-aprobación.
+- Recomendación F8A: motor CAD/DXF propio primero (costo $0, privacidad total, ataca la causa raíz: el PDF destruye capas/bloques/entidades) + subir el bridge BYO-JSON a steel-ext-2; DWG vía export DXF u ODA File Converter (gratuito, local, fuera del repo); IFC (web-ifc, MPL-2.0) segunda ola; visión multimodal opt-in cuarta capa. Descartados como dependencia: LibreDWG y Marker (GPL-3), ODA SDK (contrato/C++), Lift self-hosted (GPU + pesos <$2M).
+- QA: tests spike 12/12 verdes; research/ aislado (ningún archivo de producción lo importa); sin tocar F7, UI, flag, DB, Supabase, RLS, storage, .env, nav global; sin PDFs/DXF reales (fixture sintético en código); sin credenciales.
+- SIGUIENTE: revisión del doc F8 por la usuaria → decidir F8A (intake .dxf gateado + bridge v2 + comparador unificado). STOP: PR sin merge.
+
+---
+
+## 2026-07-05 - P2B3_GANTT_PANEL_DURATION_EDIT - EN RAMA + PR, SIN MERGE
 
 - Worktree: D:/ICONIC/SOFTWARE PRESUPUESTOS/construction-ops-p2b3-duration-edit. Rama: feature/p2b3-gantt-duration-edit. Base: origin/main post P2B2 (0205f93, incluye steel #57). Sin merge, sin deploy, sin tag. UI-only + action EXISTENTE.
 - Edicion controlada de duracion desde el panel del Gantt: nuevo gantt-duration-form.tsx (input entero min 1, boton "Guardar duracion", loading, mensaje exito/error) montado en schedule-detail-shell bajo el TaskDetailPanel, una tarea por vez.
@@ -7649,3 +7660,112 @@ STEEL_OPS_UIX_PREVIEW.
 Revision visual con los 3 PDFs reales (flag on) → calibrar umbrales de
 region/grilla → F7D grafo de evidencia + operator list (bordes de tabla,
 lineas de eje vectoriales) → decidir Q-F7-VISION-1 (no bloquea).
+
+---
+
+## STEEL_OPS_F7_1_REAL_PDF_CALIBRATION_AND_EXTRACTION_BRIDGE (2026-07-05)
+
+Rama: feature/steel-ops-f7-1-real-pdf-calibration-and-extraction-bridge.
+Base: main = 3e96501 (F7 mergeado, PR #60). Sin migracion, sin DB.
+Calibracion tras la prueba de la usuaria en produccion con los 3 PDFs reales.
+
+### A+B — Ruido de rotulo y elementos reforzados
+- `classifyTitleBlockNoise` (drawing-page-regions): responsables (ING./ARQ./
+  DIBUJO), direcciones (CALLE/CARRERA/CRA + numero, ENTRE CARRERAS, BARRIO),
+  escala/fecha/lamina/revision ⇒ frase canonica visible "Texto descartado
+  como posible rotulo / metadato del plano." Las lineas de ruido forman
+  region title_block aunque esten fuera de la zona tipica (tambien en modo
+  secuencial sin coordenadas).
+- Registro: menciones de rotulo NO cuentan como evidencia tecnica; elemento
+  SOLO-rotulo ⇒ `suspectedTitleBlockOnly` + requiere_revision + hallazgo
+  `title_block_noise` (sin missing_location/reinforcement falsos). Si el
+  codigo tambien aparece en region tecnica, la evidencia tecnica manda.
+- `penalizeTitleBlockCandidates`: candidatos F6 nacidos en linea de rotulo ⇒
+  advertencia canonica + needs_review + techo 0.4; con evidencia tecnica del
+  elemento ⇒ solo se anota (no degrada). Cableado en ambos flujos de deteccion.
+- Prefijos urbanos/metadato prohibidos como elementKey (CRA/CLL/AV/TEL/NIT/
+  ESC/NO/LOTE/MZ...). "VC-2 VC-(50x60) CALLE 14 OESTE ENTRE CARRERAS 55 Y 56"
+  ⇒ elemento VC-2 + seccion 50x60 (extractSectionSpecs; evidencia separada
+  del key), sin CRA-55 fantasma. Z-01/P-03/C-02 a secas ahora se reconocen
+  (guion + prefijo estructural conocido); A-1/B-2 (ejes) siguen fuera.
+- ElementRecord ademas trae: sectionSpec, nearbyAxisLabels (grilla),
+  detailReferences (titulos de detalle), tableReferences (tablas F7C).
+
+### C — Trazabilidad visible
+- Candidatos: fuente/pagina/tipo/metodo/fragmento/regla SIEMPRE visibles;
+  sin archivo ⇒ "Fuente no disponible (texto pegado/manual)"; boton
+  "Copiar evidencia" por candidato.
+- Panel F7: `formatSource` (nunca vacio), menciones por elemento con
+  archivo·pagina·region·metodo·flag rotulo, hallazgos con fuente y boton
+  "Copiar evidencia". Excel EVIDENCIAS: "fuente no disponible" en vez de
+  celda vacia (test existente actualizado a proposito).
+
+### D — Nativo manda sobre OCR
+- `isOcrSymbolLossVariant` + compareHybridCandidates: lectura OCR que es
+  variante corrupta del # de un nativo (5#5600 vs 545600/55600) se DESCARTA
+  de la lista con advertencia especifica en el nativo (ambas lecturas), sin
+  degradar estado/confianza; stats.symbolLossDiscarded + badge en UI.
+- El banner generico del # bajo el textarea OCR se reemplazo por lecturas
+  especificas (detectOcrSymbolLoss por pagina); la pista generica solo queda
+  como fallback cuando no hay texto nativo con que comparar.
+- Conflictos REALES (5#5600 vs 5#5680) conservan el contrato F6C (ambos
+  marcados, revision humana).
+
+### E — Longitudes comerciales editables
+- `ManualTakeoffRecord.commercialLengthsM` (localStorage, parse defensivo),
+  `validateCommercialLengthInput` (>0, tope 24 m, coma decimal),
+  `effectiveCommercialLengths` (default 6/9/12, dedupe+orden, nunca vacia).
+- Editor de chips en el plan de corte (agregar/eliminar, min 1); cambiar la
+  configuracion invalida plan/pedido previos; `buildManualCutPlan` acepta la
+  config y el pedido hereda las barras; 06_CONFIGURACION del Excel muestra
+  las longitudes del takeoff (configuradas vs default).
+
+### F — Excel ICONIC
+- Paleta ICONIC (navy #020148, blue #005DD6, cyan #00B8FF, dark #1B1F3E):
+  headers navy + texto blanco + acento cyan, banner "ICONIC · Steel Ops" en
+  00_RESUMEN con franja cyan (aplicada AL FINAL para no desplazar filas ni
+  romper B10/B14/A18), zebra azul suave que respeta acentos, tabColor por
+  hoja, acentos suaves verde/ambar/rojo por confianza (EVIDENCIAS/CANTIDADES)
+  y severidad (ALERTAS). Freeze/filtros/anchos/formatos ya existentes
+  intactos; nombres de hojas, formulas y sanitizacion sin cambios.
+
+### G — Structured Extraction Bridge (BYO-JSON, sin APIs)
+- `structured-extraction-schema.ts`: schema `steel-ext-1` (JSON Schema
+  draft-07) para planSet/pages/elements/reinforcement/stirrups/tables/
+  nomenclature/findings con evidenceText/sourceFileName/pageNumber/
+  unresolvedFields obligatorios en espiritu; `buildExternalExtractionPromptBlock`
+  copiable con reglas anti-invencion.
+- `external-structured-extraction.ts`: parser defensivo del JSON pegado
+  (errores claros; issues por campos faltantes; method `external_json`;
+  jamas auto-aprueba) + `compareExternalWithInternal`: coincide / solo
+  externo / solo F7 / conflicto (tipo/seccion), con detalles legibles; los
+  solo-rotulo de F7 no cuentan como faltantes del externo.
+- UI: seccion experimental "Importar extraccion estructurada JSON" en el
+  panel F7 (pegar/validar/importar/comparar + "Copiar schema para
+  herramienta externa").
+- `docs/STEEL_OPS_EXTERNAL_EXTRACTION_EVALUATION.md`: Lift (codigo Apache-2.0,
+  pesos OpenRAIL-M mod., self-host GPU o API con USD 20/mes gratis; fast
+  USD 6/1K pags, balanced USD 25/1K pags), Marker (GPL ⇒ no embebible),
+  API multimodal directa (valida via BYO-JSON), Document AI/Azure
+  (descartados para CAD). Recomendacion: NO integrar aun; probar BYO-JSON
+  con los 3 PDFs y medir con la checklist de criterios reales (seccion 6).
+
+### Restricciones respetadas
+Sin DB/Supabase/RLS/migraciones/storage/PDFs reales en repo/APIs externas/
+API keys/.env/service role/navegacion global/ACCESS_MODULES/NAV_ITEMS/
+APU-BOQ-catalogo real/dependencias nuevas. Todo tras STEEL_OPS_UIX_PREVIEW.
+F1 unica calculadora; F7.1 no calcula kg/costo ni aprueba nada.
+
+### QA
+- typecheck 0 · lint 0 · tests/unit/steel: 305/305 (31 archivos; +47 en 5
+  archivos nuevos: title-block-noise, native-ocr-priority, commercial-lengths,
+  manual-excel-iconic, external-structured-extraction). Suite completa
+  corrida antes del PR. Contrato F6C de conflictos reales intacto; 1 aserto
+  de Excel actualizado a proposito ("fuente no disponible").
+
+### SIGUIENTE
+Prueba de la usuaria con los 3 PDFs reales (checklist seccion 6 del doc de
+evaluacion): F7.1 solo vs F7.1 + JSON externo (playground de Lift / chat
+multimodal con el schema copiado). Si el externo gana con claridad, abrir
+fase de integracion con gate (Q-F7-VISION-1); si no, seguir con F7D local
+(operator list: bordes de tabla y lineas de eje vectoriales).
