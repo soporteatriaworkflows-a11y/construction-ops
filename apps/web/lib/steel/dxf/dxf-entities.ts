@@ -12,6 +12,20 @@ export interface DxfEntityBase {
   layer: string;
   /** Identificador de entidad del DXF (código 5), si existe. */
   handle?: string;
+  /** Color ACI (código 62): 1=rojo, 256=ByLayer, 0=ByBlock. */
+  colorIndex?: number;
+  /** True color RGB 24 bits (código 420), si existe. */
+  trueColor?: number;
+}
+
+/** Rojo = señal estructural frecuente en planos reales (no verdad absoluta). */
+export function isRedEntity(entity: Pick<DxfEntityBase, 'colorIndex' | 'trueColor'>): boolean {
+  if (entity.colorIndex === 1) return true;
+  if (entity.trueColor === undefined) return false;
+  const r = (entity.trueColor >> 16) & 0xff;
+  const g = (entity.trueColor >> 8) & 0xff;
+  const b = entity.trueColor & 0xff;
+  return r >= 180 && g <= 80 && b <= 80;
 }
 
 /** TEXT o MTEXT con su texto crudo y normalizado. */

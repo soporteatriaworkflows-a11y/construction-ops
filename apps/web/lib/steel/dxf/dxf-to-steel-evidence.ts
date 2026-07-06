@@ -16,6 +16,7 @@ import {
   type PdfIntakeCandidate,
 } from '../pdf-intake-candidates';
 import type { ManualLineRecord } from '../manual-takeoff';
+import { normalizeCompactStirrupNotation } from './compact-stirrup-notation';
 import { isDxfTextEntity, type DxfTextEntity } from './dxf-entities';
 import type { DxfParseSuccess } from './dxf-parser';
 import { isTitleBlockNoise, type DxfElementCandidate } from './dxf-structural-extractor';
@@ -75,6 +76,10 @@ export interface DxfLineContext {
   layer: string;
   entityType: 'TEXT' | 'MTEXT';
   coordinates?: { x: number; y: number };
+  /** Línea ORIGINAL cuando la normalización decimal compacta la cambió. */
+  originalLine?: string;
+  /** Advertencias de normalización ("18.4 → 184 cm"). */
+  normalizationWarnings?: readonly string[];
 }
 
 export interface DxfNotationDetection {
@@ -83,35 +88,70 @@ export interface DxfNotationDetection {
   contextByLineIndex: ReadonlyMap<number, DxfLineContext>;
 }
 
+/** ¿El conjunto de líneas del DXF es contexto de viga/estribo? (F8B P1). */
+function hasStructuralStirrupContext(lines: readonly string[]): boolean {
+  return lines.some((line) => /\bVIGA|\bESTRIBO|\bFLEJE|\bVC[\s.-]?(?:EJE|\d)/i.test(line));
+}
+
 /**
  * Corre el detector F6A sobre las líneas de texto del DXF (sin ruido de
  * rótulo). Cada candidato conserva su `lineIndex`, que aquí mapea al
  * contexto CAD (capa/entidad/coordenadas) para construir la evidencia `dxf`.
+ *
+ * F8B: antes de detectar, la nomenclatura decimal compacta de estribos
+ * (`E#318.4` → `E#3184`) se normaliza SOLO en contexto estructural; el texto
+ * original se preserva en el contexto y la advertencia viaja con el
+ * candidato. Fuera de contexto ⇒ needs_review, sin cambio silencioso.
  */
 export function detectDxfNotationCandidates(
   parse: DxfParseSuccess,
   sourceFileName: string,
+  options: { structuralContext?: boolean } = {},
 ): DxfNotationDetection {
-  const linesWithContext: Array<{ line: string; context: DxfLineContext }> = [];
+  const rawLines: Array<{ line: string; entity: DxfTextEntity }> = [];
   for (const entity of parse.entities) {
     if (!isDxfTextEntity(entity)) continue;
     for (const line of entity.rawText.split('\n')) {
       const trimmed = line.trim();
       if (trimmed.length === 0) continue;
       if (isTitleBlockNoise(trimmed, entity.layer)) continue;
-      linesWithContext.push({
-        line: trimmed,
-        context: contextOf(entity),
-      });
+      rawLines.push({ line: trimmed, entity });
     }
   }
+
+  const structuralContext =
+    options.structuralContext ?? hasStructuralStirrupContext(rawLines.map((item) => item.line));
+
+  const linesWithContext = rawLines.map(({ line, entity }) => {
+    const normalization = normalizeCompactStirrupNotation(line, { structuralContext });
+    return {
+      line: normalization.applied ? normalization.normalizedText : line,
+      context: {
+        ...contextOf(entity),
+        originalLine: normalization.applied ? line : undefined,
+        normalizationWarnings: normalization.warnings.length > 0 ? normalization.warnings : undefined,
+      } satisfies DxfLineContext,
+      forceReview: normalization.requiresReview,
+    };
+  });
 
   const contextByLineIndex = new Map<number, DxfLineContext>();
   linesWithContext.forEach((item, index) => contextByLineIndex.set(index, item.context));
 
-  const candidates = detectPdfIntakeCandidates(linesWithContext.map((item) => item.line).join('\n'), {
+  const detected = detectPdfIntakeCandidates(linesWithContext.map((item) => item.line).join('\n'), {
     pageNumber: 1,
     fileName: sourceFileName,
+  });
+
+  // Advertencias de normalización y needs_review viajan CON el candidato.
+  const candidates = detected.map((candidate) => {
+    const item = linesWithContext[candidate.evidence.lineIndex];
+    if (!item || (!item.context.normalizationWarnings && !item.forceReview)) return candidate;
+    return {
+      ...candidate,
+      warnings: [...candidate.warnings, ...(item.context.normalizationWarnings ?? [])],
+      status: item.forceReview && candidate.status === 'pending' ? ('needs_review' as const) : candidate.status,
+    };
   });
 
   return { candidates, contextByLineIndex };
@@ -150,6 +190,7 @@ export function dxfCandidatesToManualLines(
         context?.coordinates
           ? `Coords (${context.coordinates.x.toFixed(1)}, ${context.coordinates.y.toFixed(1)})`
           : undefined,
+        ...(context?.normalizationWarnings ?? []),
         candidate.evidence.detectionReason,
       ].filter((part): part is string => Boolean(part));
 
@@ -162,7 +203,9 @@ export function dxfCandidatesToManualLines(
           sourceType: DXF_SOURCE_TYPE,
           readingMethod: DXF_EVIDENCE_METHOD,
           confidence: candidate.confidenceScore,
-          originalFragment: candidate.evidence.originalText,
+          // Fragmento ORIGINAL del plano: si hubo normalización decimal
+          // compacta se preserva la línea tal como venía en el DXF.
+          originalFragment: context?.originalLine ?? candidate.evidence.originalText,
           observation: observationParts.join(' · '),
         },
       };
