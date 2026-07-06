@@ -107,3 +107,18 @@ export {
   GANTT_VIEWPORT_MAX_HEIGHT,
 } from './gantt-zoom';
 export type { GanttZoomViewMode } from './gantt-zoom';
+export {
+  DURATION_CATEGORIES,
+  classifyActivityDurationCategory,
+  evaluateActivityDuration,
+  getDurationWarningCopy,
+  buildScheduleDurationReport,
+} from './duration-criteria';
+export type {
+  DurationCategory,
+  DurationCategoryKey,
+  DurationVerdict,
+  DurationReportTask,
+  DurationReportItem,
+  ScheduleDurationReport,
+} from './duration-criteria';
