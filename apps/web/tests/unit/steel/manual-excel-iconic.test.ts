@@ -99,8 +99,8 @@ describe('Excel ICONIC (F7.1 F)', () => {
 
   it('formato numérico en cantidades/kg y acentos suaves por confianza', () => {
     const cantidades = wb.getWorksheet('01_CANTIDADES')!;
-    expect(cantidades.getColumn(7).numFmt).toBe('#,##0.00'); // G longitud corte
-    expect(cantidades.getColumn(12).numFmt).toBe('#,##0.000'); // L kg unidad
+    expect(cantidades.getColumn(9).numFmt).toBe('#,##0.00'); // I longitud corte
+    expect(cantidades.getColumn(13).numFmt).toBe('#,##0.000'); // M (W) x und
 
     const evidencias = wb.getWorksheet('EVIDENCIAS')!;
     // Confianza 0.92 ⇒ verde suave; 0.45 ⇒ rojo suave (columna H).
@@ -110,10 +110,10 @@ describe('Excel ICONIC (F7.1 F)', () => {
 
   it('las formulas de cantidades siguen intactas con los estilos aplicados', () => {
     const cantidades = wb.getWorksheet('01_CANTIDADES')!;
-    expect(cantidades.getCell('M2').value).toMatchObject({ formula: 'G2*H2*I2' });
-    expect(cantidades.getCell('N2').value).toMatchObject({ formula: 'M2*J2' });
+    expect(cantidades.getCell('N2').value).toMatchObject({ formula: 'I2*J2*K2' });
+    expect(cantidades.getCell('O2').value).toMatchObject({ formula: 'N2*G2' });
     const resumen = wb.getWorksheet('00_RESUMEN')!;
-    expect(resumen.getCell('B9').value).toMatchObject({ formula: "SUM('01_CANTIDADES'!M2:M3)" });
+    expect(resumen.getCell('B9').value).toMatchObject({ formula: "SUM('01_CANTIDADES'!N2:N3)" });
   });
 
   it('06_CONFIGURACION refleja las longitudes comerciales del takeoff', () => {

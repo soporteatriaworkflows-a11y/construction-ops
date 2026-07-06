@@ -169,16 +169,16 @@ describe('manual-excel-export (F4A)', () => {
 
     const cantidades = wb.getWorksheet('01_CANTIDADES');
     expect(cantidades).toBeDefined();
-    // F8B formula-first: diametro (F) y longitud (G) editables como números.
+    // F8C VC-VERF: código (F) y longitud de corte (I) editables como números.
     expect(typeof cantidades!.getCell('F2').value).toBe('number');
-    expect(typeof cantidades!.getCell('G2').value).toBe('number');
-    expect(cantidades!.getCell('M2').value).toMatchObject({ formula: 'G2*H2*I2' });
-    expect(cantidades!.getCell('N2').value).toMatchObject({ formula: 'M2*J2' });
-    expect(cantidades!.getCell('S1').value).toBe('fuente');
-    expect(cantidades!.getCell('X1').value).toBe('observacion');
+    expect(typeof cantidades!.getCell('I2').value).toBe('number');
+    expect(cantidades!.getCell('N2').value).toMatchObject({ formula: 'I2*J2*K2' });
+    expect(cantidades!.getCell('O2').value).toMatchObject({ formula: 'N2*G2' });
+    expect(cantidades!.getCell('W1').value).toBe('fuente');
+    expect(cantidades!.getCell('AB1').value).toBe('observacion');
 
     const resumen = wb.getWorksheet('00_RESUMEN');
-    expect(resumen!.getCell('B9').value).toMatchObject({ formula: "SUM('01_CANTIDADES'!M2:M3)" });
+    expect(resumen!.getCell('B9').value).toMatchObject({ formula: "SUM('01_CANTIDADES'!N2:N3)" });
 
     const pedido = wb.getWorksheet('05_PEDIDO_PROVEEDOR');
     expect(pedido!.getCell('H2').value).toMatchObject({ formula: 'F2*G2' });
@@ -196,7 +196,7 @@ describe('manual-excel-export (F4A)', () => {
     });
     const cantidades = wb.getWorksheet('01_CANTIDADES')!;
 
-    expect(cantidades.getCell('C2').value).toBe("'=2+2");
+    expect(cantidades.getCell('D2').value).toBe("'=2+2");
     expect(typeof cantidades.getCell('F3').value).toBe('number');
   });
 
@@ -269,12 +269,12 @@ describe('manual-excel-export (F4A)', () => {
     expect(control.getCell('B9').value).toBe(1);
 
     const cantidades = wb.getWorksheet('01_CANTIDADES')!;
-    expect(cantidades.getCell('S2').value).toBe('plano-estructural.pdf');
-    expect(cantidades.getCell('T2').value).toBe('4');
-    expect(cantidades.getCell('U2').value).toBe('manual_selection');
-    expect(cantidades.getCell('V2').value).toBe('manual');
-    expect(cantidades.getCell('W2').value).toBe('0.92');
-    expect(cantidades.getCell('X2').value).toBe('Revisado contra detalle S-04');
+    expect(cantidades.getCell('W2').value).toBe('plano-estructural.pdf');
+    expect(cantidades.getCell('X2').value).toBe('4');
+    expect(cantidades.getCell('Y2').value).toBe('manual_selection');
+    expect(cantidades.getCell('Z2').value).toBe('manual');
+    expect(cantidades.getCell('AA2').value).toBe('0.92');
+    expect(cantidades.getCell('AB2').value).toBe('Revisado contra detalle S-04');
 
     const evidencias = wb.getWorksheet('EVIDENCIAS')!;
     expect(evidencias.getCell('D3').value).toBe('plano-estructural.pdf');
@@ -312,12 +312,12 @@ describe('manual-excel-export (F4A)', () => {
     const cantidades = wb.getWorksheet('01_CANTIDADES')!;
     const evidencias = wb.getWorksheet('EVIDENCIAS')!;
 
-    expect(cantidades.getCell('M2').value).toMatchObject({ formula: 'G2*H2*I2' });
-    expect(cantidades.getCell('S2').value).toBe("'=cmd.xlsx");
-    expect(cantidades.getCell('T2').value).toBe("'\t=SUM(1,1)");
-    expect(cantidades.getCell('U2').value).toBe("'+pdf");
-    expect(cantidades.getCell('W2').value).toBe("'-1");
-    expect(cantidades.getCell('X2').value).toBe("'   =SUM(1,1)");
+    expect(cantidades.getCell('N2').value).toMatchObject({ formula: 'I2*J2*K2' });
+    expect(cantidades.getCell('W2').value).toBe("'=cmd.xlsx");
+    expect(cantidades.getCell('X2').value).toBe("'\t=SUM(1,1)");
+    expect(cantidades.getCell('Y2').value).toBe("'+pdf");
+    expect(cantidades.getCell('AA2').value).toBe("'-1");
+    expect(cantidades.getCell('AB2').value).toBe("'   =SUM(1,1)");
     expect(evidencias.getCell('I2').value).toBe("'@fragment");
     expect(evidencias.getCell('K2').value).toBe("'=approved");
   });

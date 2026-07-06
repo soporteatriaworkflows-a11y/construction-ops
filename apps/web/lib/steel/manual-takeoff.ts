@@ -55,6 +55,14 @@ export interface ManualLineEvidence {
   confidence?: string;
   originalFragment?: string;
   observation?: string;
+  /** F8C: elemento estructural de origen ("VC-EJE-3"), si aplica. */
+  elementKey?: string;
+  /** F8C: ubicación/eje de origen ("EJE A-B"), si aplica. */
+  locationText?: string;
+  /** F8C: id del beam detail DXF del que salió la línea. */
+  beamDetailId?: string;
+  /** F8C: posición del refuerzo (superior/inferior/estribo). */
+  position?: string;
 }
 
 /**

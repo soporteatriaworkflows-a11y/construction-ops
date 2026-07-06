@@ -69,7 +69,20 @@ export interface DxfDimensionEntity extends DxfEntityBase {
   measurement?: number;
 }
 
-export type DxfEntity = DxfTextEntity | DxfInsertEntity | DxfPathEntity | DxfDimensionEntity;
+/** Círculo — en cortes de viga suele representar una varilla (F8C). */
+export interface DxfCircleEntity extends DxfEntityBase {
+  type: 'CIRCLE';
+  x?: number;
+  y?: number;
+  radius?: number;
+}
+
+export type DxfEntity =
+  | DxfTextEntity
+  | DxfInsertEntity
+  | DxfPathEntity
+  | DxfDimensionEntity
+  | DxfCircleEntity;
 
 /** Conteo por tipo para el resumen del intake. */
 export interface DxfEntityStats {
@@ -79,6 +92,7 @@ export interface DxfEntityStats {
   insertCount: number;
   pathCount: number;
   dimensionCount: number;
+  circleCount: number;
 }
 
 export function isDxfTextEntity(entity: DxfEntity): entity is DxfTextEntity {
@@ -93,12 +107,14 @@ export function computeDxfEntityStats(entities: readonly DxfEntity[]): DxfEntity
     insertCount: 0,
     pathCount: 0,
     dimensionCount: 0,
+    circleCount: 0,
   };
   for (const entity of entities) {
     if (entity.type === 'TEXT') stats.textCount += 1;
     else if (entity.type === 'MTEXT') stats.mtextCount += 1;
     else if (entity.type === 'INSERT') stats.insertCount += 1;
     else if (entity.type === 'DIMENSION') stats.dimensionCount += 1;
+    else if (entity.type === 'CIRCLE') stats.circleCount += 1;
     else stats.pathCount += 1;
   }
   return stats;

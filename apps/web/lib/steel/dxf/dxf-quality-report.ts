@@ -41,9 +41,25 @@ export interface CadDrawingQualityReport {
   measurementsDetected: boolean;
   /** Hay cuadros/tablas/despieces con conteos. */
   tablesDetected: boolean;
+  /** F8C: marcadores de varilla detectados por GEOMETRÍA (shape-driven). */
+  markersDetectedByShape?: number;
+  /** F8C: subconjunto reforzado por capa/color estructural (señal). */
+  markersDetectedByLayerColor?: number;
+  /** F8C: marcadores laterales/ambiguos que exigen revisión. */
+  ambiguousMarkers?: number;
+  /** F8C: confianza del conteo por marcadores (null = sin marcadores). */
+  markerConfidence?: 'alto' | 'medio' | 'bajo' | null;
   confidence: CadQualityConfidence;
   recommendation: CadQualityRecommendation;
   notes: readonly string[];
+}
+
+/** Resumen de marcadores (lo produce el Beam Detail Assembly F8C). */
+export interface CadQualityMarkerInput {
+  markersByShape: number;
+  markersByLayerColor: number;
+  ambiguousMarkers: number;
+  markerConfidence: 'alto' | 'medio' | 'bajo' | null;
 }
 
 /**
@@ -57,6 +73,7 @@ export interface CadDrawingQualityReport {
 export function buildCadQualityReport(
   parse: DxfParseSuccess,
   extraction: DxfStructuralExtraction,
+  options: { markers?: CadQualityMarkerInput } = {},
 ): CadDrawingQualityReport {
   const { layerAssessment } = extraction;
   const usefulTexts = extraction.elements.length > 0;
@@ -95,6 +112,16 @@ export function buildCadQualityReport(
   if (extraction.noiseDiscarded > 0) {
     notes.push(`${extraction.noiseDiscarded} texto(s) de rótulo/metadato descartados como ruido.`);
   }
+  const markers = options.markers;
+  if (markers) {
+    if (markers.markersByShape === 0) {
+      notes.push('Sin marcadores gráficos de varilla en los cortes: las cantidades de longitudinales requieren revisión.');
+    } else {
+      notes.push(
+        `${markers.markersByShape} marcador(es) de varilla detectados por geometría (${markers.markersByLayerColor} con capa/color estructural${markers.ambiguousMarkers > 0 ? `; ${markers.ambiguousMarkers} ambiguos` : ''}).`,
+      );
+    }
+  }
 
   let confidence: CadQualityConfidence;
   if (usefulTexts && layerAssessment.usefulLayers && countableBlocks) {
@@ -125,6 +152,10 @@ export function buildCadQualityReport(
     countableBlocks,
     measurementsDetected,
     tablesDetected,
+    markersDetectedByShape: markers?.markersByShape,
+    markersDetectedByLayerColor: markers?.markersByLayerColor,
+    ambiguousMarkers: markers?.ambiguousMarkers,
+    markerConfidence: markers?.markerConfidence,
     confidence,
     recommendation,
     notes,
