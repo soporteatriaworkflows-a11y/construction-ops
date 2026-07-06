@@ -1,10 +1,10 @@
 /**
- * manual-excel-formula-first.test.ts — F8B P5: export formula-first editable
- * offline. Cantidad/SON/diámetro/longitud son celdas editables; kg/ml y
- * longitud comercial vienen por VLOOKUP desde CONFIG_VARILLAS; ml/kg por
- * unidad, totales, varillas comerciales y desperdicio son FÓRMULAS que
- * recalculan al cambiar un dígito. Estilo ICONIC y sanitización intactos
- * (cubiertos también por manual-excel-iconic / manual-excel-export).
+ * manual-excel-formula-first.test.ts — F8B/F8C: export formula-first editable
+ * offline, alineado al contrato VC-VERF (CANTIDADES BELLA SUIZA, hoja
+ * VC-VERF-06072026): CANT./SON/código/longitudes editables; (W) VARILLA y
+ * LONGITUD COMERCIAL por VLOOKUP de CONFIG_VARILLAS; ML×UND, (W)×UND,
+ * CANT. ML TOTAL, (W) TOTAL, CANT. VARILLAS y columnas por longitud comercial
+ * como FÓRMULAS: cambiar un dígito recalcula todo el workbook.
  */
 import { describe, expect, it } from 'vitest';
 import type ExcelJS from 'exceljs';
@@ -28,7 +28,21 @@ function takeoff(overrides: Partial<ManualTakeoffRecord> = {}): ManualTakeoffRec
 }
 
 const RECORDS: ManualLineRecord[] = [
-  { id: 'l1', originalDescription: '2x153E#3184', assumedWastePct: '5' },
+  {
+    id: 'l1',
+    originalDescription: '2x153E#3184',
+    assumedWastePct: '5',
+    evidence: {
+      sourceFileName: 'vigas.dxf',
+      pageNumber: 1,
+      sourceType: 'dxf',
+      readingMethod: 'dxf',
+      elementKey: 'VC-EJE-3',
+      locationText: 'EJE 3',
+      beamDetailId: 'bd-VC-EJE-3',
+      position: 'estribo',
+    },
+  },
   { id: 'l2', originalDescription: '5#5600', assumedWastePct: '5' },
 ];
 
@@ -37,7 +51,7 @@ function formulaOf(cell: ExcelJS.Cell): string {
   return value && typeof value === 'object' && 'formula' in value ? String(value.formula) : '';
 }
 
-describe('F8B P5 — Excel formula-first', () => {
+describe('F8C — Excel formula-first contrato VC-VERF', () => {
   const lines = computeManualLines(RECORDS);
   const wb = buildSteelManualExcelWorkbook({
     takeoff: takeoff({ lines: RECORDS }),
@@ -46,66 +60,100 @@ describe('F8B P5 — Excel formula-first', () => {
   });
   const cantidades = wb.getWorksheet('01_CANTIDADES')!;
 
-  it('cantidad, SON, diámetro y longitud de corte son celdas editables (valores planos)', () => {
-    expect(typeof cantidades.getCell('F2').value).toBe('number'); // diametro 3
-    expect(cantidades.getCell('F2').value).toBe(3);
-    expect(typeof cantidades.getCell('G2').value).toBe('number'); // longitud 1.84
-    expect(cantidades.getCell('G2').value).toBeCloseTo(1.84, 6);
-    expect(typeof cantidades.getCell('H2').value).toBe('number'); // cantidad 153
-    expect(cantidades.getCell('H2').value).toBe(153);
-    expect(typeof cantidades.getCell('I2').value).toBe('number'); // SON/repeticiones 2
-    expect(cantidades.getCell('I2').value).toBe(2);
+  it('la cabecera sigue el contrato VC-VERF', () => {
+    expect((cantidades.getRow(1).values as unknown[]).slice(1, 21)).toEqual([
+      'ITEM',
+      'ELEMENTO ESTRUCTURAL',
+      'UBICACION EJE',
+      'DESCRIPCION',
+      'Ø VARILLA',
+      'CODIGO VARILLA',
+      '(W) VARILLA kg/ml',
+      'LONGITUD COMERCIAL m',
+      'LONGITUD CORTE m',
+      'CANT.',
+      'SON',
+      'ML X UND.',
+      '(W) X UND.',
+      'CANT. ML TOTAL',
+      '(W) TOTAL',
+      'CANT. VARILLAS',
+      'VARILLAS 6 M',
+      'VARILLAS 9 M',
+      'VARILLAS 12 M',
+      'DESPERDICIO ML',
+    ]);
   });
 
-  it('kg/ml viene por búsqueda en CONFIG_VARILLAS (cambiar el diámetro recalcula)', () => {
-    expect(formulaOf(cantidades.getCell('J2'))).toContain('VLOOKUP(F2,CONFIG_VARILLAS!$A$2:$C$20,2,0)');
+  it('ELEMENTO ESTRUCTURAL y UBICACION EJE vienen de la evidencia del beam detail', () => {
+    expect(cantidades.getCell('B2').value).toBe('VC-EJE-3');
+    expect(cantidades.getCell('C2').value).toBe('EJE 3');
+    // Sin evidencia de viga, cae al alcance del takeoff (jamás celda rota).
+    expect(cantidades.getCell('B3').value).toBe('Vigas de cimentación');
   });
 
-  it('cambiar CANT en el workbook recalcula: ml total referencia la celda editable', () => {
-    // M (ml total) = G*H*I ⇒ depende de longitud, cantidad y SON editables.
-    expect(cantidades.getCell('M2').value).toMatchObject({ formula: 'G2*H2*I2' });
-    // Cadena completa: N (kg total) = M*J ⇒ un dígito cambiado recalcula kg.
-    expect(cantidades.getCell('N2').value).toMatchObject({ formula: 'M2*J2' });
+  it('CANT., SON, código y longitud de corte son celdas editables (valores planos)', () => {
+    expect(cantidades.getCell('F2').value).toBe(3); // código varilla
+    expect(cantidades.getCell('I2').value).toBeCloseTo(1.84, 6); // longitud corte
+    expect(cantidades.getCell('J2').value).toBe(153); // CANT.
+    expect(cantidades.getCell('K2').value).toBe(2); // SON
   });
 
-  it('ML total y W total son fórmulas, no valores fijos (líneas y resumen)', () => {
-    expect(formulaOf(cantidades.getCell('M2')).length).toBeGreaterThan(0);
-    expect(formulaOf(cantidades.getCell('N2')).length).toBeGreaterThan(0);
+  it('(W) VARILLA y LONGITUD COMERCIAL vienen por búsqueda en CONFIG_VARILLAS', () => {
+    expect(formulaOf(cantidades.getCell('G2'))).toContain('VLOOKUP(F2,CONFIG_VARILLAS!$A$2:$C$20,2,0)');
+    expect(formulaOf(cantidades.getCell('H2'))).toContain('VLOOKUP(F2,CONFIG_VARILLAS!$A$2:$C$20,3,0)');
+  });
+
+  it('ML X UND., (W) X UND., ML TOTAL, (W) TOTAL y CANT. VARILLAS son fórmulas', () => {
+    expect(cantidades.getCell('L2').value).toMatchObject({ formula: 'I2' });
+    expect(cantidades.getCell('M2').value).toMatchObject({ formula: 'I2*G2' });
+    expect(cantidades.getCell('N2').value).toMatchObject({ formula: 'I2*J2*K2' });
+    expect(cantidades.getCell('O2').value).toMatchObject({ formula: 'N2*G2' });
+    expect(formulaOf(cantidades.getCell('P2'))).toBe('IF(H2>0,CEILING(N2/H2,1),0)');
+  });
+
+  it('editar CANT/SON/LONGITUD CORTE recalcula: la cadena referencia las celdas editables', () => {
+    // N (ml total) = I*J*K depende de longitud (I), CANT (J) y SON (K).
+    expect(formulaOf(cantidades.getCell('N2'))).toBe('I2*J2*K2');
+    // O (kg total) = N*G ⇒ un dígito cambiado recalcula el peso.
+    expect(formulaOf(cantidades.getCell('O2'))).toBe('N2*G2');
+  });
+
+  it('las columnas por longitud comercial son fórmulas de distribución', () => {
+    expect(formulaOf(cantidades.getCell('Q2'))).toBe('IF($H2=6,$P2,0)');
+    expect(formulaOf(cantidades.getCell('R2'))).toBe('IF($H2=9,$P2,0)');
+    expect(formulaOf(cantidades.getCell('S2'))).toBe('IF($H2=12,$P2,0)');
+    expect(formulaOf(cantidades.getCell('T2'))).toBe('IF(H2>0,P2*H2-N2,0)');
+  });
+
+  it('el resumen suma con fórmulas (ML total, W total, varillas)', () => {
     const resumen = wb.getWorksheet('00_RESUMEN')!;
-    expect(resumen.getCell('B9').value).toMatchObject({ formula: "SUM('01_CANTIDADES'!M2:M3)" });
-    expect(resumen.getCell('B10').value).toMatchObject({ formula: "SUM('01_CANTIDADES'!N2:N3)" });
+    expect(resumen.getCell('B9').value).toMatchObject({ formula: "SUM('01_CANTIDADES'!N2:N3)" });
+    expect(resumen.getCell('B10').value).toMatchObject({ formula: "SUM('01_CANTIDADES'!O2:O3)" });
     expect(resumen.getCell('B11').value).toMatchObject({ formula: "SUM('01_CANTIDADES'!P2:P3)" });
   });
 
-  it('ml/kg por unidad, varillas comerciales y desperdicio son fórmulas', () => {
-    expect(cantidades.getCell('K2').value).toMatchObject({ formula: 'G2' });
-    expect(cantidades.getCell('L2').value).toMatchObject({ formula: 'G2*J2' });
-    expect(formulaOf(cantidades.getCell('P2'))).toBe('IF(O2>0,CEILING(M2/O2,1),0)');
-    expect(formulaOf(cantidades.getCell('Q2'))).toBe('IF(O2>0,P2*O2-M2,0)');
-  });
-
-  it('CONFIG_VARILLAS existe con diámetro, kg/ml y longitud comercial activa editable', () => {
+  it('CONFIG_VARILLAS existe con código, kg/ml y longitud comercial activa', () => {
     expect(STEEL_MANUAL_EXCEL_SHEETS).toContain('CONFIG_VARILLAS');
     const config = wb.getWorksheet('CONFIG_VARILLAS')!;
-    expect(config.getRow(1).values).toMatchObject([, 'diametro #', 'peso kg/ml', 'longitud comercial activa m', 'nota']);
-    // #3 ⇒ 0.560 kg/ml (spec F1); longitud activa = mayor configurada (12).
     const rowFor3 = config.getRow(3);
     expect(rowFor3.getCell(1).value).toBe(3);
     expect(rowFor3.getCell(2).value).toBeCloseTo(0.56, 3);
     expect(rowFor3.getCell(3).value).toBe(12);
   });
 
-  it('la longitud comercial configurada del takeoff aparece en CONFIG_VARILLAS', () => {
+  it('longitudes configuradas del takeoff generan sus propias columnas', () => {
     const custom = buildSteelManualExcelWorkbook({
       takeoff: takeoff({ lines: RECORDS, commercialLengthsM: ['6', '7.5'] }),
       lines,
       generatedAt: new Date('2026-07-06T12:00:00.000Z'),
-    }).getWorksheet('CONFIG_VARILLAS')!;
-    expect(custom.getRow(2).getCell(3).value).toBe(7.5);
-    expect(String(custom.getRow(2).getCell(4).value)).toContain('6 / 7.5');
+    }).getWorksheet('01_CANTIDADES')!;
+    expect(custom.getCell('Q1').value).toBe('VARILLAS 6 M');
+    expect(custom.getCell('R1').value).toBe('VARILLAS 7.5 M');
+    expect(formulaOf(custom.getCell('R2'))).toBe('IF($H2=7.5,$P2,0)');
   });
 
-  it('las fórmulas generadas no rompen la sanitización del texto de usuario', () => {
+  it('las fórmulas no rompen la sanitización del texto de usuario', () => {
     const hostile: ManualLineRecord[] = [
       { id: 'h1', originalDescription: '=2+2', assumedWastePct: '5' },
       { id: 'h2', originalDescription: '2x153E#3184', assumedWastePct: '5' },
@@ -116,14 +164,15 @@ describe('F8B P5 — Excel formula-first', () => {
       generatedAt: new Date('2026-07-06T12:00:00.000Z'),
     });
     const sheet = hostileWb.getWorksheet('01_CANTIDADES')!;
-    expect(sheet.getCell('C2').value).toBe("'=2+2"); // texto hostil neutralizado
-    expect(sheet.getCell('M3').value).toMatchObject({ formula: 'G3*H3*I3' }); // fórmula propia intacta
+    expect(sheet.getCell('D2').value).toBe("'=2+2");
+    expect(sheet.getCell('N3').value).toMatchObject({ formula: 'I3*J3*K3' });
   });
 
-  it('mantiene el estilo ICONIC (header navy + acento cyan) en la hoja nueva', () => {
-    const config = wb.getWorksheet('CONFIG_VARILLAS')!;
-    const header = config.getRow(1).getCell(1);
+  it('mantiene el estilo ICONIC en cantidades y CONFIG_VARILLAS', () => {
+    const header = cantidades.getRow(1).getCell(1);
     expect((header.fill as ExcelJS.FillPattern | undefined)?.fgColor?.argb).toBe('FF020148');
     expect(header.border?.bottom?.color?.argb).toBe('FF00B8FF');
+    const config = wb.getWorksheet('CONFIG_VARILLAS')!.getRow(1).getCell(1);
+    expect((config.fill as ExcelJS.FillPattern | undefined)?.fgColor?.argb).toBe('FF020148');
   });
 });

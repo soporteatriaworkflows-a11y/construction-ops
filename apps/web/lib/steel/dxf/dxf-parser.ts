@@ -95,7 +95,7 @@ function looksBinaryOrUnreadable(content: string): boolean {
   return controlChars > 8;
 }
 
-const SUPPORTED_TYPES = new Set(['TEXT', 'MTEXT', 'INSERT', 'LINE', 'LWPOLYLINE', 'DIMENSION']);
+const SUPPORTED_TYPES = new Set(['TEXT', 'MTEXT', 'INSERT', 'LINE', 'LWPOLYLINE', 'DIMENSION', 'CIRCLE']);
 
 /**
  * Parsea un DXF ASCII. Solo procesa la sección ENTITIES (los bloques
@@ -192,6 +192,8 @@ export function parseDxfFile(content: string): DxfParseResult {
         overrideText: override && override !== '<>' ? override : undefined,
         measurement: num(fields['42']),
       };
+    } else if (currentType === 'CIRCLE') {
+      entity = { ...base, type: 'CIRCLE', x, y, radius: num(fields['40']) };
     }
 
     if (entity) {

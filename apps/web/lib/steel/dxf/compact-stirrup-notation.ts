@@ -127,6 +127,97 @@ export function normalizeCompactStirrupNotation(
 }
 
 // ---------------------------------------------------------------------------
+// F8C — Longitudinales con longitud compacta ("6#6 33 L" ⇒ 6#6330)
+// ---------------------------------------------------------------------------
+
+/** "6#6 33 L" / "6#6 33L": dígitos separados + sufijo L ⇒ longitud ×10 en cm. */
+const COMPACT_LONGITUDINAL_L_PATTERN = /(\d)\s*#\s*(\d)\s+(\d{1,2})\s*L\b/gi;
+/** Token corto "6#635": SOLO 2 dígitos de longitud tras el código ⇒ ×10. */
+const COMPACT_LONGITUDINAL_SHORT_PATTERN = /\b(\d)#(\d)(\d{2})\b(?!\d)/g;
+
+const MIN_PLAUSIBLE_LONGITUDINAL_CM = 50;
+const MAX_PLAUSIBLE_LONGITUDINAL_CM = 1200;
+
+export interface CompactLongitudinalInterpretation {
+  raw: string;
+  /** Token normalizado ("6#6330"). */
+  normalized: string;
+  /** Código/diámetro de la varilla (el 2.º dígito; el 1.º JAMÁS es cantidad). */
+  barCode: number;
+  lengthCm: number;
+}
+
+export interface CompactLongitudinalNormalization {
+  originalText: string;
+  normalizedText: string;
+  applied: boolean;
+  requiresReview: boolean;
+  warnings: readonly string[];
+  interpretations: readonly CompactLongitudinalInterpretation[];
+}
+
+/**
+ * Normaliza longitudes compactas de refuerzo LONGITUDINAL en detalles de
+ * viga: `6#6 33 L` ⇒ `6#6330` (330 cm) y `6#635` ⇒ `6#6350` (350 cm) cuando
+ * el contexto es longitudinal. Tokens de 3+ dígitos (`6#6840`) no se tocan.
+ * Fuera de contexto o fuera de rango plausible ⇒ requiresReview sin cambio.
+ * OJO: el primer dígito es notación del plano, NO cantidad automática — la
+ * cantidad sale del conteo gráfico (círculos/markers) o de revisión humana.
+ */
+export function normalizeCompactLongitudinalNotation(
+  text: string,
+  options: CompactStirrupOptions = {},
+): CompactLongitudinalNormalization {
+  const structuralContext = options.structuralContext ?? false;
+  const warnings: string[] = [];
+  const interpretations: CompactLongitudinalInterpretation[] = [];
+  let requiresReview = false;
+  let applied = false;
+
+  const applyToken = (raw: string, first: string, bar: string, lengthDigits: string): string => {
+    const lengthCm = Number.parseInt(lengthDigits, 10) * 10;
+    if (lengthCm < MIN_PLAUSIBLE_LONGITUDINAL_CM || lengthCm > MAX_PLAUSIBLE_LONGITUDINAL_CM) {
+      requiresReview = true;
+      warnings.push(
+        `"${raw.trim()}" produciría ${lengthCm} cm (fuera de rango plausible ${MIN_PLAUSIBLE_LONGITUDINAL_CM}–${MAX_PLAUSIBLE_LONGITUDINAL_CM} cm): no se normalizó; revisar contra el plano.`,
+      );
+      return raw;
+    }
+    if (!structuralContext) {
+      requiresReview = true;
+      warnings.push(
+        `"${raw.trim()}" parece longitud compacta de refuerzo longitudinal (→ ${lengthCm} cm), pero falta contexto de viga/despiece: requiere revisión, no se normalizó automáticamente.`,
+      );
+      return raw;
+    }
+    applied = true;
+    const normalized = `${first}#${bar}${lengthCm}`;
+    interpretations.push({ raw: raw.trim(), normalized, barCode: Number.parseInt(bar, 10), lengthCm });
+    warnings.push(`Longitud compacta interpretada como centímetros: ${lengthDigits} → ${lengthCm} cm.`);
+    return normalized;
+  };
+
+  COMPACT_LONGITUDINAL_L_PATTERN.lastIndex = 0;
+  let normalizedText = text.replace(COMPACT_LONGITUDINAL_L_PATTERN, (raw, first: string, bar: string, len: string) =>
+    applyToken(raw, first, bar, len),
+  );
+  COMPACT_LONGITUDINAL_SHORT_PATTERN.lastIndex = 0;
+  normalizedText = normalizedText.replace(
+    COMPACT_LONGITUDINAL_SHORT_PATTERN,
+    (raw, first: string, bar: string, len: string) => applyToken(raw, first, bar, len),
+  );
+
+  return {
+    originalText: text,
+    normalizedText: applied ? normalizedText : text,
+    applied,
+    requiresReview,
+    warnings,
+    interpretations,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // P2 — Verificación por segmentos gráficos del estribo
 // ---------------------------------------------------------------------------
 

@@ -63,6 +63,10 @@ export interface ManualExcelLineEvidence {
   originalFragment?: string;
   observation?: string;
   reviewStatus?: string;
+  /** F8C: elemento estructural de origen ("VC-EJE-3"). */
+  elementKey?: string;
+  /** F8C: ubicación/eje de origen ("EJE A-B"). */
+  locationText?: string;
 }
 
 export interface ManualExcelExportInput {
@@ -166,6 +170,8 @@ function lineEvidence(line: ManualComputedLine): ManualExcelLineEvidence {
     originalFragment: nested.originalFragment ?? record.originalFragment ?? direct.originalFragment ?? record.fragment ?? direct.fragment,
     observation: nested.observation ?? record.observation ?? direct.observation ?? record.notes ?? direct.notes,
     reviewStatus: nested.reviewStatus ?? record.reviewStatus ?? direct.reviewStatus,
+    elementKey: nested.elementKey ?? record.elementKey ?? direct.elementKey,
+    locationText: nested.locationText ?? record.locationText ?? direct.locationText,
   };
 }
 
@@ -271,8 +277,8 @@ function addResumenSheet(
     ['Alcance', text(takeoff.scopeLabel)],
     ['Fecha export', generatedAt.toISOString().slice(0, 10)],
     ['Estado', text(takeoff.status)],
-    ['Total ml', formula(totalFormula(lines.length, 'M'), sumLineValues(lines, (line) => line.calculated.totalMl)), 'm'],
-    ['Total kg', formula(totalFormula(lines.length, 'N'), sumLineValues(lines, (line) => line.calculated.totalKg)), 'kg'],
+    ['Total ml', formula(totalFormula(lines.length, 'N'), sumLineValues(lines, (line) => line.calculated.totalMl)), 'm'],
+    ['Total kg', formula(totalFormula(lines.length, 'O'), sumLineValues(lines, (line) => line.calculated.totalKg)), 'kg'],
     [
       'Unidades comerciales',
       formula(totalFormula(lines.length, 'P'), sumLineValues(lines, (line) => line.calculated.commercialUnitsRequired)),
@@ -390,33 +396,37 @@ function addEvidenciasSheet(wb: ExcelJS.Workbook, takeoff: ManualTakeoffRecord, 
 const CONFIG_VARILLAS_RANGE = 'CONFIG_VARILLAS!$A$2:$C$20';
 
 /**
- * 01_CANTIDADES formula-first (F8B): cantidad, SON/repeticiones, diámetro y
- * longitud de corte son EDITABLES; kg/ml y longitud comercial vienen por
- * VLOOKUP desde CONFIG_VARILLAS; ml/kg por unidad y totales, varillas
- * comerciales y desperdicio son FÓRMULAS. Cambiar un dígito offline
- * recalcula todo el workbook. Las fórmulas son generadas por la app (la
- * sanitización anti formula-injection sigue aplicando al texto de usuario).
+ * 01_CANTIDADES formula-first alineada al contrato VC-VERF (F8C):
+ * ÍTEM / ELEMENTO ESTRUCTURAL / UBICACIÓN EJE / DESCRIPCIÓN / Ø / CÓDIGO /
+ * (W) VARILLA / LONG COMERCIAL / LONG CORTE / CANT. / SON / ML×UND / (W)×UND /
+ * CANT. ML TOTAL / (W) TOTAL / CANT. VARILLAS + una columna de resumen por
+ * longitud comercial configurada. CANT/SON/código/longitudes son EDITABLES;
+ * (W) y longitud comercial vienen por VLOOKUP de CONFIG_VARILLAS; el resto
+ * son FÓRMULAS encadenadas: cambiar un dígito offline recalcula todo.
  */
 function addCantidadesSheet(wb: ExcelJS.Workbook, takeoff: ManualTakeoffRecord, lines: readonly ManualComputedLine[]): void {
   const ws = wb.addWorksheet('01_CANTIDADES');
+  const configuredLengths = effectiveCommercialLengths(takeoff).map((value) => num(value));
   ws.addRow([
-    'elemento',
-    'ubicacion',
-    'descripcion original',
+    'ITEM',
+    'ELEMENTO ESTRUCTURAL',
+    'UBICACION EJE',
+    'DESCRIPCION',
+    'Ø VARILLA',
+    'CODIGO VARILLA',
+    '(W) VARILLA kg/ml',
+    'LONGITUD COMERCIAL m',
+    'LONGITUD CORTE m',
+    'CANT.',
+    'SON',
+    'ML X UND.',
+    '(W) X UND.',
+    'CANT. ML TOTAL',
+    '(W) TOTAL',
+    'CANT. VARILLAS',
+    ...configuredLengths.map((length) => `VARILLAS ${length} M`),
+    'DESPERDICIO ML',
     'interpretacion',
-    'varilla/perfil',
-    'diametro #',
-    'longitud corte m',
-    'cantidad',
-    'repeticiones (SON)',
-    'kg/ml',
-    'ml unidad',
-    'kg unidad',
-    'ml total',
-    'kg total',
-    'long comercial m',
-    'varillas comerciales',
-    'desperdicio ml',
     'estado revision',
     'fuente',
     'pagina',
@@ -427,6 +437,9 @@ function addCantidadesSheet(wb: ExcelJS.Workbook, takeoff: ManualTakeoffRecord, 
   ]);
 
   const activeLength = activeCommercialLengthM(takeoff);
+  const summaryCount = configuredLengths.length;
+  const estadoCol = 16 + summaryCount + 3;
+  const confianzaCol = 16 + summaryCount + 8;
 
   lines.forEach((line, index) => {
     const r = index + 2;
@@ -446,25 +459,29 @@ function addCantidadesSheet(wb: ExcelJS.Workbook, takeoff: ManualTakeoffRecord, 
 
     const row = ws.addRow([
       text(line.record.id),
-      text(takeoff.scopeLabel),
+      text(evidence.elementKey ?? takeoff.scopeLabel),
+      text(evidence.locationText ?? takeoff.scopeLabel),
       text(line.record.originalDescription),
-      text(line.parsed.explanation),
       text(line.barLabel),
       barNumber ?? '',
-      cutLength,
-      pieces,
-      repetitions,
-      // kg/ml por búsqueda cuando hay diámetro (editable en CONFIG_VARILLAS).
+      // (W) VARILLA por búsqueda cuando hay código (editable en CONFIG_VARILLAS).
       barNumber ? formula(`IFERROR(VLOOKUP(F${r},${CONFIG_VARILLAS_RANGE},2,0),0)`, round6(kgPerMl)) : round6(kgPerMl),
-      formula(`G${r}`, cutLength),
-      formula(`G${r}*J${r}`, round6(cutLength * kgPerMl)),
-      formula(`G${r}*H${r}*I${r}`, totalMl),
-      formula(`M${r}*J${r}`, num(line.calculated.totalKg, 6)),
       barNumber
         ? formula(`IFERROR(VLOOKUP(F${r},${CONFIG_VARILLAS_RANGE},3,0),${activeLength})`, activeLength)
         : activeLength,
-      formula(`IF(O${r}>0,CEILING(M${r}/O${r},1),0)`, commercialUnits),
-      formula(`IF(O${r}>0,P${r}*O${r}-M${r},0)`, round6(wasteMl)),
+      cutLength,
+      pieces,
+      repetitions,
+      formula(`I${r}`, cutLength),
+      formula(`I${r}*G${r}`, round6(cutLength * kgPerMl)),
+      formula(`I${r}*J${r}*K${r}`, totalMl),
+      formula(`N${r}*G${r}`, num(line.calculated.totalKg, 6)),
+      formula(`IF(H${r}>0,CEILING(N${r}/H${r},1),0)`, commercialUnits),
+      ...configuredLengths.map((length) =>
+        formula(`IF($H${r}=${length},$P${r},0)`, activeLength === length ? commercialUnits : 0),
+      ),
+      formula(`IF(H${r}>0,P${r}*H${r}-N${r},0)`, round6(wasteMl)),
+      text(line.parsed.explanation),
       text(line.calculated.verificationStatus ?? 'unreviewed'),
       cellText(evidence.sourceFileName),
       cellText(evidence.pageNumber),
@@ -473,16 +490,20 @@ function addCantidadesSheet(wb: ExcelJS.Workbook, takeoff: ManualTakeoffRecord, 
       cellText(evidence.confidence),
       cellText(evidence.observation),
     ]);
-    styleStatusCell(row.getCell(18), String(line.calculated.verificationStatus ?? 'unreviewed'));
-    styleConfidenceCell(row.getCell(23), evidence.confidence);
+    styleStatusCell(row.getCell(estadoCol), String(line.calculated.verificationStatus ?? 'unreviewed'));
+    styleConfidenceCell(row.getCell(confianzaCol), evidence.confidence);
   });
-  [7, 11, 13, 15, 17].forEach((col) => {
+  [8, 9, 12, 14, 16 + summaryCount + 1].forEach((col) => {
     ws.getColumn(col).numFmt = NUM_FMT;
   });
-  [10, 12, 14].forEach((col) => {
+  [7, 13, 15].forEach((col) => {
     ws.getColumn(col).numFmt = KG_FMT;
   });
-  finishTable(ws, [16, 22, 28, 44, 13, 11, 13, 10, 13, 10, 11, 11, 11, 11, 13, 14, 13, 18, 24, 9, 13, 12, 11, 32]);
+  finishTable(ws, [
+    14, 20, 16, 26, 11, 12, 12, 14, 14, 9, 9, 10, 10, 13, 12, 13,
+    ...configuredLengths.map(() => 12),
+    13, 40, 16, 22, 8, 12, 10, 10, 30,
+  ]);
 }
 
 function round6(value: number): number {
