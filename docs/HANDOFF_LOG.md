@@ -1,5 +1,17 @@
 # Handoff Log
 
+## 2026-07-05 - STEEL_OPS_F8A_DXF_INTAKE - EN RAMA + PR - Fable
+
+- Rama `feature/steel-ops-f8a-layer-resilient-cad-engine` (base `origin/main = 874a439`, post F8 #62). PR `feat(steel): add DXF intake for structural takeoff`. Primera funcionalidad real del camino CAD: cargar DXF, leer entidades reales y generar evidencia estructural revisable, TODO en el navegador y detrás de `STEEL_OPS_UIX_PREVIEW`.
+- Motor nuevo `lib/steel/dxf/` (6 módulos puros, cero dependencias): `dxf-entities` (tipos TEXT/MTEXT/INSERT/LINE/LWPOLYLINE/DIMENSION con capa/handle/coords/rotación), `dxf-parser` (DXF ASCII con tracking de secciones — BLOCKS no cuenta como dibujado; %%C→Ø, \P→salto; binario/no legible ⇒ mensaje amable, sin crash), `dxf-structural-extractor` (LAYER-AWARE pero LAYER-RESILIENT: capas semánticas conf 0.95 / capas con nombre 0.9 / Layer 0-genéricas 0.75 con advertencia; ruido de rótulo filtrado SIEMPRE por reglas F7 + capa; filtro de prosa para menciones sin tipo; conteo gráfico por bloques INSERT o por repetición de textos (conf baja); conteos listados CANT/SON/TOTAL; hallazgos count_match/count_mismatch/graphic_count_unverified — jamás inventa), `dxf-quality-report` (CAD Drawing Quality Report: capas/textos/bloques/cotas/tablas sí-no, % capa dominante, confianza alto-medio-bajo, recomendación usable/usable_con_revision/baja_calidad_cad/no_confiable; orienta, no bloquea), `dxf-to-steel-evidence` (evidencia method `dxf` con capa/entidad/coords/fragmento; candidatos de notación vía detector F6A existente → líneas F3 con evidencia dxf que el Excel F4A.2 ya muestra sin tocar el export), `dxf-pdf-comparison` (DXF↔F7 opcional: match/dxf_only/pdf_only/conflict/needs_review — el DXF funciona solo).
+- Promoción de contrato: `lib/steel/research/steel-ext-2-schema.ts` → `lib/steel/structural-extraction-v2.ts` (fuente única; imports del spike F8 actualizados). Tipos ampliados aditivamente: `ManualLineEvidenceMethod` += 'dxf' y su label F6E.
+- UI: `dxf-intake-section.tsx` "Fuentes CAD / DXF" montada en el workspace del takeoff (paso 1, junto al intake PDF): carga .dxf client-side, resumen de entidades/capas, quality report visible, tabla de elementos (tipo/sección/Ø/capa/coords/confianza/fuente), hallazgos de conteo, comparación DXF↔PDF cuando hay análisis F7 (nuevo prop opcional `onAnalysisChange` en ManualPdfIntakeSection), y candidatos de notación aprobables manualmente → takeoff con evidencia dxf. Nada se auto-aprueba; F1 única calculadora.
+- Tests: 29 nuevos en `tests/unit/steel/dxf/` (los 20 del mandato + extras), fixtures 100% sintéticos generados por código. Guardas estáticas: módulos DXF sin red/DB/Supabase/env/storage y sin cálculo kg/costo.
+- SMOKE manual con DXF real local (C:\OPS_AGENT\steel-samples\2504_010A_R1_REFUERZO_VIGAS_CIMENTACION.dxf, ~14MB, FUERA del repo, jamás commiteado): 1.645 entidades en ~1.2s; calidad alto/usable; capas estructurales reconocidas (VIGAS/EstribosSeccVigas/TEXTO…); detecta las 12 vigas VC-EJE-1…VC-EJE-D con conf 0.95 (la nomenclatura que dolía en PDF); 96 símbolos de barra vinculados a VC-EJE-3 por cercanía; 118 candidatos de notación (E#3@12/E#3@25 honestamente needs_review por falta de longitud; 15 f1Ready); falso positivo "EN 8 PISOS"→EN-8 corregido con filtro de prosa; sin conteos listados en esta lámina ⇒ cero hallazgos inventados.
+- Restricciones: sin DB/Supabase/RLS/migraciones/storage/.env/APIs externas/keys; el DXF jamás se sube (File.text() en navegador); sin dependencias nuevas; sin tocar nav global/ACCESS_MODULES/NAV_ITEMS; sin archivos reales en Git; export Excel intacto.
+
+---
+
 ## 2026-07-05 - P2C1_GANTT_VIEWPORT_CONTEXT - EN RAMA + PR, SIN MERGE
 
 - Worktree: D:/ICONIC/SOFTWARE PRESUPUESTOS/construction-ops-p2c1-gantt-context. Rama: feature/p2c1-gantt-viewport-context. Base: origin/main post P2B3 (3e96501, incluye steel #60). Sin merge, sin deploy, sin tag. UI + lectura ligera.
@@ -12,6 +24,7 @@
 - Restricciones: sin Supabase Cloud, db push, migraciones, RLS, Vercel envs, DATABASE_URL, SMTP, usuarios reales, deploy, tag, merge, role-map, DB enum, construction-ops-1rqh, V5.7B, portal cliente, PDF presentacion, 6D ni librerias nuevas.
 
 ---
+
 ## 2026-07-05 - STEEL_OPS_F8_AEC_EXTRACTION_ENGINE_SPIKE - EN RAMA + PR, SIN MERGE - Fable
 
 - Rama `feature/steel-ops-f8-aec-extraction-engine-spike` (base `origin/main = b6f9c20`, post F7.1 #61). Spike exploratorio: investigación + prototipo aislado + decisión técnica. PR `research(steel): evaluate AEC extraction engines for structural plans`, SIN merge.

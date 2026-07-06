@@ -29,7 +29,7 @@ import {
   type Ext2GraphicCount,
   type Ext2TextCount,
   type SteelExt2Document,
-} from './steel-ext-2-schema';
+} from '../structural-extraction-v2';
 
 // ---------------------------------------------------------------------------
 // Parser DXF ASCII mínimo

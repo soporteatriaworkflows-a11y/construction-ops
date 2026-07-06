@@ -47,6 +47,7 @@ export const ELEMENT_EVIDENCE_METHOD_LABEL: Record<ManualLineEvidenceMethod, str
   native_text: 'Texto nativo',
   ocr: 'OCR',
   manual: 'Texto pegado/manual',
+  dxf: 'Entidad DXF (CAD)',
 };
 
 /**
