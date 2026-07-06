@@ -11,7 +11,7 @@ import { PageHeader } from '@/components/shared/page-header';
 import { Badge } from '@/components/ui/badge';
 import { resolveAuthenticatedViewer } from '@/server/auth/resolve-viewer';
 import { getScheduleDetailForViewer, getScheduleContextForViewer, displayWbs, ScheduleNotFoundError } from '@/server/planning';
-import { buildPlanningViewModel, mapScheduleToGantt } from '@/modules/planning';
+import { buildPlanningViewModel, buildScheduleDurationReport, mapScheduleToGantt } from '@/modules/planning';
 import { PlanningSummary } from '@/components/planning/planning-summary';
 import { ScheduleTable } from '@/components/planning/schedule-table';
 import { GanttChart } from '@/components/planning/gantt-chart';
@@ -126,6 +126,9 @@ export default async function ScheduleDetailPage({
   const activities = rawTasks.filter((t) => t.taskType === 'activity');
   const noApu = activities.filter((t) => !t.apuTemplateId).length;
   const noYield = activities.filter((t) => t.productivitySource === 'unknown').length;
+
+  // P2C4a: reporte puro de criterio de duración (sin queries; solo advierte).
+  const durationReport = buildScheduleDurationReport(workspaceTasks);
 
   // Nodos para las pestañas de la shell (Gantt/Trazabilidad/Edición), renderizados
   // por el servidor con los componentes existentes SIN modificarlos.
@@ -300,6 +303,27 @@ export default async function ScheduleDetailPage({
           criticalPath={canSeeCriticalPath ? vm.criticalPath : undefined}
         />
       </section>
+
+      {/* P2C4a: indicador global de criterio de duración — señal INTERNA de
+          calidad de datos (consulta NO lo ve). Solo advierte; nunca bloquea. */}
+      {!isClientSafe && (durationReport.outOfRangeCount > 0 || schedule.status === 'draft') && (
+        <section aria-label="Criterio de duración" className="mb-6 space-y-2">
+          {durationReport.outOfRangeCount > 0 && (
+            <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              Este cronograma dura {durationReport.totalDays} días. Hay {durationReport.outOfRangeCount}{' '}
+              actividad(es) fuera del rango sugerido
+              {durationReport.highCount > 0 && ` · ${durationReport.highCount} con duración inusualmente alta`}
+              {durationReport.lowCount > 0 && ` · ${durationReport.lowCount} con duración inusualmente baja`}
+              . Revisar antes de publicar.
+            </div>
+          )}
+          {schedule.status === 'draft' && (
+            <div className="rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+              Cronograma en borrador con datos estimados.
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Workspace maestro-detalle con pestañas (Tareas / Gantt / Trazabilidad / Edición). */}
       <ScheduleDetailShell

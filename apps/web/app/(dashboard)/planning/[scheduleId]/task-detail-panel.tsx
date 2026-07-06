@@ -15,6 +15,11 @@ import { Pencil } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ScheduleStatusBadge } from '@/components/planning/schedule-status-badge';
 import { formatDate, formatNumber } from '@/lib/utils/format';
+import {
+  classifyActivityDurationCategory,
+  evaluateActivityDuration,
+  getDurationWarningCopy,
+} from '@/modules/planning';
 import { isDelayed, type WorkspaceTask } from './schedule-workspace-filter';
 
 interface Props {
@@ -51,6 +56,20 @@ export function TaskDetailPanel({
     );
   }
   const isActivity = task.taskType === 'activity';
+  // P2C4a: criterio de duración (señal INTERNA; consulta no la ve). Sin
+  // categoría o dentro de rango ⇒ sin advertencia. Nunca bloquea nada.
+  const durationCategory =
+    isActivity && !task.isMilestone
+      ? classifyActivityDurationCategory(task.name, task.chapterName)
+      : null;
+  const durationVerdict = evaluateActivityDuration(
+    Number(task.plannedDurationDays),
+    durationCategory,
+  );
+  const durationWarning =
+    durationCategory && (durationVerdict === 'high' || durationVerdict === 'low')
+      ? getDurationWarningCopy(durationVerdict, durationCategory)
+      : null;
   return (
     <div className="space-y-3 rounded-md border border-gray-200 bg-white p-4">
       <div>
@@ -96,6 +115,11 @@ export function TaskDetailPanel({
       )}
 
       {/* Advertencias específicas de la tarea. */}
+      {!clientSafe && durationWarning && (
+        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          ⚠ {durationWarning}
+        </p>
+      )}
       {!clientSafe && task.productivitySource === 'manual' && (
         <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">⚠ Sin APU vinculado: duración manual (mínima).</p>
       )}
