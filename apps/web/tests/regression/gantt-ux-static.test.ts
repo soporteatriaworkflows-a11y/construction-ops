@@ -42,7 +42,12 @@ describe('P2_GANTT_UX static wiring', () => {
     expect(source).toContain('ganttColumnWidth(');
     expect(source).toContain('ganttFitZoom(');
     expect(source).toContain('column_width: columnWidth');
-    expect(source).toContain('max-h-[65vh] overflow-auto');
+    // P2C1: la caja de scroll es el propio .gantt-container (container_height
+    // numérico); el wrapper ya no scrollea y la leyenda queda fuera, debajo.
+    expect(source).toContain('container_height: containerHeight');
+    expect(source).toContain('ganttContainerHeight(tasks.length)');
+    expect(source).not.toContain('max-h-[65vh] overflow-auto');
+    expect(source.indexOf('frappe-gantt-container')).toBeLessThan(source.indexOf('<GanttLegend />'));
     const helper = read('modules/planning/gantt-zoom.ts');
     expect(helper).not.toContain('document.');
     expect(helper).not.toContain('window.');
@@ -111,6 +116,39 @@ describe('P2_GANTT_UX static wiring', () => {
     expect(form).toContain('Guardar duración');
     // Sin heuristicas de duracion en P2B3 (eso es P2B4).
     expect(form).not.toContain('duration-criteria');
+  });
+
+  it('P2C1: viewport del Gantt sin scroll anidado y leyenda fuera del area scrolleable', () => {
+    const shell = read('app/(dashboard)/planning/[scheduleId]/schedule-detail-shell.tsx');
+    const ganttBlock = shell.slice(shell.indexOf("tab === 'gantt'"), shell.indexOf("tab === 'trace'"));
+    expect(ganttBlock).not.toContain('max-h-[70vh]');
+    expect(ganttBlock).not.toContain('overflow-auto');
+    expect(ganttBlock).toContain('onClick={handleGanttClick}');
+    const helper = read('modules/planning/gantt-zoom.ts');
+    expect(helper).toContain('export function ganttContainerHeight');
+    expect(helper).toContain('GANTT_VIEWPORT_MIN_HEIGHT = 240');
+    expect(helper).toContain('GANTT_VIEWPORT_MAX_HEIGHT = 560');
+  });
+
+  it('P2C1: header con contexto Proyecto/Alcance/Presupuesto y fallbacks amables', () => {
+    const page = read('app/(dashboard)/planning/[scheduleId]/page.tsx');
+    expect(page).toContain('getScheduleContextForViewer(schedule.estimateVersionId)');
+    expect(page).toContain("{context?.projectName ?? 'Proyecto'}");
+    expect(page).toContain("Alcance: {context?.scopeName ?? 'Alcance no definido'}");
+    expect(page).toContain('Ver proyecto');
+    expect(page).toContain('Ver presupuesto');
+    // El link a presupuesto solo aparece con la cadena completa resuelta.
+    expect(page).toContain('{context?.estimateId && context.scopeId && context.projectId && (');
+    // Solo nombres/navegacion: el contexto NO consulta montos.
+    const repo = read('server/planning/repository.ts');
+    expect(repo).toContain('getScheduleContext(estimateVersionId: Uuid)');
+    // El select del contexto trae SOLO ids/nombres/estado — sin montos.
+    expect(repo).toContain(
+      "'id, version_number, status, estimates(id, name, project_scope_id, project_scopes(id, name, project_id, projects(id, name)))'",
+    );
+    const service = read('server/planning/service.ts');
+    expect(service).toContain('export async function getScheduleContextForViewer');
+    expect(service).toContain('return null;');
   });
 
   it('P1 client-safe no se revierte: gates de consulta en planning intactos', () => {

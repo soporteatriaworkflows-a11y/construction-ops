@@ -73,6 +73,24 @@ const GANTT_PADDING_DAYS_TOTAL: Record<GanttZoomViewMode, number> = {
   Month: 122,
 };
 
+/** Altura del viewport del Gantt (px): límites de la caja de scroll (P2C1). */
+export const GANTT_VIEWPORT_MIN_HEIGHT = 240;
+export const GANTT_VIEWPORT_MAX_HEIGHT = 560;
+
+/**
+ * Alto (px) de la caja de scroll interna del Gantt (`container_height` de
+ * frappe) según el número de barras. Aproxima el alto real del grid
+ * (encabezados 36+26+10 + fila = barra 22 + padding 12) más margen para la
+ * barra de scroll horizontal, y lo clampa para que: (a) cronogramas cortos no
+ * dejen un vacío enorme, (b) cronogramas largos scrolleen DENTRO de la caja y
+ * la barra horizontal quede siempre visible al borde inferior del viewport.
+ */
+export function ganttContainerHeight(taskCount: number): number {
+  if (!Number.isFinite(taskCount) || taskCount <= 0) return GANTT_VIEWPORT_MIN_HEIGHT;
+  const content = 72 + Math.round(taskCount) * 34 + 18;
+  return Math.min(GANTT_VIEWPORT_MAX_HEIGHT, Math.max(GANTT_VIEWPORT_MIN_HEIGHT, content));
+}
+
 /**
  * Restringe `zoom` al rango permitido de la escala; valores no finitos o <= 0
  * caen al default.

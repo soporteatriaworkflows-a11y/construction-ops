@@ -12,6 +12,19 @@
 
 ---
 
+## 2026-07-05 - P2C1_GANTT_VIEWPORT_CONTEXT - EN RAMA + PR, SIN MERGE
+
+- Worktree: D:/ICONIC/SOFTWARE PRESUPUESTOS/construction-ops-p2c1-gantt-context. Rama: feature/p2c1-gantt-viewport-context. Base: origin/main post P2B3 (3e96501, incluye steel #60). Sin merge, sin deploy, sin tag. UI + lectura ligera.
+- Viewport Gantt: la caja de scroll ahora es el propio .gantt-container de frappe via container_height NUMERICO (helper puro ganttContainerHeight: 72 + 34*barras + 18, clamp 240-560px). La barra horizontal queda pegada al borde inferior del viewport visible, sin bajar todo el grid. Se elimino el scroll anidado: wrapper de gantt-chart pasa a overflow-hidden (solo medicion de ancho para fit) y la shell pierde el max-h-[70vh] overflow-auto de la pestana Gantt.
+- Leyenda/controles: quedan fuera del area scrolleable por construccion (la leyenda ya se renderizaba despues del wrapper; al quitar el scroll externo queda abajo y fija).
+- Header contexto: breadcrumb "Proyecto {link} - Alcance: {nombre|Alcance no definido} - Presupuesto: {nombre vN | No disponible}" + acciones "Ver proyecto" (siempre, schedule.projectId) y "Ver presupuesto" (solo con cadena completa; ruta workspace con estimateId REAL de estimates, no versionId). SOLO nombres y navegacion, sin montos: client-safe.
+- Lectura: PlanningRepository.getScheduleContext (UNA consulta anidada RLS-bound version -> estimate -> scope -> project, patron loadGeneratorSource) + getScheduleContextForViewer en service que NUNCA lanza (fallo => null => fallback amable). Secuencial, disciplina P0B.
+- Sin drag/resize de barras, sin heuristicas/alertas de duracion, sin indicador global (P2C2/P2C4); sin cambios de permisos ni datos nuevos a consulta.
+- Tests: gantt-ux-static actualizado (container_height reemplaza max-h-[65vh]; leyenda tras el contenedor) + 2 bloques P2C1 (viewport sin scroll anidado; header/fallbacks/select solo-nombres) + 3 unit tests ganttContainerHeight.
+- Restricciones: sin Supabase Cloud, db push, migraciones, RLS, Vercel envs, DATABASE_URL, SMTP, usuarios reales, deploy, tag, merge, role-map, DB enum, construction-ops-1rqh, V5.7B, portal cliente, PDF presentacion, 6D ni librerias nuevas.
+
+---
+
 ## 2026-07-05 - STEEL_OPS_F8_AEC_EXTRACTION_ENGINE_SPIKE - EN RAMA + PR, SIN MERGE - Fable
 
 - Rama `feature/steel-ops-f8-aec-extraction-engine-spike` (base `origin/main = b6f9c20`, post F7.1 #61). Spike exploratorio: investigación + prototipo aislado + decisión técnica. PR `research(steel): evaluate AEC extraction engines for structural plans`, SIN merge.
