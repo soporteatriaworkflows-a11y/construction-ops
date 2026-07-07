@@ -6,6 +6,14 @@
 > **Estado del módulo:** preview interno con datos locales; sin conexión a
 > base de datos ni afectación de presupuestos reales.
 
+> ⚠️ **Pendiente F8F.1: golden beam sequence extraction para completar 4+4
+> longitudinales.** Bug funcional detectado con el plano real (VC-EJE-3):
+> la extracción todavía detecta solo la barra longitudinal inicial/final de
+> la secuencia cuando debería detectar 4 superiores + 4 inferiores. Se
+> corrige en la fase F8F.1 (fuera del alcance de F8G, que es solo QA/docs).
+> Al mergear F8F.1, revalidar la checklist §9 ("todos los textos del plano
+> están, en orden") y actualizar este documento si aplica.
+
 ---
 
 ## 1. Dónde revisar
@@ -275,7 +283,16 @@ sesión con rol admin/gerencia/presupuestos, tener un DXF de despiece real.
 Clasificación de lo encontrado en esta fase (ningún bug crítico):
 
 **Bug crítico**
-- Ninguno encontrado. El contrato F8F se comporta según lo validado.
+- Ninguno encontrado dentro del alcance de F8G (contrato F8F y flujo de
+  revisión se comportan según lo validado con fixtures sintéticos).
+
+**Bug funcional conocido — fuera del alcance F8G**
+- **Pendiente F8F.1: golden beam sequence extraction para completar 4+4
+  longitudinales.** Con el plano real, VC-EJE-3 todavía detecta solo la
+  barra longitudinal inicial/final en vez de 4 superiores + 4 inferiores.
+  Se corrige en F8F.1 (fase funcional separada); F8G no toca lógica de
+  extracción. Tras el merge de F8F.1: rebasear esta rama contra `main` y
+  revalidar §9.
 
 **Mejora UX menor**
 - `beam-detail-review-panel.tsx` §5 "Cálculo": la lista de explicaciones usa
