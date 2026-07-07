@@ -96,6 +96,68 @@ export interface ManualTakeoffRecord {
    * altera cálculos F1 de ml/kg.
    */
   commercialLengthsM?: readonly DecimalString[];
+  /**
+   * F8D: fuente del % de desperdicio del takeoff. `calculated` (default) =
+   * el desperdicio real lo reporta el optimizador FFD según barras
+   * comerciales/sobrantes; `manual` = factor comercial editable para
+   * presupuestar/margen. Son conceptos distintos y la UI/Excel dicen cuál es.
+   */
+  wasteMode?: TakeoffWasteMode;
+  /** % de desperdicio manual (solo aplica con `wasteMode: 'manual'`). */
+  manualWastePercent?: DecimalString;
+}
+
+// ---------------------------------------------------------------------------
+// Desperdicio: calculado (optimizador) vs factor manual (F8D)
+// ---------------------------------------------------------------------------
+
+export type TakeoffWasteMode = 'calculated' | 'manual';
+
+export const TAKEOFF_WASTE_MODE_LABEL: Record<TakeoffWasteMode, string> = {
+  calculated: 'Calculado por optimización',
+  manual: 'Factor manual',
+};
+
+/** Rango razonable del factor manual (%): 0–30. */
+export const MAX_MANUAL_WASTE_PCT = 30;
+
+export interface TakeoffWasteConfig {
+  mode: TakeoffWasteMode;
+  /** Presente solo cuando el modo es manual y el % es válido. */
+  manualWastePercent?: DecimalString;
+}
+
+/**
+ * Valida el factor manual de desperdicio digitado. Rechaza vacío, no
+ * numérico, negativos y valores fuera del rango razonable 0–30%.
+ */
+export function validateManualWastePercentInput(
+  raw: string,
+): { ok: true; pct: DecimalString } | { ok: false; reason: string } {
+  const trimmed = raw.trim().replace(',', '.');
+  if (trimmed.length === 0) return { ok: false, reason: 'Escribe un porcentaje de desperdicio.' };
+  const value = Number(trimmed);
+  if (!Number.isFinite(value)) return { ok: false, reason: 'El desperdicio debe ser un número (%).' };
+  if (value < 0) return { ok: false, reason: 'El desperdicio no puede ser negativo.' };
+  if (value > MAX_MANUAL_WASTE_PCT) {
+    return { ok: false, reason: `El factor manual supera el máximo razonable (${MAX_MANUAL_WASTE_PCT}%).` };
+  }
+  return { ok: true, pct: toDecimal(trimmed).toFixed() };
+}
+
+/**
+ * Configuración efectiva de desperdicio del takeoff. `manual` solo si el %
+ * guardado es válido; en cualquier otro caso cae a `calculated` (honesto:
+ * no se aplica un factor inválido en silencio).
+ */
+export function effectiveWasteConfig(
+  takeoff: Pick<ManualTakeoffRecord, 'wasteMode' | 'manualWastePercent'> | undefined,
+): TakeoffWasteConfig {
+  if (takeoff?.wasteMode === 'manual' && takeoff.manualWastePercent !== undefined) {
+    const validated = validateManualWastePercentInput(takeoff.manualWastePercent);
+    if (validated.ok) return { mode: 'manual', manualWastePercent: validated.pct };
+  }
+  return { mode: 'calculated' };
 }
 
 // ---------------------------------------------------------------------------
@@ -240,6 +302,8 @@ export interface ManualComputedLine {
   barLabel: string;
   totalPieces: DecimalString;
   wastePct: DecimalString;
+  /** F8D: de dónde salió el % de la línea (factor manual del takeoff o asumido por línea). */
+  wasteSource: 'manual' | 'assumed';
   wasteSeverity: 'ok' | 'warning' | 'critical';
   alerts: readonly SteelAlert[];
   priceStatus: SteelPriceStatusView;
@@ -273,20 +337,27 @@ function cutPlanExclusionReason(params: {
 /**
  * Descripción original → interpretación (parser F1) → cálculo (calculadora F1)
  * → alertas (evaluador F1). Idéntico camino al de la ingesta real futura.
+ * F8D: con `manualWastePct` (factor manual del takeoff) ese % reemplaza el
+ * asumido por línea — la fuente queda explícita en `wasteSource`.
  */
-export function computeManualLine(record: ManualLineRecord): ManualComputedLine {
+export function computeManualLine(
+  record: ManualLineRecord,
+  options: { manualWastePct?: DecimalString } = {},
+): ManualComputedLine {
   const parsed = parseSteelDescription(record.originalDescription);
   const baseInput = lineInputFromParsed(record.id, parsed);
   const barNumber = parsed.barNumber ?? record.manualBarNumber;
   const spec = barNumber ? findDefaultRebarSpec(barNumber) : undefined;
   const mockSpec = spec ? findMockSpecView(spec.technicalReference) : undefined;
+  const wasteSource: ManualComputedLine['wasteSource'] =
+    options.manualWastePct !== undefined ? 'manual' : 'assumed';
 
   const input: SteelLineInput = {
     ...baseInput,
     barNumber,
     steelSpecId: spec?.id,
     wasteMode: 'assumed',
-    assumedWastePct: record.assumedWastePct,
+    assumedWastePct: options.manualWastePct ?? record.assumedWastePct,
     unitPriceSnapshot: mockSpec?.priceCop,
     currency: 'COP',
   };
@@ -325,6 +396,7 @@ export function computeManualLine(record: ManualLineRecord): ManualComputedLine 
     barLabel: barNumber ? `#${barNumber}` : 'sin identificar',
     totalPieces,
     wastePct,
+    wasteSource,
     wasteSeverity,
     alerts,
     priceStatus: mockSpec?.priceStatus ?? 'sin_precio',
@@ -334,8 +406,11 @@ export function computeManualLine(record: ManualLineRecord): ManualComputedLine 
   };
 }
 
-export function computeManualLines(records: readonly ManualLineRecord[]): readonly ManualComputedLine[] {
-  return records.map(computeManualLine);
+export function computeManualLines(
+  records: readonly ManualLineRecord[],
+  options: { manualWastePct?: DecimalString } = {},
+): readonly ManualComputedLine[] {
+  return records.map((record) => computeManualLine(record, options));
 }
 
 // ---------------------------------------------------------------------------
@@ -536,7 +611,7 @@ export function buildManualOrderDraft(takeoffName: string, plan: SteelCutPlan): 
     });
 
   return {
-    name: `Pedido acero (mock) — ${takeoffName}`,
+    name: `Pedido acero (referencia) — ${takeoffName}`,
     status: 'draft',
     lines,
     totalUnits: totalUnits.toFixed(0),

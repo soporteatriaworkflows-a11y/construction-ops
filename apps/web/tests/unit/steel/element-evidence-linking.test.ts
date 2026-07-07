@@ -396,7 +396,8 @@ describe('la evidencia viaja a la línea manual F3 y al Excel F4A.2', () => {
     for (let col = 1; col <= 11; col += 1) values.push(String(row.getCell(col).value ?? ''));
     expect(values.join(' | ')).toContain('despiece-vigas.pdf');
     expect(values.join(' | ')).toContain('refuerzo_despiece');
-    expect(values.join(' | ')).toContain('native_text');
+    // F8D: el método de lectura se muestra en español en el Excel.
+    expect(values.join(' | ')).toContain('texto nativo PDF');
     expect(values.join(' | ')).toContain('5#5600');
   });
 

@@ -168,11 +168,12 @@ describe('F8C — Excel formula-first contrato VC-VERF', () => {
     expect(sheet.getCell('N3').value).toMatchObject({ formula: 'I3*J3*K3' });
   });
 
-  it('mantiene el estilo ICONIC en cantidades y CONFIG_VARILLAS', () => {
+  it('mantiene el estilo ICONIC (F8D: header suave con acento cyan) en cantidades y CONFIG_VARILLAS', () => {
     const header = cantidades.getRow(1).getCell(1);
-    expect((header.fill as ExcelJS.FillPattern | undefined)?.fgColor?.argb).toBe('FF020148');
+    expect((header.fill as ExcelJS.FillPattern | undefined)?.fgColor?.argb).toBe('FFE9F1FC');
+    expect(header.font?.color?.argb).toBe('FF1B1F3E');
     expect(header.border?.bottom?.color?.argb).toBe('FF00B8FF');
     const config = wb.getWorksheet('CONFIG_VARILLAS')!.getRow(1).getCell(1);
-    expect((config.fill as ExcelJS.FillPattern | undefined)?.fgColor?.argb).toBe('FF020148');
+    expect((config.fill as ExcelJS.FillPattern | undefined)?.fgColor?.argb).toBe('FFE9F1FC');
   });
 });

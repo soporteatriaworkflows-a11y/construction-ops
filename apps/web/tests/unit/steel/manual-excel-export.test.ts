@@ -133,7 +133,7 @@ describe('manual-excel-export (F4A)', () => {
       'estado',
       'ahorro ml',
       'ahorro kg',
-      'ahorro COP mock',
+      'ahorro COP (referencia)',
     ]);
     expect(wb.getWorksheet('EVIDENCIAS')!.getRow(1).values).toMatchObject([
       ,
@@ -221,9 +221,10 @@ describe('manual-excel-export (F4A)', () => {
     const evidencias = wb.getWorksheet('EVIDENCIAS')!;
     expect(evidencias.rowCount).toBe(3);
     // F7.1: sin fuente se dice explícitamente, nunca celda vacía.
+    // F8D: método y estado en español.
     expect(evidencias.getCell('D2').value).toBe('fuente no disponible');
-    expect(evidencias.getCell('G2').value).toBe('unknown');
-    expect(evidencias.getCell('K2').value).toBe('unreviewed');
+    expect(evidencias.getCell('G2').value).toBe('desconocido');
+    expect(evidencias.getCell('K2').value).toBe('Sin revisar');
   });
 
   it('exporta evidencia opcional en CONTROL_LECTURA, EVIDENCIAS y columnas finales de cantidades', () => {
@@ -280,11 +281,11 @@ describe('manual-excel-export (F4A)', () => {
     expect(evidencias.getCell('D3').value).toBe('plano-estructural.pdf');
     expect(evidencias.getCell('E3').value).toBe('5');
     expect(evidencias.getCell('F3').value).toBe('native_text');
-    expect(evidencias.getCell('G3').value).toBe('native_text');
+    expect(evidencias.getCell('G3').value).toBe('texto nativo PDF');
     expect(evidencias.getCell('H3').value).toBe('0.45');
     expect(evidencias.getCell('I3').value).toBe('Estribos 74E#3200');
     expect(evidencias.getCell('J3').value).toBe('Confirmar separacion');
-    expect(evidencias.getCell('K3').value).toBe('needs_review');
+    expect(evidencias.getCell('K3').value).toBe('Necesita revisión');
   });
 
   it('sanitiza texto peligroso en evidencia sin afectar formulas internas', () => {

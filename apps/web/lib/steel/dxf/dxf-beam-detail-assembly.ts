@@ -44,6 +44,20 @@ import {
   type DxfStructuralExtraction,
 } from './dxf-structural-extractor';
 import { DXF_EVIDENCE_METHOD, DXF_SOURCE_TYPE } from './dxf-to-steel-evidence';
+import {
+  entityViewAssignment,
+  segmentDxfViews,
+  viewForBeamKey,
+  viewForPoint,
+  type DxfViewSegmentation,
+  type DxfViewType,
+} from './dxf-view-segmentation';
+import {
+  buildStirrupSummaryContract,
+  resolveStirrupTakeoffChoice,
+  type StirrupSummaryContract,
+  type StirrupTakeoffChoice,
+} from './stirrup-summary-contract';
 
 // ---------------------------------------------------------------------------
 // Tipos
@@ -118,6 +132,8 @@ export interface BeamDetail {
   stirrupZonesTotal?: number;
   stirrupSummary?: StirrupSummary;
   zoneComparison?: StirrupZoneComparison;
+  /** F8D: contrato zonas vs resumen con estado y reglas de envío. */
+  stirrupContract?: StirrupSummaryContract;
   segmentCheck?: StirrupSegmentEvaluation;
   crossSectionMarkers: CrossSectionMarkers;
   sourceLayer: string;
@@ -125,6 +141,13 @@ export interface BeamDetail {
   sourceEntityHandles: readonly string[];
   sourceFragments: readonly string[];
   coordinates?: { x: number; y: number };
+  /** F8D: vista/detalle del DXF a la que pertenece el corte. */
+  viewId?: string;
+  viewType?: DxfViewType;
+  /** F8D: entidades cercanas EXCLUIDAS por pertenecer a otra vista. */
+  crossViewExcludedCount: number;
+  /** F8D: entidades cercanas EXCLUIDAS por caer entre dos vistas. */
+  ambiguousExcludedCount: number;
   confidence: number;
   warnings: readonly string[];
   status: 'ok' | 'missing_location' | 'requires_review';
@@ -186,6 +209,10 @@ function collectBarMarkers(
   entities: readonly DxfEntity[],
   anchor: Point,
   radius: number,
+  allowEntity: (entity: DxfEntity) => boolean = () => true,
+  // F8D: con vista segmentada el ámbito es LA VISTA (reach ∞); el radio se
+  // conserva para las guardas geométricas (tamaño de círculo, outliers).
+  reach: number = radius,
 ): BarMarker[] {
   const circles = entities.filter((e): e is DxfCircleEntity => e.type === 'CIRCLE');
   const inserts = entities.filter((e): e is DxfInsertEntity => e.type === 'INSERT');
@@ -194,7 +221,8 @@ function collectBarMarkers(
   for (const circle of circles) {
     if (!hasPoint(circle)) continue;
     if (isTitleLayer(circle.layer)) continue; // rótulo jamás cuenta
-    if (distance(circle, anchor) > radius) continue; // fuera del corte
+    if (!allowEntity(circle)) continue; // otra vista/franja ambigua (F8D)
+    if (distance(circle, anchor) > reach) continue; // fuera del corte
     // Un círculo enorme no es una varilla en sección (contornos, símbolos).
     if (circle.radius !== undefined && circle.radius > radius * 0.25) continue;
     candidates.push({
@@ -210,7 +238,11 @@ function collectBarMarkers(
   // (donut/bloque). Se exige repetición (≥2 del mismo bloque) para no contar
   // logos o referencias sueltas.
   const insertsInRegion = inserts.filter(
-    (insert) => hasPoint(insert) && !isTitleLayer(insert.layer) && distance(insert as Point, anchor) <= radius,
+    (insert) =>
+      hasPoint(insert) &&
+      !isTitleLayer(insert.layer) &&
+      allowEntity(insert) &&
+      distance(insert as Point, anchor) <= reach,
   );
   const byBlock = new Map<string, DxfInsertEntity[]>();
   for (const insert of insertsInRegion) {
@@ -302,11 +334,15 @@ function classifyMarkers(markers: readonly BarMarker[]): CrossSectionMarkers {
 export function assembleBeamDetails(
   parse: DxfParseSuccess,
   extraction: DxfStructuralExtraction,
+  options: { segmentation?: DxfViewSegmentation } = {},
 ): BeamDetail[] {
-  const schedule = buildBeamSchedule(parse, extraction);
+  // F8D: primero se segmentan las vistas/detalles independientes del DXF;
+  // el ensamblaje solo asocia entidades DENTRO de la vista de cada viga.
+  const segmentation = options.segmentation ?? segmentDxfViews(parse);
+  const schedule = buildBeamSchedule(parse, extraction, { segmentation });
   if (schedule.length === 0) return [];
   const radius = dxfNeighborhoodRadius(parse.entities) * 1.5;
-  return schedule.map((row) => assembleDetail(row, parse.entities, radius));
+  return schedule.map((row) => assembleDetail(row, parse.entities, radius, segmentation));
 }
 
 interface RegionText {
@@ -314,18 +350,47 @@ interface RegionText {
   line: string;
 }
 
-function assembleDetail(row: BeamScheduleRow, entities: readonly DxfEntity[], radius: number): BeamDetail {
+function assembleDetail(
+  row: BeamScheduleRow,
+  entities: readonly DxfEntity[],
+  radius: number,
+  segmentation: DxfViewSegmentation,
+): BeamDetail {
   const anchor = row.coordinates;
   const warnings: string[] = [];
   const fragments = new Set<string>([row.sourceText]);
   const handles = new Set<string>();
 
-  // Región del detalle: entidades dentro del radio alrededor del código.
+  // Vista de la viga (F8D): las entidades de OTRAS vistas jamás se asocian;
+  // las que caen entre dos vistas quedan ambiguas y también se excluyen.
+  const beamView =
+    viewForBeamKey(segmentation, row.elementKey, anchor) ??
+    (anchor ? viewForPoint(segmentation, anchor) : undefined);
+  const crossViewExcluded = new Set<DxfEntity>();
+  const ambiguousExcluded = new Set<DxfEntity>();
+  const allowEntity = (entity: DxfEntity): boolean => {
+    if (!beamView) return true; // sin segmentación clara ⇒ solo radio (F8C)
+    const assignment = entityViewAssignment(segmentation, entity);
+    if (assignment.ambiguous) {
+      ambiguousExcluded.add(entity);
+      return false;
+    }
+    if (assignment.viewId !== undefined && assignment.viewId !== beamView.viewId) {
+      crossViewExcluded.add(entity);
+      return false;
+    }
+    return true;
+  };
+
+  // Región del detalle: con vista segmentada el ámbito ES la vista completa
+  // (una viga larga excede el radio euclidiano); sin vista, solo el radio.
+  const reach = beamView ? Number.POSITIVE_INFINITY : radius;
   const regionTexts: RegionText[] = [];
   if (anchor) {
     for (const entity of entities) {
       if (!isDxfTextEntity(entity) || !hasPoint(entity)) continue;
-      if (distance(entity, anchor) > radius) continue;
+      if (distance(entity, anchor) > reach) continue;
+      if (!allowEntity(entity)) continue;
       for (const line of entity.rawText.split('\n')) {
         const trimmed = line.trim();
         if (trimmed.length === 0 || isTitleBlockNoise(trimmed, entity.layer)) continue;
@@ -336,7 +401,7 @@ function assembleDetail(row: BeamScheduleRow, entities: readonly DxfEntity[], ra
   }
 
   // ---- Marcadores del corte (shape-driven) --------------------------------
-  const markers = anchor ? collectBarMarkers(entities, anchor, radius) : [];
+  const markers = anchor ? collectBarMarkers(entities, anchor, radius, allowEntity, reach) : [];
   const crossSectionMarkers = classifyMarkers(markers);
   if (crossSectionMarkers.status === 'unavailable') {
     warnings.push('Sin marcadores gráficos de varilla en el corte: la cantidad de longitudinales requiere revisión.');
@@ -456,6 +521,38 @@ function assembleDetail(row: BeamScheduleRow, entities: readonly DxfEntity[], ra
   const zoneComparison = compareZonesWithSummary(zonesTotal, zones.length, summary);
   if (zoneComparison && zoneComparison.status !== 'match') warnings.push(zoneComparison.message);
 
+  // ---- Contrato de resumen de estribos (F8D) -------------------------------
+  let ambiguousZoneCount = 0;
+  for (const entity of ambiguousExcluded) {
+    if (!isDxfTextEntity(entity)) continue;
+    STIRRUP_ZONE_PATTERN.lastIndex = 0;
+    if (STIRRUP_ZONE_PATTERN.test(entity.rawText)) ambiguousZoneCount += 1;
+  }
+  const stirrupContract = buildStirrupSummaryContract({ summary, zones, ambiguousZoneCount });
+  if (stirrupContract && stirrupContract.comparisonStatus !== 'match') {
+    warnings.push(stirrupContract.message);
+  }
+
+  // ---- Transparencia de segmentación (F8D) ----------------------------------
+  if (crossViewExcluded.size > 0) {
+    warnings.push(
+      `${crossViewExcluded.size} entidad(es) cercanas pertenecen a OTRA vista del plano y quedaron excluidas del detalle (segmentación de vistas).`,
+    );
+  }
+  if (ambiguousExcluded.size > 0) {
+    warnings.push(
+      `${ambiguousExcluded.size} entidad(es) caen entre dos vistas (ambiguas) y quedaron excluidas: confirmar contra el plano.`,
+    );
+  }
+  if (!beamView && segmentation.views.length > 0) {
+    warnings.push('La viga no quedó dentro de una vista segmentada: la asociación usa solo el radio de vecindad.');
+  }
+  if (segmentation.views.length === 0) {
+    warnings.push(...segmentation.warnings);
+  } else if (beamView && beamView.confidence < 0.6) {
+    warnings.push(...beamView.warnings);
+  }
+
   const segmentCheck =
     summary?.lengthCm !== undefined && segmentNumbers.length >= 2
       ? evaluateStirrupSegmentSum(segmentNumbers, summary.lengthCm, { assumeSymmetry: true })
@@ -464,6 +561,7 @@ function assembleDetail(row: BeamScheduleRow, entities: readonly DxfEntity[], ra
   // ---- Estado y confianza ---------------------------------------------------
   const statusReasons: string[] = [...row.statusReasons];
   if (zoneComparison?.status === 'zone_count_mismatch') statusReasons.push(zoneComparison.message);
+  if (stirrupContract?.comparisonStatus === 'ambiguous') statusReasons.push(stirrupContract.message);
   if (crossSectionMarkers.status !== 'from_markers' && longitudinal.length > 0) {
     statusReasons.push('Cantidad de longitudinales sin conteo gráfico confiable.');
   }
@@ -489,6 +587,7 @@ function assembleDetail(row: BeamScheduleRow, entities: readonly DxfEntity[], ra
     stirrupZonesTotal: zonesTotal,
     stirrupSummary: summary,
     zoneComparison,
+    stirrupContract,
     segmentCheck,
     crossSectionMarkers,
     sourceLayer: row.layer,
@@ -496,6 +595,10 @@ function assembleDetail(row: BeamScheduleRow, entities: readonly DxfEntity[], ra
     sourceEntityHandles: [...handles],
     sourceFragments: [...fragments],
     coordinates: row.coordinates,
+    viewId: beamView?.viewId,
+    viewType: beamView?.type,
+    crossViewExcludedCount: crossViewExcluded.size,
+    ambiguousExcludedCount: ambiguousExcluded.size,
     confidence,
     warnings,
     status,
@@ -602,58 +705,31 @@ export function summarizeMarkersForQuality(details: readonly BeamDetail[]): Mark
 
 /**
  * Convierte UN beam detail en líneas F3 con evidencia dxf completa. Solo
- * entra lo verificable: el resumen de estribos interpretable por F1, y los
- * longitudinales cuya CANTIDAD viene del conteo gráfico (`4#6330` = 4
- * marcadores × varilla #6 de 330 cm). Lo demás queda en revisión, jamás se
- * inventa.
+ * entra lo verificable: los longitudinales cuya CANTIDAD viene del conteo
+ * gráfico (`4#6330` = 4 marcadores × varilla #6 de 330 cm) y, para estribos,
+ * SOLO el resumen sugerido del contrato F8D:
+ *
+ * - `match` ⇒ el resumen entra por defecto (jamás las zonas sueltas).
+ * - `mismatch`/`unverified` ⇒ NO se autoaprueba: requiere `stirrupChoice`
+ *   explícita de la usuaria (resumen del plano / suma por zonas).
+ * - `ambiguous` ⇒ no entra ni con elección (revisar segmentación primero).
  */
 export function beamDetailToManualLines(
   detail: BeamDetail,
   sourceFileName: string,
-  options: { assumedWastePct?: string } = {},
+  options: { assumedWastePct?: string; stirrupChoice?: StirrupTakeoffChoice } = {},
 ): readonly Omit<ManualLineRecord, 'id'>[] {
   const assumedWastePct = options.assumedWastePct ?? '5';
   const lines: Array<Omit<ManualLineRecord, 'id'>> = [];
 
-  const baseEvidence = {
-    sourceFileName,
-    pageNumber: 1,
-    sourceType: DXF_SOURCE_TYPE,
-    readingMethod: DXF_EVIDENCE_METHOD,
-    elementKey: detail.beamKey,
-    locationText: detail.locationText,
-    beamDetailId: detail.beamDetailId,
-  };
+  const stirrupLine = stirrupChoiceToManualLine(detail, sourceFileName, {
+    assumedWastePct,
+    stirrupChoice: options.stirrupChoice,
+  });
+  if (stirrupLine) lines.push(stirrupLine);
 
-  const observationBase = [
-    `Viga ${detail.beamKey}`,
-    detail.locationText ? `Ubicación ${detail.locationText}` : undefined,
-    detail.sectionSpec ? `Sección ${detail.sectionSpec}` : undefined,
-    `Capa: ${detail.sourceLayer}`,
-    detail.sourceColor !== undefined ? `Color ACI ${detail.sourceColor}` : undefined,
-    detail.coordinates ? `Coords (${detail.coordinates.x.toFixed(1)}, ${detail.coordinates.y.toFixed(1)})` : undefined,
-    detail.sourceEntityHandles.length > 0 ? `Handles: ${detail.sourceEntityHandles.slice(0, 6).join(',')}` : undefined,
-  ].filter((part): part is string => Boolean(part));
-
-  if (detail.stirrupSummary) {
-    lines.push({
-      originalDescription: detail.stirrupSummary.normalized,
-      assumedWastePct,
-      evidence: {
-        ...baseEvidence,
-        position: 'estribo',
-        confidence: detail.zoneComparison?.status === 'match' ? '0.9' : '0.75',
-        originalFragment: detail.stirrupSummary.raw,
-        observation: [
-          ...observationBase,
-          'Posición: estribos/flejado',
-          detail.zoneComparison?.message,
-        ]
-          .filter((part): part is string => Boolean(part))
-          .join(' · '),
-      },
-    });
-  }
+  const baseEvidence = beamDetailBaseEvidence(detail, sourceFileName);
+  const observationBase = beamDetailObservationBase(detail);
 
   for (const reading of [...detail.topLongitudinalBars, ...detail.bottomLongitudinalBars]) {
     if (reading.quantityFromGraphic === undefined || !reading.cutLengthM) continue;
@@ -677,4 +753,73 @@ export function beamDetailToManualLines(
   }
 
   return lines;
+}
+
+function beamDetailBaseEvidence(detail: BeamDetail, sourceFileName: string) {
+  return {
+    sourceFileName,
+    pageNumber: 1,
+    sourceType: DXF_SOURCE_TYPE,
+    readingMethod: DXF_EVIDENCE_METHOD,
+    elementKey: detail.beamKey,
+    locationText: detail.locationText,
+    beamDetailId: detail.beamDetailId,
+  };
+}
+
+function beamDetailObservationBase(detail: BeamDetail): string[] {
+  return [
+    `Viga ${detail.beamKey}`,
+    detail.locationText ? `Ubicación ${detail.locationText}` : undefined,
+    detail.sectionSpec ? `Sección ${detail.sectionSpec}` : undefined,
+    `Capa: ${detail.sourceLayer}`,
+    detail.sourceColor !== undefined ? `Color ACI ${detail.sourceColor}` : undefined,
+    detail.coordinates ? `Coords (${detail.coordinates.x.toFixed(1)}, ${detail.coordinates.y.toFixed(1)})` : undefined,
+    detail.sourceEntityHandles.length > 0 ? `Handles: ${detail.sourceEntityHandles.slice(0, 6).join(',')}` : undefined,
+    detail.viewId ? `Vista ${detail.viewId}` : undefined,
+  ].filter((part): part is string => Boolean(part));
+}
+
+/**
+ * Línea de ESTRIBOS de un beam detail según el contrato F8D. Sin elección:
+ * solo `match` produce línea (el resumen sugerido). Con elección explícita
+ * de la usuaria se resuelve resumen del plano o suma por zonas — nunca en
+ * `ambiguous` y nunca `mark_for_review`.
+ */
+export function stirrupChoiceToManualLine(
+  detail: BeamDetail,
+  sourceFileName: string,
+  options: { assumedWastePct?: string; stirrupChoice?: StirrupTakeoffChoice } = {},
+): Omit<ManualLineRecord, 'id'> | null {
+  const contract = detail.stirrupContract;
+  if (!contract) return null;
+  const assumedWastePct = options.assumedWastePct ?? '5';
+
+  let description: string;
+  let note: string;
+  let confidence: string;
+  if (options.stirrupChoice) {
+    const resolution = resolveStirrupTakeoffChoice(contract, options.stirrupChoice);
+    if (!resolution.ok) return null;
+    description = resolution.description;
+    note = resolution.note;
+    confidence = '0.7';
+  } else {
+    if (contract.comparisonStatus !== 'match' || !contract.suggestedTakeoffLine) return null;
+    description = contract.suggestedTakeoffLine;
+    note = contract.message;
+    confidence = '0.9';
+  }
+
+  return {
+    originalDescription: description,
+    assumedWastePct,
+    evidence: {
+      ...beamDetailBaseEvidence(detail, sourceFileName),
+      position: 'estribo',
+      confidence,
+      originalFragment: contract.declaredRaw ?? contract.zones[0]?.sourceText,
+      observation: [...beamDetailObservationBase(detail), 'Posición: estribos/flejado', note].join(' · '),
+    },
+  };
 }
