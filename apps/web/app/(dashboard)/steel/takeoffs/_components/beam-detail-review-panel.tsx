@@ -1,9 +1,13 @@
 /**
  * beam-detail-review-panel.tsx — Panel lateral "Ver detalle" de una viga
- * (F8D-B). El listado compacto no puede cargar todo el contenido en celdas
- * angostas: este panel muestra el detalle COMPLETO — resumen, superior,
- * inferior, estribos con el contrato zonas vs resumen (y la decisión humana
- * cuando hay desfase), cálculo legible y evidencia CAD. Nada se autoaprueba.
+ * (F8D-B, accionable desde F8F). El listado compacto no puede cargar todo el
+ * contenido en celdas angostas: este panel muestra el detalle COMPLETO y
+ * permite ACTUAR sobre cada barra — editar cantidad/longitud, marcar para
+ * revisión y asignar banda a las barras sin clasificar — antes del único
+ * "Enviar al takeoff". Regla F8F: cada texto longitudinal válido es UNA
+ * línea computable con cantidad 1 por aparición textual DXF (editable); los
+ * marcadores gráficos son evidencia de apoyo, jamás requisito. Nada se
+ * autoaprueba.
  */
 'use client';
 
@@ -17,6 +21,8 @@ import { explainSteelCalculation } from '@/lib/steel/steel-calculation-explanati
 import {
   buildBeamTakeoffDispatch,
   type BeamDetail,
+  type LongitudinalBarDecision,
+  type LongitudinalBarReading,
 } from '@/lib/steel/dxf/dxf-beam-detail-assembly';
 import { BEAM_SCHEDULE_STATUS_LABEL } from '@/lib/steel/dxf/beam-schedule';
 import { DXF_VIEW_TYPE_LABEL } from '@/lib/steel/dxf/dxf-view-segmentation';
@@ -57,35 +63,195 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-function LongitudinalRows({ bars }: { bars: BeamDetail['topLongitudinalBars'] }) {
+type DecisionMap = Readonly<Record<string, LongitudinalBarDecision>>;
+
+/** Evidencia de marcadores como texto de apoyo (jamás bloquea). */
+function markerEvidenceText(bar: LongitudinalBarReading): string {
+  if (bar.markerEvidence !== undefined) {
+    return `apoyo visual: ${bar.markerEvidence} marcador(es), confianza ${bar.markerConfidence ?? 'bajo'}`;
+  }
+  return 'no confiables / no disponibles';
+}
+
+/** Estado accionable de una barra dentro del panel. */
+function barStateText(decision: LongitudinalBarDecision | undefined, unclassified: boolean): string {
+  if (decision?.markForReview) return 'marcada para revisión — no se envía';
+  if (unclassified) {
+    if (decision?.assignPosition) return `asignada a ${decision.assignPosition} — computable, pendiente de aprobación`;
+    if (decision?.acceptUnclassified) return 'aceptada sin clasificar — computable, pendiente de aprobación';
+    return 'requiere decisión de banda — no se envía sin asignación';
+  }
+  return 'computable, pendiente de aprobación';
+}
+
+/**
+ * Filas accionables de una banda longitudinal: cantidad y longitud editables,
+ * fuente de la cantidad visible y acciones por barra. Para "sin clasificar"
+ * agrega asignar a superior/inferior, mantener o aceptar sin clasificar.
+ */
+function LongitudinalRows({
+  bars,
+  decisions,
+  onDecision,
+  disabled,
+  unclassified = false,
+}: {
+  bars: readonly LongitudinalBarReading[];
+  decisions: DecisionMap;
+  onDecision: (readingId: string, patch: LongitudinalBarDecision) => void;
+  disabled?: boolean;
+  unclassified?: boolean;
+}) {
   if (bars.length === 0) return <p className="text-xs text-iconic-graphite/50">Sin barras detectadas en esta banda.</p>;
   return (
-    <table className="mt-1 w-full text-left text-[11px]">
-      <thead>
-        <tr className="text-iconic-graphite/50">
-          <th scope="col" className="py-0.5 pr-2">Texto original</th>
-          <th scope="col" className="py-0.5 pr-2">Normalizado</th>
-          <th scope="col" className="py-0.5 pr-2">Cant. gráfica</th>
-          <th scope="col" className="py-0.5">Fuente cantidad</th>
-        </tr>
-      </thead>
-      <tbody>
-        {bars.map((bar) => (
-          <tr key={`${bar.sourceText}-${bar.description}`} className="border-t border-iconic-soft-blue/15 align-top">
-            <td className="py-1 pr-2 font-mono">{bar.sourceText}</td>
-            <td className="py-1 pr-2 font-mono">{bar.description}</td>
-            <td className="py-1 pr-2">{bar.quantityFromGraphic ?? '¿?'}</td>
-            <td className="py-1">
-              {bar.quantityStatus === 'from_markers' ? (
-                <Badge variant="success">conteo gráfico de marcadores</Badge>
-              ) : (
-                <Badge variant="warning">requiere revisión</Badge>
+    <div className="mt-1 space-y-2">
+      {bars.map((bar) => {
+        const decision = decisions[bar.readingId];
+        const marked = decision?.markForReview === true;
+        return (
+          <div key={bar.readingId} className="rounded border border-iconic-soft-blue/25 p-2 text-[11px]">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="font-mono">{bar.sourceText}</span>
+              <span className="text-iconic-graphite/50">→</span>
+              <span className="font-mono font-semibold">{bar.description}</span>
+              <Badge variant="secondary">#{bar.barCode}</Badge>
+              <Badge variant={marked ? 'warning' : 'secondary'}>{barStateText(decision, unclassified)}</Badge>
+            </div>
+            <dl className="mt-1 grid grid-cols-2 gap-x-4 gap-y-0.5">
+              <Field
+                label="Cantidad"
+                value={
+                  decision?.quantity !== undefined
+                    ? `${decision.quantity} (editada por la usuaria)`
+                    : `${bar.quantity} por aparición textual DXF`
+                }
+              />
+              <Field label="Marcadores gráficos" value={markerEvidenceText(bar)} />
+              <Field
+                label="Longitud corte"
+                value={
+                  decision?.cutLengthM !== undefined
+                    ? `${decision.cutLengthM} m (editada)`
+                    : bar.cutLengthM
+                      ? `${bar.cutLengthM} m`
+                      : 'no legible'
+                }
+              />
+              <Field label="Fuente cantidad" value={decision?.quantity !== undefined ? 'editada por la usuaria' : bar.quantitySource} />
+            </dl>
+            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+              <label className="flex items-center gap-1">
+                <span className="text-iconic-graphite/50">Cantidad:</span>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  disabled={disabled}
+                  value={decision?.quantity ?? bar.quantity}
+                  aria-label={`Editar cantidad de ${bar.description}`}
+                  onChange={(event) => {
+                    const value = Number(event.target.value);
+                    onDecision(bar.readingId, {
+                      quantity: Number.isFinite(value) && value >= 1 ? Math.floor(value) : undefined,
+                    });
+                  }}
+                  className="w-16 rounded border border-iconic-soft-blue/40 px-1 py-0.5 text-[11px]"
+                />
+              </label>
+              <label className="flex items-center gap-1">
+                <span className="text-iconic-graphite/50">Longitud (m):</span>
+                <input
+                  type="number"
+                  min={0.1}
+                  step={0.05}
+                  disabled={disabled}
+                  value={decision?.cutLengthM ?? bar.cutLengthM ?? ''}
+                  aria-label={`Editar longitud de ${bar.description}`}
+                  onChange={(event) => {
+                    const raw = event.target.value.trim();
+                    onDecision(bar.readingId, {
+                      cutLengthM: raw.length > 0 && Number(raw) > 0 ? raw : undefined,
+                    });
+                  }}
+                  className="w-20 rounded border border-iconic-soft-blue/40 px-1 py-0.5 text-[11px]"
+                />
+              </label>
+              <Button
+                type="button"
+                size="sm"
+                variant={marked ? 'ghost' : 'outline'}
+                disabled={disabled}
+                aria-pressed={!marked}
+                onClick={() => onDecision(bar.readingId, { markForReview: false })}
+              >
+                Aceptar línea
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={marked ? 'default' : 'ghost'}
+                disabled={disabled}
+                aria-pressed={marked}
+                onClick={() => onDecision(bar.readingId, { markForReview: !marked })}
+              >
+                Marcar para revisión
+              </Button>
+              {unclassified && (
+                <>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={decision?.assignPosition === 'superior' ? 'default' : 'outline'}
+                    disabled={disabled}
+                    aria-pressed={decision?.assignPosition === 'superior'}
+                    onClick={() =>
+                      onDecision(bar.readingId, { assignPosition: 'superior', acceptUnclassified: undefined })
+                    }
+                  >
+                    Asignar a superior
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={decision?.assignPosition === 'inferior' ? 'default' : 'outline'}
+                    disabled={disabled}
+                    aria-pressed={decision?.assignPosition === 'inferior'}
+                    onClick={() =>
+                      onDecision(bar.readingId, { assignPosition: 'inferior', acceptUnclassified: undefined })
+                    }
+                  >
+                    Asignar a inferior
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={decision?.acceptUnclassified ? 'default' : 'outline'}
+                    disabled={disabled}
+                    aria-pressed={decision?.acceptUnclassified === true}
+                    onClick={() =>
+                      onDecision(bar.readingId, { assignPosition: undefined, acceptUnclassified: true })
+                    }
+                  >
+                    Aceptar sin clasificar
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    disabled={disabled}
+                    onClick={() =>
+                      onDecision(bar.readingId, { assignPosition: undefined, acceptUnclassified: undefined })
+                    }
+                  >
+                    Mantener sin clasificar
+                  </Button>
+                </>
               )}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+            </div>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -104,12 +270,22 @@ export function BeamDetailReviewPanel({
 }) {
   const contract = detail.stirrupContract;
   const [stirrupDecision, setStirrupDecision] = useState<StirrupTakeoffChoice | null>(null);
+  const [decisions, setDecisions] = useState<DecisionMap>({});
   const [sentInfo, setSentInfo] = useState<string | null>(null);
 
-  // F8E: el envío es UNO solo — superior + inferior + estribo (según decisión).
+  function updateDecision(readingId: string, patch: LongitudinalBarDecision) {
+    setDecisions((current) => ({ ...current, [readingId]: { ...current[readingId], ...patch } }));
+    setSentInfo(null);
+  }
+
+  // F8E/F8F: el envío es UNO solo — superior + inferior + decisiones + estribo.
   const dispatch = useMemo(
-    () => buildBeamTakeoffDispatch(detail, fileName, { stirrupChoice: stirrupDecision ?? undefined }),
-    [detail, fileName, stirrupDecision],
+    () =>
+      buildBeamTakeoffDispatch(detail, fileName, {
+        stirrupChoice: stirrupDecision ?? undefined,
+        decisions,
+      }),
+    [detail, fileName, stirrupDecision, decisions],
   );
 
   // "Ver cálculo": explicación F1 de cada línea candidata (sin persistir nada).
@@ -125,7 +301,9 @@ export function BeamDetailReviewPanel({
     if (dispatch.lines.length === 0) return;
     onAddLines(dispatch.lines);
     setSentInfo(
-      `${dispatch.lines.length} línea(s) enviadas: ${dispatch.topCount} superior, ${dispatch.bottomCount} inferior, ${dispatch.stirrupIncluded ? 1 : 0} estribo.`,
+      `${dispatch.lines.length} línea(s) enviadas: ${dispatch.topCount} superior, ${dispatch.bottomCount} inferior, ${
+        dispatch.unclassifiedCount > 0 ? `${dispatch.unclassifiedCount} sin clasificar, ` : ''
+      }${dispatch.stirrupIncluded ? 1 : 0} estribo.`,
     );
   }
 
@@ -191,11 +369,11 @@ export function BeamDetailReviewPanel({
           </ul>
         )}
 
-        {/* 2/3. Longitudinales — lista COMPLETA en secuencia, jamás truncada */}
+        {/* 2/3. Longitudinales — lista COMPLETA en secuencia, accionable */}
         <SectionHeading>2 · Refuerzo superior ({detail.topLongitudinalBars.length} items)</SectionHeading>
-        <LongitudinalRows bars={detail.topLongitudinalBars} />
+        <LongitudinalRows bars={detail.topLongitudinalBars} decisions={decisions} onDecision={updateDecision} disabled={disabled} />
         <SectionHeading>3 · Refuerzo inferior ({detail.bottomLongitudinalBars.length} items)</SectionHeading>
-        <LongitudinalRows bars={detail.bottomLongitudinalBars} />
+        <LongitudinalRows bars={detail.bottomLongitudinalBars} decisions={decisions} onDecision={updateDecision} disabled={disabled} />
         {detail.unclassifiedLongitudinalBars.length > 0 && (
           <>
             <SectionHeading>
@@ -203,9 +381,16 @@ export function BeamDetailReviewPanel({
             </SectionHeading>
             <InlineCallout tone="warning" className="mt-1" title="Textos longitudinales sin banda clara">
               Estos textos se detectaron dentro de la vista pero no quedó clara su banda
-              superior/inferior: no se envían al takeoff sin revisión.
+              superior/inferior. La línea NO se congela: asígnala a superior/inferior, acéptala sin
+              clasificar o mantenla en revisión — se envía solo con tu decisión.
             </InlineCallout>
-            <LongitudinalRows bars={detail.unclassifiedLongitudinalBars} />
+            <LongitudinalRows
+              bars={detail.unclassifiedLongitudinalBars}
+              decisions={decisions}
+              onDecision={updateDecision}
+              disabled={disabled}
+              unclassified
+            />
           </>
         )}
 
@@ -275,7 +460,8 @@ export function BeamDetailReviewPanel({
         <SectionHeading>5 · Cálculo (fórmulas F1)</SectionHeading>
         {explanations.length === 0 ? (
           <p className="text-xs text-iconic-graphite/50">
-            No hay líneas verificables listas para calcular (cantidades sin conteo gráfico o estribos sin coincidencia).
+            No hay líneas computables listas para calcular (longitudes ilegibles, barras marcadas
+            para revisión o estribos sin coincidencia).
           </p>
         ) : (
           <ul className="mt-1 space-y-2">
@@ -351,9 +537,10 @@ export function BeamDetailReviewPanel({
           </div>
         </div>
         <p className="mt-1 text-[11px] text-iconic-graphite/50">
-          Se envía cada barra superior/inferior con cantidad por conteo gráfico y UNA línea de
-          estribos: el resumen sugerido cuando zonas y resumen coinciden, o la opción elegida arriba
-          cuando hay desfase. Lo ambiguo y lo que requiere definir cantidad NO entra al takeoff.
+          Cada texto longitudinal superior/inferior se envía como una línea computable con cantidad 1
+          por aparición textual DXF, editable por la usuaria; los marcadores gráficos se usan como
+          evidencia de apoyo. Estribos: UNA línea — el resumen sugerido cuando zonas y resumen
+          coinciden, o la opción elegida arriba cuando hay desfase. Lo ambiguo no entra al takeoff.
         </p>
       </div>
     </div>

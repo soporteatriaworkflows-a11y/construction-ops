@@ -233,13 +233,17 @@ describe('F8E-A/E — VC-EJE-3: secuencia longitudinal completa', () => {
     expect(bottom[0]?.position).toBe('inferior');
   });
 
-  it('4 marcadores arriba/abajo ⇒ cantidad gráfica 4 en cada banda', () => {
+  it('F8F: cantidad 1 por aparición textual; 4 marcadores por banda como EVIDENCIA de apoyo', () => {
     for (const bar of detail.topLongitudinalBars) {
-      expect(bar.quantityFromGraphic).toBe(4);
-      expect(bar.quantityStatus).toBe('from_markers');
+      expect(bar.quantity).toBe(1);
+      expect(bar.quantityMode).toBe('textual_occurrence');
+      expect(bar.quantitySource).toBe('aparición textual DXF');
+      expect(bar.markerEvidence).toBe(4);
+      expect(bar.markerConfidence).toBeDefined();
     }
     for (const bar of detail.bottomLongitudinalBars) {
-      expect(bar.quantityFromGraphic).toBe(4);
+      expect(bar.quantity).toBe(1);
+      expect(bar.markerEvidence).toBe(4);
     }
   });
 
@@ -279,7 +283,10 @@ describe('F8E-B — banda superior/inferior y sin_clasificar', () => {
     const ambiguousBar = detail.unclassifiedLongitudinalBars[0];
     expect(ambiguousBar?.description).toBe('6#6555');
     expect(ambiguousBar?.position).toBe('sin_clasificar');
-    expect(ambiguousBar?.quantityStatus).toBe('requires_review');
+    // F8F: la barra sigue siendo computable (cantidad 1 textual); lo que
+    // falta es la DECISIÓN de banda, no la cantidad.
+    expect(ambiguousBar?.quantity).toBe(1);
+    expect(ambiguousBar?.quantityMode).toBe('textual_occurrence');
     expect(detail.warnings.join(' ')).toContain('Sin clasificar / revisar');
     expect(detail.status).toBe('requires_review');
   });
@@ -355,18 +362,25 @@ describe('F8E-C — Takeoff Dispatch Contract', () => {
     expect(dispatch.stirrupIncluded).toBe(true);
     expect(dispatch.previewText).toBe('Se enviarán 9 línea(s): 4 superior, 4 inferior, 1 estribo.');
     const descriptions = dispatch.lines.map((l) => l.originalDescription);
-    // Cantidad gráfica 4, jamás el 6 del texto.
+    // F8F: la descripción es el texto normalizado del plano; la cantidad va
+    // en manualQuantity = 1 por aparición textual (jamás el 6 del texto).
     expect(descriptions).toEqual([
-      '4#6330',
-      '4#6840',
-      '4#6900',
-      '4#6350',
-      '4#6440',
-      '4#6840',
-      '4#6730',
-      '4#6400',
+      '6#6330',
+      '6#6840',
+      '6#6900',
+      '6#6350',
+      '6#6440',
+      '6#6840',
+      '6#6730',
+      '6#6400',
       '2x141E#3184',
     ]);
+    for (const line of dispatch.lines) {
+      if (line.evidence?.position === 'estribo') continue;
+      expect(line.manualQuantity).toBe('1');
+      expect(line.manualCutLengthM).toBeDefined();
+      expect(line.evidence?.quantityMode).toBe('textual_occurrence');
+    }
   });
 
   it('mismatch SIN decisión ⇒ solo longitudinales + estribo bloqueado con motivo', () => {
@@ -411,14 +425,18 @@ describe('F8E-C — Takeoff Dispatch Contract', () => {
     expect(dispatch.stirrupBlockedReason).toBeDefined();
   });
 
-  it('sin marcadores ⇒ barras NO entran (requiere definir cantidad) y se explica', () => {
+  it('F8F: sin marcadores las barras SÍ entran con cantidad 1 por aparición textual', () => {
     const dispatch = buildBeamTakeoffDispatch(detailOf(vcEje3Dxf({ withMarkers: false })), 'vigas.dxf');
-    // Solo el estribo (match) es computable ⇒ 1 línea y explicación visible.
-    expect(dispatch.lines.length).toBe(1);
+    // Las 8 longitudinales son computables (cantidad 1 textual) + el estribo.
+    expect(dispatch.lines.length).toBe(9);
     expect(dispatch.stirrupIncluded).toBe(true);
-    expect(dispatch.skippedBars.length).toBe(8);
-    expect(dispatch.skippedBars.every((bar) => bar.reason.includes('Requiere definir cantidad'))).toBe(true);
-    expect(dispatch.explanations.join(' ')).toContain('NO se envían');
+    expect(dispatch.skippedBars.length).toBe(0);
+    for (const line of dispatch.lines) {
+      if (line.evidence?.position === 'estribo') continue;
+      expect(line.manualQuantity).toBe('1');
+      expect(line.evidence?.quantityMode).toBe('textual_occurrence');
+      expect(line.evidence?.observation).toContain('no confiables / no disponibles');
+    }
   });
 
   it('al takeoff SOLO entran líneas computables: cantidad + longitud + varilla', () => {

@@ -78,6 +78,10 @@ export interface ManualExcelLineEvidence {
   elementKey?: string;
   /** F8C: ubicación/eje de origen ("EJE A-B"). */
   locationText?: string;
+  /** F8F: modo de cantidad (textual_occurrence / graphic_marker / manual / unresolved). */
+  quantityMode?: string;
+  /** F8F: fuente legible de la cantidad ("aparición textual DXF"). */
+  quantitySource?: string;
 }
 
 export interface ManualExcelExportInput {
@@ -173,6 +177,19 @@ function readingMethodLabel(method: string | undefined | null): string {
   return READING_METHOD_LABEL[String(method)] ?? String(method);
 }
 
+/** Etiquetas en español para el modo de cantidad (F8F). */
+const QUANTITY_MODE_LABEL: Record<string, string> = {
+  textual_occurrence: 'cantidad por aparición textual DXF',
+  graphic_marker: 'conteo gráfico de marcadores',
+  manual: 'cantidad editada por la usuaria',
+  unresolved: 'cantidad sin resolver',
+};
+
+function quantityModeLabel(mode: string | undefined | null): string {
+  if (!mode) return '';
+  return QUANTITY_MODE_LABEL[String(mode)] ?? String(mode);
+}
+
 function verificationLabel(status: string | undefined | null): string {
   if (!status) return VERIFICATION_STATUS_LABEL.unreviewed!;
   return VERIFICATION_STATUS_LABEL[String(status)] ?? String(status);
@@ -202,6 +219,8 @@ function lineEvidence(line: ManualComputedLine): ManualExcelLineEvidence {
     reviewStatus: nested.reviewStatus ?? record.reviewStatus ?? direct.reviewStatus,
     elementKey: nested.elementKey ?? record.elementKey ?? direct.elementKey,
     locationText: nested.locationText ?? record.locationText ?? direct.locationText,
+    quantityMode: nested.quantityMode ?? record.quantityMode ?? direct.quantityMode,
+    quantitySource: nested.quantitySource ?? record.quantitySource ?? direct.quantitySource,
   };
 }
 
@@ -429,6 +448,7 @@ function addEvidenciasSheet(wb: ExcelJS.Workbook, takeoff: ManualTakeoffRecord, 
     'fragmento original',
     'observaciones',
     'estado revision',
+    'modo cantidad',
   ]);
 
   lines.forEach((line) => {
@@ -445,11 +465,12 @@ function addEvidenciasSheet(wb: ExcelJS.Workbook, takeoff: ManualTakeoffRecord, 
       cellText(evidence.originalFragment),
       cellText(evidence.observation),
       cellText(verificationLabel(evidence.reviewStatus ?? line.calculated.verificationStatus)),
+      cellText(quantityModeLabel(evidence.quantityMode)),
     ]);
     styleConfidenceCell(row.getCell(8), evidence.confidence);
     styleStatusCell(row.getCell(11), String(evidence.reviewStatus ?? line.calculated.verificationStatus ?? 'unreviewed'));
   });
-  finishTable(ws, [18, 22, 30, 28, 10, 16, 16, 12, 46, 42, 18]);
+  finishTable(ws, [18, 22, 30, 28, 10, 16, 16, 12, 46, 42, 18, 26]);
 }
 
 /** Rango de búsqueda de CONFIG_VARILLAS (diámetros #2–#18, filas 2–18). */

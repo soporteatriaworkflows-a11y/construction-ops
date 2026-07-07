@@ -78,7 +78,8 @@ describe('Excel ICONIC (F7.1 F)', () => {
     const evidencias = wb.getWorksheet('EVIDENCIAS')!;
     const lastRow = evidencias.rowCount;
     const firstCell = evidencias.getRow(1).getCell(1);
-    const lastCell = evidencias.getRow(lastRow).getCell(11);
+    // F8F: EVIDENCIAS suma la columna "modo cantidad" (12 columnas).
+    const lastCell = evidencias.getRow(lastRow).getCell(12);
     expect(firstCell.border?.left?.style).toBe('medium');
     expect(firstCell.border?.left?.color?.argb).toBe(ICONIC_BLUE);
     expect(lastCell.border?.bottom?.style).toBe('medium');

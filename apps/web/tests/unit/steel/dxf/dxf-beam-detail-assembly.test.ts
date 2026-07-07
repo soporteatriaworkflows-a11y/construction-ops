@@ -174,22 +174,23 @@ describe('F8C — Beam Detail Assembly', () => {
     expect(Number(bar?.cutLengthM)).toBeCloseTo(3.3, 6);
   });
 
-  it('6. el primer dígito del texto JAMÁS es la cantidad', () => {
+  it('6. el primer dígito del texto JAMÁS es la cantidad (F8F: cantidad 1 textual)', () => {
     for (const bar of [...(detail?.topLongitudinalBars ?? []), ...(detail?.bottomLongitudinalBars ?? [])]) {
-      // La cantidad viene de los 4 marcadores, no del "6" del texto.
-      expect(bar.quantityFromGraphic).not.toBe(6);
+      // F8F: cantidad 1 por aparición textual; el "6" del texto no cuenta.
+      expect(bar.quantity).toBe(1);
+      expect(bar.quantityMode).toBe('textual_occurrence');
     }
   });
 
-  it('7/8. 4 círculos arriba ⇒ quantity superior 4; 4 abajo ⇒ inferior 4', () => {
+  it('7/8. 4 círculos arriba/abajo ⇒ markerEvidence 4 por banda (apoyo, no cantidad)', () => {
     expect(detail?.crossSectionMarkers.top).toBe(4);
     expect(detail?.crossSectionMarkers.bottom).toBe(4);
     expect(detail?.crossSectionMarkers.status).toBe('from_markers');
     const top = detail?.topLongitudinalBars[0];
     const bottom = detail?.bottomLongitudinalBars[0];
-    expect(top?.quantityFromGraphic).toBe(4);
-    expect(top?.quantityStatus).toBe('from_markers');
-    expect(bottom?.quantityFromGraphic).toBe(4);
+    expect(top?.markerEvidence).toBe(4);
+    expect(top?.markerConfidence).toBeDefined();
+    expect(bottom?.markerEvidence).toBe(4);
   });
 
   it('los círculos fuera del corte y los del rótulo NO cuentan', () => {
@@ -197,14 +198,18 @@ describe('F8C — Beam Detail Assembly', () => {
     expect(detail?.crossSectionMarkers.byShape).toBe(8);
   });
 
-  it('sin marcadores ⇒ cantidad requiere revisión (no se inventa)', () => {
+  it('sin marcadores ⇒ cantidad 1 por aparición textual, editable (F8F: no se congela)', () => {
     const { details: noMarkers } = detailsOf(beamDetailDxf({ withCircles: 'none' }));
     const d = noMarkers[0];
     expect(d?.crossSectionMarkers.status).toBe('unavailable');
     for (const bar of [...(d?.topLongitudinalBars ?? []), ...(d?.bottomLongitudinalBars ?? [])]) {
-      expect(bar.quantityFromGraphic).toBeUndefined();
-      expect(bar.quantityStatus).toBe('requires_review');
+      expect(bar.markerEvidence).toBeUndefined();
+      expect(bar.quantity).toBe(1);
+      expect(bar.quantityMode).toBe('textual_occurrence');
+      expect(bar.warnings.join(' ')).toContain('cantidad 1 por aparición textual DXF');
     }
+    // La falta de marcadores NO congela el detalle por sí sola.
+    expect(d?.statusReasons.join(' ')).not.toContain('conteo gráfico');
   });
 
   it('círculos negros en capa genérica cuentan igual (shape-driven), con confianza menor', () => {
@@ -313,17 +318,25 @@ describe('F8C — beam detail → takeoff con evidencia completa', () => {
     }
   });
 
-  it('el resumen de estribos entra normalizado y los longitudinales con cantidad GRÁFICA', () => {
+  it('el resumen de estribos entra normalizado y los longitudinales con cantidad 1 textual (F8F)', () => {
     expect(lines.some((l) => l.originalDescription === '2x141E#3184')).toBe(true);
-    // 4 marcadores arriba ⇒ 4#6330 (NO 6#6330).
-    expect(lines.some((l) => l.originalDescription === '4#6330')).toBe(true);
-    expect(lines.some((l) => l.originalDescription.startsWith('6#6'))).toBe(false);
+    // La descripción es el texto normalizado del plano; la cantidad viaja en
+    // manualQuantity = 1 (el "6" del texto y los 4 marcadores NO son cantidad).
+    const bar = lines.find((l) => l.originalDescription === '6#6330');
+    expect(bar).toBeDefined();
+    expect(bar?.manualQuantity).toBe('1');
+    expect(bar?.manualBarNumber).toBe(6);
+    expect(bar?.evidence?.quantityMode).toBe('textual_occurrence');
+    expect(lines.some((l) => l.originalDescription === '4#6330')).toBe(false);
   });
 
-  it('sin marcadores, los longitudinales NO se envían (requieren revisión)', () => {
+  it('F8F: sin marcadores los longitudinales SÍ se envían con cantidad 1 textual', () => {
     const { details: noMarkers } = detailsOf(beamDetailDxf({ withCircles: 'none', summary: '2x141E#318.4' }));
     const sent = beamDetailToManualLines(noMarkers[0]!, 'vigas.dxf');
-    expect(sent.every((l) => l.evidence?.position === 'estribo')).toBe(true);
+    const longitudinals = sent.filter((l) => l.evidence?.position !== 'estribo');
+    expect(longitudinals.length).toBeGreaterThan(0);
+    expect(longitudinals.every((l) => l.manualQuantity === '1')).toBe(true);
+    expect(longitudinals.every((l) => l.evidence?.quantityMode === 'textual_occurrence')).toBe(true);
   });
 });
 
