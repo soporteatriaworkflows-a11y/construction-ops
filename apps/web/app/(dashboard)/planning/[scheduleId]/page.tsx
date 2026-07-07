@@ -10,6 +10,7 @@ import { ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
 import { Badge } from '@/components/ui/badge';
 import { resolveAuthenticatedViewer } from '@/server/auth/resolve-viewer';
+import { createOpsPerfTrace } from '@/server/performance/ops-perf';
 import { getScheduleDetailForViewer, getScheduleContextForViewer, displayWbs, ScheduleNotFoundError } from '@/server/planning';
 import { buildPlanningViewModel, buildScheduleDurationReport, mapScheduleToGantt } from '@/modules/planning';
 import { PlanningSummary } from '@/components/planning/planning-summary';
@@ -35,20 +36,22 @@ export default async function ScheduleDetailPage({
   params: Promise<{ scheduleId: string }>;
 }) {
   const { scheduleId } = await params;
+  const perf = createOpsPerfTrace('/planning/[scheduleId]');
 
   let detail: Awaited<ReturnType<typeof getScheduleDetailForViewer>> | null = null;
   let viewerProfileRole: string | null = null;
   let error: string | null = null;
   try {
-    const viewer = await resolveAuthenticatedViewer();
+    const viewer = await perf.span('auth.resolveAuthenticatedViewer', async () => await resolveAuthenticatedViewer());
     viewerProfileRole = viewer.profileRole ?? null;
-    detail = await getScheduleDetailForViewer(viewer, scheduleId);
+    detail = await perf.span('planning.getScheduleDetailForViewer', () => getScheduleDetailForViewer(viewer, scheduleId));
   } catch (e) {
     if (e instanceof ScheduleNotFoundError) notFound();
     error = e instanceof Error ? e.message : 'Error al cargar el cronograma';
   }
 
   if (error) {
+    perf.finish({ hasError: true });
     return (
       <div>
         <PageHeader title="Cronograma" />
@@ -64,15 +67,15 @@ export default async function ScheduleDetailPage({
   // P2C1: contexto de negocio (proyecto/alcance/presupuesto) para el header.
   // Lectura ligera SECUENCIAL (una consulta anidada, disciplina P0B); si falla
   // o falta la cadena, degrada a fallback amable sin tumbar la página.
-  const context = await getScheduleContextForViewer(schedule.estimateVersionId);
+  const context = await perf.span('planning.getScheduleContextForViewer', () => getScheduleContextForViewer(schedule.estimateVersionId));
   const isClientSafe = viewerProfileRole === 'consulta';
-  const vm = buildPlanningViewModel(summary, {
+  const vm = await perf.span('planning.buildPlanningViewModel', async () => buildPlanningViewModel(summary, {
     canSeeCriticalPath,
     asOfDate: new Date().toISOString().slice(0, 10),
-  });
-  const ganttTasks = mapScheduleToGantt(summary.tasks, summary.dependencies, {
+  }));
+  const ganttTasks = await perf.span('planning.mapScheduleToGantt', async () => mapScheduleToGantt(summary.tasks, summary.dependencies, {
     criticalTaskIds: canSeeCriticalPath ? vm.criticalTaskIds : [],
-  });
+  }));
 
   const editableTasks: EditableTask[] = rawTasks.map((t) => ({
     id: t.id,
@@ -129,6 +132,18 @@ export default async function ScheduleDetailPage({
 
   // P2C4a: reporte puro de criterio de duración (sin queries; solo advierte).
   const durationReport = buildScheduleDurationReport(workspaceTasks);
+
+  perf.finish({
+    taskCount: summary.tasks.length,
+    milestoneCount: summary.milestones.length,
+    dependencyCount: summary.dependencies.length,
+    rawTaskCount: rawTasks.length,
+    ganttTaskCount: ganttTasks.length,
+    canManage,
+    canSeeCriticalPath,
+    isClientSafe,
+    hasContext: Boolean(context),
+  });
 
   // Nodos para las pestañas de la shell (Gantt/Trazabilidad/Edición), renderizados
   // por el servidor con los componentes existentes SIN modificarlos.

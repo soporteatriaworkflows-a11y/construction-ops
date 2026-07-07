@@ -265,3 +265,179 @@ Sigue sin justificarse VPS inmediato. La evidencia P2D-2 local apunta a:
 - reducir fan-out si se confirma costo bajo DB;
 - observar payload/render de paginas grandes;
 - reservar backend/VPS para jobs pesados confirmados: PDF/APU grandes, imports grandes, DXF/Steel parsing o procesos asincronicos prolongados.
+
+## P2D-2B DB-backed Measurement Plan
+
+Fecha: 2026-07-07
+Alcance: medicion con `READ_MODEL_SOURCE=db` contra entorno no productivo, sin tocar Production, Supabase remoto, migraciones, secretos reales ni VPS.
+
+### Entorno seguro identificado
+
+- Supabase local `construction-ops` estaba corriendo en Docker.
+- DB local: `127.0.0.1:54322/postgres`.
+- API local: `127.0.0.1:54321`.
+- Esto es no productivo: host loopback, contenedores Docker locales, sin Vercel Production y sin Supabase Cloud.
+- El worktree no tenia `.env.local`; solo `.env.example` con placeholders locales.
+- Los seeds locales crean filas en `auth.users` y `profiles`, pero documentan que no crean passwords/login reales. Por eso no se hizo navegacion HTTP autenticada completa sin mutar Auth local.
+
+### Variables necesarias para local/preview
+
+Local DB-backed seguro:
+
+```powershell
+$env:OPS_PERF_LOGS='true'
+$env:APP_AUTH_MODE='supabase'
+$env:READ_MODEL_SOURCE='db'
+$env:DATABASE_URL='postgresql://postgres:postgres@127.0.0.1:54322/postgres'
+$env:NEXT_PUBLIC_SUPABASE_URL='http://127.0.0.1:54321'
+$env:NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY='<local publishable key from supabase status>'
+pnpm.cmd dev
+```
+
+Preview DB-backed seguro:
+
+- Activar `OPS_PERF_LOGS=true` solo en Preview/Development.
+- Confirmar `READ_MODEL_SOURCE=db` solo si `DATABASE_URL` apunta a DB no productiva.
+- Confirmar `APP_AUTH_MODE=supabase`.
+- Confirmar que `NEXT_PUBLIC_SUPABASE_URL` apunta a proyecto no productivo.
+- No activar `OPS_PERF_LOGS` ni cambiar `READ_MODEL_SOURCE` en Production.
+
+### Como confirmar que NO es produccion
+
+1. `DATABASE_URL` debe apuntar a `127.0.0.1`, `localhost` o a un proyecto/staging explicitamente no productivo.
+2. `NEXT_PUBLIC_SUPABASE_URL` debe ser local (`http://127.0.0.1:54321`) o staging; nunca el proyecto Supabase productivo.
+3. En Vercel, verificar el environment antes de editar: Preview/Development solamente.
+4. No usar service-role ni copiar secretos reales a logs.
+5. Validar que `OPS_PERF_LOGS` queda false/unset en Production despues de la prueba.
+
+### Rutas a navegar cuando exista sesion segura
+
+- `/dashboard`
+- Budget workspace: `/projects/:id/scopes/:scopeId/estimates/:estimateId/workspace`
+- `/quantities`
+- `/planning`
+- `/planning/:scheduleId` para Gantt/detail
+- `/catalog/monitoring`
+- `/api/exports?format=xlsx-client&profile=client&projectId=...&estimateVersionId=...`
+- Steel Ops solo lectura/rendimiento, sin DXF parsing ni dispatch.
+
+### Logs a capturar
+
+- Lineas JSON con `event=ops.perf`.
+- `readModel.rlsTransaction` por ruta.
+- `request.total` por ruta.
+- Spans de repositorio: dashboard, quantities, estimates workspace, planning, monitoring, exports.
+- Contadores no sensibles: counts de proyectos, capitulos, items, schedules, tasks, dependencies, runs.
+- Tiempos HTTP y payload aproximado por ruta.
+
+### Como desactivar logs
+
+```powershell
+$env:OPS_PERF_LOGS='false'
+```
+
+En Vercel Preview/Development, remover o volver a `false` y redeploy si aplica. No tocar Production.
+
+## P2D-2B DB-backed Measurement Results
+
+### Entorno usado
+
+- Entorno: Supabase local Docker `construction-ops`.
+- DB: `127.0.0.1:54322`, no productiva.
+- App mode usado para medicion directa: `READ_MODEL_SOURCE=db`, `OPS_PERF_LOGS=true`.
+- No se uso Vercel Production.
+- No se modificaron variables remotas.
+- No se ejecuto migracion.
+- No se escribio en DB.
+- No se modifico Steel Ops funcionalmente.
+
+### Limitacion encontrada
+
+No se pudo hacer navegacion HTTP DB-backed completa porque el seed local crea usuarios/perfiles sin password/login real. Crear o resetear usuarios de Auth local habria sido una mutacion fuera del alcance de esta fase. Por seguridad, no se hizo.
+
+Se hizo una medicion read-only directa de modulos server-side contra DB local. Esto valida latencia real de Drizzle/read-model local, pero no reemplaza la medicion HTTP autenticada en Preview o local con sesion valida.
+
+### Datos locales disponibles
+
+| Tabla | Conteo |
+| --- | ---: |
+| `projects` | 2 |
+| `project_scopes` | 1 |
+| `estimates` | 1 |
+| `estimate_versions` | 1 |
+| `chapters` | 1 |
+| `boq_items` | 1 |
+| `quantity_groups` | 1 |
+| `planning_schedules` | 0 |
+| `schedule_tasks` | 6 |
+| `task_dependencies` | 4 |
+| `price_monitor_targets` | 0 |
+| `price_monitor_runs` | 0 |
+
+### Mediciones DB-backed directas
+
+| Operacion | Resultado | Duracion aprox. | Nota |
+| --- | --- | ---: | --- |
+| `readModel.listProjects` | OK | 103 ms | Emitio `readModel.rlsTransaction` 102 ms |
+| `readModel.getDashboardSummary` | OK | 109 ms | Emitio `readModel.rlsTransaction` 108 ms |
+| `readModel.getProjectOverview` | OK | 98 ms | Emitio `readModel.rlsTransaction` 97 ms |
+| `readModel.listQuantities` | OK | 44 ms | Emitio `readModel.rlsTransaction` 43 ms |
+| `estimates.repo.*` | Bloqueado fuera de request | 0-1 ms | Requiere Supabase SSR/cookies en request scope |
+| `planning.listSchedulesForViewer` | Bloqueado fuera de request | 1 ms | Requiere Supabase SSR/cookies en request scope |
+| `exports.generate.xlsxClient` | Error esperado | 35 ms | Proyecto no visible bajo proyeccion client directa sin sesion/grants HTTP |
+| `monitor.repo.*` | No medido en esta pasada | n/a | Requiere Supabase SSR/cookies; ademas DB local tiene 0 targets/runs |
+
+### Diferencias contra fixture
+
+- Fixture P2D-2 tenia spans de read-model de 0-4 ms.
+- DB local P2D-2B muestra `readModel.rlsTransaction` de 43-109 ms aun con dataset pequeno.
+- Esto confirma que la latencia DB/RLS existe y debe medirse en request real antes de optimizar render/payload.
+- Workspace fan-out no queda confirmado como cuello real DB en esta pasada porque el repositorio de estimates es SSR-bound y no puede ejecutarse fuera de request sin cookies.
+- Planning no queda confirmado como cuello DB: no hay `planning_schedules` locales; hay tareas/dependencias sueltas pero sin schedule navegable.
+- Catalog monitoring no queda confirmado: dataset local tiene 0 targets/runs y el repo UI depende de Supabase SSR.
+- Exports no justifican async todavia: XLSX fixture era barato, y DB direct fallo por alcance/session, no por CPU.
+
+### Top 5 cuellos o riesgos reales tras P2D-2B
+
+1. `readModel.rlsTransaction` local ya cuesta ~43-109 ms por operacion con dataset pequeno; varias operaciones por request pueden acumular latencia perceptible.
+2. El camino DB-backed real para workspace/planning/monitoring depende de request autenticado; medir fuera de request no sirve para esos repositorios SSR-bound.
+3. Workspace fan-out sigue siendo el principal riesgo estructural, pero falta confirmarlo con sesion DB-backed real.
+4. Planning necesita medicion page-level real en `/planning` y `/planning/:scheduleId`; la instrumentacion minima ya quedo agregada para esa proxima prueba.
+5. Monitoring requiere dataset no vacio y request autenticado; con 0 targets/runs locales no se puede evaluar batch/read-model.
+
+### Decision sobre P2D-3
+
+- Prioridad P2D-3: preparar una sesion segura no productiva para medicion HTTP real, o un Preview con DB staging confirmada.
+- No implementar optimizaciones de workspace todavia sin evidencia HTTP/DB real.
+- No crear RPC/read-model agregado para planning todavia; primero medir con schedules reales.
+- No mover exports a async todavia; medir PDF/APU package con DB y payload real.
+- No montar VPS: sigue sin justificarse. El caso actual apunta a reducir fan-out y medir request real antes de infraestructura nueva.
+
+### Instrumentacion agregada en P2D-2B
+
+Se agrego page-level perf logging a:
+
+- `/planning`
+  - `auth.resolveAuthenticatedViewer`
+  - `planning.listSchedulesForViewer`
+  - `request.total` con `scheduleCount`, `canManage`, `hasError`
+
+- `/planning/[scheduleId]`
+  - `auth.resolveAuthenticatedViewer`
+  - `planning.getScheduleDetailForViewer`
+  - `planning.getScheduleContextForViewer`
+  - `planning.buildPlanningViewModel`
+  - `planning.mapScheduleToGantt`
+  - `request.total` con `taskCount`, `milestoneCount`, `dependencyCount`, `rawTaskCount`, `ganttTaskCount`, `canManage`, `canSeeCriticalPath`, `isClientSafe`, `hasContext`
+
+No se loguean IDs, montos, URLs, nombres, emails ni secretos.
+### Validacion P2D-2B
+
+- `git diff --check`: OK.
+- `pnpm.cmd lint`: OK.
+- `pnpm.cmd typecheck`: OK.
+- `pnpm.cmd --filter web exec vitest run tests/unit/dashboard/db-mode-routes.test.ts`: OK.
+- `pnpm.cmd test`: OK, 3098 passed, 42 skipped.
+- `pnpm.cmd build`: OK.
+
+Nota: `pnpm.cmd test` fallo una vez por un test estatico que buscaba el patron literal `await resolveAuthenticatedViewer()` en `/planning`; se ajusto el callback de instrumentacion para conservar ese patron sin cambiar comportamiento y luego la prueba focal y la suite completa pasaron.

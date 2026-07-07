@@ -13,6 +13,7 @@ import { EmptyState } from '@/components/shared/empty-state';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { resolveAuthenticatedViewer } from '@/server/auth/resolve-viewer';
+import { createOpsPerfTrace } from '@/server/performance/ops-perf';
 import {
   listSchedulesForViewer,
   canManageSchedules,
@@ -29,16 +30,19 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export default async function PlanningPage() {
+  const perf = createOpsPerfTrace('/planning');
   let schedules: ScheduleListItem[] = [];
   let canManage = false;
   let error: string | null = null;
   try {
-    const viewer = await resolveAuthenticatedViewer();
+    const viewer = await perf.span('auth.resolveAuthenticatedViewer', async () => await resolveAuthenticatedViewer());
     canManage = canManageSchedules(viewer.role);
-    schedules = await listSchedulesForViewer(viewer, undefined);
+    schedules = await perf.span('planning.listSchedulesForViewer', () => listSchedulesForViewer(viewer, undefined));
   } catch (e) {
     error = e instanceof Error ? e.message : 'Error al cargar los cronogramas';
   }
+
+  perf.finish({ scheduleCount: schedules.length, canManage, hasError: Boolean(error) });
 
   const actions = canManage ? (
     <Button size="sm" asChild>
