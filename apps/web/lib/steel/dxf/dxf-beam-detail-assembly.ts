@@ -16,14 +16,21 @@
  * fuera del cluster del corte o en capas de rótulo no cuentan.
  *
  * Honestidad: la cantidad de longitudinales NUNCA sale del primer dígito del
- * texto (`6#6330` no son 6 varillas): sale del conteo gráfico de marcadores
- * o queda en revisión. Nada se aprueba solo; nada se inventa.
+ * texto (`6#6330` no son 6 varillas). Nada se aprueba solo; nada se inventa.
  *
  * F8E: la secuencia longitudinal se lee COMPLETA dentro de cada vista (todos
  * los tramos tras traslapos/cambios de tramo, ordenados por el eje dominante,
  * clasificados por banda con zona `sin_clasificar` explícita) y el envío al
  * takeoff manda cada barra superior/inferior computable + UNA línea de
  * estribos según el contrato F8D — jamás solo estribos ni solo extremos.
+ *
+ * F8F: contrato de cantidad corregido — cada texto longitudinal válido del
+ * DXF es UNA línea computable con cantidad 1 por aparición textual
+ * (`quantityMode: textual_occurrence`, editable por la usuaria); los
+ * marcadores gráficos pasan a `markerEvidence`/`markerConfidence` (apoyo
+ * visual) y NUNCA bloquean el envío. Las barras sin banda clara se asignan
+ * con decisión de la usuaria en vez de congelarse. La cantidad 1 por
+ * ocurrencia textual NO es inventada: es la regla operativa del takeoff.
  */
 import type { ManualLineRecord } from '../manual-takeoff';
 import { buildBeamSchedule, type BeamScheduleRow } from './beam-schedule';
@@ -69,7 +76,25 @@ import {
 // Tipos
 // ---------------------------------------------------------------------------
 
+/**
+ * F8F: modo de cantidad de una barra longitudinal. Regla operativa corregida:
+ * cada texto longitudinal válido del DXF representa UNA línea computable con
+ * cantidad 1 (`textual_occurrence`), editable por la usuaria. Los marcadores
+ * gráficos son EVIDENCIA de apoyo (`markerEvidence`/`markerConfidence`) —
+ * validan la sección pero jamás bloquean el envío.
+ */
+export type LongitudinalQuantityMode = 'textual_occurrence' | 'graphic_marker' | 'manual' | 'unresolved';
+
+/** Fuente legible de la cantidad por ocurrencia textual (F8F). */
+export const TEXTUAL_OCCURRENCE_QUANTITY_SOURCE = 'aparición textual DXF';
+
+/** Advertencia informativa (NO bloqueante) cuando no hay marcadores confiables. */
+export const LONGITUDINAL_NO_MARKER_WARNING =
+  'Marcadores gráficos no confiables o no disponibles; se usa cantidad 1 por aparición textual DXF. Puedes editar la cantidad.';
+
 export interface LongitudinalBarReading {
+  /** Id estable dentro del detalle para decisiones de revisión (F8F). */
+  readingId: string;
   /** Descripción normalizada ("6#6330"). */
   description: string;
   /** Texto original del plano ("6#6 33 L"). */
@@ -79,9 +104,17 @@ export interface LongitudinalBarReading {
   /** Longitud de corte en metros ("3.30") si la notación la trae. */
   cutLengthM?: string;
   position: 'superior' | 'inferior' | 'sin_clasificar';
-  /** Cantidad desde el conteo gráfico de marcadores (jamás del texto). */
-  quantityFromGraphic?: number;
-  quantityStatus: 'from_markers' | 'requires_review';
+  /**
+   * Cantidad computable de la línea (F8F): 1 por aparición textual DXF.
+   * El primer dígito del texto (`6#6350`) JAMÁS es la cantidad.
+   */
+  quantity: number;
+  quantityMode: LongitudinalQuantityMode;
+  /** Fuente legible de la cantidad ("aparición textual DXF"). */
+  quantitySource: string;
+  /** Marcadores gráficos contados en la banda — apoyo visual, no requisito. */
+  markerEvidence?: number;
+  markerConfidence?: 'alto' | 'medio' | 'bajo';
   warnings: readonly string[];
 }
 
@@ -422,7 +455,9 @@ function assembleDetail(
   const markers = anchor ? collectBarMarkers(entities, anchor, radius, allowEntity, reach) : [];
   const crossSectionMarkers = classifyMarkers(markers);
   if (crossSectionMarkers.status === 'unavailable') {
-    warnings.push('Sin marcadores gráficos de varilla en el corte: la cantidad de longitudinales requiere revisión.');
+    warnings.push(
+      'Sin marcadores gráficos de varilla en el corte: se usa cantidad 1 por aparición textual DXF para las longitudinales (editable); los marcadores son solo evidencia de apoyo.',
+    );
   } else if (crossSectionMarkers.status === 'requires_review') {
     warnings.push(
       `${crossSectionMarkers.ambiguous} marcador(es) laterales/ambiguos en el corte: confirmar banda superior/inferior.`,
@@ -517,16 +552,21 @@ function assembleDetail(
       dedupeKeys.add(dedupeKey);
       const barCode = Number.parseInt(match[2] ?? '', 10);
       const lengthCm = Number.parseInt(match[3] ?? '', 10);
+      const computable = Number.isFinite(barCode) && Number.isFinite(lengthCm) && lengthCm > 0;
       longitudinal.push({
         x: entity.x,
         y: entity.y,
         reading: {
+          readingId: '', // se asigna al final, sobre la secuencia ordenada
           description,
           sourceText: line,
           barCode,
           cutLengthM: Number.isFinite(lengthCm) ? String(lengthCm / 100) : undefined,
           position: 'sin_clasificar',
-          quantityStatus: 'requires_review',
+          // F8F: cada texto válido = UNA línea computable con cantidad 1.
+          quantity: 1,
+          quantityMode: computable ? 'textual_occurrence' : 'unresolved',
+          quantitySource: TEXTUAL_OCCURRENCE_QUANTITY_SOURCE,
           warnings: [...normalization.warnings],
         },
       });
@@ -547,26 +587,25 @@ function assembleDetail(
       if (item.y >= bandSplit.dividerY + bandSplit.epsilon) position = 'superior';
       else if (item.y <= bandSplit.dividerY - bandSplit.epsilon) position = 'inferior';
     }
+    // F8F: los marcadores de la banda son EVIDENCIA de apoyo — validan la
+    // sección pero nunca definen ni bloquean la cantidad (1 por texto).
     const band = position === 'superior' ? crossSectionMarkers.top : position === 'inferior' ? crossSectionMarkers.bottom : 0;
-    const canCount = crossSectionMarkers.status === 'from_markers' && band > 0 && position !== 'sin_clasificar';
+    const hasMarkerSupport = crossSectionMarkers.status === 'from_markers' && band > 0 && position !== 'sin_clasificar';
     const reading: LongitudinalBarReading = {
       ...item.reading,
       position,
-      quantityFromGraphic: canCount ? band : undefined,
-      quantityStatus: canCount ? 'from_markers' : 'requires_review',
-      warnings: canCount
+      markerEvidence: hasMarkerSupport ? band : undefined,
+      markerConfidence: hasMarkerSupport ? crossSectionMarkers.confidence : undefined,
+      warnings: hasMarkerSupport
         ? item.reading.warnings
-        : [
-            ...item.reading.warnings,
-            'Cantidad sin conteo gráfico confiable: el primer dígito de la notación NO es cantidad; requiere revisión.',
-          ],
+        : [...item.reading.warnings, LONGITUDINAL_NO_MARKER_WARNING],
     };
     const classified = { ...item, reading };
     if (position === 'superior') topCandidates.push(classified);
     else if (position === 'inferior') bottomCandidates.push(classified);
     else {
       warnings.push(
-        `"${item.reading.sourceText}": sin banda superior/inferior clara — queda en "Sin clasificar / revisar" y no se envía sin decisión.`,
+        `"${item.reading.sourceText}": sin banda superior/inferior clara — queda en "Sin clasificar / revisar"; asígnala a superior/inferior o acéptala sin clasificar antes de enviar.`,
       );
       unclassifiedCandidates.push(classified);
     }
@@ -574,10 +613,13 @@ function assembleDetail(
 
   // 4) Orden por el eje dominante de la vista (X en vigas horizontales; Y si
   //    la vista está rotada/vertical) para conservar la secuencia del plano.
+  //    El readingId se asigna sobre la secuencia final (estable por posición).
   const sequenceAxis = dominantSequenceAxis(longitudinal, beamView?.bbox);
-  const top = sortBySequenceAxis(topCandidates, sequenceAxis);
-  const bottom = sortBySequenceAxis(bottomCandidates, sequenceAxis);
-  const unclassified = sortBySequenceAxis(unclassifiedCandidates, sequenceAxis);
+  const assignReadingIds = (bars: LongitudinalBarReading[], prefix: string): LongitudinalBarReading[] =>
+    bars.map((bar, index) => ({ ...bar, readingId: `${row.elementKey}:${prefix}:${index + 1}` }));
+  const top = assignReadingIds(sortBySequenceAxis(topCandidates, sequenceAxis), 'sup');
+  const bottom = assignReadingIds(sortBySequenceAxis(bottomCandidates, sequenceAxis), 'inf');
+  const unclassified = assignReadingIds(sortBySequenceAxis(unclassifiedCandidates, sequenceAxis), 'sc');
 
   // ---- Zonas de estribos + resumen ----------------------------------------
   const zones: StirrupZone[] = [];
@@ -666,12 +708,11 @@ function assembleDetail(
   const statusReasons: string[] = [...row.statusReasons];
   if (zoneComparison?.status === 'zone_count_mismatch') statusReasons.push(zoneComparison.message);
   if (stirrupContract?.comparisonStatus === 'ambiguous') statusReasons.push(stirrupContract.message);
-  if (crossSectionMarkers.status !== 'from_markers' && longitudinal.length > 0) {
-    statusReasons.push('Cantidad de longitudinales sin conteo gráfico confiable.');
-  }
+  // F8F: la falta de marcadores NO congela las longitudinales — la cantidad
+  // es 1 por aparición textual DXF (editable) y ya quedó advertida arriba.
   if (unclassified.length > 0) {
     statusReasons.push(
-      `${unclassified.length} texto(s) longitudinales sin banda superior/inferior clara: revisar en "Sin clasificar / revisar".`,
+      `${unclassified.length} texto(s) longitudinales sin banda superior/inferior clara: asignar superior/inferior (o aceptar sin clasificar) en "Ver detalle".`,
     );
   }
   if (segmentCheck?.status === 'segment_sum_mismatch') statusReasons.push(segmentCheck.message);
@@ -882,20 +923,45 @@ export interface BeamTakeoffSkippedBar {
 }
 
 /**
- * Resultado del "Enviar al takeoff" de UNA viga (F8E): las líneas listas,
- * el desglose superior/inferior/estribo, lo que quedó bloqueado y por qué, y
- * el texto de preview ("Se enviarán 9 líneas: 4 superior, 4 inferior,
- * 1 estribo"). Contrato: al takeoff SOLO entran líneas computables (cantidad
- * numérica + longitud + varilla); el estado de revisión humana es aparte.
+ * F8F: decisión de la usuaria sobre UNA barra longitudinal del panel.
+ * Permite asignar banda a las barras sin clasificar, aceptar una barra sin
+ * clasificar tal cual, editar cantidad/longitud y marcar para revisión.
+ * Nada se autoaprueba: el envío sigue siendo el clic "Enviar al takeoff".
+ */
+export interface LongitudinalBarDecision {
+  /** Asignar la barra a la banda superior o inferior. */
+  assignPosition?: 'superior' | 'inferior';
+  /** Aceptar la barra COMO sin clasificar (decisión explícita de la usuaria). */
+  acceptUnclassified?: boolean;
+  /** Excluir la barra del envío hasta revisarla. */
+  markForReview?: boolean;
+  /** Cantidad editada por la usuaria (entero > 0). */
+  quantity?: number;
+  /** Longitud de corte editada por la usuaria, en metros. */
+  cutLengthM?: string;
+}
+
+/** Decisiones por barra, indexadas por `readingId`. */
+export type BeamLongitudinalDecisions = Readonly<Record<string, LongitudinalBarDecision>>;
+
+/**
+ * Resultado del "Enviar al takeoff" de UNA viga (F8E/F8F): las líneas listas,
+ * el desglose superior/inferior/sin clasificar/estribo, lo que quedó
+ * bloqueado y por qué, y el texto de preview ("Se enviarán 9 línea(s):
+ * 4 superior, 4 inferior, 1 estribo."). Contrato F8F: cada texto longitudinal
+ * válido entra con cantidad 1 por aparición textual DXF (editable); los
+ * marcadores gráficos son evidencia de apoyo y jamás bloquean.
  */
 export interface BeamTakeoffDispatch {
   lines: readonly Omit<ManualLineRecord, 'id'>[];
   topCount: number;
   bottomCount: number;
+  /** F8F: líneas aceptadas explícitamente como sin clasificar. */
+  unclassifiedCount: number;
   stirrupIncluded: boolean;
   /** Motivo cuando hay estribos detectados pero la línea NO entra. */
   stirrupBlockedReason?: string;
-  /** Barras detectadas que no entran (sin cantidad gráfica / sin banda). */
+  /** Barras detectadas que no entran (longitud ilegible / banda sin decisión / revisión). */
   skippedBars: readonly BeamTakeoffSkippedBar[];
   previewText: string;
   /** Motivos legibles cuando se envía poco o nada. */
@@ -903,14 +969,17 @@ export interface BeamTakeoffDispatch {
 }
 
 /**
- * Arma el envío al takeoff de un beam detail completo (F8E):
+ * Arma el envío al takeoff de un beam detail completo (F8E/F8F):
  *
- * - CADA barra superior e inferior con cantidad del conteo gráfico entra como
- *   línea propia (`4#6330` = 4 marcadores × varilla #6 de 330 cm) — nunca
- *   solo la primera/última.
- * - Barras sin cantidad gráfica confiable NO entran (requieren definir
- *   cantidad): quedan en `skippedBars`, visibles en el panel. Jamás se
- *   inventa cantidad ni entra una línea incomputable al takeoff/Excel.
+ * - CADA texto longitudinal superior/inferior válido entra como línea propia
+ *   con CANTIDAD 1 por aparición textual DXF (`6#6330` = 1 línea de varilla
+ *   #6 de 330 cm, editable) — el primer dígito del texto JAMÁS es cantidad y
+ *   los marcadores gráficos son evidencia de apoyo, no requisito.
+ * - Barras sin clasificar: entran solo con decisión de la usuaria (asignar a
+ *   superior/inferior o aceptar sin clasificar); sin decisión quedan en
+ *   `skippedBars`, visibles en el panel.
+ * - Bloqueos reales que sí excluyen: longitud/diámetro no parseables,
+ *   cantidad editada inválida o barra marcada para revisión.
  * - Estribos: UNA sola línea — el resumen sugerido en `match`; en
  *   `mismatch`/`unverified` solo con `stirrupChoice` explícita de la usuaria
  *   (resumen del plano / suma por zonas); `ambiguous` no entra nunca; las
@@ -919,9 +988,14 @@ export interface BeamTakeoffDispatch {
 export function buildBeamTakeoffDispatch(
   detail: BeamDetail,
   sourceFileName: string,
-  options: { assumedWastePct?: string; stirrupChoice?: StirrupTakeoffChoice } = {},
+  options: {
+    assumedWastePct?: string;
+    stirrupChoice?: StirrupTakeoffChoice;
+    decisions?: BeamLongitudinalDecisions;
+  } = {},
 ): BeamTakeoffDispatch {
   const assumedWastePct = options.assumedWastePct ?? '5';
+  const decisions = options.decisions ?? {};
   const lines: Array<Omit<ManualLineRecord, 'id'>> = [];
   const skippedBars: BeamTakeoffSkippedBar[] = [];
   const explanations: string[] = [];
@@ -929,56 +1003,126 @@ export function buildBeamTakeoffDispatch(
   const baseEvidence = beamDetailBaseEvidence(detail, sourceFileName);
   const observationBase = beamDetailObservationBase(detail);
 
-  let topCount = 0;
-  let bottomCount = 0;
+  // Candidatas al envío: las clasificadas entran por defecto; las sin
+  // clasificar SOLO con decisión explícita (asignar banda o aceptar tal cual).
+  interface SendCandidate {
+    reading: LongitudinalBarReading;
+    effectivePosition: 'superior' | 'inferior' | 'sin_clasificar';
+    decision?: LongitudinalBarDecision;
+  }
+  const candidates: SendCandidate[] = [];
   for (const reading of [...detail.topLongitudinalBars, ...detail.bottomLongitudinalBars]) {
-    if (reading.quantityFromGraphic === undefined) {
+    candidates.push({
+      reading,
+      effectivePosition: reading.position,
+      decision: decisions[reading.readingId],
+    });
+  }
+  for (const reading of detail.unclassifiedLongitudinalBars) {
+    const decision = decisions[reading.readingId];
+    if (decision?.markForReview) {
+      skippedBars.push({
+        position: reading.position,
+        description: reading.description,
+        sourceText: reading.sourceText,
+        reason: 'Marcada para revisión por la usuaria: no se envía.',
+      });
+      continue;
+    }
+    if (decision?.assignPosition) {
+      candidates.push({ reading, effectivePosition: decision.assignPosition, decision });
+    } else if (decision?.acceptUnclassified) {
+      candidates.push({ reading, effectivePosition: 'sin_clasificar', decision });
+    } else {
       skippedBars.push({
         position: reading.position,
         description: reading.description,
         sourceText: reading.sourceText,
         reason:
-          'Requiere definir cantidad: sin conteo gráfico confiable de marcadores (el primer dígito del texto NO es cantidad).',
+          'Sin banda superior/inferior clara: asígnala a superior/inferior o acéptala sin clasificar en "Ver detalle".',
+      });
+    }
+  }
+
+  let topCount = 0;
+  let bottomCount = 0;
+  let unclassifiedCount = 0;
+  for (const { reading, effectivePosition, decision } of candidates) {
+    if (decision?.markForReview) {
+      skippedBars.push({
+        position: effectivePosition,
+        description: reading.description,
+        sourceText: reading.sourceText,
+        reason: 'Marcada para revisión por la usuaria: no se envía.',
       });
       continue;
     }
-    if (!reading.cutLengthM) {
+    const cutLengthM = decision?.cutLengthM ?? reading.cutLengthM;
+    if (!cutLengthM || !(Number(cutLengthM) > 0)) {
       skippedBars.push({
-        position: reading.position,
+        position: effectivePosition,
         description: reading.description,
         sourceText: reading.sourceText,
         reason: 'Sin longitud de corte legible en la notación: no es computable por F1.',
       });
       continue;
     }
-    const lengthCm = Math.round(Number(reading.cutLengthM) * 100);
-    if (reading.position === 'superior') topCount += 1;
-    else bottomCount += 1;
+    if (!Number.isFinite(reading.barCode)) {
+      skippedBars.push({
+        position: effectivePosition,
+        description: reading.description,
+        sourceText: reading.sourceText,
+        reason: 'Sin diámetro/código de varilla legible: no es computable por F1.',
+      });
+      continue;
+    }
+    if (decision?.quantity !== undefined && (!Number.isInteger(decision.quantity) || decision.quantity <= 0)) {
+      skippedBars.push({
+        position: effectivePosition,
+        description: reading.description,
+        sourceText: reading.sourceText,
+        reason: 'Cantidad editada inválida: debe ser un entero mayor que 0.',
+      });
+      continue;
+    }
+    const quantity = decision?.quantity ?? reading.quantity;
+    const edited = decision?.quantity !== undefined;
+    const quantityMode: LongitudinalQuantityMode = edited ? 'manual' : reading.quantityMode;
+    const quantitySource = edited ? 'editada por la usuaria' : reading.quantitySource;
+    if (effectivePosition === 'superior') topCount += 1;
+    else if (effectivePosition === 'inferior') bottomCount += 1;
+    else unclassifiedCount += 1;
     lines.push({
-      originalDescription: `${reading.quantityFromGraphic}#${reading.barCode}${lengthCm}`,
+      // La descripción/código es el texto normalizado del plano ("6#6350");
+      // los campos estructurados (manualQuantity/manualCutLengthM) evitan que
+      // F1 reinterprete su primer dígito como cantidad.
+      originalDescription: reading.description,
       assumedWastePct,
       manualBarNumber: reading.barCode,
+      manualQuantity: String(quantity),
+      manualCutLengthM: cutLengthM,
       evidence: {
         ...baseEvidence,
-        position: reading.position,
+        position: effectivePosition,
         confidence: '0.8',
         originalFragment: reading.sourceText,
+        quantityMode,
+        quantitySource,
         observation: [
           ...observationBase,
-          `Posición: ${reading.position}`,
-          `Cantidad ${reading.quantityFromGraphic} por conteo gráfico de marcadores (el texto decía "${reading.sourceText}")`,
-          ...reading.warnings,
-        ].join(' · '),
+          `Posición: ${effectivePosition}${decision?.assignPosition ? ' (asignada por la usuaria)' : ''}`,
+          edited
+            ? `Cantidad ${quantity} editada por la usuaria (el primer dígito del texto "${reading.sourceText}" NO es cantidad)`
+            : `Cantidad ${quantity} por aparición textual DXF (el primer dígito del texto "${reading.sourceText}" NO es cantidad)`,
+          reading.markerEvidence !== undefined
+            ? `Marcadores gráficos de apoyo: ${reading.markerEvidence} (confianza ${reading.markerConfidence ?? 'bajo'})`
+            : 'Marcadores gráficos: no confiables / no disponibles (evidencia de apoyo, no bloquean)',
+          decision?.cutLengthM !== undefined ? `Longitud de corte editada por la usuaria: ${decision.cutLengthM} m` : undefined,
+          ...reading.warnings.filter((warning) => warning !== LONGITUDINAL_NO_MARKER_WARNING),
+        ]
+          .filter((part): part is string => Boolean(part))
+          .join(' · '),
       },
-    });
-  }
-
-  for (const reading of detail.unclassifiedLongitudinalBars) {
-    skippedBars.push({
-      position: reading.position,
-      description: reading.description,
-      sourceText: reading.sourceText,
-      reason: 'Sin banda superior/inferior clara: revisar en "Sin clasificar / revisar" antes de enviar.',
     });
   }
 
@@ -1022,12 +1166,15 @@ export function buildBeamTakeoffDispatch(
   const previewText =
     lines.length === 0
       ? 'No se enviará ninguna línea.'
-      : `Se enviarán ${lines.length} línea(s): ${topCount} superior, ${bottomCount} inferior, ${stirrupIncluded ? 1 : 0} estribo.`;
+      : `Se enviarán ${lines.length} línea(s): ${topCount} superior, ${bottomCount} inferior, ${
+          unclassifiedCount > 0 ? `${unclassifiedCount} sin clasificar, ` : ''
+        }${stirrupIncluded ? 1 : 0} estribo.`;
 
   return {
     lines,
     topCount,
     bottomCount,
+    unclassifiedCount,
     stirrupIncluded,
     stirrupBlockedReason,
     skippedBars,
@@ -1043,7 +1190,11 @@ export function buildBeamTakeoffDispatch(
 export function beamDetailToManualLines(
   detail: BeamDetail,
   sourceFileName: string,
-  options: { assumedWastePct?: string; stirrupChoice?: StirrupTakeoffChoice } = {},
+  options: {
+    assumedWastePct?: string;
+    stirrupChoice?: StirrupTakeoffChoice;
+    decisions?: BeamLongitudinalDecisions;
+  } = {},
 ): readonly Omit<ManualLineRecord, 'id'>[] {
   return buildBeamTakeoffDispatch(detail, sourceFileName, options).lines;
 }

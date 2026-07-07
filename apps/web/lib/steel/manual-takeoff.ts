@@ -63,6 +63,13 @@ export interface ManualLineEvidence {
   beamDetailId?: string;
   /** F8C: posición del refuerzo (superior/inferior/estribo). */
   position?: string;
+  /**
+   * F8F: modo de cantidad de la línea (`textual_occurrence` = 1 por aparición
+   * textual DXF, `graphic_marker`, `manual`, `unresolved`). Trazabilidad.
+   */
+  quantityMode?: string;
+  /** F8F: fuente legible de la cantidad ("aparición textual DXF"). */
+  quantitySource?: string;
 }
 
 /**
@@ -77,6 +84,15 @@ export interface ManualLineRecord {
   assumedWastePct: DecimalString;
   /** Nº de varilla asignado a mano cuando el parser no lo infiere (ej. `15 + 35 + 15`). */
   manualBarNumber?: number;
+  /**
+   * F8F: override estructurado de CANTIDAD. Cuando está presente, la cantidad
+   * de la línea es ESTE valor (con repeticiones = 1) y el primer dígito de la
+   * descripción NO se usa como cantidad: `6#6350` con `manualQuantity: '1'`
+   * es UNA barra #6 de 3.50 m, jamás 6 barras. Editable por la usuaria.
+   */
+  manualQuantity?: DecimalString;
+  /** F8F: override estructurado de longitud de corte, en metros. */
+  manualCutLengthM?: DecimalString;
   /** Evidencia de origen (F6E): de qué PDF/página/método salió la línea. */
   evidence?: ManualLineEvidence;
 }
@@ -344,7 +360,27 @@ export function computeManualLine(
   record: ManualLineRecord,
   options: { manualWastePct?: DecimalString } = {},
 ): ManualComputedLine {
-  const parsed = parseSteelDescription(record.originalDescription);
+  let parsed = parseSteelDescription(record.originalDescription);
+  // F8F: override estructurado — cantidad/longitud explícitas mandan sobre la
+  // reinterpretación del texto. Evita que `6#6350` se lea como 6 unidades
+  // cuando la regla operativa es 1 por aparición textual DXF. F1 sigue siendo
+  // la única calculadora: solo cambian los INPUTS, jamás las fórmulas.
+  const hasStructuredOverride =
+    record.manualQuantity !== undefined || record.manualCutLengthM !== undefined;
+  if (hasStructuredOverride) {
+    parsed = {
+      ...parsed,
+      explanation: [
+        parsed.explanation,
+        `Campos estructurados aplicados: ${[
+          record.manualQuantity !== undefined ? `cantidad ${record.manualQuantity}` : undefined,
+          record.manualCutLengthM !== undefined ? `longitud ${record.manualCutLengthM} m` : undefined,
+        ]
+          .filter(Boolean)
+          .join(' y ')} (el primer dígito del texto NO es cantidad).`,
+      ].join(' '),
+    };
+  }
   const baseInput = lineInputFromParsed(record.id, parsed);
   const barNumber = parsed.barNumber ?? record.manualBarNumber;
   const spec = barNumber ? findDefaultRebarSpec(barNumber) : undefined;
@@ -355,6 +391,9 @@ export function computeManualLine(
   const input: SteelLineInput = {
     ...baseInput,
     barNumber,
+    cutLengthM: record.manualCutLengthM ?? baseInput.cutLengthM,
+    quantityPerUnit: record.manualQuantity ?? baseInput.quantityPerUnit,
+    repetitions: record.manualQuantity !== undefined ? '1' : baseInput.repetitions,
     steelSpecId: spec?.id,
     wasteMode: 'assumed',
     assumedWastePct: options.manualWastePct ?? record.assumedWastePct,

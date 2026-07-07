@@ -148,6 +148,7 @@ describe('manual-excel-export (F4A)', () => {
       'fragmento original',
       'observaciones',
       'estado revision',
+      'modo cantidad',
     ]);
   });
 

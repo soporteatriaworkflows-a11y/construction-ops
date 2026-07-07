@@ -95,9 +95,14 @@ const BEAM_STATUS_VARIANT: Record<BeamScheduleRow['status'], 'success' | 'warnin
   requires_review: 'warning',
 };
 
+/**
+ * F8F: cada texto longitudinal es UNA línea con cantidad 1 por aparición
+ * textual DXF; la celda compacta muestra el código normalizado y, si hay
+ * marcadores, el conteo como evidencia de apoyo (jamás como cantidad).
+ */
 function barLabel(bar: BeamDetail['topLongitudinalBars'][number]): string {
-  const qty = bar.quantityFromGraphic !== undefined ? `${bar.quantityFromGraphic}×` : '¿?×';
-  return `${qty}${bar.description}`;
+  const support = bar.markerEvidence !== undefined ? ` (${bar.markerEvidence}⛒)` : '';
+  return `${bar.description}${support}`;
 }
 
 /** Celda compacta de banda (F8D): primera barra + "+N más" — el resto vive en "Ver detalle". */
@@ -486,9 +491,11 @@ export function DxfIntakeSection({
               <p className="mt-1 text-[11px] text-iconic-graphite/50">
                 Fuente: DXF ({loaded.fileName}), segmentado por vistas/detalles independientes. “Ver
                 detalle” abre el panel con superior/inferior completos, zonas vs resumen de estribos,
-                cálculo y evidencia. “Enviar al takeoff” agrega SOLO lo verificable: longitudinales con
-                cantidad por conteo gráfico y el resumen de estribos cuando coincide con las zonas —
-                los desfases exigen decisión humana en el panel. Nada se aprueba solo.
+                cálculo y evidencia. “Enviar al takeoff”: cada texto longitudinal superior/inferior se
+                envía como una línea computable con cantidad 1 por aparición textual DXF, editable por
+                la usuaria; los marcadores gráficos se usan como evidencia de apoyo. Estribos: el
+                resumen cuando coincide con las zonas — los desfases exigen decisión humana en el
+                panel. Nada se aprueba solo.
               </p>
             </div>
           )}
