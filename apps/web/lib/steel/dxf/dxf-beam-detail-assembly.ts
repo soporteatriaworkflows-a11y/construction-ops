@@ -18,6 +18,12 @@
  * Honestidad: la cantidad de longitudinales NUNCA sale del primer dígito del
  * texto (`6#6330` no son 6 varillas): sale del conteo gráfico de marcadores
  * o queda en revisión. Nada se aprueba solo; nada se inventa.
+ *
+ * F8E: la secuencia longitudinal se lee COMPLETA dentro de cada vista (todos
+ * los tramos tras traslapos/cambios de tramo, ordenados por el eje dominante,
+ * clasificados por banda con zona `sin_clasificar` explícita) y el envío al
+ * takeoff manda cada barra superior/inferior computable + UNA línea de
+ * estribos según el contrato F8D — jamás solo estribos ni solo extremos.
  */
 import type { ManualLineRecord } from '../manual-takeoff';
 import { buildBeamSchedule, type BeamScheduleRow } from './beam-schedule';
@@ -128,6 +134,18 @@ export interface BeamDetail {
   sectionSpec?: string;
   topLongitudinalBars: readonly LongitudinalBarReading[];
   bottomLongitudinalBars: readonly LongitudinalBarReading[];
+  /**
+   * F8E: textos longitudinales detectados SIN banda superior/inferior clara.
+   * No se descartan (se muestran en "Sin clasificar / revisar") pero jamás
+   * entran al takeoff sin decisión humana.
+   */
+  unclassifiedLongitudinalBars: readonly LongitudinalBarReading[];
+  /**
+   * F8E: textos longitudinales dentro del bbox de la vista recuperados pese a
+   * haber quedado fuera de la asignación estricta (franja ambigua/segmento):
+   * así no se pierden barras intermedias tras traslapos o cambios de tramo.
+   */
+  rescuedLongitudinalTextCount: number;
   stirrupZones: readonly StirrupZone[];
   stirrupZonesTotal?: number;
   stirrupSummary?: StirrupSummary;
@@ -170,8 +188,8 @@ export interface MarkerQualitySummary {
 const STIRRUP_ZONE_PATTERN = /(\d{1,3})\s*E\s*#\s*(\d)\s*@\s*(\d{1,3})\b/gi;
 /** Resumen de estribos: "2x240E#3184" / "2x303E#318.4". */
 const STIRRUP_SUMMARY_PATTERN = /(\d+)\s*[xX]\s*(\d+)\s*E\s*#\s*(\d)(\d{2,4})\b/;
-/** Token longitudinal normalizado: "6#6330" (3–4 dígitos de longitud). */
-const LONGITUDINAL_TOKEN_PATTERN = /\b(\d)#(\d)(\d{3,4})\b/g;
+/** Token longitudinal: "6#6330" y variantes con espacios ("6 # 6 330"). */
+const LONGITUDINAL_TOKEN_PATTERN = /\b(\d)\s*#\s*(\d)\s?(\d{3,4})\b/g;
 /** ¿La línea es candidata longitudinal? (tiene #, no es estribo E#). */
 const HAS_LONGITUDINAL_HINT = /\d\s*#\s*\d/;
 const SEGMENT_TEXT_PATTERN = /^\d{1,3}$/;
@@ -414,44 +432,120 @@ function assembleDetail(
     warnings.push('Marcadores detectados por geometría sin capa/color estructural: confianza reducida, revisar.');
   }
 
-  // ---- Longitudinales superior/inferior -----------------------------------
-  const longitudinal: Array<{ reading: LongitudinalBarReading; y?: number }> = [];
+  // ---- Longitudinales superior/inferior (F8E: secuencia COMPLETA) ---------
+  // 1) TODOS los textos candidatos de la vista, no solo los extremos: los que
+  //    la asignación estricta dejó en franja ambigua o en un cluster suelto
+  //    pero caen dentro del bbox de ESTA vista (y de ninguna otra vista con
+  //    viga) se recuperan — así los tramos intermedios tras traslapos o
+  //    cambios de tramo no se pierden.
+  const isLongitudinalLine = (line: string): boolean =>
+    HAS_LONGITUDINAL_HINT.test(line) && !/E\s*#/i.test(line);
+  const longitudinalTexts: RegionText[] = [];
+  const seenLongitudinalEntities = new Set<DxfTextEntity>();
   for (const { entity, line } of regionTexts) {
-    if (!HAS_LONGITUDINAL_HINT.test(line)) continue;
-    if (/E\s*#/i.test(line)) continue; // estribos van aparte
+    if (!isLongitudinalLine(line)) continue;
+    longitudinalTexts.push({ entity, line });
+    seenLongitudinalEntities.add(entity);
+  }
+  let rescuedLongitudinalTextCount = 0;
+  if (beamView) {
+    const margin = segmentation.linkRadius;
+    const otherBeamViews = segmentation.views.filter(
+      (view) => view.viewId !== beamView.viewId && view.candidateBeamKeys.length > 0,
+    );
+    for (const entity of entities) {
+      if (!isDxfTextEntity(entity) || !hasPoint(entity)) continue;
+      if (seenLongitudinalEntities.has(entity)) continue;
+      const assignment = entityViewAssignment(segmentation, entity);
+      if (assignment.viewId === beamView.viewId) continue; // ya recorrido arriba
+      // Lo asignado FIRMEMENTE a otra vista de viga es contenido ajeno.
+      if (
+        assignment.viewId !== undefined &&
+        !assignment.ambiguous &&
+        otherBeamViews.some((view) => view.viewId === assignment.viewId)
+      ) {
+        continue;
+      }
+      const point = { x: entity.x, y: entity.y };
+      if (!pointInViewBBox(point, beamView.bbox, margin)) continue;
+      // ESTRICTAMENTE dentro del bbox de otra vista de viga ⇒ contenido
+      // contestado de verdad: sigue excluido (sin margen — el margen solo
+      // amplía la vista propia).
+      if (otherBeamViews.some((view) => pointInViewBBox(point, view.bbox, 0))) continue;
+      let rescuedFromEntity = false;
+      for (const line of entity.rawText.split('\n')) {
+        const trimmed = line.trim();
+        if (trimmed.length === 0 || isTitleBlockNoise(trimmed, entity.layer)) continue;
+        if (!isLongitudinalLine(trimmed)) continue;
+        longitudinalTexts.push({ entity, line: trimmed });
+        if (entity.handle) handles.add(entity.handle);
+        rescuedFromEntity = true;
+      }
+      if (rescuedFromEntity) {
+        seenLongitudinalEntities.add(entity);
+        rescuedLongitudinalTextCount += 1;
+        crossViewExcluded.delete(entity);
+        ambiguousExcluded.delete(entity);
+      }
+    }
+  }
+  if (rescuedLongitudinalTextCount > 0) {
+    warnings.push(
+      `${rescuedLongitudinalTextCount} texto(s) de barras longitudinales dentro del área de la vista se recuperaron aunque la segmentación los dejaba en franja ambigua/cluster suelto: verificar la secuencia contra el plano.`,
+    );
+  }
 
+  // 2) Tokens normalizados. Dedupe SOLO de texto superpuesto (mismo token en
+  //    la MISMA posición) — jamás por compartir diámetro o longitud similar:
+  //    un 6#6840 arriba y otro abajo son DOS barras distintas.
+  interface LongitudinalCandidate {
+    reading: LongitudinalBarReading;
+    x?: number;
+    y?: number;
+  }
+  const longitudinal: LongitudinalCandidate[] = [];
+  const dedupeKeys = new Set<string>();
+  for (const { entity, line } of longitudinalTexts) {
     const normalization = normalizeCompactLongitudinalNotation(line, { structuralContext: true });
     const normalizedLine = normalization.applied ? normalization.normalizedText : line;
 
     LONGITUDINAL_TOKEN_PATTERN.lastIndex = 0;
     for (const match of normalizedLine.matchAll(LONGITUDINAL_TOKEN_PATTERN)) {
+      const description = `${match[1]}#${match[2]}${match[3]}`;
+      const dedupeKey = `${description}|${entity.x?.toFixed(1) ?? '?'},${entity.y?.toFixed(1) ?? '?'}|${match.index ?? 0}`;
+      if (dedupeKeys.has(dedupeKey)) continue;
+      dedupeKeys.add(dedupeKey);
       const barCode = Number.parseInt(match[2] ?? '', 10);
       const lengthCm = Number.parseInt(match[3] ?? '', 10);
-      const tokenWarnings = [...normalization.warnings];
       longitudinal.push({
+        x: entity.x,
         y: entity.y,
         reading: {
-          description: match[0],
+          description,
           sourceText: line,
           barCode,
           cutLengthM: Number.isFinite(lengthCm) ? String(lengthCm / 100) : undefined,
           position: 'sin_clasificar',
           quantityStatus: 'requires_review',
-          warnings: tokenWarnings,
+          warnings: [...normalization.warnings],
         },
       });
       fragments.add(line);
     }
   }
 
-  // Banda superior/inferior: divisor por marcadores o por mayor salto en Y.
-  const dividerY = longitudinalDivider(markers, longitudinal);
-  const top: LongitudinalBarReading[] = [];
-  const bottom: LongitudinalBarReading[] = [];
+  // 3) Banda superior/inferior por BANDA (marcadores o salto dominante en Y),
+  //    no por cercanía al primer texto. La zona intermedia queda
+  //    `sin_clasificar` con advertencia visible — jamás se descarta.
+  const bandSplit = longitudinalBandSplit(markers, longitudinal);
+  const topCandidates: LongitudinalCandidate[] = [];
+  const bottomCandidates: LongitudinalCandidate[] = [];
+  const unclassifiedCandidates: LongitudinalCandidate[] = [];
   for (const item of longitudinal) {
     let position: LongitudinalBarReading['position'] = 'sin_clasificar';
-    if (dividerY !== undefined && item.y !== undefined) {
-      position = item.y >= dividerY ? 'superior' : 'inferior';
+    if (bandSplit && item.y !== undefined) {
+      if (item.y >= bandSplit.dividerY + bandSplit.epsilon) position = 'superior';
+      else if (item.y <= bandSplit.dividerY - bandSplit.epsilon) position = 'inferior';
     }
     const band = position === 'superior' ? crossSectionMarkers.top : position === 'inferior' ? crossSectionMarkers.bottom : 0;
     const canCount = crossSectionMarkers.status === 'from_markers' && band > 0 && position !== 'sin_clasificar';
@@ -467,13 +561,23 @@ function assembleDetail(
             'Cantidad sin conteo gráfico confiable: el primer dígito de la notación NO es cantidad; requiere revisión.',
           ],
     };
-    if (position === 'superior') top.push(reading);
-    else if (position === 'inferior') bottom.push(reading);
+    const classified = { ...item, reading };
+    if (position === 'superior') topCandidates.push(classified);
+    else if (position === 'inferior') bottomCandidates.push(classified);
     else {
-      warnings.push(`"${item.reading.sourceText}": sin banda superior/inferior clara — requiere revisión.`);
-      top.push(reading);
+      warnings.push(
+        `"${item.reading.sourceText}": sin banda superior/inferior clara — queda en "Sin clasificar / revisar" y no se envía sin decisión.`,
+      );
+      unclassifiedCandidates.push(classified);
     }
   }
+
+  // 4) Orden por el eje dominante de la vista (X en vigas horizontales; Y si
+  //    la vista está rotada/vertical) para conservar la secuencia del plano.
+  const sequenceAxis = dominantSequenceAxis(longitudinal, beamView?.bbox);
+  const top = sortBySequenceAxis(topCandidates, sequenceAxis);
+  const bottom = sortBySequenceAxis(bottomCandidates, sequenceAxis);
+  const unclassified = sortBySequenceAxis(unclassifiedCandidates, sequenceAxis);
 
   // ---- Zonas de estribos + resumen ----------------------------------------
   const zones: StirrupZone[] = [];
@@ -565,6 +669,11 @@ function assembleDetail(
   if (crossSectionMarkers.status !== 'from_markers' && longitudinal.length > 0) {
     statusReasons.push('Cantidad de longitudinales sin conteo gráfico confiable.');
   }
+  if (unclassified.length > 0) {
+    statusReasons.push(
+      `${unclassified.length} texto(s) longitudinales sin banda superior/inferior clara: revisar en "Sin clasificar / revisar".`,
+    );
+  }
   if (segmentCheck?.status === 'segment_sum_mismatch') statusReasons.push(segmentCheck.message);
 
   let status: BeamDetail['status'] = row.status;
@@ -583,6 +692,8 @@ function assembleDetail(
     sectionSpec: row.sectionSpec,
     topLongitudinalBars: top,
     bottomLongitudinalBars: bottom,
+    unclassifiedLongitudinalBars: unclassified,
+    rescuedLongitudinalTextCount,
     stirrupZones: zones,
     stirrupZonesTotal: zonesTotal,
     stirrupSummary: summary,
@@ -606,14 +717,22 @@ function assembleDetail(
   };
 }
 
-/** Divisor Y del corte: marcadores si existen; si no, mayor salto entre textos. */
-function longitudinalDivider(
+/**
+ * Divisor de banda del corte con zona intermedia explícita: marcadores si
+ * existen (divisor = centro del rango; epsilon = 15% del rango); si no, el
+ * mayor salto en Y entre textos (epsilon = 25% del salto). Sin separación
+ * clara ⇒ undefined y TODO queda `sin_clasificar` (jamás se adivina banda).
+ */
+function longitudinalBandSplit(
   markers: readonly BarMarker[],
   longitudinal: ReadonlyArray<{ y?: number }>,
-): number | undefined {
+): { dividerY: number; epsilon: number } | undefined {
   if (markers.length >= 2) {
     const ys = markers.map((m) => m.y);
-    return (Math.min(...ys) + Math.max(...ys)) / 2;
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+    const range = maxY - minY;
+    if (range > 0) return { dividerY: (minY + maxY) / 2, epsilon: range * 0.15 };
   }
   const ys = longitudinal.map((item) => item.y).filter((y): y is number => typeof y === 'number');
   if (ys.length < 2) return undefined;
@@ -628,7 +747,58 @@ function longitudinalDivider(
     }
   }
   const range = (sorted[sorted.length - 1] ?? 0) - (sorted[0] ?? 0);
-  return bestGap > range * 0.2 ? dividerY : undefined;
+  if (dividerY === undefined || bestGap <= range * 0.2) return undefined;
+  return { dividerY, epsilon: bestGap * 0.25 };
+}
+
+/** ¿Punto dentro del bbox de una vista (con margen)? */
+function pointInViewBBox(
+  point: Point,
+  bbox: { minX: number; minY: number; maxX: number; maxY: number },
+  margin: number,
+): boolean {
+  return (
+    point.x >= bbox.minX - margin &&
+    point.x <= bbox.maxX + margin &&
+    point.y >= bbox.minY - margin &&
+    point.y <= bbox.maxY + margin
+  );
+}
+
+type SequenceAxis = 'x' | 'y';
+
+/**
+ * Eje dominante de la secuencia: X para vigas horizontales (lo usual), Y si
+ * los textos —o el bbox de la vista— se extienden más en vertical (vista
+ * rotada/vertical).
+ */
+function dominantSequenceAxis(
+  candidates: ReadonlyArray<{ x?: number; y?: number }>,
+  bbox?: { minX: number; minY: number; maxX: number; maxY: number },
+): SequenceAxis {
+  const xs = candidates.map((c) => c.x).filter((v): v is number => typeof v === 'number');
+  const ys = candidates.map((c) => c.y).filter((v): v is number => typeof v === 'number');
+  if (xs.length >= 2 && ys.length >= 2) {
+    const xRange = Math.max(...xs) - Math.min(...xs);
+    const yRange = Math.max(...ys) - Math.min(...ys);
+    if (xRange !== yRange) return xRange > yRange ? 'x' : 'y';
+  }
+  if (bbox) {
+    return bbox.maxX - bbox.minX >= bbox.maxY - bbox.minY ? 'x' : 'y';
+  }
+  return 'x';
+}
+
+/** Ordena por el eje de secuencia (X ascendente; Y descendente = de arriba abajo). */
+function sortBySequenceAxis(
+  candidates: ReadonlyArray<{ reading: LongitudinalBarReading; x?: number; y?: number }>,
+  axis: SequenceAxis,
+): LongitudinalBarReading[] {
+  return [...candidates]
+    .sort((a, b) =>
+      axis === 'x' ? (a.x ?? 0) - (b.x ?? 0) : (b.y ?? 0) - (a.y ?? 0),
+    )
+    .map((candidate) => candidate.reading);
 }
 
 function compareZonesWithSummary(
@@ -703,40 +873,91 @@ export function summarizeMarkersForQuality(details: readonly BeamDetail[]): Mark
 // Beam detail → líneas del takeoff (clic humano = aprobación)
 // ---------------------------------------------------------------------------
 
+/** Barra que NO entra al takeoff todavía (se queda visible en el panel). */
+export interface BeamTakeoffSkippedBar {
+  position: LongitudinalBarReading['position'];
+  description: string;
+  sourceText: string;
+  reason: string;
+}
+
 /**
- * Convierte UN beam detail en líneas F3 con evidencia dxf completa. Solo
- * entra lo verificable: los longitudinales cuya CANTIDAD viene del conteo
- * gráfico (`4#6330` = 4 marcadores × varilla #6 de 330 cm) y, para estribos,
- * SOLO el resumen sugerido del contrato F8D:
- *
- * - `match` ⇒ el resumen entra por defecto (jamás las zonas sueltas).
- * - `mismatch`/`unverified` ⇒ NO se autoaprueba: requiere `stirrupChoice`
- *   explícita de la usuaria (resumen del plano / suma por zonas).
- * - `ambiguous` ⇒ no entra ni con elección (revisar segmentación primero).
+ * Resultado del "Enviar al takeoff" de UNA viga (F8E): las líneas listas,
+ * el desglose superior/inferior/estribo, lo que quedó bloqueado y por qué, y
+ * el texto de preview ("Se enviarán 9 líneas: 4 superior, 4 inferior,
+ * 1 estribo"). Contrato: al takeoff SOLO entran líneas computables (cantidad
+ * numérica + longitud + varilla); el estado de revisión humana es aparte.
  */
-export function beamDetailToManualLines(
+export interface BeamTakeoffDispatch {
+  lines: readonly Omit<ManualLineRecord, 'id'>[];
+  topCount: number;
+  bottomCount: number;
+  stirrupIncluded: boolean;
+  /** Motivo cuando hay estribos detectados pero la línea NO entra. */
+  stirrupBlockedReason?: string;
+  /** Barras detectadas que no entran (sin cantidad gráfica / sin banda). */
+  skippedBars: readonly BeamTakeoffSkippedBar[];
+  previewText: string;
+  /** Motivos legibles cuando se envía poco o nada. */
+  explanations: readonly string[];
+}
+
+/**
+ * Arma el envío al takeoff de un beam detail completo (F8E):
+ *
+ * - CADA barra superior e inferior con cantidad del conteo gráfico entra como
+ *   línea propia (`4#6330` = 4 marcadores × varilla #6 de 330 cm) — nunca
+ *   solo la primera/última.
+ * - Barras sin cantidad gráfica confiable NO entran (requieren definir
+ *   cantidad): quedan en `skippedBars`, visibles en el panel. Jamás se
+ *   inventa cantidad ni entra una línea incomputable al takeoff/Excel.
+ * - Estribos: UNA sola línea — el resumen sugerido en `match`; en
+ *   `mismatch`/`unverified` solo con `stirrupChoice` explícita de la usuaria
+ *   (resumen del plano / suma por zonas); `ambiguous` no entra nunca; las
+ *   zonas sueltas jamás se envían por defecto.
+ */
+export function buildBeamTakeoffDispatch(
   detail: BeamDetail,
   sourceFileName: string,
   options: { assumedWastePct?: string; stirrupChoice?: StirrupTakeoffChoice } = {},
-): readonly Omit<ManualLineRecord, 'id'>[] {
+): BeamTakeoffDispatch {
   const assumedWastePct = options.assumedWastePct ?? '5';
   const lines: Array<Omit<ManualLineRecord, 'id'>> = [];
-
-  const stirrupLine = stirrupChoiceToManualLine(detail, sourceFileName, {
-    assumedWastePct,
-    stirrupChoice: options.stirrupChoice,
-  });
-  if (stirrupLine) lines.push(stirrupLine);
+  const skippedBars: BeamTakeoffSkippedBar[] = [];
+  const explanations: string[] = [];
 
   const baseEvidence = beamDetailBaseEvidence(detail, sourceFileName);
   const observationBase = beamDetailObservationBase(detail);
 
+  let topCount = 0;
+  let bottomCount = 0;
   for (const reading of [...detail.topLongitudinalBars, ...detail.bottomLongitudinalBars]) {
-    if (reading.quantityFromGraphic === undefined || !reading.cutLengthM) continue;
+    if (reading.quantityFromGraphic === undefined) {
+      skippedBars.push({
+        position: reading.position,
+        description: reading.description,
+        sourceText: reading.sourceText,
+        reason:
+          'Requiere definir cantidad: sin conteo gráfico confiable de marcadores (el primer dígito del texto NO es cantidad).',
+      });
+      continue;
+    }
+    if (!reading.cutLengthM) {
+      skippedBars.push({
+        position: reading.position,
+        description: reading.description,
+        sourceText: reading.sourceText,
+        reason: 'Sin longitud de corte legible en la notación: no es computable por F1.',
+      });
+      continue;
+    }
     const lengthCm = Math.round(Number(reading.cutLengthM) * 100);
+    if (reading.position === 'superior') topCount += 1;
+    else bottomCount += 1;
     lines.push({
       originalDescription: `${reading.quantityFromGraphic}#${reading.barCode}${lengthCm}`,
       assumedWastePct,
+      manualBarNumber: reading.barCode,
       evidence: {
         ...baseEvidence,
         position: reading.position,
@@ -752,7 +973,79 @@ export function beamDetailToManualLines(
     });
   }
 
-  return lines;
+  for (const reading of detail.unclassifiedLongitudinalBars) {
+    skippedBars.push({
+      position: reading.position,
+      description: reading.description,
+      sourceText: reading.sourceText,
+      reason: 'Sin banda superior/inferior clara: revisar en "Sin clasificar / revisar" antes de enviar.',
+    });
+  }
+
+  // ---- Estribos: UNA línea según el contrato F8D ---------------------------
+  let stirrupIncluded = false;
+  let stirrupBlockedReason: string | undefined;
+  const contract = detail.stirrupContract;
+  if (contract) {
+    const stirrupLine = stirrupChoiceToManualLine(detail, sourceFileName, {
+      assumedWastePct,
+      stirrupChoice: options.stirrupChoice,
+    });
+    if (stirrupLine) {
+      lines.push(stirrupLine);
+      stirrupIncluded = true;
+    } else if (options.stirrupChoice === 'mark_for_review') {
+      stirrupBlockedReason = 'Estribo marcado para revisión por la usuaria: no se envía.';
+    } else if (contract.comparisonStatus === 'ambiguous') {
+      stirrupBlockedReason = `Estribo bloqueado: ${contract.message}`;
+    } else if (options.stirrupChoice) {
+      const resolution = resolveStirrupTakeoffChoice(contract, options.stirrupChoice);
+      stirrupBlockedReason = resolution.ok ? undefined : `Estribo bloqueado: ${resolution.reason}`;
+    } else {
+      stirrupBlockedReason =
+        contract.comparisonStatus === 'mismatch'
+          ? 'Estribo bloqueado por desfase zonas vs resumen: elige "Usar resumen del plano" o "Usar cálculo por zonas".'
+          : 'Estribo sin verificar: requiere elección explícita (resumen del plano / cálculo por zonas) para enviarse.';
+    }
+  }
+
+  if (skippedBars.length > 0) {
+    explanations.push(
+      `${skippedBars.length} barra(s) longitudinales detectadas NO se envían: ${[...new Set(skippedBars.map((bar) => bar.reason))].join(' ')}`,
+    );
+  }
+  if (stirrupBlockedReason) explanations.push(stirrupBlockedReason);
+  if (lines.length === 0) {
+    explanations.push('No hay líneas computables para el takeoff: nada se envía (jamás se inventa cantidad).');
+  }
+
+  const previewText =
+    lines.length === 0
+      ? 'No se enviará ninguna línea.'
+      : `Se enviarán ${lines.length} línea(s): ${topCount} superior, ${bottomCount} inferior, ${stirrupIncluded ? 1 : 0} estribo.`;
+
+  return {
+    lines,
+    topCount,
+    bottomCount,
+    stirrupIncluded,
+    stirrupBlockedReason,
+    skippedBars,
+    previewText,
+    explanations,
+  };
+}
+
+/**
+ * Convierte UN beam detail en líneas F3 con evidencia dxf completa (wrapper
+ * de compatibilidad F8C/F8D sobre `buildBeamTakeoffDispatch`).
+ */
+export function beamDetailToManualLines(
+  detail: BeamDetail,
+  sourceFileName: string,
+  options: { assumedWastePct?: string; stirrupChoice?: StirrupTakeoffChoice } = {},
+): readonly Omit<ManualLineRecord, 'id'>[] {
+  return buildBeamTakeoffDispatch(detail, sourceFileName, options).lines;
 }
 
 function beamDetailBaseEvidence(detail: BeamDetail, sourceFileName: string) {

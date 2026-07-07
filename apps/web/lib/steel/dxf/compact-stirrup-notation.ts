@@ -132,6 +132,8 @@ export function normalizeCompactStirrupNotation(
 
 /** "6#6 33 L" / "6#6 33L": dígitos separados + sufijo L ⇒ longitud ×10 en cm. */
 const COMPACT_LONGITUDINAL_L_PATTERN = /(\d)\s*#\s*(\d)\s+(\d{1,2})\s*L\b/gi;
+/** "6#6 L=330" / "6#6 L=33": longitud explícita tras `L=` (cm; 2 dígitos ⇒ ×10). */
+const COMPACT_LONGITUDINAL_LEQ_PATTERN = /(\d)\s*#\s*(\d)\s*L\s*=\s*(\d{2,4})\b/gi;
 /** Token corto "6#635": SOLO 2 dígitos de longitud tras el código ⇒ ×10. */
 const COMPACT_LONGITUDINAL_SHORT_PATTERN = /\b(\d)#(\d)(\d{2})\b(?!\d)/g;
 
@@ -174,8 +176,11 @@ export function normalizeCompactLongitudinalNotation(
   let requiresReview = false;
   let applied = false;
 
-  const applyToken = (raw: string, first: string, bar: string, lengthDigits: string): string => {
-    const lengthCm = Number.parseInt(lengthDigits, 10) * 10;
+  const applyToken = (raw: string, first: string, bar: string, lengthDigits: string, cmDirect = false): string => {
+    // 2 dígitos ⇒ decímetros compactos (×10); con `L=` 3+ dígitos ya son cm.
+    const lengthCm = cmDirect && lengthDigits.length >= 3
+      ? Number.parseInt(lengthDigits, 10)
+      : Number.parseInt(lengthDigits, 10) * 10;
     if (lengthCm < MIN_PLAUSIBLE_LONGITUDINAL_CM || lengthCm > MAX_PLAUSIBLE_LONGITUDINAL_CM) {
       requiresReview = true;
       warnings.push(
@@ -200,6 +205,11 @@ export function normalizeCompactLongitudinalNotation(
   COMPACT_LONGITUDINAL_L_PATTERN.lastIndex = 0;
   let normalizedText = text.replace(COMPACT_LONGITUDINAL_L_PATTERN, (raw, first: string, bar: string, len: string) =>
     applyToken(raw, first, bar, len),
+  );
+  COMPACT_LONGITUDINAL_LEQ_PATTERN.lastIndex = 0;
+  normalizedText = normalizedText.replace(
+    COMPACT_LONGITUDINAL_LEQ_PATTERN,
+    (raw, first: string, bar: string, len: string) => applyToken(raw, first, bar, len, true),
   );
   COMPACT_LONGITUDINAL_SHORT_PATTERN.lastIndex = 0;
   normalizedText = normalizedText.replace(

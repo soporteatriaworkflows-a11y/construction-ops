@@ -15,8 +15,7 @@ import { InlineCallout } from '@/components/shared/inline-callout';
 import { computeManualLine, type ManualLineRecord } from '@/lib/steel/manual-takeoff';
 import { explainSteelCalculation } from '@/lib/steel/steel-calculation-explanation';
 import {
-  beamDetailToManualLines,
-  stirrupChoiceToManualLine,
+  buildBeamTakeoffDispatch,
   type BeamDetail,
 } from '@/lib/steel/dxf/dxf-beam-detail-assembly';
 import { BEAM_SCHEDULE_STATUS_LABEL } from '@/lib/steel/dxf/beam-schedule';
@@ -107,36 +106,33 @@ export function BeamDetailReviewPanel({
   const [stirrupDecision, setStirrupDecision] = useState<StirrupTakeoffChoice | null>(null);
   const [sentInfo, setSentInfo] = useState<string | null>(null);
 
-  const defaultLines = useMemo(() => beamDetailToManualLines(detail, fileName), [detail, fileName]);
+  // F8E: el envío es UNO solo — superior + inferior + estribo (según decisión).
+  const dispatch = useMemo(
+    () => buildBeamTakeoffDispatch(detail, fileName, { stirrupChoice: stirrupDecision ?? undefined }),
+    [detail, fileName, stirrupDecision],
+  );
 
   // "Ver cálculo": explicación F1 de cada línea candidata (sin persistir nada).
   const explanations = useMemo(
     () =>
-      defaultLines.map((line) =>
+      dispatch.lines.map((line) =>
         explainSteelCalculation(computeManualLine({ ...line, id: `preview-${line.originalDescription}` })),
       ),
-    [defaultLines],
+    [dispatch],
   );
 
   function handleSendDefault() {
-    if (defaultLines.length === 0) return;
-    onAddLines(defaultLines);
-    setSentInfo(`${defaultLines.length} línea(s) enviadas al takeoff.`);
+    if (dispatch.lines.length === 0) return;
+    onAddLines(dispatch.lines);
+    setSentInfo(
+      `${dispatch.lines.length} línea(s) enviadas: ${dispatch.topCount} superior, ${dispatch.bottomCount} inferior, ${dispatch.stirrupIncluded ? 1 : 0} estribo.`,
+    );
   }
 
+  // La decisión humana SOLO fija qué estribo entrará en el envío (no envía).
   function handleStirrupChoice(choice: StirrupTakeoffChoice) {
     setStirrupDecision(choice);
-    if (choice === 'mark_for_review') {
-      setSentInfo('Estribo marcado para revisión: NO se envió al takeoff.');
-      return;
-    }
-    const line = stirrupChoiceToManualLine(detail, fileName, { stirrupChoice: choice });
-    if (!line) {
-      setSentInfo('No se pudo armar la línea con esa elección (ver estado del contrato).');
-      return;
-    }
-    onAddLines([line]);
-    setSentInfo(`Estribo enviado como ${line.originalDescription} (${STIRRUP_TAKEOFF_CHOICE_LABEL[choice]}).`);
+    setSentInfo(null);
   }
 
   const needsDecision = contract && (contract.comparisonStatus === 'mismatch' || contract.comparisonStatus === 'unverified');
@@ -177,6 +173,15 @@ export function BeamDetailReviewPanel({
             label="Vista DXF"
             value={detail.viewId ? `${detail.viewId} (${detail.viewType ? DXF_VIEW_TYPE_LABEL[detail.viewType] : '—'})` : 'sin vista segmentada'}
           />
+          <Field label="Superior" value={`${detail.topLongitudinalBars.length} items`} />
+          <Field label="Inferior" value={`${detail.bottomLongitudinalBars.length} items`} />
+          <Field
+            label="Estribos"
+            value={`${detail.stirrupSummary ? 1 : 0} resumen + ${detail.stirrupZones.length} zonas`}
+          />
+          {detail.unclassifiedLongitudinalBars.length > 0 && (
+            <Field label="Sin clasificar" value={`${detail.unclassifiedLongitudinalBars.length} items`} />
+          )}
         </dl>
         {detail.statusReasons.length > 0 && (
           <ul className="mt-1 list-disc pl-4 text-[11px] text-amber-700 dark:text-amber-400">
@@ -186,11 +191,23 @@ export function BeamDetailReviewPanel({
           </ul>
         )}
 
-        {/* 2/3. Longitudinales */}
-        <SectionHeading>2 · Refuerzo superior</SectionHeading>
+        {/* 2/3. Longitudinales — lista COMPLETA en secuencia, jamás truncada */}
+        <SectionHeading>2 · Refuerzo superior ({detail.topLongitudinalBars.length} items)</SectionHeading>
         <LongitudinalRows bars={detail.topLongitudinalBars} />
-        <SectionHeading>3 · Refuerzo inferior</SectionHeading>
+        <SectionHeading>3 · Refuerzo inferior ({detail.bottomLongitudinalBars.length} items)</SectionHeading>
         <LongitudinalRows bars={detail.bottomLongitudinalBars} />
+        {detail.unclassifiedLongitudinalBars.length > 0 && (
+          <>
+            <SectionHeading>
+              Sin clasificar / revisar ({detail.unclassifiedLongitudinalBars.length} items)
+            </SectionHeading>
+            <InlineCallout tone="warning" className="mt-1" title="Textos longitudinales sin banda clara">
+              Estos textos se detectaron dentro de la vista pero no quedó clara su banda
+              superior/inferior: no se envían al takeoff sin revisión.
+            </InlineCallout>
+            <LongitudinalRows bars={detail.unclassifiedLongitudinalBars} />
+          </>
+        )}
 
         {/* 4. Estribos/flejado — contrato zonas vs resumen */}
         <SectionHeading>4 · Estribos / flejado</SectionHeading>
@@ -226,7 +243,7 @@ export function BeamDetailReviewPanel({
             {needsDecision && (
               <div className="mt-2 rounded border border-amber-300/60 p-2">
                 <p className="text-[11px] font-medium text-amber-800 dark:text-amber-300">
-                  Requiere decisión humana — el envío automático está bloqueado:
+                  Requiere decisión humana — el estribo NO entra al envío hasta elegir:
                 </p>
                 <div className="mt-1.5 flex flex-wrap gap-2">
                   {(['declared_summary', 'zone_total', 'mark_for_review'] as const).map((choice) => (
@@ -234,7 +251,7 @@ export function BeamDetailReviewPanel({
                       key={choice}
                       type="button"
                       size="sm"
-                      variant={choice === 'mark_for_review' ? 'ghost' : 'outline'}
+                      variant={stirrupDecision === choice ? 'default' : choice === 'mark_for_review' ? 'ghost' : 'outline'}
                       disabled={disabled}
                       aria-pressed={stirrupDecision === choice}
                       onClick={() => handleStirrupChoice(choice)}
@@ -243,6 +260,12 @@ export function BeamDetailReviewPanel({
                     </Button>
                   ))}
                 </div>
+                {stirrupDecision && (
+                  <p className="mt-1 text-[11px] text-iconic-graphite/60">
+                    Decisión: {STIRRUP_TAKEOFF_CHOICE_LABEL[stirrupDecision]} — se aplica al usar
+                    “Enviar al takeoff”.
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -301,17 +324,36 @@ export function BeamDetailReviewPanel({
           </ul>
         )}
 
-        {/* Acciones */}
-        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-iconic-soft-blue/30 pt-3">
-          <Button type="button" size="sm" onClick={handleSendDefault} disabled={disabled || defaultLines.length === 0}>
-            Enviar al takeoff ({defaultLines.length} línea(s) verificables)
-          </Button>
-          {sentInfo && <Badge variant="success">{sentInfo}</Badge>}
+        {/* Acciones — preview honesto de lo que entra y lo que queda fuera */}
+        <div className="mt-4 border-t border-iconic-soft-blue/30 pt-3">
+          <p className="text-[11px] font-medium text-iconic-ink">{dispatch.previewText}</p>
+          {dispatch.explanations.length > 0 && (
+            <ul className="mt-1 list-disc pl-4 text-[11px] text-amber-700 dark:text-amber-400">
+              {dispatch.explanations.map((explanation) => (
+                <li key={explanation}>{explanation}</li>
+              ))}
+            </ul>
+          )}
+          {dispatch.skippedBars.length > 0 && (
+            <ul className="mt-1 list-disc pl-4 font-mono text-[11px] text-iconic-graphite/60">
+              {dispatch.skippedBars.map((bar) => (
+                <li key={`${bar.position}-${bar.description}-${bar.sourceText}`}>
+                  {bar.description} ({bar.position}) — {bar.reason}
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <Button type="button" size="sm" onClick={handleSendDefault} disabled={disabled || dispatch.lines.length === 0}>
+              Enviar al takeoff ({dispatch.lines.length} línea(s))
+            </Button>
+            {sentInfo && <Badge variant="success">{sentInfo}</Badge>}
+          </div>
         </div>
         <p className="mt-1 text-[11px] text-iconic-graphite/50">
-          Por defecto se envían: cada barra superior/inferior con cantidad por conteo gráfico y SOLO el
-          resumen sugerido de estribos cuando zonas y resumen coinciden. Los desfases exigen la decisión
-          de arriba; lo ambiguo no se envía.
+          Se envía cada barra superior/inferior con cantidad por conteo gráfico y UNA línea de
+          estribos: el resumen sugerido cuando zonas y resumen coinciden, o la opción elegida arriba
+          cuando hay desfase. Lo ambiguo y lo que requiere definir cantidad NO entra al takeoff.
         </p>
       </div>
     </div>
