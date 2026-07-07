@@ -7,12 +7,20 @@ import {
   type SteelOffcut,
 } from '@/modules/steel';
 import { computeOffcutSavings, specDisplayLabel } from './domain-bridge';
+import {
+  OFFCUT_STATUS_LABEL,
+  PRICE_STATUS_LABEL,
+  TAKEOFF_STATUS_LABEL,
+  VERIFICATION_STATUS_LABEL,
+} from './format';
 import { MOCK_STEEL_SETTINGS, MOCK_STEEL_SPECS } from './mock-data';
 import {
   buildManualCutPlan,
   buildManualOrderDraft,
   DEFAULT_COMMERCIAL_LENGTHS_M,
   effectiveCommercialLengths,
+  effectiveWasteConfig,
+  TAKEOFF_WASTE_MODE_LABEL,
   type ManualComputedLine,
   type ManualCutPlanResult,
   type ManualOrderDraft,
@@ -36,15 +44,18 @@ const NUM_FMT = '#,##0.00';
 const KG_FMT = '#,##0.000';
 const COP_FMT = '"$"#,##0';
 
-// Paleta ICONIC (identidad visual de la plataforma; F7.1):
+// Paleta ICONIC (identidad visual de la plataforma; F7.1 → F8D):
 // navy #020148 · blue #005DD6 · cyan #00B8FF · dark #1B1F3E + neutros.
+// F8D: el navy deja de ser bloque gigante — encabezados SUAVES (azul claro,
+// texto oscuro) con azul/cian solo como ACENTO; bordes de tabla visibles.
 const ICONIC_NAVY = 'FF020148';
 const ICONIC_BLUE = 'FF005DD6';
 const ICONIC_CYAN = 'FF00B8FF';
 const ICONIC_DARK = 'FF1B1F3E';
-const HEADER_FILL = ICONIC_NAVY;
-const BAND_FILL = 'FFF0F6FF'; // azul muy suave para zebra
-const BORDER = 'FFC9D8F0';
+const HEADER_FILL = 'FFE9F1FC'; // azul muy claro (encabezado suave)
+const BAND_FILL = 'FFF5F9FF'; // azul apenas perceptible para zebra
+const BORDER = 'FFB9CCE8';
+const OUTER_BORDER = ICONIC_BLUE;
 // Acentos suaves para estados/confianza (legibles, no chillones).
 const SOFT_GREEN = 'FFE2F5E9';
 const SOFT_AMBER = 'FFFFF3D6';
@@ -148,6 +159,25 @@ function formula(formulaText: string, result: number): ExcelJS.CellValue {
   return { formula: formulaText, result };
 }
 
+/** Etiquetas en español para el método de lectura de la evidencia (F8D). */
+const READING_METHOD_LABEL: Record<string, string> = {
+  native_text: 'texto nativo PDF',
+  ocr: 'OCR',
+  manual: 'manual',
+  dxf: 'DXF (CAD)',
+  unknown: 'desconocido',
+};
+
+function readingMethodLabel(method: string | undefined | null): string {
+  if (!method) return READING_METHOD_LABEL.unknown!;
+  return READING_METHOD_LABEL[String(method)] ?? String(method);
+}
+
+function verificationLabel(status: string | undefined | null): string {
+  if (!status) return VERIFICATION_STATUS_LABEL.unreviewed!;
+  return VERIFICATION_STATUS_LABEL[String(status)] ?? String(status);
+}
+
 type EvidenceCarrier = Partial<ManualExcelLineEvidence> & {
   evidence?: Partial<ManualExcelLineEvidence>;
   sourceFile?: string;
@@ -187,12 +217,13 @@ function isLowConfidence(evidence: ManualExcelLineEvidence): boolean {
 
 function styleHeader(row: ExcelJS.Row): void {
   row.eachCell((cell) => {
-    cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    // F8D: encabezado SUAVE — fondo azul claro, texto oscuro ICONIC; el cian
+    // queda como acento (línea de marca), no como bloque pesado.
+    cell.font = { bold: true, color: { argb: ICONIC_DARK } };
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_FILL } };
     cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
     cell.border = {
       ...thinBorder(),
-      // Acento cyan ICONIC bajo el encabezado (línea de marca).
       bottom: { style: 'medium', color: { argb: ICONIC_CYAN } },
     };
   });
@@ -248,6 +279,26 @@ function finishTable(ws: ExcelJS.Worksheet, widths: readonly number[], headerRow
       }
     });
   });
+  applyOuterBorder(ws, widths.length, headerRow);
+}
+
+/** F8D: borde EXTERIOR visible alrededor de toda la tabla (azul ICONIC). */
+function applyOuterBorder(ws: ExcelJS.Worksheet, columnCount: number, headerRow: number): void {
+  const lastRow = ws.rowCount;
+  if (lastRow < headerRow || columnCount === 0) return;
+  const outer: ExcelJS.Border = { style: 'medium', color: { argb: OUTER_BORDER } };
+  for (let rowNumber = headerRow; rowNumber <= lastRow; rowNumber += 1) {
+    const row = ws.getRow(rowNumber);
+    for (let col = 1; col <= columnCount; col += 1) {
+      const cell = row.getCell(col);
+      const border = { ...cell.border };
+      if (rowNumber === headerRow) border.top = outer;
+      if (rowNumber === lastRow) border.bottom = outer;
+      if (col === 1) border.left = outer;
+      if (col === columnCount) border.right = outer;
+      cell.border = border;
+    }
+  }
 }
 
 function addResumenSheet(
@@ -259,24 +310,33 @@ function addResumenSheet(
   generatedAt: Date,
 ): void {
   const ws = wb.addWorksheet('00_RESUMEN', { views: [{ showGridLines: false }] });
-  ws.columns = [{ width: 34 }, { width: 26 }, { width: 30 }];
-  // Banner ICONIC: navy con texto blanco y acento cyan (fila 2 vacía existente).
+  ws.columns = [{ width: 34 }, { width: 26 }, { width: 34 }];
+  // Banner ICONIC (F8D): texto navy sobre blanco con franja cyan de acento —
+  // la marca se conserva sin el bloque navy pesado.
   ws.mergeCells('A1:C1');
   const banner = ws.getCell('A1');
-  banner.value = 'ICONIC · Steel Ops — Takeoff de acero (export tecnico)';
-  banner.font = { bold: true, size: 15, color: { argb: 'FFFFFFFF' } };
-  banner.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: ICONIC_NAVY } };
+  banner.value = 'ICONIC · Steel Ops — Cuantificación de acero (exportación técnica)';
+  banner.font = { bold: true, size: 15, color: { argb: ICONIC_NAVY } };
   banner.alignment = { horizontal: 'center', vertical: 'middle' };
+  banner.border = { bottom: { style: 'medium', color: { argb: ICONIC_CYAN } } };
   ws.getRow(1).height = 30;
+
+  // F8D: fuente del desperdicio explícita (calculado por optimización vs
+  // factor manual) — dos conceptos distintos que no deben confundirse.
+  const wasteConfig = effectiveWasteConfig(takeoff);
+  const assumedWasteNote =
+    wasteConfig.mode === 'manual'
+      ? `m (factor manual ${wasteConfig.manualWastePercent}%)`
+      : 'm (asumido por linea, pre-optimizacion)';
 
   const totalCritical = lines.flatMap((l) => l.alerts).filter((a) => a.severity === 'critical').length;
   const savings = computeOffcutSavings([plan]);
   const rows: [string, CellValue, string?][] = [
     ['Proyecto', text(takeoff.projectName)],
-    ['Takeoff', text(takeoff.name)],
+    ['Cuantificación', text(takeoff.name)],
     ['Alcance', text(takeoff.scopeLabel)],
-    ['Fecha export', generatedAt.toISOString().slice(0, 10)],
-    ['Estado', text(takeoff.status)],
+    ['Fecha de exportación', generatedAt.toISOString().slice(0, 10)],
+    ['Estado', text(TAKEOFF_STATUS_LABEL[takeoff.status] ?? takeoff.status)],
     ['Total ml', formula(totalFormula(lines.length, 'N'), sumLineValues(lines, (line) => line.calculated.totalMl)), 'm'],
     ['Total kg', formula(totalFormula(lines.length, 'O'), sumLineValues(lines, (line) => line.calculated.totalKg)), 'kg'],
     [
@@ -284,11 +344,11 @@ function addResumenSheet(
       formula(totalFormula(lines.length, 'P'), sumLineValues(lines, (line) => line.calculated.commercialUnitsRequired)),
       'un',
     ],
-    ['Desperdicio estimado', totalWasteMl(lines), 'm'],
-    ['Desperdicio optimizado', num(plan.totalWasteM), 'm'],
-    ['Ahorro estimado', num(savings.totalCop, 0), 'COP mock'],
-    ['Alertas criticas', totalCritical, 'conteo'],
-    ['Pedido proveedor mock', text(order.name)],
+    ['Desperdicio estimado', totalWasteMl(lines), assumedWasteNote],
+    ['Desperdicio optimizado', num(plan.totalWasteM), 'm (calculado por optimización)'],
+    ['Ahorro estimado', num(savings.totalCop, 0), 'COP (referencia, no aprobado)'],
+    ['Alertas críticas', totalCritical, 'conteo'],
+    ['Pedido proveedor (referencia)', text(order.name)],
   ];
 
   ws.addRow([]);
@@ -299,7 +359,7 @@ function addResumenSheet(
   ws.getCell('B10').numFmt = KG_FMT;
   ws.getCell('B14').numFmt = COP_FMT;
   ws.getCell('A18').value = 'Nota';
-  ws.getCell('B18').value = 'Borrador para revision interna/proveedor; no reemplaza aprobacion tecnica.';
+  ws.getCell('B18').value = 'Borrador para revisión interna/proveedor; no reemplaza aprobación técnica.';
   ws.mergeCells('B18:C18');
 
   // Franja de acento cyan ICONIC bajo el banner (al final: las filas ya están
@@ -341,15 +401,15 @@ function addControlLecturaSheet(
   const totalWithEvidence = evidences.filter(hasEvidence).length;
   const totalLowConfidence = evidences.filter(isLowConfidence).length;
   const rows: [string, CellValue, string?][] = [
-    ['Takeoff', text(takeoff.name)],
-    ['Fecha export', generatedAt.toISOString().slice(0, 10)],
-    ['Estado', text(takeoff.status)],
-    ['Advertencia', 'Borrador para revision tecnica', 'No usar como aprobacion automatica.'],
-    ['Total lineas', lines.length],
-    ['Total lineas con evidencia', totalWithEvidence],
-    ['Total lineas sin evidencia', lines.length - totalWithEvidence],
-    ['Total lineas de baja confianza', totalLowConfidence, 'Confianza de evidencia menor a 0.70.'],
-    ['Nota', 'No reemplaza aprobacion tecnica.'],
+    ['Cuantificación', text(takeoff.name)],
+    ['Fecha de exportación', generatedAt.toISOString().slice(0, 10)],
+    ['Estado', text(TAKEOFF_STATUS_LABEL[takeoff.status] ?? takeoff.status)],
+    ['Advertencia', 'Borrador para revisión técnica', 'No usar como aprobación automática.'],
+    ['Total líneas', lines.length],
+    ['Total líneas con evidencia', totalWithEvidence],
+    ['Total líneas sin evidencia', lines.length - totalWithEvidence],
+    ['Total líneas de baja confianza', totalLowConfidence, 'Confianza de evidencia menor a 0.70.'],
+    ['Nota', 'No reemplaza aprobación técnica.'],
   ];
   rows.forEach((row) => ws.addRow(row));
   finishTable(ws, [34, 28, 58]);
@@ -380,11 +440,11 @@ function addEvidenciasSheet(wb: ExcelJS.Workbook, takeoff: ManualTakeoffRecord, 
       cellText(evidence.sourceFileName || 'fuente no disponible'),
       cellText(evidence.pageNumber),
       cellText(evidence.sourceType),
-      cellText(evidence.readingMethod ?? 'unknown'),
+      cellText(readingMethodLabel(evidence.readingMethod)),
       cellText(evidence.confidence),
       cellText(evidence.originalFragment),
       cellText(evidence.observation),
-      cellText(evidence.reviewStatus ?? line.calculated.verificationStatus ?? 'unreviewed'),
+      cellText(verificationLabel(evidence.reviewStatus ?? line.calculated.verificationStatus)),
     ]);
     styleConfidenceCell(row.getCell(8), evidence.confidence);
     styleStatusCell(row.getCell(11), String(evidence.reviewStatus ?? line.calculated.verificationStatus ?? 'unreviewed'));
@@ -482,11 +542,11 @@ function addCantidadesSheet(wb: ExcelJS.Workbook, takeoff: ManualTakeoffRecord, 
       ),
       formula(`IF(H${r}>0,P${r}*H${r}-N${r},0)`, round6(wasteMl)),
       text(line.parsed.explanation),
-      text(line.calculated.verificationStatus ?? 'unreviewed'),
+      text(verificationLabel(line.calculated.verificationStatus)),
       cellText(evidence.sourceFileName),
       cellText(evidence.pageNumber),
       cellText(evidence.sourceType),
-      cellText(evidence.readingMethod),
+      cellText(readingMethodLabel(evidence.readingMethod)),
       cellText(evidence.confidence),
       cellText(evidence.observation),
     ]);
@@ -533,7 +593,7 @@ function addConfigVarillasSheet(wb: ExcelJS.Workbook, takeoff: ManualTakeoffReco
       barNumber,
       num(spec.unitWeightKgM, 6),
       activeLength,
-      text(`Editable. Longitudes configuradas del takeoff: ${configured} m.`),
+      text(`Editable. Longitudes configuradas de la cuantificación: ${configured} m.`),
     ]);
   }
   ws.getColumn(2).numFmt = KG_FMT;
@@ -595,7 +655,7 @@ function addPlanCorteSheet(wb: ExcelJS.Workbook, lines: readonly ManualComputedL
       text(bar.assignments.map((a) => `${a.cutId}:${a.lengthM}m`).join(' | ')),
       text(destination.join(', ')),
       num(bar.remainingLengthM),
-      text(bar.offcutStatus),
+      text(OFFCUT_STATUS_LABEL[bar.offcutStatus] ?? bar.offcutStatus),
     ]);
   });
   [3, 6].forEach((col) => { ws.getColumn(col).numFmt = NUM_FMT; });
@@ -604,7 +664,7 @@ function addPlanCorteSheet(wb: ExcelJS.Workbook, lines: readonly ManualComputedL
 
 function addSobrantesSheet(wb: ExcelJS.Workbook, plan: SteelCutPlan): void {
   const ws = wb.addWorksheet('04_SOBRANTES');
-  ws.addRow(['material', 'longitud sobrante', 'peso sobrante', 'origen', 'posible destino', 'estado', 'ahorro ml', 'ahorro kg', 'ahorro COP mock']);
+  ws.addRow(['material', 'longitud sobrante', 'peso sobrante', 'origen', 'posible destino', 'estado', 'ahorro ml', 'ahorro kg', 'ahorro COP (referencia)']);
   plan.offcuts.forEach((offcut) => {
     const weight = offcutWeightKg(offcut);
     const price = mockPriceCopPerKg(offcut.steelSpecId);
@@ -613,8 +673,8 @@ function addSobrantesSheet(wb: ExcelJS.Workbook, plan: SteelCutPlan): void {
       num(offcut.lengthM),
       weight,
       text(offcut.sourceCutPlanBarId),
-      'Banco de sobrantes Steel Ops preview',
-      text(offcut.status),
+      'Banco de sobrantes Steel Ops (vista previa)',
+      text(OFFCUT_STATUS_LABEL[offcut.status] ?? offcut.status),
       num(offcut.lengthM),
       weight,
       formula(`H${ws.rowCount + 1}*${price}`, Math.round(weight * price)),
@@ -644,14 +704,14 @@ function mockPriceCopPerKg(steelSpecId: string): number {
 function addPedidoSheet(wb: ExcelJS.Workbook, order: ManualOrderDraft): void {
   const ws = wb.addWorksheet('05_PEDIDO_PROVEEDOR');
   ws.addRow([
-    'proveedor mock',
+    'proveedor (referencia)',
     'material',
     'unidad',
     'cantidad varillas/piezas',
     'ml total',
     'kg total',
-    'precio unitario mock',
-    'subtotal mock',
+    'precio unitario (referencia)',
+    'subtotal (referencia)',
     'vigencia precio',
     'estado precio',
   ]);
@@ -667,7 +727,7 @@ function addPedidoSheet(wb: ExcelJS.Workbook, order: ManualOrderDraft): void {
       num(line.unitPriceCopPerKg, 0),
       formula(`F${rowNumber}*G${rowNumber}`, num(line.subtotalCop, 0)),
       text(line.validUntil),
-      text(line.priceStatus),
+      text(PRICE_STATUS_LABEL[line.priceStatus] ?? line.priceStatus),
     ]);
   });
   [4, 5].forEach((col) => { ws.getColumn(col).numFmt = NUM_FMT; });
@@ -685,21 +745,35 @@ function addConfiguracionSheet(wb: ExcelJS.Workbook, takeoff: ManualTakeoffRecor
   const isDefaultLengths =
     configuredLengths.length === DEFAULT_COMMERCIAL_LENGTHS_M.length &&
     configuredLengths.every((length, index) => length === DEFAULT_COMMERCIAL_LENGTHS_M[index]);
+  // F8D: fuente del desperdicio explícita en la configuración exportada.
+  const wasteConfig = effectiveWasteConfig(takeoff);
   const rows: [string, CellValue, string][] = [
     [
       'longitudes comerciales',
       configuredLengths.join(' / '),
-      isDefaultLengths ? 'm (default del preview)' : 'm (configuradas en este takeoff)',
+      isDefaultLengths ? 'm (default de la vista previa)' : 'm (configuradas en esta cuantificación)',
+    ],
+    [
+      'fuente del desperdicio',
+      TAKEOFF_WASTE_MODE_LABEL[wasteConfig.mode],
+      wasteConfig.mode === 'manual'
+        ? 'Factor comercial editable por la usuaria; no es el sobrante del optimizador.'
+        : 'El plan de corte FFD reporta el sobrante real por barras comerciales y cortes.',
+    ],
+    [
+      'factor manual de desperdicio',
+      wasteConfig.mode === 'manual' ? num(wasteConfig.manualWastePercent) : 'no aplica',
+      '% (editable en la app; rango razonable 0-30)',
     ],
     ['kerf refuerzo', num(MOCK_STEEL_SETTINGS.kerfRebarM), 'm'],
     ['kerf perfiles', num(MOCK_STEEL_SETTINGS.kerfProfilesM, 3), 'm'],
-    ['desperdicio warning refuerzo', num(MOCK_STEEL_SETTINGS.wasteWarningPctRebar), '%'],
-    ['desperdicio critical refuerzo', num(MOCK_STEEL_SETTINGS.wasteCriticalPctRebar), '%'],
-    ['desperdicio warning perfiles', num(MOCK_STEEL_SETTINGS.wasteWarningPctProfiles), '%'],
-    ['desperdicio critical perfiles', num(MOCK_STEEL_SETTINGS.wasteCriticalPctProfiles), '%'],
-    ['minimo sobrante util refuerzo', num(MOCK_STEEL_SETTINGS.minimumUsefulOffcutRebarM), 'm'],
-    ['minimo sobrante util perfiles', num(MOCK_STEEL_SETTINGS.minimumUsefulOffcutProfilesM), 'm'],
-    ['precios', 'mock V1', 'Precios de referencia mock; no reemplazan cotizacion aprobada.'],
+    ['desperdicio advertencia refuerzo', num(MOCK_STEEL_SETTINGS.wasteWarningPctRebar), '%'],
+    ['desperdicio crítico refuerzo', num(MOCK_STEEL_SETTINGS.wasteCriticalPctRebar), '%'],
+    ['desperdicio advertencia perfiles', num(MOCK_STEEL_SETTINGS.wasteWarningPctProfiles), '%'],
+    ['desperdicio crítico perfiles', num(MOCK_STEEL_SETTINGS.wasteCriticalPctProfiles), '%'],
+    ['mínimo sobrante útil refuerzo', num(MOCK_STEEL_SETTINGS.minimumUsefulOffcutRebarM), 'm'],
+    ['mínimo sobrante útil perfiles', num(MOCK_STEEL_SETTINGS.minimumUsefulOffcutProfilesM), 'm'],
+    ['precios', 'referencia V1', 'Precios de referencia; no reemplazan cotización aprobada.'],
   ];
   rows.forEach((row) => ws.addRow(row.map((cell) => (typeof cell === 'string' ? text(cell) : cell))));
   finishTable(ws, [34, 24, 58]);

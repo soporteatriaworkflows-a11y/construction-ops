@@ -30,6 +30,12 @@ import {
   type DxfStructuralExtraction,
 } from './dxf-structural-extractor';
 import { DXF_EVIDENCE_METHOD, DXF_SOURCE_TYPE } from './dxf-to-steel-evidence';
+import {
+  entityViewAssignment,
+  viewForBeamKey,
+  viewForPoint,
+  type DxfViewSegmentation,
+} from './dxf-view-segmentation';
 
 // ---------------------------------------------------------------------------
 // Tipos
@@ -134,6 +140,7 @@ function locationFromContext(lines: readonly string[]): string | undefined {
 export function buildBeamSchedule(
   parse: DxfParseSuccess,
   extraction: DxfStructuralExtraction,
+  options: { segmentation?: DxfViewSegmentation } = {},
 ): BeamScheduleRow[] {
   const beams = extraction.elements.filter((el) => el.elementType === 'beam');
   if (beams.length === 0) return [];
@@ -141,14 +148,22 @@ export function buildBeamSchedule(
   const radius = dxfNeighborhoodRadius(parse.entities) * 1.5;
   const texts = parse.entities.filter(isDxfTextEntity);
 
-  return beams.map((beam) => buildRow(beam, texts, radius));
+  return beams.map((beam) => buildRow(beam, texts, radius, options.segmentation));
 }
 
 function buildRow(
   beam: DxfElementCandidate,
   texts: readonly DxfTextEntity[],
   radius: number,
+  segmentation?: DxfViewSegmentation,
 ): BeamScheduleRow {
+  // Vista de la viga (F8D): los textos de OTRAS vistas o ambiguos no entran
+  // al contexto de la fila aunque caigan dentro del radio.
+  const beamView = segmentation
+    ? (viewForBeamKey(segmentation, beam.elementKey, beam.coordinates) ??
+      (beam.coordinates ? viewForPoint(segmentation, beam.coordinates) : undefined))
+    : undefined;
+
   // Vecindad espacial propia (más amplia que la del extractor, cap 12).
   const nearbyTexts: string[] = [];
   if (beam.coordinates) {
@@ -156,6 +171,11 @@ function buildRow(
       if (typeof text.x !== 'number' || typeof text.y !== 'number') continue;
       const distance = Math.hypot(text.x - beam.coordinates.x, text.y - beam.coordinates.y);
       if (distance > radius) continue;
+      if (beamView && segmentation) {
+        const assignment = entityViewAssignment(segmentation, text);
+        if (assignment.ambiguous) continue;
+        if (assignment.viewId !== undefined && assignment.viewId !== beamView.viewId) continue;
+      }
       for (const line of text.rawText.split('\n')) {
         const trimmed = line.trim();
         if (trimmed.length === 0 || isTitleBlockNoise(trimmed, text.layer)) continue;
@@ -219,7 +239,9 @@ function buildRow(
   if (sections.size > 1) {
     statusReasons.push(`Secciones distintas cerca del elemento: ${[...sections].join(', ')} — confirmar contra el detalle.`);
   }
-  if (stirrups.length >= 3) {
+  // Con vista segmentada (F8D), varias zonas de estribo son el contenido
+  // ESPERADO del detalle — solo sin segmentación la vecindad es ambigua.
+  if (stirrups.length >= 3 && !beamView) {
     statusReasons.push(`Varios textos de estribo cercanos (${stirrups.length}): asociación ambigua, confirmar cuál pertenece a esta viga.`);
   }
   if (segmentCheck?.status === 'segment_sum_mismatch') {

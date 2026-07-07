@@ -194,7 +194,7 @@ describe('manual-takeoff (motor puro F3 sobre dominio F1)', () => {
     expect(csv).toContain('Descripción original');
     expect(csv).toContain('5#5600');
     expect(csv).toContain("'=2+2"); // fórmula neutralizada
-    expect(csv).toContain('Pedido acero (mock) — Takeoff CSV');
+    expect(csv).toContain('Pedido acero (referencia) — Takeoff CSV');
     expect(csv).toContain('Long. comercial (m)');
   });
 

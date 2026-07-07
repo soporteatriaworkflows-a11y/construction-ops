@@ -26,6 +26,7 @@ import {
   computeManualLines,
   computeManualTotals,
   effectiveCommercialLengths,
+  effectiveWasteConfig,
   ensureDemoIntakeTakeoff,
   MANUAL_TAKEOFF_STATUS_TRANSITIONS,
   MANUAL_TAKEOFF_TRANSITION_LABEL,
@@ -33,6 +34,7 @@ import {
   type ManualLineRecord,
   type ManualOrderDraft,
   type ManualTakeoffRecord,
+  type TakeoffWasteConfig,
 } from '@/lib/steel/manual-takeoff';
 import { loadManualTakeoffs } from '@/lib/steel/manual-store';
 import { openManualTakeoff } from '@/lib/steel/open-takeoff';
@@ -74,9 +76,17 @@ export function ManualTakeoffWorkspace({ takeoffId }: { takeoffId: string }) {
 
   const takeoff = takeoffs.find((t) => t.id === takeoffId);
 
+  // F8D: fuente del desperdicio del takeoff (calculado vs factor manual).
+  const wasteConfig = useMemo(() => effectiveWasteConfig(takeoff), [takeoff]);
   const computedLines = useMemo(
-    () => (takeoff ? computeManualLines(takeoff.lines) : []),
-    [takeoff],
+    () =>
+      takeoff
+        ? computeManualLines(
+            takeoff.lines,
+            wasteConfig.mode === 'manual' ? { manualWastePct: wasteConfig.manualWastePercent } : {},
+          )
+        : [],
+    [takeoff, wasteConfig],
   );
   const totals = useMemo(() => computeManualTotals(computedLines), [computedLines]);
   const referenceDate = new Date().toISOString().slice(0, 10);
@@ -133,6 +143,17 @@ export function ManualTakeoffWorkspace({ takeoffId }: { takeoffId: string }) {
   function handleChangeCommercialLengths(next: readonly string[]) {
     updateTakeoff((current) => ({ ...current, commercialLengthsM: next }));
     // Cambió la configuración: el plan/pedido previos quedan obsoletos.
+    setPlanResult(null);
+    setOrder(null);
+  }
+
+  function handleChangeWasteConfig(next: TakeoffWasteConfig) {
+    updateTakeoff((current) => ({
+      ...current,
+      wasteMode: next.mode,
+      manualWastePercent: next.manualWastePercent,
+    }));
+    // Cambió la fuente del desperdicio: el plan/pedido previos quedan obsoletos.
     setPlanResult(null);
     setOrder(null);
   }
@@ -220,9 +241,13 @@ export function ManualTakeoffWorkspace({ takeoffId }: { takeoffId: string }) {
         <KpiCard label="Total kg" value={formatDecimal(totals.totalKg)} />
         <KpiCard label="Unid. comerciales" value={formatDecimal(totals.totalCommercialUnits, 0)} hint="ceil por línea, pre-optimización" />
         <KpiCard
-          label="Desperdicio asumido"
+          label={wasteConfig.mode === 'manual' ? 'Desperdicio (factor manual)' : 'Desperdicio asumido'}
           value={`${formatDecimal(totals.estimatedWasteKg, 1)} kg`}
-          hint={`${formatDecimal(totals.estimatedWasteMl)} ml`}
+          hint={
+            wasteConfig.mode === 'manual'
+              ? `${formatDecimal(totals.estimatedWasteMl)} ml · factor ${wasteConfig.manualWastePercent}%`
+              : `${formatDecimal(totals.estimatedWasteMl)} ml · pre-optimización`
+          }
           tone={totals.criticalAlerts > 0 ? 'danger' : totals.warningAlerts > 0 ? 'warn' : 'default'}
         />
         <KpiCard label="Costo estimado (mock)" value={formatCop(totals.estimatedCostCop)} hint="precios de referencia" />
@@ -282,7 +307,9 @@ export function ManualTakeoffWorkspace({ takeoffId }: { takeoffId: string }) {
               planResult={planResult}
               commercialLengths={effectiveCommercialLengths(takeoff)}
               canEditLengths={canEdit}
+              wasteConfig={wasteConfig}
               onChangeCommercialLengths={handleChangeCommercialLengths}
+              onChangeWasteConfig={handleChangeWasteConfig}
               onGenerate={handleGeneratePlan}
             />
           </section>

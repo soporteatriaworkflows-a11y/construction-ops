@@ -519,6 +519,11 @@ export function ManualPdfIntakeSection({
           <p className="mt-1 text-xs text-iconic-graphite/70 dark:text-content-muted">
             Lectura asistida preliminar. No reemplaza revision tecnica.
           </p>
+          <p className="mt-1 text-[11px] text-iconic-graphite/60">
+            El PDF sigue vigente como capa complementaria: es la evidencia visual/contractual de lo
+            emitido y el fallback cuando no hay CAD. El DXF (abajo) es el motor principal de lectura
+            estructurada; DXF + PDF juntos permiten la comparación recomendada.
+          </p>
         </div>
         <Badge variant="secondary">Preview local F6A/F6B/F6C</Badge>
       </div>

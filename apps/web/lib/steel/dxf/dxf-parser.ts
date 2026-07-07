@@ -181,9 +181,9 @@ export function parseDxfFile(content: string): DxfParseResult {
     } else if (currentType === 'INSERT' && fields['2'] !== undefined) {
       entity = { ...base, type: 'INSERT', blockName: fields['2'], x, y, z, rotation };
     } else if (currentType === 'LINE') {
-      entity = { ...base, type: 'LINE', vertexCount: 2 };
+      entity = { ...base, type: 'LINE', vertexCount: 2, x, y, x2: num(fields['11']), y2: num(fields['21']) };
     } else if (currentType === 'LWPOLYLINE') {
-      entity = { ...base, type: 'LWPOLYLINE', vertexCount: num(fields['90']) ?? 0 };
+      entity = { ...base, type: 'LWPOLYLINE', vertexCount: num(fields['90']) ?? 0, x, y };
     } else if (currentType === 'DIMENSION') {
       const override = fields['1'] !== undefined ? decodeDxfText(fields['1']) : undefined;
       entity = {

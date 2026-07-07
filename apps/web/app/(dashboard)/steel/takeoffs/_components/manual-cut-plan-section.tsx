@@ -26,11 +26,117 @@ import {
 } from '@/lib/steel/cut-plan-view';
 import {
   DEFAULT_COMMERCIAL_LENGTHS_M,
+  MAX_MANUAL_WASTE_PCT,
+  TAKEOFF_WASTE_MODE_LABEL,
   validateCommercialLengthInput,
+  validateManualWastePercentInput,
   type ManualComputedLine,
   type ManualCutPlanResult,
+  type TakeoffWasteConfig,
+  type TakeoffWasteMode,
 } from '@/lib/steel/manual-takeoff';
 import { SteelStatusBadge } from '../../_components/steel-status-badge';
+
+/**
+ * Editor de la fuente del desperdicio (F8D-E): separa el desperdicio de
+ * OPTIMIZACIÓN (lo reporta el plan de corte según barras comerciales,
+ * sobrantes y cortes rechazados) del FACTOR comercial/manual (editable para
+ * presupuestar o decidir margen). La fuente activa queda visible siempre.
+ */
+function WasteModeEditor({
+  wasteConfig,
+  canEdit,
+  onChange,
+}: {
+  wasteConfig: TakeoffWasteConfig;
+  canEdit: boolean;
+  onChange: (next: TakeoffWasteConfig) => void;
+}) {
+  const [draftPct, setDraftPct] = useState(wasteConfig.manualWastePercent ?? '5');
+  const [error, setError] = useState<string | null>(null);
+
+  function handleMode(mode: TakeoffWasteMode) {
+    setError(null);
+    if (mode === 'calculated') {
+      onChange({ mode: 'calculated' });
+      return;
+    }
+    const validated = validateManualWastePercentInput(draftPct);
+    if (!validated.ok) {
+      setError(validated.reason);
+      return;
+    }
+    onChange({ mode: 'manual', manualWastePercent: validated.pct });
+  }
+
+  function handleApplyPct() {
+    const validated = validateManualWastePercentInput(draftPct);
+    if (!validated.ok) {
+      setError(validated.reason);
+      return;
+    }
+    setError(null);
+    onChange({ mode: 'manual', manualWastePercent: validated.pct });
+  }
+
+  return (
+    <div className="mb-3 rounded-lg border border-iconic-soft-blue/40 p-3">
+      <h4 className="text-xs font-semibold uppercase tracking-wide text-iconic-graphite/60">
+        Desperdicio: fuente y factor
+      </h4>
+      <p className="mt-1 text-[11px] text-iconic-graphite/60">
+        <strong>Calculado por optimización</strong>: el optimizador FFD reporta el desperdicio real
+        según barras comerciales, sobrantes y cortes rechazados. <strong>Factor manual</strong>:
+        porcentaje comercial editable ({0}–{MAX_MANUAL_WASTE_PCT}%) para presupuestar o decidir
+        margen. Son conceptos distintos; el porcentaje calculado no se confunde con el margen manual.
+      </p>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        {(Object.keys(TAKEOFF_WASTE_MODE_LABEL) as TakeoffWasteMode[]).map((mode) => (
+          <Button
+            key={mode}
+            type="button"
+            size="sm"
+            variant={wasteConfig.mode === mode ? 'default' : 'outline'}
+            aria-pressed={wasteConfig.mode === mode}
+            disabled={!canEdit}
+            onClick={() => handleMode(mode)}
+          >
+            {TAKEOFF_WASTE_MODE_LABEL[mode]}
+          </Button>
+        ))}
+        {wasteConfig.mode === 'manual' && (
+          <span className="flex items-end gap-2">
+            <span className="w-24">
+              <Label htmlFor="manual-waste-pct-input">Factor (%)</Label>
+              <Input
+                id="manual-waste-pct-input"
+                type="number"
+                min="0"
+                max={MAX_MANUAL_WASTE_PCT}
+                step="0.5"
+                value={draftPct}
+                disabled={!canEdit}
+                onChange={(event) => setDraftPct(event.target.value)}
+                className="mt-1 h-8"
+              />
+            </span>
+            <Button type="button" size="sm" variant="outline" disabled={!canEdit} onClick={handleApplyPct}>
+              Aplicar factor
+            </Button>
+          </span>
+        )}
+        {error && <p className="text-[11px] text-red-600">{error}</p>}
+      </div>
+      <p className="mt-1.5 text-[11px] text-iconic-graphite/60">
+        Fuente activa: <strong>{TAKEOFF_WASTE_MODE_LABEL[wasteConfig.mode]}</strong>
+        {wasteConfig.mode === 'manual' && wasteConfig.manualWastePercent
+          ? ` (${wasteConfig.manualWastePercent}% aplicado a las líneas)`
+          : ' (el % por línea es solo estimación pre-optimización)'}
+        . El Excel exportado indica esta fuente.
+      </p>
+    </div>
+  );
+}
 
 /**
  * Editor de longitudes comerciales del takeoff (F7.1): chips + alta/baja con
@@ -142,14 +248,18 @@ export function ManualCutPlanSection({
   planResult,
   commercialLengths,
   canEditLengths,
+  wasteConfig,
   onChangeCommercialLengths,
+  onChangeWasteConfig,
   onGenerate,
 }: {
   lines: readonly ManualComputedLine[];
   planResult: ManualCutPlanResult | null;
   commercialLengths: readonly string[];
   canEditLengths: boolean;
+  wasteConfig: TakeoffWasteConfig;
   onChangeCommercialLengths: (next: readonly string[]) => void;
+  onChangeWasteConfig: (next: TakeoffWasteConfig) => void;
   onGenerate: () => void;
 }) {
   const eligibleCount = lines.filter((l) => l.cutPlanEligible).length;
@@ -209,6 +319,8 @@ export function ManualCutPlanSection({
         onChange={onChangeCommercialLengths}
       />
 
+      <WasteModeEditor wasteConfig={wasteConfig} canEdit={canEditLengths} onChange={onChangeWasteConfig} />
+
       <div className="mb-3 flex flex-wrap items-center gap-3">
         <Button type="button" onClick={onGenerate} disabled={eligibleCount === 0}>
           <Scissors className="h-4 w-4" aria-hidden="true" />
@@ -242,7 +354,8 @@ export function ManualCutPlanSection({
             Optimización FFD (first-fit decreasing) con longitudes comerciales{' '}
             {commercialLengths.map((l) => formatDecimal(l)).join(' / ')} m: heurística buena, no
             necesariamente el óptimo absoluto. Desperdicio final del plan:{' '}
-            {formatDecimal(planResult.plan.totalWasteM)} m.
+            {formatDecimal(planResult.plan.totalWasteM)} m (calculado por optimización — barras
+            comerciales, sobrantes y cortes rechazados).
           </InlineCallout>
 
           {/* F8C-A: barra de filtros — reduce lo visible, jamás borra datos */}

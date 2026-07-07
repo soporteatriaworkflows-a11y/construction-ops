@@ -54,11 +54,17 @@ export interface DxfInsertEntity extends DxfEntityBase {
   rotation?: number;
 }
 
-/** LINE / LWPOLYLINE — hoy solo aportan densidad/estructura del dibujo. */
+/** LINE / LWPOLYLINE — aportan densidad/estructura y anclaje espacial (F8D). */
 export interface DxfPathEntity extends DxfEntityBase {
   type: 'LINE' | 'LWPOLYLINE';
   /** Número de vértices declarado (LWPOLYLINE, código 90); LINE = 2. */
   vertexCount: number;
+  /** Primer vértice (código 10/20), si el DXF lo trae — ancla para segmentar vistas. */
+  x?: number;
+  y?: number;
+  /** Punto final de LINE (código 11/21): conecta la geometría del dibujo. */
+  x2?: number;
+  y2?: number;
 }
 
 /** Cota. `overrideText` es el texto forzado (código 1, "<>" = medida real). */

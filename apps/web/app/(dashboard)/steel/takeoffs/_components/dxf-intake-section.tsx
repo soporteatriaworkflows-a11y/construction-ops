@@ -47,6 +47,8 @@ import {
   summarizeMarkersForQuality,
   type BeamDetail,
 } from '@/lib/steel/dxf/dxf-beam-detail-assembly';
+import { STIRRUP_COMPARISON_STATUS_LABEL } from '@/lib/steel/dxf/stirrup-summary-contract';
+import { BeamDetailReviewPanel } from './beam-detail-review-panel';
 import {
   DXF_FILTER_MODE_LABEL,
   matchesDxfFilter,
@@ -98,6 +100,20 @@ function barLabel(bar: BeamDetail['topLongitudinalBars'][number]): string {
   return `${qty}${bar.description}`;
 }
 
+/** Celda compacta de banda (F8D): primera barra + "+N más" — el resto vive en "Ver detalle". */
+function compactBand(bars: BeamDetail['topLongitudinalBars']): string {
+  if (bars.length === 0) return '—';
+  const first = barLabel(bars[0]!);
+  return bars.length > 1 ? `${first} +${bars.length - 1}` : first;
+}
+
+const STIRRUP_STATUS_VARIANT: Record<string, 'success' | 'warning' | 'secondary' | 'destructive'> = {
+  match: 'success',
+  mismatch: 'warning',
+  unverified: 'secondary',
+  ambiguous: 'destructive',
+};
+
 function yesNo(value: boolean): string {
   return value ? 'Sí' : 'No';
 }
@@ -123,6 +139,8 @@ export function DxfIntakeSection({
   const [selectedColors, setSelectedColors] = useState<ReadonlySet<number>>(new Set());
   const [includeTitleBlock, setIncludeTitleBlock] = useState(true);
   const [beamSentKey, setBeamSentKey] = useState<string | null>(null);
+  // F8D: panel lateral "Ver detalle" de una viga del listado compacto.
+  const [openDetail, setOpenDetail] = useState<BeamDetail | null>(null);
 
   const comparison = useMemo(() => {
     if (!loaded || !pdfAnalysis) return null;
@@ -192,6 +210,7 @@ export function DxfIntakeSection({
     setSelectedColors(new Set());
     setIncludeTitleBlock(true);
     setBeamSentKey(null);
+    setOpenDetail(null);
   }
 
   function toggleLayer(layer: string) {
@@ -257,6 +276,12 @@ export function DxfIntakeSection({
         Se leen entidades CAD reales — textos, capas, bloques, coordenadas — EN este navegador: el
         archivo jamás se sube a ningún servidor. Si las capas no ayudan (todo en Layer 0), la
         detección usa texto y cercanía espacial con confianza menor. Nada se aprueba automáticamente.
+      </p>
+      <p className="mt-1 text-[11px] text-iconic-graphite/60">
+        El PDF no queda obsoleto: <strong>DXF</strong> es el motor principal de lectura CAD
+        estructurada (entidades reales); <strong>PDF</strong> es la evidencia visual/contractual de
+        lo emitido y el fallback cuando no hay CAD. <strong>DXF + PDF</strong> es el mejor caso: el
+        DXF lee las entidades y el PDF valida lo publicado (comparación recomendada).
       </p>
 
       <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -384,13 +409,13 @@ export function DxfIntakeSection({
             </p>
           </div>
 
-          {/* Listado de vigas detectadas (F8C — Beam Detail Assembly) */}
+          {/* Listado de vigas detectadas (F8D — compacto + panel "Ver detalle") */}
           {visibleBeams.length > 0 && (
             <div className="rounded border border-iconic-soft-blue/30 p-2">
               <p className="font-semibold">Listado de vigas detectadas ({visibleBeams.length})</p>
               <div className="mt-1 max-h-96 overflow-auto">
-                <table className="w-full min-w-[980px] text-left text-[11px]">
-                  <caption className="sr-only">Listado de vigas detectadas en el DXF (elemento compuesto)</caption>
+                <table className="w-full min-w-[720px] text-left text-[11px]">
+                  <caption className="sr-only">Listado compacto de vigas detectadas en el DXF</caption>
                   <thead className="sticky top-0 z-10 bg-white dark:bg-surface-soft">
                     <tr className="border-b border-iconic-soft-blue/30 text-iconic-graphite/50">
                       <th scope="col" className="py-1 pr-2">Viga</th>
@@ -398,113 +423,59 @@ export function DxfIntakeSection({
                       <th scope="col" className="py-1 pr-2">Sección</th>
                       <th scope="col" className="py-1 pr-2">Superior</th>
                       <th scope="col" className="py-1 pr-2">Inferior</th>
-                      <th scope="col" className="py-1 pr-2">Estribos/Flejado</th>
-                      <th scope="col" className="py-1 pr-2">Cant. gráfica</th>
-                      <th scope="col" className="py-1 pr-2">Capa/Color</th>
-                      <th scope="col" className="py-1 pr-2">Confianza</th>
+                      <th scope="col" className="py-1 pr-2">Estribos</th>
+                      <th scope="col" className="py-1 pr-2">Conf.</th>
                       <th scope="col" className="py-1 pr-2">Estado</th>
-                      <th scope="col" className="py-1">Acción</th>
+                      <th scope="col" className="py-1">Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
                     {visibleBeams.map((detail) => (
                       <tr key={detail.beamDetailId} className="border-b border-iconic-soft-blue/15 align-top">
-                        <td className="py-1 pr-2 font-medium">{detail.beamKey}</td>
-                        <td className="py-1 pr-2">{detail.locationText ?? '—'}</td>
-                        <td className="py-1 pr-2">{detail.sectionSpec ?? '—'}</td>
-                        <td className="py-1 pr-2">
-                          {detail.topLongitudinalBars.length === 0
-                            ? '—'
-                            : detail.topLongitudinalBars.map((bar) => (
-                                <div key={`${bar.sourceText}-${bar.description}`}>
-                                  <code>{barLabel(bar)}</code>
-                                  {bar.sourceText !== bar.description && (
-                                    <span className="text-iconic-graphite/50"> (“{bar.sourceText}”)</span>
-                                  )}
-                                </div>
-                              ))}
-                        </td>
-                        <td className="py-1 pr-2">
-                          {detail.bottomLongitudinalBars.length === 0
-                            ? '—'
-                            : detail.bottomLongitudinalBars.map((bar) => (
-                                <div key={`${bar.sourceText}-${bar.description}`}>
-                                  <code>{barLabel(bar)}</code>
-                                </div>
-                              ))}
-                        </td>
-                        <td className="py-1 pr-2">
-                          {detail.stirrupZones.length > 0 && (
-                            <div className="text-iconic-graphite/70">
-                              {detail.stirrupZones.map((zone) => zone.sourceText).join(' · ')}
-                              {detail.stirrupZonesTotal !== undefined && (
-                                <div className="font-medium">Subtotal zonas: {detail.stirrupZonesTotal}</div>
-                              )}
-                            </div>
-                          )}
-                          {detail.stirrupSummary && (
-                            <div>
-                              Resumen: <code>{detail.stirrupSummary.normalized}</code>
-                            </div>
-                          )}
-                          {detail.zoneComparison && (
-                            <div
-                              className={
-                                detail.zoneComparison.status === 'match'
-                                  ? 'text-emerald-700 dark:text-emerald-400'
-                                  : 'text-amber-700 dark:text-amber-400'
-                              }
-                            >
-                              {detail.zoneComparison.message}
-                            </div>
-                          )}
-                          {detail.segmentCheck && (
-                            <div className="text-iconic-graphite/60">{detail.segmentCheck.message}</div>
-                          )}
-                          {detail.stirrupZones.length === 0 && !detail.stirrupSummary && '—'}
-                        </td>
-                        <td className="py-1 pr-2">
-                          {detail.crossSectionMarkers.status === 'unavailable' ? (
-                            <Badge variant="secondary">sin marcadores</Badge>
-                          ) : (
+                        <td className="py-1.5 pr-2 font-medium">{detail.beamKey}</td>
+                        <td className="py-1.5 pr-2">{detail.locationText ?? '—'}</td>
+                        <td className="py-1.5 pr-2">{detail.sectionSpec ?? '—'}</td>
+                        <td className="py-1.5 pr-2"><code>{compactBand(detail.topLongitudinalBars)}</code></td>
+                        <td className="py-1.5 pr-2"><code>{compactBand(detail.bottomLongitudinalBars)}</code></td>
+                        <td className="py-1.5 pr-2">
+                          {detail.stirrupContract ? (
                             <>
-                              <div>↑ {detail.crossSectionMarkers.top} · ↓ {detail.crossSectionMarkers.bottom}</div>
-                              <div className="text-iconic-graphite/50">
-                                {detail.crossSectionMarkers.byShape} por forma · conf. {detail.crossSectionMarkers.confidence}
+                              <Badge variant={STIRRUP_STATUS_VARIANT[detail.stirrupContract.comparisonStatus] ?? 'secondary'}>
+                                {STIRRUP_COMPARISON_STATUS_LABEL[detail.stirrupContract.comparisonStatus]}
+                              </Badge>
+                              <div className="mt-0.5 text-[10px] text-iconic-graphite/50">
+                                zonas {detail.stirrupContract.zoneTotalPerRepetition ?? '—'} · resumen{' '}
+                                {detail.stirrupContract.declaredPerRepetition ?? '—'}
                               </div>
                             </>
+                          ) : (
+                            '—'
                           )}
                         </td>
-                        <td className="py-1 pr-2">
-                          {detail.sourceLayer}
-                          {detail.sourceColor !== undefined ? ` · c${detail.sourceColor}` : ''}
-                        </td>
-                        <td className="py-1 pr-2">{(detail.confidence * 100).toFixed(0)}%</td>
-                        <td className="py-1 pr-2">
+                        <td className="py-1.5 pr-2">{(detail.confidence * 100).toFixed(0)}%</td>
+                        <td className="py-1.5 pr-2">
                           <Badge variant={BEAM_STATUS_VARIANT[detail.status]}>
                             {BEAM_SCHEDULE_STATUS_LABEL[detail.status]}
                           </Badge>
-                          {detail.statusReasons.length > 0 && (
-                            <div className="mt-0.5 max-w-56 text-[10px] text-iconic-graphite/50">
-                              {detail.statusReasons[0]}
-                            </div>
-                          )}
                         </td>
-                        <td className="py-1">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleSendBeamDetail(detail)}
-                            disabled={disabled || beamDetailToManualLines(detail, loaded.fileName).length === 0}
-                          >
-                            Enviar al takeoff
-                          </Button>
-                          {beamSentKey?.startsWith(`${detail.beamKey}:`) && (
-                            <Badge variant="success" className="ml-1">
-                              {beamSentKey.split(':')[1]} línea(s)
-                            </Badge>
-                          )}
+                        <td className="py-1.5">
+                          <div className="flex flex-wrap items-center gap-1">
+                            <Button type="button" size="sm" variant="outline" onClick={() => setOpenDetail(detail)}>
+                              Ver detalle
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleSendBeamDetail(detail)}
+                              disabled={disabled || beamDetailToManualLines(detail, loaded.fileName).length === 0}
+                            >
+                              Enviar al takeoff
+                            </Button>
+                            {beamSentKey?.startsWith(`${detail.beamKey}:`) && (
+                              <Badge variant="success">{beamSentKey.split(':')[1]} línea(s)</Badge>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -512,12 +483,23 @@ export function DxfIntakeSection({
                 </table>
               </div>
               <p className="mt-1 text-[11px] text-iconic-graphite/50">
-                Fuente: DXF ({loaded.fileName}). Cada fila es el CORTE COMPLETO de la viga. “Enviar al
-                takeoff” agrega SOLO lo verificable: el resumen de estribos interpretable por F1 y los
-                longitudinales cuya cantidad viene del conteo gráfico de marcadores — jamás del primer
-                dígito del texto. Nada se aprueba solo.
+                Fuente: DXF ({loaded.fileName}), segmentado por vistas/detalles independientes. “Ver
+                detalle” abre el panel con superior/inferior completos, zonas vs resumen de estribos,
+                cálculo y evidencia. “Enviar al takeoff” agrega SOLO lo verificable: longitudinales con
+                cantidad por conteo gráfico y el resumen de estribos cuando coincide con las zonas —
+                los desfases exigen decisión humana en el panel. Nada se aprueba solo.
               </p>
             </div>
+          )}
+
+          {openDetail && (
+            <BeamDetailReviewPanel
+              detail={openDetail}
+              fileName={loaded.fileName}
+              disabled={disabled}
+              onClose={() => setOpenDetail(null)}
+              onAddLines={onAddApproved}
+            />
           )}
 
           {/* Elementos detectados */}
