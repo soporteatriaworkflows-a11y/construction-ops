@@ -20,6 +20,7 @@ import { getFriendlyDataLoadError } from '@/lib/db/errors';
 import type { ImportedBatchSummary } from '@/lib/quantity-import/types';
 import type { ViewerContext } from '@/lib/contracts/read-model';
 import { QuantitiesShell, type QuantitiesTab } from './_components/quantities-shell';
+import { createOpsPerfTrace } from '@/server/performance/ops-perf';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,6 +32,7 @@ export default async function QuantitiesPage({
   const query = searchParams ? await searchParams : {};
   const rawTab = Array.isArray(query.tab) ? query.tab[0] : query.tab;
   const activeTab: QuantitiesTab = rawTab === 'sync' ? 'sync' : 'imports';
+  const perf = createOpsPerfTrace('/quantities', { tab: activeTab });
 
   const rm = getReadModel();
 
@@ -42,13 +44,14 @@ export default async function QuantitiesPage({
   let viewer: ViewerContext | null = null;
   let canImport = false;
   try {
-    viewer = await resolveViewer();
-    canImport = isCreationModeEnabled() && ['management', 'internal'].includes(viewer.role);
-    const projects = await rm.listProjects(viewer);
+    const resolvedViewer = await perf.span('auth.resolveViewer', async () => await resolveViewer());
+    viewer = resolvedViewer;
+    canImport = isCreationModeEnabled() && ['management', 'internal'].includes(resolvedViewer.role);
+    const projects = await perf.span('readModel.listProjects', () => rm.listProjects(resolvedViewer));
     if (projects.length > 0) {
       const first = projects[0]!;
       projectName = first.name;
-      const overview = await rm.getProjectOverview(viewer, first.id);
+      const overview = await perf.span('readModel.getProjectOverview', () => rm.getProjectOverview(resolvedViewer, first.id));
       if (overview) {
         const floorScope = overview.scopes.find((s) => s.scopeType === 'floor');
         const anyScope = overview.scopes[0];
@@ -67,7 +70,7 @@ export default async function QuantitiesPage({
 
   if (viewer && scopeId && !loadError) {
     try {
-      groups = await rm.listQuantities(viewer, scopeId);
+      groups = await perf.span('readModel.listQuantities', () => rm.listQuantities(viewer, scopeId));
     } catch (e) {
       loadError = getFriendlyDataLoadError(e, 'No pudimos cargar las cantidades en este momento. Intenta actualizar en unos segundos.');
     }
@@ -76,8 +79,8 @@ export default async function QuantitiesPage({
   let importedBatches: ImportedBatchSummary[] = [];
   if (canImport && !loadError) {
     try {
-      const authedViewer = await resolveAuthenticatedViewer();
-      importedBatches = await listQuantityImportBatches(authedViewer);
+      const authedViewer = await perf.span('auth.resolveAuthenticatedViewer', () => resolveAuthenticatedViewer());
+      importedBatches = await perf.span('quantityImport.listBatches', () => listQuantityImportBatches(authedViewer));
     } catch {
       // Lectura opcional: no bloquea la página.
     }
@@ -98,6 +101,8 @@ export default async function QuantitiesPage({
       ) : null}
     </div>
   );
+
+  perf.finish({ groupCount: groups.length, batchCount: importedBatches.length, hasError: Boolean(loadError) });
 
   if (loadError) {
     return (

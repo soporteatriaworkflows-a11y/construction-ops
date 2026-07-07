@@ -31,6 +31,7 @@ import { formatVersionLabel } from '../../../estimate-format';
 import { BoqWorkspace } from './boq-workspace';
 import { AddApuPanel } from './add-apu-panel';
 import { CommercialSimulator } from './commercial-simulator';
+import { createOpsPerfTrace } from '@/server/performance/ops-perf';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,10 +48,11 @@ export default async function BoqWorkspacePage({ params, searchParams }: PagePro
   const initialApuFilter: 'all' | 'with' | 'without' =
     apuParam === 'missing' ? 'without' : apuParam === 'with' ? 'with' : 'all';
   const basePath = `/projects/${id}/scopes/${scopeId}/estimates/${estimateId}`;
+  const perf = createOpsPerfTrace('/projects/[id]/scopes/[scopeId]/estimates/[estimateId]/workspace');
 
   let viewer: Awaited<ReturnType<typeof resolveViewer>>;
   try {
-    viewer = await resolveViewer();
+    viewer = await perf.span('auth.resolveViewer', async () => await resolveViewer());
   } catch {
     notFound();
   }
@@ -58,7 +60,7 @@ export default async function BoqWorkspacePage({ params, searchParams }: PagePro
   const repo = getEstimatesWriteRepository();
   let estimate: Awaited<ReturnType<typeof repo.getEstimateById>>;
   try {
-    estimate = await repo.getEstimateById(viewer, estimateId);
+    estimate = await perf.span('estimates.repo.getEstimateById', () => repo.getEstimateById(viewer, estimateId));
   } catch (e) {
     if (e instanceof EstimateNotFoundError) notFound();
     notFound();
@@ -87,20 +89,28 @@ export default async function BoqWorkspacePage({ params, searchParams }: PagePro
   }
 
   // Capítulos (incluye archivados; el filtro del workspace es visual) + ítems.
-  const chapters = await repo.listChaptersByEstimateVersion(viewer, estimateId, {
-    includeArchived: true,
-  });
+  const chapters = await perf.span('estimates.repo.listChaptersByEstimateVersion', () =>
+    repo.listChaptersByEstimateVersion(viewer, estimateId, {
+      includeArchived: true,
+    }),
+  );
   const data: WorkspaceChapterData[] = [];
-  for (const chapter of chapters) {
-    data.push({
-      chapter,
-      items: await repo.listItemsByChapter(viewer, chapter.id, { includeArchived: true }),
-    });
-  }
+  await perf.span('estimates.repo.listItemsByChapter.sequential', async () => {
+    for (const chapter of chapters) {
+      data.push({
+        chapter,
+        items: await repo.listItemsByChapter(viewer, chapter.id, { includeArchived: true }),
+      });
+    }
+  }, { chapterCount: chapters.length });
 
   // Resumen financiero + AIU + desglose (todo server-derived).
-  const financialSummary = await repo.calculateEstimateFinancialSummary(viewer, estimateId);
-  const aiu = await repo.getEstimateVersionAiu(viewer, estimateId).catch(() => null);
+  const financialSummary = await perf.span('estimates.repo.calculateEstimateFinancialSummary', () =>
+    repo.calculateEstimateFinancialSummary(viewer, estimateId),
+  );
+  const aiu = await perf.span('estimates.repo.getEstimateVersionAiu', () =>
+    repo.getEstimateVersionAiu(viewer, estimateId).catch(() => null),
+  );
   const breakdown = computeChapterBreakdown(chapters);
 
   // V5.6.6B: gate de modo + gate de ROL (compras/obra/consulta solo lectura).
@@ -115,12 +125,13 @@ export default async function BoqWorkspacePage({ params, searchParams }: PagePro
   // Solo se ofrece en versiones editables (issued ⇒ bloqueado server-side igual).
   let apuOptions: ApuAddOption[] = [];
   if (canMutate) {
-    apuOptions = await listApusForBoqAdd(viewer as AuthenticatedViewer).catch(() => []);
+    apuOptions = await perf.span('apu.listApusForBoqAdd', () => listApusForBoqAdd(viewer as AuthenticatedViewer).catch(() => []));
   }
   const chapterOptions = chapters
     .filter((c) => !c.archived)
     .map((c) => ({ id: c.id, code: c.code, name: c.name }));
 
+  perf.finish({ chapterCount: chapters.length, itemCount: data.reduce((total, chapter) => total + chapter.items.length, 0) });
   return (
     <div>
       <PageHeader

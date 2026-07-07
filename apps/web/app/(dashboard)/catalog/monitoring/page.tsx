@@ -40,6 +40,7 @@ import {
   type MonitorFilterStatus,
 } from '@/lib/pricing/monitor-ui';
 import { RunNowButton, TargetToggleButton, CadenceForm } from './_components/monitor-controls';
+import { createOpsPerfTrace } from '@/server/performance/ops-perf';
 import { getFriendlyDataLoadError } from '@/lib/db/errors';
 
 export const dynamic = 'force-dynamic';
@@ -112,6 +113,7 @@ export default async function MonitoringCenterPage({
   // V5.6.2: guard de módulo server-side. `monitoring` = admin/gerencia/compras.
   await requireModuleAccess('monitoring');
   const status = parseMonitorStatus((await searchParams).status);
+  const perf = createOpsPerfTrace('/catalog/monitoring', { filter: status });
   let viewerRole = 'consulta';
   let targets: MonitorTargetView[] = [];
   let runs: MonitorRunView[] = [];
@@ -138,10 +140,10 @@ export default async function MonitoringCenterPage({
       viewerRole = viewer.role;
     }
 
-    targets = await repo.listTargets(viewer);
-    runs = await repo.listRecentRuns(viewer, RECENT_RUN_LIMIT);
+    targets = await perf.span('monitor.repo.listTargets', () => repo.listTargets(viewer));
+    runs = await perf.span('monitor.repo.listRecentRuns', () => repo.listRecentRuns(viewer, RECENT_RUN_LIMIT), { limit: RECENT_RUN_LIMIT });
     try {
-      summary = await repo.getMonitoringSummary(viewer);
+      summary = await perf.span('monitor.repo.getMonitoringSummary', () => repo.getMonitoringSummary(viewer));
     } catch {
       summary = null;
     }
@@ -160,6 +162,8 @@ export default async function MonitoringCenterPage({
   } catch (e) {
     error = getFriendlyDataLoadError(e, 'No pudimos cargar el monitoreo en este momento. Intenta actualizar en unos segundos.');
   }
+
+  perf.finish({ targetCount: targets.length, runCount: runs.length });
 
   const canMutate = MUTATION_ROLES.includes(viewerRole);
   // V5.2.2b — filtrado server-side por estado (sin isla client). Conteos sobre TODOS.
