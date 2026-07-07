@@ -20,6 +20,7 @@ import { computeManualLine, type ManualLineRecord } from '@/lib/steel/manual-tak
 import { explainSteelCalculation } from '@/lib/steel/steel-calculation-explanation';
 import {
   buildBeamTakeoffDispatch,
+  LONGITUDINAL_EXCLUSION_REASON_LABEL,
   type BeamDetail,
   type LongitudinalBarDecision,
   type LongitudinalBarReading,
@@ -491,7 +492,24 @@ export function BeamDetailReviewPanel({
           <Field label="Entidades (handles)" value={detail.sourceEntityHandles.slice(0, 8).join(', ') || undefined} />
           <Field label="Excluidas de otras vistas" value={detail.crossViewExcludedCount} />
           <Field label="Excluidas por ambigüedad" value={detail.ambiguousExcludedCount} />
+          <Field label="Textos long. no incluidos" value={detail.longitudinalExclusions.length} />
         </dl>
+        {detail.longitudinalExclusions.length > 0 && (
+          <div className="mt-1 max-h-32 overflow-y-auto rounded border border-iconic-soft-blue/20 p-1.5">
+            <p className="text-[11px] font-medium text-iconic-graphite/60">
+              Diagnóstico de exclusiones (F8F.1) — textos longitudinales que no entran a este
+              detalle y su razón (nada desaparece en silencio):
+            </p>
+            <ul className="list-disc pl-4 font-mono text-[11px] text-iconic-graphite/70">
+              {detail.longitudinalExclusions.map((record) => (
+                <li key={`${record.reason}|${record.sourceText}|${record.x ?? '?'},${record.y ?? '?'}`}>
+                  {record.sourceText} — {LONGITUDINAL_EXCLUSION_REASON_LABEL[record.reason]}
+                  {record.detail ? ` (${record.detail})` : ''}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         {detail.sourceFragments.length > 0 && (
           <div className="mt-1 max-h-32 overflow-y-auto rounded border border-iconic-soft-blue/20 p-1.5">
             <p className="text-[11px] font-medium text-iconic-graphite/60">Fragmentos originales:</p>
