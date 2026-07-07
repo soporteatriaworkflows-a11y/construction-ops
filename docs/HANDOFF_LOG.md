@@ -1,5 +1,16 @@
 # Handoff Log
 
+## 2026-07-07 - STEEL_OPS_F8G_ENGINEER_REVIEW_READINESS - EN RAMA - Fable
+
+- Rama `feature/f8g-review-readiness-v3` (base `origin/main = ce76795`, post F8F #70). Fase de QA/documentación/smoke tests para preparar Steel Ops a revisión de un ingeniero estructural/operativo. SIN refactors, SIN tocar DXF parsing/takeoff dispatch/quantity contract, SIN tocar P2D (PR #71 / `feature/p2d-infra-performance-fix`), producción, Supabase, migraciones, secretos ni Vercel.
+- QA funcional verificado sobre el código (sin modificarlo): flujo completo `/steel/takeoffs` → workspace → DXF intake → listado de vigas → panel "Ver detalle" accionable (editar cantidad/longitud, aceptar línea, marcar revisión, asignar banda a sin clasificar, decisión de estribos) → "Enviar al takeoff" con preview honesto → Excel. Gate confirmado en `steel/layout.tsx` (flag `STEEL_OPS_UIX_PREVIEW` + roles admin/gerencia/presupuestos, 404 en caso contrario). Los 8 casos prioritarios del mandato ya estaban protegidos por `f8f-longitudinal-occurrence.test.ts` (20 tests).
+- Tests focales NUEVOS `tests/unit/steel/dxf/f8g-review-readiness.test.ts` (9 tests, aditivos, cierran huecos de cobertura): `readingId` único y estable entre parses (ancla de las decisiones de la usuaria — no tenía aserción directa), `manualBarNumber` standalone cuando F1 no infiere varilla, trío de overrides con aritmética F1 exacta (4×3.50=14 ml), `quantityMode`+`quantitySource` presentes en TODA línea longitudinal del dispatch, y mismatch de estribo + decisión explícita (`declared_summary`/`zone_total` ⇒ entra; `mark_for_review` ⇒ fuera con motivo).
+- Documento NUEVO `docs/audits/STEEL_OPS_ENGINEER_REVIEW_READINESS.md`: rutas y requisitos de acceso, qué revisar, flujo en 6 pasos, tabla quantityMode/quantitySource, casos automatizados vs manuales, límites del módulo, 10 preguntas para el ingeniero, checklist operativa completa, riesgos conocidos con mitigación, y hallazgos F8G clasificados (bug crítico: NINGUNO; UX menor: keys React duplicadas en sección Cálculo del panel con descripciones idénticas — NO corregido a propósito para no tocar el panel validado F8F; técnica futura: readingId en evidencia enviada, persistencia de decisiones; validación de ingeniero: regla cantidad 1/mismatch default/umbrales ×10; backend futuro: persistencia F2, DXF server-side, precios reales).
+- QA: typecheck 0 · lint 0 · steel focal (f8f 20 + f8g 9) verde · suite completa y build ver cierre de sesión.
+- Restricciones respetadas: sin DB/Supabase/RLS/migraciones/secretos/Vercel/deps nuevas; sin archivos reales en Git; sin merge; comportamiento F8F intacto (diff solo agrega test + docs).
+
+---
+
 ## 2026-07-07 - STEEL_OPS_F8F_LONGITUDINAL_OCCURRENCE_QUANTITY_ACTIONABLE_REVIEW - EN RAMA + PR - Fable
 
 - Rama `feature/steel-ops-f8f-longitudinal-occurrence-review` (base `origin/main = ee59405`, post F8E #69). PR `fix(steel): use textual occurrence quantity for DXF longitudinal bars`. Problema conceptual de producción (panel VC-EJE-3): el sistema BLOQUEABA barras longitudinales superiores/inferiores por falta de "conteo gráfico confiable de marcadores" — incorrecto para el flujo real de cantidades de la usuaria.
