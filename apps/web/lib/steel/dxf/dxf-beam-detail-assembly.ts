@@ -118,6 +118,45 @@ export interface LongitudinalBarReading {
   warnings: readonly string[];
 }
 
+/**
+ * F8F.1: razón por la que un texto longitudinal detectado NO quedó en las
+ * bandas superior/inferior de ESTE detalle. Diagnóstico de exclusión
+ * obligatorio: un texto longitudinal jamás desaparece en silencio — o es
+ * visible en el detalle (superior/inferior/sin clasificar) o queda registrado
+ * aquí con su razón. `banda_ambigua` además es visible y accionable en
+ * "Sin clasificar / revisar".
+ */
+export type LongitudinalExclusionReason =
+  | 'fuera_de_vista'
+  | 'asignada_a_otra_vista'
+  | 'deduplicada'
+  | 'no_parseable'
+  | 'banda_ambigua'
+  | 'descartada_por_title_block'
+  | 'descartada_por_radio'
+  | 'descartada_por_bbox';
+
+export const LONGITUDINAL_EXCLUSION_REASON_LABEL: Record<LongitudinalExclusionReason, string> = {
+  fuera_de_vista: 'fuera del territorio de la vista',
+  asignada_a_otra_vista: 'asignada a otra vista',
+  deduplicada: 'texto superpuesto deduplicado',
+  no_parseable: 'notación no parseable',
+  banda_ambigua: 'banda ambigua (visible en "Sin clasificar / revisar")',
+  descartada_por_title_block: 'descartada por rótulo/tabla',
+  descartada_por_radio: 'fuera del radio de vecindad',
+  descartada_por_bbox: 'dentro del área de otra vista de viga',
+};
+
+export interface LongitudinalExclusionRecord {
+  /** Línea de texto tal como aparece en el plano. */
+  sourceText: string;
+  reason: LongitudinalExclusionReason;
+  /** Contexto adicional legible ("vista view-2", "leída en el detalle de VC-EJE-4"). */
+  detail?: string;
+  x?: number;
+  y?: number;
+}
+
 export interface StirrupZone {
   count: number;
   barCode: number;
@@ -177,8 +216,16 @@ export interface BeamDetail {
    * F8E: textos longitudinales dentro del bbox de la vista recuperados pese a
    * haber quedado fuera de la asignación estricta (franja ambigua/segmento):
    * así no se pierden barras intermedias tras traslapos o cambios de tramo.
+   * F8F.1: el rescate cubre el TERRITORIO de la fila de la vista (hasta el
+   * inicio de la siguiente vista de viga), no solo el bbox recortado.
    */
   rescuedLongitudinalTextCount: number;
+  /**
+   * F8F.1: diagnóstico de exclusión — todo texto longitudinal del DXF que NO
+   * aparece en superior/inferior de este detalle queda registrado aquí con su
+   * razón. Jamás desaparece en silencio.
+   */
+  longitudinalExclusions: readonly LongitudinalExclusionRecord[];
   stirrupZones: readonly StirrupZone[];
   stirrupZonesTotal?: number;
   stirrupSummary?: StirrupSummary;
@@ -393,7 +440,70 @@ export function assembleBeamDetails(
   const schedule = buildBeamSchedule(parse, extraction, { segmentation });
   if (schedule.length === 0) return [];
   const radius = dxfNeighborhoodRadius(parse.entities) * 1.5;
-  return schedule.map((row) => assembleDetail(row, parse.entities, radius, segmentation));
+  // F8F.1: qué detalle leyó cada texto longitudinal (clave texto|x,y). Con el
+  // mapa completo, las exclusiones "fuera de vista/radio/bbox" cuyo texto SÍ
+  // quedó leído en otra viga se re-etiquetan (no hay pérdida); las restantes
+  // generan advertencia visible — nada desaparece en silencio.
+  const claimedBy = new Map<string, string>();
+  const details = schedule.map((row) => assembleDetail(row, parse.entities, radius, segmentation, claimedBy));
+  return details.map((detail) => finalizeLongitudinalExclusions(detail, claimedBy));
+}
+
+/** Clave estable de un texto longitudinal por contenido y posición. */
+function longitudinalTextKey(sourceText: string, x?: number, y?: number): string {
+  return `${sourceText}|${x?.toFixed(1) ?? '?'},${y?.toFixed(1) ?? '?'}`;
+}
+
+/** Exclusiones que implican riesgo de pérdida real de un texto. */
+const LONGITUDINAL_LOSS_REASONS: ReadonlySet<LongitudinalExclusionReason> = new Set([
+  'fuera_de_vista',
+  'descartada_por_radio',
+  'descartada_por_bbox',
+  'no_parseable',
+]);
+
+/** Exclusiones re-etiquetables cuando OTRO detalle sí leyó el texto. */
+const LONGITUDINAL_RELABELABLE_REASONS: ReadonlySet<LongitudinalExclusionReason> = new Set([
+  'fuera_de_vista',
+  'descartada_por_radio',
+  'descartada_por_bbox',
+]);
+
+function finalizeLongitudinalExclusions(
+  detail: BeamDetail,
+  claimedBy: ReadonlyMap<string, string>,
+): BeamDetail {
+  const exclusions = detail.longitudinalExclusions.map((record) => {
+    if (!LONGITUDINAL_RELABELABLE_REASONS.has(record.reason)) return record;
+    const owner = claimedBy.get(longitudinalTextKey(record.sourceText, record.x, record.y));
+    if (owner && owner !== detail.beamKey) {
+      return {
+        ...record,
+        reason: 'asignada_a_otra_vista' as const,
+        detail: `leída en el detalle de ${owner}`,
+      };
+    }
+    return record;
+  });
+  const lost = exclusions.filter((record) => LONGITUDINAL_LOSS_REASONS.has(record.reason));
+  if (lost.length === 0) {
+    return exclusions === detail.longitudinalExclusions
+      ? detail
+      : { ...detail, longitudinalExclusions: exclusions };
+  }
+  const byReason = new Map<LongitudinalExclusionReason, number>();
+  for (const record of lost) byReason.set(record.reason, (byReason.get(record.reason) ?? 0) + 1);
+  const summary = [...byReason.entries()]
+    .map(([reason, count]) => `${LONGITUDINAL_EXCLUSION_REASON_LABEL[reason]}: ${count}`)
+    .join(' · ');
+  return {
+    ...detail,
+    longitudinalExclusions: exclusions,
+    warnings: [
+      ...detail.warnings,
+      `${lost.length} texto(s) longitudinales detectados NO entraron a este detalle ni a otro (${summary}): verificar contra el plano en el diagnóstico de exclusiones.`,
+    ],
+  };
 }
 
 interface RegionText {
@@ -406,11 +516,28 @@ function assembleDetail(
   entities: readonly DxfEntity[],
   radius: number,
   segmentation: DxfViewSegmentation,
+  claimedBy: Map<string, string>,
 ): BeamDetail {
   const anchor = row.coordinates;
   const warnings: string[] = [];
   const fragments = new Set<string>([row.sourceText]);
   const handles = new Set<string>();
+
+  // F8F.1: diagnóstico de exclusión de textos longitudinales — cada decisión
+  // de descarte queda registrada con razón; nada desaparece en silencio.
+  const longitudinalExclusions: LongitudinalExclusionRecord[] = [];
+  const exclusionKeys = new Set<string>();
+  const recordExclusion = (
+    sourceText: string,
+    reason: LongitudinalExclusionReason,
+    at: { x?: number; y?: number },
+    detailNote?: string,
+  ): void => {
+    const key = `${reason}|${longitudinalTextKey(sourceText, at.x, at.y)}`;
+    if (exclusionKeys.has(key)) return;
+    exclusionKeys.add(key);
+    longitudinalExclusions.push({ sourceText, reason, detail: detailNote, x: at.x, y: at.y });
+  };
 
   // Vista de la viga (F8D): las entidades de OTRAS vistas jamás se asocian;
   // las que caen entre dos vistas quedan ambiguas y también se excluyen.
@@ -482,51 +609,97 @@ function assembleDetail(
     longitudinalTexts.push({ entity, line });
     seenLongitudinalEntities.add(entity);
   }
+  // F8F.1: recorrido de RESCATE + DIAGNÓSTICO sobre TODOS los textos del DXF.
+  // La segmentación puede dejar la vista RECORTADA (viga larga que es la única
+  // de su fila: los tramos intermedios caen en clusters sueltos sin código),
+  // así que el rescate ya no exige el bbox recortado de la vista sino el
+  // TERRITORIO de su fila — hasta el inicio de la siguiente vista de viga, la
+  // convención con la que se dibujan los despieces. Jamás se toma "solo
+  // extremos" ni se filtra por cercanía al código; todo texto longitudinal que
+  // NO entra queda registrado con razón en `longitudinalExclusions`.
   let rescuedLongitudinalTextCount = 0;
-  if (beamView) {
+  {
     const margin = segmentation.linkRadius;
-    const otherBeamViews = segmentation.views.filter(
-      (view) => view.viewId !== beamView.viewId && view.candidateBeamKeys.length > 0,
+    const otherBeamViews = beamView
+      ? segmentation.views.filter(
+          (view) => view.viewId !== beamView.viewId && view.candidateBeamKeys.length > 0,
+        )
+      : [];
+    // Tablas de despiece y rótulos contienen notación longitudinal que NO es
+    // una barra dibujada del detalle: jamás se rescatan como barras.
+    const nonContentViewIds = new Set(
+      segmentation.views
+        .filter((view) => view.type === 'table' || view.type === 'title_block')
+        .map((view) => view.viewId),
     );
     for (const entity of entities) {
-      if (!isDxfTextEntity(entity) || !hasPoint(entity)) continue;
-      if (seenLongitudinalEntities.has(entity)) continue;
-      const assignment = entityViewAssignment(segmentation, entity);
-      if (assignment.viewId === beamView.viewId) continue; // ya recorrido arriba
-      // Lo asignado FIRMEMENTE a otra vista de viga es contenido ajeno.
-      if (
-        assignment.viewId !== undefined &&
-        !assignment.ambiguous &&
-        otherBeamViews.some((view) => view.viewId === assignment.viewId)
-      ) {
+      if (!isDxfTextEntity(entity)) continue;
+      const hintLines: string[] = [];
+      for (const line of entity.rawText.split('\n')) {
+        const trimmed = line.trim();
+        if (trimmed.length === 0 || !isLongitudinalLine(trimmed)) continue;
+        if (isTitleBlockNoise(trimmed, entity.layer)) {
+          recordExclusion(trimmed, 'descartada_por_title_block', entity);
+          continue;
+        }
+        hintLines.push(trimmed);
+      }
+      if (hintLines.length === 0 || seenLongitudinalEntities.has(entity)) continue;
+      if (!hasPoint(entity)) {
+        for (const line of hintLines) {
+          recordExclusion(line, 'fuera_de_vista', entity, 'texto sin coordenadas en el DXF');
+        }
         continue;
       }
+      if (!beamView) {
+        // Sin vista segmentada (modo F8C) la asociación es solo por radio.
+        for (const line of hintLines) {
+          recordExclusion(line, 'descartada_por_radio', entity, 'fuera del radio de vecindad del corte');
+        }
+        continue;
+      }
+      const assignment = entityViewAssignment(segmentation, entity);
+      if (anchor && assignment.viewId === beamView.viewId) continue; // ya recorrido arriba
+      if (assignment.viewId !== undefined && !assignment.ambiguous && assignment.viewId !== beamView.viewId) {
+        // Lo asignado FIRMEMENTE a otra vista de viga es contenido ajeno.
+        if (otherBeamViews.some((view) => view.viewId === assignment.viewId)) {
+          for (const line of hintLines) {
+            recordExclusion(line, 'asignada_a_otra_vista', entity, `vista ${assignment.viewId}`);
+          }
+          continue;
+        }
+        if (nonContentViewIds.has(assignment.viewId)) {
+          for (const line of hintLines) {
+            recordExclusion(line, 'descartada_por_title_block', entity, `tabla/rótulo ${assignment.viewId}`);
+          }
+          continue;
+        }
+      }
       const point = { x: entity.x, y: entity.y };
-      if (!pointInViewBBox(point, beamView.bbox, margin)) continue;
       // ESTRICTAMENTE dentro del bbox de otra vista de viga ⇒ contenido
       // contestado de verdad: sigue excluido (sin margen — el margen solo
       // amplía la vista propia).
-      if (otherBeamViews.some((view) => pointInViewBBox(point, view.bbox, 0))) continue;
-      let rescuedFromEntity = false;
-      for (const line of entity.rawText.split('\n')) {
-        const trimmed = line.trim();
-        if (trimmed.length === 0 || isTitleBlockNoise(trimmed, entity.layer)) continue;
-        if (!isLongitudinalLine(trimmed)) continue;
-        longitudinalTexts.push({ entity, line: trimmed });
-        if (entity.handle) handles.add(entity.handle);
-        rescuedFromEntity = true;
+      if (otherBeamViews.some((view) => pointInViewBBox(point, view.bbox, 0))) {
+        for (const line of hintLines) {
+          recordExclusion(line, 'descartada_por_bbox', entity, 'dentro del área de otra vista de viga');
+        }
+        continue;
       }
-      if (rescuedFromEntity) {
-        seenLongitudinalEntities.add(entity);
-        rescuedLongitudinalTextCount += 1;
-        crossViewExcluded.delete(entity);
-        ambiguousExcluded.delete(entity);
+      if (!inBeamRowTerritory(point, beamView.bbox, otherBeamViews, margin)) {
+        for (const line of hintLines) recordExclusion(line, 'fuera_de_vista', entity);
+        continue;
       }
+      for (const line of hintLines) longitudinalTexts.push({ entity, line });
+      if (entity.handle) handles.add(entity.handle);
+      seenLongitudinalEntities.add(entity);
+      rescuedLongitudinalTextCount += 1;
+      crossViewExcluded.delete(entity);
+      ambiguousExcluded.delete(entity);
     }
   }
   if (rescuedLongitudinalTextCount > 0) {
     warnings.push(
-      `${rescuedLongitudinalTextCount} texto(s) de barras longitudinales dentro del área de la vista se recuperaron aunque la segmentación los dejaba en franja ambigua/cluster suelto: verificar la secuencia contra el plano.`,
+      `${rescuedLongitudinalTextCount} texto(s) de barras longitudinales dentro del territorio de la vista se recuperaron aunque la segmentación los dejaba en franja ambigua/cluster suelto: verificar la secuencia contra el plano.`,
     );
   }
 
@@ -544,11 +717,17 @@ function assembleDetail(
     const normalization = normalizeCompactLongitudinalNotation(line, { structuralContext: true });
     const normalizedLine = normalization.applied ? normalization.normalizedText : line;
 
+    let tokensInLine = 0;
     LONGITUDINAL_TOKEN_PATTERN.lastIndex = 0;
     for (const match of normalizedLine.matchAll(LONGITUDINAL_TOKEN_PATTERN)) {
+      tokensInLine += 1;
       const description = `${match[1]}#${match[2]}${match[3]}`;
       const dedupeKey = `${description}|${entity.x?.toFixed(1) ?? '?'},${entity.y?.toFixed(1) ?? '?'}|${match.index ?? 0}`;
-      if (dedupeKeys.has(dedupeKey)) continue;
+      if (dedupeKeys.has(dedupeKey)) {
+        // SOLO texto superpuesto idéntico (mismo token en la MISMA posición).
+        recordExclusion(line, 'deduplicada', entity, `duplicado superpuesto de ${description}`);
+        continue;
+      }
       dedupeKeys.add(dedupeKey);
       const barCode = Number.parseInt(match[2] ?? '', 10);
       const lengthCm = Number.parseInt(match[3] ?? '', 10);
@@ -572,6 +751,16 @@ function assembleDetail(
       });
       fragments.add(line);
     }
+    if (tokensInLine === 0) {
+      // La línea parecía longitudinal pero ningún token es interpretable:
+      // queda registrada, jamás desaparece en silencio.
+      recordExclusion(line, 'no_parseable', entity, 'notación longitudinal no interpretable');
+      continue;
+    }
+    // F8F.1: este detalle LEYÓ el texto (clave por contenido+posición) — las
+    // exclusiones de otros detalles sobre el mismo texto se re-etiquetan.
+    const claimKey = longitudinalTextKey(line, entity.x, entity.y);
+    if (!claimedBy.has(claimKey)) claimedBy.set(claimKey, row.elementKey);
   }
 
   // 3) Banda superior/inferior por BANDA (marcadores o salto dominante en Y),
@@ -606,6 +795,12 @@ function assembleDetail(
     else {
       warnings.push(
         `"${item.reading.sourceText}": sin banda superior/inferior clara — queda en "Sin clasificar / revisar"; asígnala a superior/inferior o acéptala sin clasificar antes de enviar.`,
+      );
+      recordExclusion(
+        item.reading.sourceText,
+        'banda_ambigua',
+        { x: item.x, y: item.y },
+        'visible en "Sin clasificar / revisar" — requiere decisión',
       );
       unclassifiedCandidates.push(classified);
     }
@@ -735,6 +930,7 @@ function assembleDetail(
     bottomLongitudinalBars: bottom,
     unclassifiedLongitudinalBars: unclassified,
     rescuedLongitudinalTextCount,
+    longitudinalExclusions,
     stirrupZones: zones,
     stirrupZonesTotal: zonesTotal,
     stirrupSummary: summary,
@@ -790,6 +986,51 @@ function longitudinalBandSplit(
   const range = (sorted[sorted.length - 1] ?? 0) - (sorted[0] ?? 0);
   if (dividerY === undefined || bestGap <= range * 0.2) return undefined;
   return { dividerY, epsilon: bestGap * 0.25 };
+}
+
+/**
+ * Territorio de fila/columna de la vista de una viga (F8F.1). La segmentación
+ * puede recortar la vista de una viga LARGA que es la única de su fila: los
+ * tramos intermedios quedan en clusters sueltos sin código y el bbox de la
+ * vista no cubre la longitud real del dibujo. El rescate de textos
+ * longitudinales usa la franja de la banda de la vista extendida por el eje
+ * de la secuencia hasta el inicio de la SIGUIENTE vista de viga — la misma
+ * convención con la que se dibujan los despieces (el territorio de un detalle
+ * va desde su código hasta el siguiente). Sin vecino en esa dirección, la
+ * franja llega al borde de la lámina; nunca invade el área de otra viga.
+ */
+function inBeamRowTerritory(
+  point: Point,
+  ownBBox: { minX: number; minY: number; maxX: number; maxY: number },
+  otherBeamViews: ReadonlyArray<{ bbox: { minX: number; minY: number; maxX: number; maxY: number } }>,
+  margin: number,
+): boolean {
+  const withinX = point.x >= ownBBox.minX - margin && point.x <= ownBBox.maxX + margin;
+  const withinY = point.y >= ownBBox.minY - margin && point.y <= ownBBox.maxY + margin;
+  if (withinX && withinY) return true;
+  if (!withinX && !withinY) return false;
+  if (withinY) {
+    // Fila horizontal: extensión en X hasta el detalle vecino de la fila.
+    const rowViews = otherBeamViews.filter(
+      (view) => view.bbox.maxY >= ownBBox.minY - margin && view.bbox.minY <= ownBBox.maxY + margin,
+    );
+    if (point.x > ownBBox.maxX) {
+      // Derecha: el territorio termina donde EMPIEZA el siguiente detalle.
+      return !rowViews.some((view) => view.bbox.minX > ownBBox.minX && point.x >= view.bbox.minX - margin);
+    }
+    // Izquierda: el territorio del vecino izquierdo llega hasta nuestro código.
+    return !rowViews.some((view) => view.bbox.minX < ownBBox.minX && point.x >= view.bbox.minX - margin);
+  }
+  // Columna vertical (vista rotada): misma convención sobre Y, de arriba abajo.
+  const columnViews = otherBeamViews.filter(
+    (view) => view.bbox.maxX >= ownBBox.minX - margin && view.bbox.minX <= ownBBox.maxX + margin,
+  );
+  if (point.y < ownBBox.minY) {
+    // Abajo: hasta el borde superior del siguiente detalle de la columna.
+    return !columnViews.some((view) => view.bbox.maxY < ownBBox.maxY && point.y <= view.bbox.maxY + margin);
+  }
+  // Arriba: el territorio del vecino superior llega hasta nuestro código.
+  return !columnViews.some((view) => view.bbox.maxY > ownBBox.maxY && point.y <= view.bbox.maxY + margin);
 }
 
 /** ¿Punto dentro del bbox de una vista (con margen)? */
