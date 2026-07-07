@@ -43,7 +43,7 @@ import {
 } from '@/lib/steel/dxf/beam-schedule';
 import {
   assembleBeamDetails,
-  beamDetailToManualLines,
+  buildBeamTakeoffDispatch,
   summarizeMarkersForQuality,
   type BeamDetail,
 } from '@/lib/steel/dxf/dxf-beam-detail-assembly';
@@ -233,10 +233,10 @@ export function DxfIntakeSection({
 
   function handleSendBeamDetail(detail: BeamDetail) {
     if (!loaded) return;
-    const lines = beamDetailToManualLines(detail, loaded.fileName);
-    if (lines.length === 0) return;
-    onAddApproved(lines);
-    setBeamSentKey(`${detail.beamKey}:${lines.length}`);
+    const dispatch = buildBeamTakeoffDispatch(detail, loaded.fileName);
+    if (dispatch.lines.length === 0) return;
+    onAddApproved(dispatch.lines);
+    setBeamSentKey(`${detail.beamKey}:${dispatch.lines.length}`);
   }
 
   function toggleApproved(id: string) {
@@ -467,8 +467,9 @@ export function DxfIntakeSection({
                               type="button"
                               size="sm"
                               variant="ghost"
+                              title={buildBeamTakeoffDispatch(detail, loaded.fileName).previewText}
                               onClick={() => handleSendBeamDetail(detail)}
-                              disabled={disabled || beamDetailToManualLines(detail, loaded.fileName).length === 0}
+                              disabled={disabled || buildBeamTakeoffDispatch(detail, loaded.fileName).lines.length === 0}
                             >
                               Enviar al takeoff
                             </Button>
