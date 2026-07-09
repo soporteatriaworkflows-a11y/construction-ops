@@ -1,5 +1,17 @@
 # Handoff Log
 
+## 2026-07-08 - STEEL_OPS_F8F2_LWPOLYLINE_VERTEX_PARSER_HARDENING - EN RAMA + PR - Fable
+
+- Rama `fix/steel-ops-f8f2-lwpolyline-vertices` (base `origin/main = 6280859`, post F8F.1 #73). PR `fix(steel): preserve DXF LWPOLYLINE vertices for beam view bounds`. Contexto: F8F.1 se implementó DOS veces en paralelo el 2026-07-07 — PR #73 (mergeado, fix a nivel ensamblador: territorio de fila/columna + `longitudinalExclusions`) y el commit local `8e45528` en `feature/f8f1-golden-beam-sequence-v2` (NO mergeado, fix profundo del parser). Esta fase porta el fix del parser SOBRE #73, en rama nueva desde main, sin reusar la rama vieja.
+- BUG DE PARSER (seguía en main): `dxf-parser.ts` solo conservaba el PRIMER vértice de cada `LWPOLYLINE` ("los 10/20 extra no pisan el punto inicial") ⇒ un contorno de viga dibujado como polilínea (lo usual en AutoCAD) anclaba la vista en un único punto y el bbox quedaba truncado al vecindario del código; #73 lo rodeó a nivel assembly sin corregirlo.
+- PORTADO de `8e45528` (3 archivos de lib, idénticos entre `ce76795` y main ⇒ port exacto): `dxf-parser.ts` acumula TODOS los vértices 10/20 en orden + flag de cierre (código 70 bit 1; `x/y` sigue = primer vértice por compatibilidad); `dxf-entities.ts` `DxfPathEntity += vertices?/closed?` (aditivo); `dxf-view-segmentation.ts` ancla polilíneas por vértices de sus segmentos CORTOS (misma guarda `maxLineLength` que las LINE: bordes de lámina/ejes no cosen vistas) y la asignación por retícula evalúa TODOS los puntos de anclaje con prioridad assign > ambiguous > far (`classifyBandPoint` extraído; lógica por punto idéntica a la original).
+- NO PORTADO: el test viejo `f8f1-golden-beam-sequence.test.ts` de `8e45528` (colisionaba con el de #73), su HANDOFF_LOG y `docs/audits/F8F1_GOLDEN_BEAM_SEQUENCE_FIX.md`. El ensamblador (`dxf-beam-detail-assembly.ts`) y el panel NO se tocan: el comportamiento de #73 queda intacto (sus 18 tests pasan sin cambios).
+- TESTS focales (+14, `f8f2-lwpolyline-vertices.test.ts`, fixtures sintéticos por código): A parser conserva vértices/orden/closed/vertexCount y compatibilidad x/y (cerrada y abierta); B bbox de vista cose el contorno completo (x hasta 795, no solo el vecindario del código) y el borde de lámina LWPOLYLINE gigante NO cose vistas; C golden 4+4 con contorno LWPOLYLINE + readingId estable/único + vecino no absorbe + invariante "visible o excluido con razón"; D contrato F8F (cantidad 1 textual, quantityMode/quantitySource, overrides manualQuantity/manualCutLengthM/manualBarNumber) + dispatch 9 líneas (4+4+1) + mismatch de estribo bloquea SOLO estribo.
+- Tests: 3136→3150 (+14); steel 562/0; suite completa 3150/0 (42 skipped gated); typecheck 0; lint 0.
+- Restricciones: sin DB/Supabase/RLS/migraciones/storage/env/APIs/dependencias nuevas; sin navegación global/ACCESS_MODULES/NAV_ITEMS; sin tocar P2D (#71) ni F8G draft (#72); sin archivos reales en Git; contrato F8F y dispatch intactos; F1 única calculadora.
+
+---
+
 ## 2026-07-07 - STEEL_OPS_F8F1_GOLDEN_BEAM_SEQUENCE_EXTRACTION_FIX - EN RAMA + PR - Fable
 
 - Rama `fix/steel-ops-f8f1-golden-beam-sequence` (base `origin/main = ce76795`, post F8F #70). PR `fix(steel): enforce golden DXF beam sequence extraction`. Hotfix independiente F8F.1 (NO es F8G — F8G ya existe como "Steel Ops Engineer Review Readiness"). Problema real de producción (VC-EJE-3): el panel ya dejaba accionar líneas (F8F), pero el extractor seguía detectando SOLO la barra inicial de cada banda — los textos longitudinales intermedios/finales desaparecían en silencio.
