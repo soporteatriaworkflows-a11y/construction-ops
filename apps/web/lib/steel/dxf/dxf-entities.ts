@@ -65,6 +65,14 @@ export interface DxfPathEntity extends DxfEntityBase {
   /** Punto final de LINE (código 11/21): conecta la geometría del dibujo. */
   x2?: number;
   y2?: number;
+  /**
+   * TODOS los vértices de una LWPOLYLINE (pares 10/20 en orden). F8F.1: el
+   * contorno real de una viga suele ser polilínea; sin sus vértices la vista
+   * no se "cose" a lo largo de la elevación y el bbox queda truncado.
+   */
+  vertices?: ReadonlyArray<{ x: number; y: number }>;
+  /** LWPOLYLINE cerrada (código 70, bit 1): el tramo final→inicial cuenta. */
+  closed?: boolean;
 }
 
 /** Cota. `overrideText` es el texto forzado (código 1, "<>" = medida real). */

@@ -120,6 +120,7 @@ export function parseDxfFile(content: string): DxfParseResult {
   let currentType = '';
   let fields: Record<string, string> | null = null;
   let mtextParts: string[] = [];
+  let polyVertices: Array<{ x?: number; y?: number }> = [];
 
   const num = (value: string | undefined): number | undefined => {
     if (value === undefined) return undefined;
@@ -132,6 +133,7 @@ export function parseDxfFile(content: string): DxfParseResult {
       fields = null;
       currentType = '';
       mtextParts = [];
+      polyVertices = [];
       return;
     }
     const layer = fields['8'] ?? '0';
@@ -183,7 +185,23 @@ export function parseDxfFile(content: string): DxfParseResult {
     } else if (currentType === 'LINE') {
       entity = { ...base, type: 'LINE', vertexCount: 2, x, y, x2: num(fields['11']), y2: num(fields['21']) };
     } else if (currentType === 'LWPOLYLINE') {
-      entity = { ...base, type: 'LWPOLYLINE', vertexCount: num(fields['90']) ?? 0, x, y };
+      // F8F.1: todos los vértices (no solo el primero) — el contorno de una
+      // viga dibujado como polilínea debe anclar la vista a lo largo de toda
+      // la elevación, igual que una cadena de LINEs.
+      const vertices = polyVertices.filter(
+        (vertex): vertex is { x: number; y: number } =>
+          typeof vertex.x === 'number' && typeof vertex.y === 'number',
+      );
+      const flags = Number.parseInt(fields['70'] ?? '0', 10);
+      entity = {
+        ...base,
+        type: 'LWPOLYLINE',
+        vertexCount: num(fields['90']) ?? vertices.length,
+        x,
+        y,
+        vertices: vertices.length > 0 ? vertices : undefined,
+        closed: Number.isFinite(flags) ? (flags & 1) === 1 : undefined,
+      };
     } else if (currentType === 'DIMENSION') {
       const override = fields['1'] !== undefined ? decodeDxfText(fields['1']) : undefined;
       entity = {
@@ -203,6 +221,7 @@ export function parseDxfFile(content: string): DxfParseResult {
     fields = null;
     currentType = '';
     mtextParts = [];
+    polyVertices = [];
   };
 
   for (const pair of pairs) {
@@ -232,6 +251,16 @@ export function parseDxfFile(content: string): DxfParseResult {
     if (currentType === 'MTEXT' && pair.code === 3) {
       mtextParts.push(pair.value);
       continue;
+    }
+    // F8F.1: LWPOLYLINE acumula TODOS sus vértices (pares 10/20 en orden);
+    // el primer valor sigue cayendo en fields para conservar x/y = 1er vértice.
+    if (currentType === 'LWPOLYLINE' && (pair.code === 10 || pair.code === 20)) {
+      if (pair.code === 10) {
+        polyVertices.push({ x: num(pair.value) });
+      } else {
+        const last = polyVertices[polyVertices.length - 1];
+        if (last && last.y === undefined) last.y = num(pair.value);
+      }
     }
     // Primer valor gana para códigos repetidos (10/20 de vértices extra de
     // LWPOLYLINE no pisan el punto inicial).

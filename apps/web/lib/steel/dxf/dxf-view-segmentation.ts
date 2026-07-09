@@ -114,6 +114,33 @@ interface AnchoredEntity {
 function anchoredEntities(entities: readonly DxfEntity[], maxLineLength: number): AnchoredEntity[] {
   const out: AnchoredEntity[] = [];
   for (const entity of entities) {
+    // F8F.1: una LWPOLYLINE ancla por los vértices de sus segmentos CORTOS —
+    // el contorno real de una viga cose la vista igual que una cadena de
+    // LINEs. Los segmentos larguísimos (bordes de lámina/ejes) siguen sin
+    // anclar: un rectángulo de margen no debe unir detalles distintos.
+    if (entity.type === 'LWPOLYLINE' && entity.vertices && entity.vertices.length >= 2) {
+      const ring = entity.closed ? [...entity.vertices, entity.vertices[0]!] : [...entity.vertices];
+      const kept: Point[] = [];
+      const seen = new Set<string>();
+      const push = (point: { x: number; y: number }) => {
+        const key = `${point.x},${point.y}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        kept.push({ x: point.x, y: point.y });
+      };
+      for (let i = 1; i < ring.length; i += 1) {
+        const a = ring[i - 1]!;
+        const b = ring[i]!;
+        if (distance(a, b) > maxLineLength) continue;
+        push(a);
+        push(b);
+      }
+      if (kept.length === 0) continue; // solo segmentos larguísimos ⇒ no ancla
+      const primary =
+        kept.find((point) => point.x === entity.vertices![0]!.x && point.y === entity.vertices![0]!.y) ?? kept[0]!;
+      out.push({ entity, point: primary, points: kept });
+      continue;
+    }
     const candidate = entity as { x?: number; y?: number; x2?: number; y2?: number };
     if (typeof candidate.x !== 'number' || typeof candidate.y !== 'number') continue;
     const start = { x: candidate.x, y: candidate.y };
@@ -387,61 +414,81 @@ export function segmentDxfViews(parse: DxfParseSuccess): DxfViewSegmentation {
         ? boundedWidths.sort((a, b) => a - b)[Math.floor(boundedWidths.length / 2)]! * 2
         : attachRadius;
 
+    // Clasificación de UN punto de anclaje dentro de la retícula (la lógica
+    // original por member.point, extraída para poder evaluar TODOS los puntos
+    // de una entidad: F8F.1 — el contorno de la viga tiene vértices en ambos
+    // extremos y basta con que UNO caiga en el segmento de su código).
+    type BandClaim = { kind: 'assign'; draft: ViewDraft } | { kind: 'ambiguous' } | { kind: 'far' };
+    const classifyBandPoint = (point: Point): BandClaim => {
+      const stack = stackCoord(point, bandLayout.axis);
+      const band = bandLayout.bands.find((value) => Math.abs(stack - value) <= bandLayout.tolerance);
+
+      if (band === undefined) {
+        // Entre bandas: ¿franja entre detalles (cerca) o contenido ajeno?
+        let nearest = Infinity;
+        for (const anchorPoint of globalAnchorPoints) {
+          const d = distance(point, anchorPoint);
+          if (d < nearest) nearest = d;
+        }
+        return nearest <= attachRadius ? { kind: 'ambiguous' } : { kind: 'far' };
+      }
+
+      const rowSeeds = seedsByBand.get(band);
+      if (!rowSeeds || rowSeeds.length === 0) return { kind: 'far' };
+      const cross = crossCoord(point, bandLayout.axis);
+      // Segmento: el último código con cross ≤ posición (piso).
+      let segmentIndex = -1;
+      for (let i = 0; i < rowSeeds.length; i += 1) {
+        if (rowSeeds[i]!.cross <= cross) segmentIndex = i;
+      }
+      if (segmentIndex === -1) {
+        // Antes del primer código de la banda.
+        const first = rowSeeds[0]!;
+        if (first.cross - cross <= linkRadius) return { kind: 'assign', draft: first.draft };
+        if (first.cross - cross <= attachRadius) return { kind: 'ambiguous' };
+        return { kind: 'far' };
+      }
+      const seed = rowSeeds[segmentIndex]!;
+      const nextSeed = rowSeeds[segmentIndex + 1];
+      if (nextSeed && nextSeed.cross - cross <= linkRadius) {
+        // Pegado a la frontera del siguiente detalle: decisión humana.
+        return { kind: 'ambiguous' };
+      }
+      if (!nextSeed && cross - seed.cross > lastSegmentReach) {
+        // Más allá del alcance razonable del último detalle de la banda.
+        return { kind: 'far' };
+      }
+      return { kind: 'assign', draft: seed.draft };
+    };
+
     const farByCluster = new Map<AnchoredEntity[], AnchoredEntity[]>();
     for (const members of clusters) {
       for (const member of members) {
-        const stack = stackCoord(member.point, bandLayout.axis);
-        const band = bandLayout.bands.find((value) => Math.abs(stack - value) <= bandLayout.tolerance);
-        const markFar = () => {
+        // Punto principal primero (comportamiento previo); si no asigna, los
+        // demás puntos de anclaje pueden hacerlo (contornos LWPOLYLINE/LINE
+        // cuyos extremos sí caen en el segmento de su detalle). Prioridad:
+        // assign > ambiguous > far — jamás se degrada una asignación clara.
+        let claim = classifyBandPoint(member.point);
+        if (claim.kind !== 'assign' && member.points.length > 1) {
+          for (const point of member.points) {
+            if (point === member.point) continue;
+            const alternative = classifyBandPoint(point);
+            if (alternative.kind === 'assign') {
+              claim = alternative;
+              break;
+            }
+            if (alternative.kind === 'ambiguous' && claim.kind === 'far') claim = alternative;
+          }
+        }
+        if (claim.kind === 'assign') {
+          claim.draft.members.push(member);
+        } else if (claim.kind === 'ambiguous') {
+          ambiguousMembers.push(member);
+        } else {
           const list = farByCluster.get(members) ?? [];
           list.push(member);
           farByCluster.set(members, list);
-        };
-
-        if (band === undefined) {
-          // Entre bandas: ¿franja entre detalles (cerca) o contenido ajeno?
-          let nearest = Infinity;
-          for (const anchorPoint of globalAnchorPoints) {
-            const d = distance(member.point, anchorPoint);
-            if (d < nearest) nearest = d;
-          }
-          if (nearest <= attachRadius) ambiguousMembers.push(member);
-          else markFar();
-          continue;
         }
-
-        const rowSeeds = seedsByBand.get(band);
-        if (!rowSeeds || rowSeeds.length === 0) {
-          markFar();
-          continue;
-        }
-        const cross = crossCoord(member.point, bandLayout.axis);
-        // Segmento: el último código con cross ≤ posición (piso).
-        let segmentIndex = -1;
-        for (let i = 0; i < rowSeeds.length; i += 1) {
-          if (rowSeeds[i]!.cross <= cross) segmentIndex = i;
-        }
-        if (segmentIndex === -1) {
-          // Antes del primer código de la banda.
-          const first = rowSeeds[0]!;
-          if (first.cross - cross <= linkRadius) first.draft.members.push(member);
-          else if (first.cross - cross <= attachRadius) ambiguousMembers.push(member);
-          else markFar();
-          continue;
-        }
-        const seed = rowSeeds[segmentIndex]!;
-        const nextSeed = rowSeeds[segmentIndex + 1];
-        if (nextSeed && nextSeed.cross - cross <= linkRadius) {
-          // Pegado a la frontera del siguiente detalle: decisión humana.
-          ambiguousMembers.push(member);
-          continue;
-        }
-        if (!nextSeed && cross - seed.cross > lastSegmentReach) {
-          // Más allá del alcance razonable del último detalle de la banda.
-          markFar();
-          continue;
-        }
-        seed.draft.members.push(member);
       }
     }
     for (const far of farByCluster.values()) {
