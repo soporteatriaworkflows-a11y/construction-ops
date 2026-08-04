@@ -77,6 +77,7 @@ import {
 } from '@/server/quick-notes';
 import { createQuickNoteAction, archiveQuickNoteAction } from './notes-actions';
 import { DeniedModuleCallout } from './denied-module-callout';
+import { createOpsPerfTrace } from '@/server/performance/ops-perf';
 
 /** Render en REQUEST-TIME (ver cabecera). Igual que `/projects` y `/projects/new`. */
 export const dynamic = 'force-dynamic';
@@ -239,10 +240,11 @@ function DashboardScopeSelector({
 }
 
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
+  const perf = createOpsPerfTrace('/dashboard');
   // Viewer por modo: supabase=autenticado (lee cookies → dinámico); demo=fixture.
   let viewer: Awaited<ReturnType<typeof resolveViewer>>;
   try {
-    viewer = await resolveViewer();
+    viewer = await perf.span('auth.resolveViewer', async () => await resolveViewer());
   } catch (e) {
     // Usuario Auth CONFIRMADO pero sin `profiles`: casi siempre una invitación
     // cuyo cierre no llegó a ejecutarse. En vez de dejarlo sin salida, intenta
@@ -276,7 +278,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   let projectId: string | null;
   let projectCount = 0;
   try {
-    projects = await rm.listProjects(viewer);
+    projects = await perf.span('readModel.listProjects', () => rm.listProjects(viewer));
     projectCount = projects.length;
     const isScopedDashboard = isScopedProfileRole(profileRole);
     scope = resolveDashboardProjectScope(
@@ -297,6 +299,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   // estado deliberado, nunca un error.
   if (!projectId) {
     const isConsulta = isScopedProfileRole(profileRole);
+    perf.finish({ projectCount, outcome: 'empty' });
     return (
       <div>
         <OperationsHeader
@@ -332,7 +335,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
   let summary: Awaited<ReturnType<typeof rm.getDashboardSummary>>;
   try {
-    summary = await rm.getDashboardSummary(viewer, projectId);
+    summary = await perf.span('readModel.getDashboardSummary', () => rm.getDashboardSummary(viewer, projectId));
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Error al cargar el resumen';
     return <DashboardError message={`Error al cargar el resumen: ${msg}`} />;
@@ -407,12 +410,12 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   let quickNotes: QuickNoteView[] = [];
   if (canViewNotes) {
     try {
-      quickNotes = await getDashboardQuickNotes({
+      quickNotes = await perf.span('quickNotes.getDashboardQuickNotes', () => getDashboardQuickNotes({
         userId: viewer.profileId ?? viewer.organizationId,
         profileId: viewer.profileId ?? viewer.organizationId,
         organizationId: viewer.organizationId,
         role: viewer.role,
-      }, undefined, selectedProjectId);
+      }, undefined, selectedProjectId));
     } catch {
       quickNotes = [];
     }
@@ -474,6 +477,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         }
       : null,
   ].filter((card): card is NonNullable<typeof card> => card !== null);
+
+  perf.finish({ projectCount, noteCount: quickNotes.length, outcome: 'loaded' });
 
   return (
     <div>

@@ -36,6 +36,7 @@ import {
   generateCsvSchedule,
 } from '@/modules/exports/generators';
 import { DEMO_ORGANIZATION_ID, getDemoViewer } from '@/server/read-model';
+import { withOpsPerfSpan } from '@/server/performance/ops-perf';
 
 /** Logger inyectable para trazabilidad (sin datos sensibles). */
 export interface ExportLogger {
@@ -89,20 +90,32 @@ export class ExportServiceImpl implements ExportService {
     try {
       // 4. Consultar el read-model proyectado por rol
       const [overview, scheduleResult] = await Promise.all([
-        this.readModel.getProjectOverview(viewer, request.projectId),
+        withOpsPerfSpan('/api/exports', 'exports.readModel.getProjectOverview', () =>
+          this.readModel.getProjectOverview(viewer, request.projectId),
+          { format: request.format, profile: request.profile },
+        ),
         request.includeSchedule || request.format === 'csv-schedule' || request.format === 'xlsx-internal'
-          ? this.readModel.getSchedule(viewer, request.projectId).catch(() => null)
+          ? withOpsPerfSpan('/api/exports', 'exports.readModel.getSchedule', () =>
+              this.readModel.getSchedule(viewer, request.projectId).catch(() => null),
+              { format: request.format, profile: request.profile },
+            )
           : Promise.resolve(null),
       ]);
 
-      const estimateDetail = await this.readModel.getEstimateDetail(
-        viewer,
-        request.estimateVersionId ?? overview.budgetSummary.versionId,
+      const estimateDetail = await withOpsPerfSpan('/api/exports', 'exports.readModel.getEstimateDetail', () =>
+        this.readModel.getEstimateDetail(
+          viewer,
+          request.estimateVersionId ?? overview.budgetSummary.versionId,
+        ),
+        { format: request.format, profile: request.profile },
       );
 
       const dashboardResult =
         (request.format === 'pdf-management')
-          ? await this.readModel.getDashboardSummary(viewer, request.projectId).catch(() => null)
+          ? await withOpsPerfSpan('/api/exports', 'exports.readModel.getDashboardSummary', () =>
+              this.readModel.getDashboardSummary(viewer, request.projectId).catch(() => null),
+              { format: request.format, profile: request.profile },
+            )
           : null;
 
       // 5. Generar buffer en memoria
@@ -111,18 +124,18 @@ export class ExportServiceImpl implements ExportService {
 
       switch (request.format) {
         case 'xlsx-client':
-          buffer = await generateXlsxClient({
+          buffer = await withOpsPerfSpan('/api/exports', 'exports.generate.xlsxClient', () => generateXlsxClient({
             projectName,
             projectLocation: overview.project.location,
             estimate: estimateDetail.estimate,
             chapters: estimateDetail.chapters,
             items: estimateDetail.items,
             generatedAt: now,
-          });
+          }), { format: request.format, profile: request.profile });
           break;
 
         case 'xlsx-internal':
-          buffer = await generateXlsxInternal({
+          buffer = await withOpsPerfSpan('/api/exports', 'exports.generate.xlsxInternal', () => generateXlsxInternal({
             projectName,
             projectLocation: overview.project.location,
             estimate: estimateDetail.estimate,
@@ -130,21 +143,21 @@ export class ExportServiceImpl implements ExportService {
             items: estimateDetail.items,
             schedule: scheduleResult ?? undefined,
             generatedAt: now,
-          });
+          }), { format: request.format, profile: request.profile });
           break;
 
         case 'pdf-client':
-          buffer = await generatePdfClient({
+          buffer = await withOpsPerfSpan('/api/exports', 'exports.generate.pdfClient', () => generatePdfClient({
             projectName,
             projectLocation: overview.project.location,
             estimate: estimateDetail.estimate,
             chapters: estimateDetail.chapters,
             generatedAt: now,
-          });
+          }), { format: request.format, profile: request.profile });
           break;
 
         case 'pdf-management':
-          buffer = await generatePdfManagement({
+          buffer = await withOpsPerfSpan('/api/exports', 'exports.generate.pdfManagement', () => generatePdfManagement({
             projectName,
             projectLocation: overview.project.location,
             estimate: estimateDetail.estimate,
@@ -152,7 +165,7 @@ export class ExportServiceImpl implements ExportService {
             dashboard: dashboardResult ?? undefined,
             schedule: scheduleResult ?? undefined,
             generatedAt: now,
-          });
+          }), { format: request.format, profile: request.profile });
           break;
 
         case 'csv-schedule': {

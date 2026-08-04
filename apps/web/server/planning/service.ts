@@ -39,6 +39,7 @@ import {
   ScheduleValidationError,
   ScheduleNotFoundError,
 } from './errors';
+import { withOpsPerfSpan } from '@/server/performance/ops-perf';
 
 export interface SchedulePreviewParams {
   estimateVersionId: Uuid;
@@ -175,10 +176,19 @@ export async function listSchedulesForViewer(
   projectId: Uuid | undefined,
   repo: PlanningRepository = new PlanningRepository(),
 ): Promise<ScheduleListItem[]> {
-  const schedules = await repo.listSchedules(projectId);
+  const schedules = await withOpsPerfSpan(
+    '/planning',
+    'planning.repo.listSchedules',
+    () => repo.listSchedules(projectId),
+    { filteredByProject: Boolean(projectId) },
+  );
   return Promise.all(
     schedules.map(async (s) => {
-      const tasks = await repo.listTasks(s.id);
+      const tasks = await withOpsPerfSpan(
+        '/planning',
+        'planning.repo.listTasksForSchedule',
+        () => repo.listTasks(s.id),
+      );
       const activities = tasks.filter((t) => t.taskType !== 'chapter');
       return {
         id: s.id,
@@ -202,10 +212,23 @@ export async function getScheduleDetailForViewer(
   scheduleId: Uuid,
   repo: PlanningRepository = new PlanningRepository(),
 ): Promise<ScheduleDetail> {
-  const schedule = await repo.getSchedule(scheduleId);
+  const schedule = await withOpsPerfSpan(
+    '/planning/[scheduleId]',
+    'planning.repo.getSchedule',
+    () => repo.getSchedule(scheduleId),
+  );
   if (!schedule) throw new ScheduleNotFoundError();
-  const tasks = await repo.listTasks(scheduleId);
-  const deps = await repo.listDependencies(tasks.map((t) => t.id));
+  const tasks = await withOpsPerfSpan(
+    '/planning/[scheduleId]',
+    'planning.repo.listTasks',
+    () => repo.listTasks(scheduleId),
+  );
+  const deps = await withOpsPerfSpan(
+    '/planning/[scheduleId]',
+    'planning.repo.listDependencies',
+    () => repo.listDependencies(tasks.map((t) => t.id)),
+    { taskCount: tasks.length },
+  );
   return {
     schedule,
     summary: toScheduleSummary(schedule, tasks, deps),

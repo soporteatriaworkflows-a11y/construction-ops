@@ -73,6 +73,7 @@ import {
   type PriceObservationRow,
 } from '@/server/catalog/price-status';
 import { filterGrantedProjects, isProjectGranted } from './project-grants';
+import { withOpsPerfSpan } from '@/server/performance/ops-perf';
 
 /** Normaliza un valor de fecha/hora de Drizzle a ISO string. */
 function toIso(value: Date | string): string {
@@ -124,19 +125,21 @@ export class DrizzleReadModelRepository implements ReadModelPort {
    * filtros explícitos por `organizationId` se conservan como segunda barrera.
    */
   private read<T>(viewer: ViewerContext, fn: () => Promise<T>): Promise<T> {
-    if (this.injectedRepo) {
-      return this.als.run(this.injectedRepo, fn);
-    }
-    const claims = buildRlsClaims({
-      organizationId: viewer.organizationId,
-      profileId: viewer.profileId,
-      role: viewer.role,
-    });
-    return withTenantDb(claims, (scopedDb) =>
-      // La transacción RLS-scoped expone el mismo interfaz de consulta que `db`
-      // (select/from/where); el cast es seguro en runtime.
-      this.als.run(new DrizzleReadRepository(scopedDb as unknown as ReadDb), fn),
-    );
+    return withOpsPerfSpan('/read-model', 'readModel.rlsTransaction', async () => {
+      if (this.injectedRepo) {
+        return this.als.run(this.injectedRepo, fn);
+      }
+      const claims = buildRlsClaims({
+        organizationId: viewer.organizationId,
+        profileId: viewer.profileId,
+        role: viewer.role,
+      });
+      return withTenantDb(claims, (scopedDb) =>
+        // La transacción RLS-scoped expone el mismo interfaz de consulta que `db`
+        // (select/from/where); el cast es seguro en runtime.
+        this.als.run(new DrizzleReadRepository(scopedDb as unknown as ReadDb), fn),
+      );
+    }, { role: viewer.role, injectedRepo: Boolean(this.injectedRepo) });
   }
 
   /**
